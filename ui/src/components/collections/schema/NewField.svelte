@@ -1,11 +1,12 @@
 <script>
+    import { createEventDispatcher } from "svelte";
     import CommonHelper from "@/utils/CommonHelper";
-    import ObjectSelect from "@/components/base/ObjectSelect.svelte";
-
-    export let value = "text";
+    import Toggler from "@/components/base/Toggler.svelte";
 
     let classes = "";
     export { classes as class }; // export reserved keyword
+
+    const dispatch = createEventDispatcher();
 
     const types = [
         {
@@ -64,6 +65,50 @@
             icon: CommonHelper.getFieldTypeIcon("json"),
         },
     ];
+
+    function select(fieldType) {
+        dispatch("select", fieldType);
+    }
 </script>
 
-<ObjectSelect class="field-type-select {classes}" items={types} bind:keyOfSelected={value} {...$$restProps} />
+<button type="button" class={classes} on:click={dispatch}>
+    <i class="ri-add-line" />
+    <div class="txt">New field</div>
+    <Toggler class="dropdown field-types-dropdown">
+        {#each types as item}
+            <div
+                tabindex="0"
+                class="dropdown-item closable"
+                on:click|stopPropagation={() => {
+                    select(item.value);
+                }}
+                on:keydown|stopPropagation={(e) => {
+                    if (e.code === "Enter" || e.code === "Space") {
+                        select(item.value);
+                    }
+                }}
+            >
+                <i class="icon {item.icon}" />
+                <span class="txt">{item.label}</span>
+            </div>
+        {/each}
+    </Toggler>
+</button>
+
+<style lang="scss">
+    :global(.field-types-dropdown) {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        max-width: none;
+        padding: 10px;
+        margin: 0;
+        border: 0;
+        box-shadow: 0px 0px 0px 2px var(--primaryColor);
+        border-top-left-radius: 0;
+        border-top-right-radius: 0;
+        .dropdown-item {
+            width: 25%;
+        }
+    }
+</style>
