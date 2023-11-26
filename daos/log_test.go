@@ -11,23 +11,23 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func TestRequestQuery(t *testing.T) {
+func TestLogQuery(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	expected := "SELECT {{_requests}}.* FROM `_requests`"
+	expected := "SELECT {{_logs}}.* FROM `_logs`"
 
-	sql := app.Dao().RequestQuery().Build().SQL()
+	sql := app.Dao().LogQuery().Build().SQL()
 	if sql != expected {
 		t.Errorf("Expected sql %s, got %s", expected, sql)
 	}
 }
 
-func TestFindRequestById(t *testing.T) {
+func TestFindLogById(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	tests.MockRequestLogsData(app)
+	tests.MockLogsData(app)
 
 	scenarios := []struct {
 		id          string
@@ -40,7 +40,7 @@ func TestFindRequestById(t *testing.T) {
 	}
 
 	for i, scenario := range scenarios {
-		admin, err := app.LogsDao().FindRequestById(scenario.id)
+		admin, err := app.LogsDao().FindLogById(scenario.id)
 
 		hasErr := err != nil
 		if hasErr != scenario.expectError {
@@ -53,17 +53,17 @@ func TestFindRequestById(t *testing.T) {
 	}
 }
 
-func TestRequestsStats(t *testing.T) {
+func TestLogsStats(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	tests.MockRequestLogsData(app)
+	tests.MockLogsData(app)
 
 	expected := `[{"total":1,"date":"2022-05-01 10:00:00.000Z"},{"total":1,"date":"2022-05-02 10:00:00.000Z"}]`
 
 	now := time.Now().UTC().Format(types.DefaultDateLayout)
 	exp := dbx.NewExp("[[created]] <= {:date}", dbx.Params{"date": now})
-	result, err := app.LogsDao().RequestsStats(exp)
+	result, err := app.LogsDao().LogsStats(exp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,20 +74,20 @@ func TestRequestsStats(t *testing.T) {
 	}
 }
 
-func TestDeleteOldRequests(t *testing.T) {
+func TestDeleteOldLogs(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	tests.MockRequestLogsData(app)
+	tests.MockLogsData(app)
 
 	scenarios := []struct {
 		date          string
 		expectedTotal int
 	}{
-		{"2022-01-01 10:00:00.000Z", 2}, // no requests to delete before that time
-		{"2022-05-01 11:00:00.000Z", 1}, // only 1 request should have left
-		{"2022-05-03 11:00:00.000Z", 0}, // no more requests should have left
-		{"2022-05-04 11:00:00.000Z", 0}, // no more requests should have left
+		{"2022-01-01 10:00:00.000Z", 2}, // no logs to delete before that time
+		{"2022-05-01 11:00:00.000Z", 1}, // only 1 log should have left
+		{"2022-05-03 11:00:00.000Z", 0}, // no more logs should have left
+		{"2022-05-04 11:00:00.000Z", 0}, // no more logs should have left
 	}
 
 	for i, scenario := range scenarios {
@@ -96,53 +96,53 @@ func TestDeleteOldRequests(t *testing.T) {
 			t.Errorf("(%d) Date error %v", i, dateErr)
 		}
 
-		deleteErr := app.LogsDao().DeleteOldRequests(date)
+		deleteErr := app.LogsDao().DeleteOldLogs(date)
 		if deleteErr != nil {
 			t.Errorf("(%d) Delete error %v", i, deleteErr)
 		}
 
-		// check total remaining requests
+		// check total remaining logs
 		var total int
-		countErr := app.LogsDao().RequestQuery().Select("count(*)").Row(&total)
+		countErr := app.LogsDao().LogQuery().Select("count(*)").Row(&total)
 		if countErr != nil {
 			t.Errorf("(%d) Count error %v", i, countErr)
 		}
 
 		if total != scenario.expectedTotal {
-			t.Errorf("(%d) Expected %d remaining requests, got %d", i, scenario.expectedTotal, total)
+			t.Errorf("(%d) Expected %d remaining logs, got %d", i, scenario.expectedTotal, total)
 		}
 	}
 }
 
-func TestSaveRequest(t *testing.T) {
+func TestSaveLog(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	tests.MockRequestLogsData(app)
+	tests.MockLogsData(app)
 
-	// create new request
-	newRequest := &models.Request{}
-	newRequest.Method = "get"
-	newRequest.Meta = types.JsonMap{}
-	createErr := app.LogsDao().SaveRequest(newRequest)
+	// create new log
+	newLog := &models.Log{}
+	newLog.Level = -4
+	newLog.Data = types.JsonMap{}
+	createErr := app.LogsDao().SaveLog(newLog)
 	if createErr != nil {
 		t.Fatal(createErr)
 	}
 
 	// check if it was really created
-	existingRequest, fetchErr := app.LogsDao().FindRequestById(newRequest.Id)
+	existingLog, fetchErr := app.LogsDao().FindLogById(newLog.Id)
 	if fetchErr != nil {
 		t.Fatal(fetchErr)
 	}
 
-	existingRequest.Method = "post"
-	updateErr := app.LogsDao().SaveRequest(existingRequest)
+	existingLog.Level = 4
+	updateErr := app.LogsDao().SaveLog(existingLog)
 	if updateErr != nil {
 		t.Fatal(updateErr)
 	}
 	// refresh instance to check if it was really updated
-	existingRequest, _ = app.LogsDao().FindRequestById(existingRequest.Id)
-	if existingRequest.Method != "post" {
-		t.Fatalf("Expected request method to be %s, got %s", "post", existingRequest.Method)
+	existingLog, _ = app.LogsDao().FindLogById(existingLog.Id)
+	if existingLog.Level != 4 {
+		t.Fatalf("Expected log level to be %d, got %d", 4, existingLog.Level)
 	}
 }

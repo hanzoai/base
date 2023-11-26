@@ -2,13 +2,36 @@ package logs
 
 import (
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/migrate"
 )
-
-var LogsMigrations migrate.MigrationsList
 
 func init() {
 	LogsMigrations.Register(func(db dbx.Builder) error {
+		if _, err := db.DropTable("_requests").Execute(); err != nil {
+			return err
+		}
+
+		_, err := db.NewQuery(`
+			CREATE TABLE {{_logs}} (
+				[[id]]      TEXT PRIMARY KEY DEFAULT ('r'||lower(hex(randomblob(7)))) NOT NULL,
+				[[level]]   INTEGER DEFAULT 0 NOT NULL,
+				[[message]] TEXT DEFAULT "" NOT NULL,
+				[[data]]    JSON DEFAULT "{}" NOT NULL,
+				[[created]] TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL,
+				[[updated]] TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL
+			);
+
+			CREATE INDEX _logs_level_idx on {{_logs}} ([[level]]);
+			CREATE INDEX _logs_message_idx on {{_logs}} ([[message]]);
+			CREATE INDEX _logs_data_auth_idx on {{_logs}} (JSON_EXTRACT([[data]], '$.auth'));
+			CREATE INDEX _logs_created_hour_idx on {{_logs}} (strftime('%Y-%m-%d %H:00:00', [[created]]));
+		`).Execute()
+
+		return err
+	}, func(db dbx.Builder) error {
+		if _, err := db.DropTable("_logs").Execute(); err != nil {
+			return err
+		}
+
 		_, err := db.NewQuery(`
 			CREATE TABLE {{_requests}} (
 				[[id]]        TEXT PRIMARY KEY NOT NULL,
@@ -30,9 +53,6 @@ func init() {
 			CREATE INDEX _request_created_hour_idx on {{_requests}} (strftime('%Y-%m-%d %H:00:00', [[created]]));
 		`).Execute()
 
-		return err
-	}, func(db dbx.Builder) error {
-		_, err := db.DropTable("_requests").Execute()
 		return err
 	})
 }
