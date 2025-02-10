@@ -4,9 +4,9 @@ import { svelte, vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 // see https://vitejs.dev/config
 export default defineConfig({
     server: {
-        port: 3000,
+        port: 7777,
     },
-    envPrefix: 'PB',
+    envPrefix: 'HZ',
     base: './',
     build: {
         chunkSizeWarningLimit: 1000,

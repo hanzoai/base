@@ -28,36 +28,36 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${collection?.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${collection?.name}').requestEmailChange('new@example.com');
+        await base.collection('${collection?.name}').requestEmailChange('new@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${collection?.name}').confirmEmailChange(
+        await base.collection('${collection?.name}').confirmEmailChange(
             'EMAIL_CHANGE_TOKEN',
             'YOUR_PASSWORD',
         );
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${collection?.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${collection?.name}').requestEmailChange('new@example.com');
+        await base.collection('${collection?.name}').requestEmailChange('new@example.com');
 
         ...
 
@@ -66,7 +66,7 @@
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${collection?.name}').confirmEmailChange(
+        await base.collection('${collection?.name}').confirmEmailChange(
           'EMAIL_CHANGE_TOKEN',
           'YOUR_PASSWORD',
         );

@@ -5,8 +5,8 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/mails"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/mails"
 )
 
 const (
@@ -94,7 +94,7 @@ func (form *TestEmailSend) Submit() error {
 		if field.GetHidden() {
 			continue
 		}
-		record.Set(field.GetName(), "__pb_test_"+field.GetName()+"__")
+		record.Set(field.GetName(), "__hz_test_"+field.GetName()+"__")
 	}
 	record.RefreshTokenKey()
 	record.SetEmail(form.Email)
@@ -107,7 +107,7 @@ func (form *TestEmailSend) Submit() error {
 	case TestTemplateEmailChange:
 		return mails.SendRecordChangeEmail(form.app, record, form.Email)
 	case TestTemplateOTP:
-		return mails.SendRecordOTP(form.app, record, "_PB_TEST_OTP_ID_", "123456")
+		return mails.SendRecordOTP(form.app, record, "_HZ_TEST_OTP_ID_", "123456")
 	case TestTemplateAuthAlert:
 		return mails.SendRecordAuthAlert(form.app, record)
 	default:

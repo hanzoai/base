@@ -53,24 +53,24 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        const record = await pb.collection('${collection?.name}').getOne('RECORD_ID', {
+        const record = await base.collection('${collection?.name}').getOne('RECORD_ID', {
             expand: 'relField1,relField2.subRelField',
         });
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        final record = await pb.collection('${collection?.name}').getOne('RECORD_ID',
+        final record = await base.collection('${collection?.name}').getOne('RECORD_ID',
           expand: 'relField1,relField2.subRelField',
         );
     `}

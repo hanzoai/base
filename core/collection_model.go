@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/security"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 )
 
@@ -26,7 +26,7 @@ const (
 	CollectionTypeView = "view"
 )
 
-const systemHookIdCollection = "__pbCollectionSystemHook__"
+const systemHookIdCollection = "__hzCollectionSystemHook__"
 
 const defaultLowercaseRecordIdPattern = "^[a-z0-9]+$"
 
@@ -738,7 +738,7 @@ func onCollectionDeleteExecute(e *CollectionEvent) error {
 // -------------------------------------------------------------------
 
 func (c *Collection) idChecksum() string {
-	return "pbc_" + crc32Checksum(c.Type+c.Name)
+	return "hbc_" + crc32Checksum(c.Type+c.Name)
 }
 
 func (c *Collection) initDefaultId() {

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/hanzoai/base/tools/filesystem"
 )
 
 func TestFileSystemExists(t *testing.T) {
@@ -739,7 +739,7 @@ func TestFileSystemCreateThumb(t *testing.T) {
 // ---
 
 func createTestDir(t *testing.T) string {
-	dir, err := os.MkdirTemp(os.TempDir(), "pb_test")
+	dir, err := os.MkdirTemp(os.TempDir(), "hz_test")
 	if err != nil {
 		t.Fatal(err)
 	}

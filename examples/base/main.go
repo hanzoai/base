@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/plugins/ghupdate"
-	"github.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pocketbase/pocketbase/plugins/migratecmd"
-	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/hanzoai/base"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/ghupdate"
+	"github.com/hanzoai/base/plugins/jsvm"
+	"github.com/hanzoai/base/plugins/migratecmd"
+	"github.com/hanzoai/base/tools/hook"
 )
 
 func main() {
-	app := pocketbase.New()
+	app := base.New()
 
 	// ---------------------------------------------------------------
 	// Optional plugin flags:
@@ -36,7 +36,7 @@ func main() {
 		&hooksWatch,
 		"hooksWatch",
 		true,
-		"auto restart the app on pb_hooks file change; it has no effect on Windows",
+		"auto restart the app on hz_hooks file change; it has no effect on Windows",
 	)
 
 	var hooksPool int
@@ -85,7 +85,7 @@ func main() {
 	// Plugins and hooks:
 	// ---------------------------------------------------------------
 
-	// load jsvm (pb_hooks and pb_migrations)
+	// load jsvm (hz_hooks and hz_migrations)
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: migrationsDir,
 		HooksDir:      hooksDir,
@@ -121,12 +121,12 @@ func main() {
 	}
 }
 
-// the default pb_public dir location is relative to the executable
+// the default hz_public dir location is relative to the executable
 func defaultPublicDir() string {
 	if strings.HasPrefix(os.Args[0], os.TempDir()) {
 		// most likely ran with go run
-		return "./pb_public"
+		return "./hz_public"
 	}
 
-	return filepath.Join(os.Args[0], "../pb_public")
+	return filepath.Join(os.Args[0], "../hz_public")
 }

@@ -1,6 +1,6 @@
-// Package core is the backbone of PocketBase.
+// Package core is the backbone of Base.
 //
-// It defines the main PocketBase App interface and its base implementation.
+// It defines the main Base App interface and its base implementation.
 package core
 
 import (
@@ -8,16 +8,16 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/cron"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pocketbase/pocketbase/tools/store"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/cron"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/mailer"
+	"github.com/hanzoai/base/tools/store"
+	"github.com/hanzoai/base/tools/subscriptions"
 )
 
-// App defines the main PocketBase app interface.
+// App defines the main Base app interface.
 //
 // Note that the interface is not intended to be implemented manually by users
 // and instead they should use core.BaseApp (either directly or as embedded field in a custom struct).
@@ -101,7 +101,7 @@ type App interface {
 	// ReloadSettings reinitializes and reloads the stored application settings.
 	ReloadSettings() error
 
-	// CreateBackup creates a new backup of the current app pb_data directory.
+	// CreateBackup creates a new backup of the current app hz_data directory.
 	//
 	// Backups can be stored on S3 if it is configured in app.Settings().Backups.
 	//
@@ -113,7 +113,7 @@ type App interface {
 	// the current running application process.
 	//
 	// The safely perform the restore it is recommended to have free disk space
-	// for at least 2x the size of the restored pb_data backup.
+	// for at least 2x the size of the restored hz_data backup.
 	//
 	// Please refer to the godoc of the specific core.App implementation
 	// for details on the restore procedures.
@@ -140,10 +140,10 @@ type App interface {
 	// DB methods
 	// ---------------------------------------------------------------
 
-	// DB returns the default app data db instance (pb_data/data.db).
+	// DB returns the default app data db instance (hz_data/data.db).
 	DB() dbx.Builder
 
-	// NonconcurrentDB returns the nonconcurrent app data db instance (pb_data/data.db).
+	// NonconcurrentDB returns the nonconcurrent app data db instance (hz_data/data.db).
 	//
 	// The returned db instance is limited only to a single open connection,
 	// meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -157,10 +157,10 @@ type App interface {
 	// In a transaction the ConcurrentDB() and NonconcurrentDB() refer to the same *dbx.TX instance.
 	NonconcurrentDB() dbx.Builder
 
-	// AuxDB returns the default app auxiliary db instance (pb_data/auxiliary.db).
+	// AuxDB returns the default app auxiliary db instance (hz_data/auxiliary.db).
 	AuxDB() dbx.Builder
 
-	// AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (pb_data/auxiliary.db)..
+	// AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (hz_data/auxiliary.db)..
 	//
 	// The returned db instance is limited only to a single open connection,
 	// meaning that it can process only 1 db operation at a time (other operations will be queued up).

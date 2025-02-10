@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 	"github.com/spf13/cast"
 )
 
@@ -56,10 +56,10 @@ func TestCronsList(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`{"id":"__pbLogsCleanup__","expression":"0 */6 * * *"}`,
-				`{"id":"__pbDBOptimize__","expression":"0 0 * * *"}`,
-				`{"id":"__pbMFACleanup__","expression":"0 * * * *"}`,
-				`{"id":"__pbOTPCleanup__","expression":"0 * * * *"}`,
+				`{"id":"__hzLogsCleanup__","expression":"0 */6 * * *"}`,
+				`{"id":"__hzDBOptimize__","expression":"0 0 * * *"}`,
+				`{"id":"__hzMFACleanup__","expression":"0 * * * *"}`,
+				`{"id":"__hzOTPCleanup__","expression":"0 * * * *"}`,
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},

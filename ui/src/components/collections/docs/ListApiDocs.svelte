@@ -70,48 +70,48 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
         // fetch a paginated records list
-        const resultList = await pb.collection('${collection?.name}').getList(1, 50, {
+        const resultList = await base.collection('${collection?.name}').getList(1, 50, {
             filter: 'someField1 != someField2',
         });
 
         // you can also fetch all records at once via getFullList
-        const records = await pb.collection('${collection?.name}').getFullList({
+        const records = await base.collection('${collection?.name}').getFullList({
             sort: '-someField',
         });
 
         // or fetch only the first record that matches the specified filter
-        const record = await pb.collection('${collection?.name}').getFirstListItem('someField="test"', {
+        const record = await base.collection('${collection?.name}').getFirstListItem('someField="test"', {
             expand: 'relField1,relField2.subRelField',
         });
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
         // fetch a paginated records list
-        final resultList = await pb.collection('${collection?.name}').getList(
+        final resultList = await base.collection('${collection?.name}').getList(
           page: 1,
           perPage: 50,
           filter: 'someField1 != someField2',
         );
 
         // you can also fetch all records at once via getFullList
-        final records = await pb.collection('${collection?.name}').getFullList(
+        final records = await base.collection('${collection?.name}').getFullList(
           sort: '-someField',
         );
 
         // or fetch only the first record that matches the specified filter
-        final record = await pb.collection('${collection?.name}').getFirstListItem(
+        final record = await base.collection('${collection?.name}').getFirstListItem(
           'someField="test"',
           expand: 'relField1,relField2.subRelField',
         );

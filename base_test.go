@@ -1,4 +1,4 @@
-package pocketbase
+package base
 
 import (
 	"os"
@@ -29,7 +29,7 @@ func TestNew(t *testing.T) {
 	app := New()
 
 	if app == nil {
-		t.Fatal("Expected initialized PocketBase instance, got nil")
+		t.Fatal("Expected initialized Base instance, got nil")
 	}
 
 	if app.RootCmd == nil {
@@ -57,7 +57,7 @@ func TestNewWithConfig(t *testing.T) {
 	})
 
 	if app == nil {
-		t.Fatal("Expected initialized PocketBase instance, got nil")
+		t.Fatal("Expected initialized Base instance, got nil")
 	}
 
 	if app.RootCmd == nil {
@@ -106,7 +106,7 @@ func TestNewWithConfigAndFlags(t *testing.T) {
 	})
 
 	if app == nil {
-		t.Fatal("Expected initialized PocketBase instance, got nil")
+		t.Fatal("Expected initialized Base instance, got nil")
 	}
 
 	if app.RootCmd == nil {
@@ -139,7 +139,7 @@ func TestSkipBootstrap(t *testing.T) {
 		os.Args = originalArgs
 	}()
 
-	tempDir := filepath.Join(os.TempDir(), "temp_pb_data")
+	tempDir := filepath.Join(os.TempDir(), "temp_hz_data")
 	defer os.RemoveAll(tempDir)
 
 	// already bootstrapped

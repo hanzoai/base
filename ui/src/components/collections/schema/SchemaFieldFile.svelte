@@ -284,7 +284,7 @@
                 <small class="txt-hint">
                     it will require View API rule permissions and file token to be accessible
                     <a
-                        href={import.meta.env.PB_PROTECTED_FILE_DOCS}
+                        href={import.meta.env.HZ_PROTECTED_FILE_DOCS}
                         class="toggle-info"
                         target="_blank"
                         rel="noopener"

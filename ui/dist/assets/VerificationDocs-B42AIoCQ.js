@@ -21,59 +21,59 @@ import{S as le,i as ne,s as ie,X as F,h as b,t as j,a as U,I as Y,Z as x,_ as Te
                   }
                 }
             `}]),[o,f,c,r]}class Me extends le{constructor(t){super(),ne(this,t,Ee,Oe,ie,{collection:0})}}function ke(s,t,e){const o=s.slice();return o[5]=t[e],o[7]=e,o}function $e(s,t,e){const o=s.slice();return o[5]=t[e],o[7]=e,o}function we(s){let t,e,o,f,c;function r(){return s[4](s[7])}return{c(){t=m("button"),e=m("div"),e.textContent=`${s[5].title}`,o=y(),v(e,"class","txt"),v(t,"class","tab-item"),K(t,"active",s[1]==s[7])},m(a,d){h(a,t,d),u(t,e),u(t,o),f||(c=oe(t,"click",r),f=!0)},p(a,d){s=a,d&2&&K(t,"active",s[1]==s[7])},d(a){a&&b(t),f=!1,c()}}}function ye(s){let t,e,o,f;var c=s[5].component;function r(a,d){return{props:{collection:a[0]}}}return c&&(e=ue(c,r(s))),{c(){t=m("div"),e&&Q(e.$$.fragment),o=y(),v(t,"class","tab-item"),K(t,"active",s[1]==s[7])},m(a,d){h(a,t,d),e&&G(e,t,null),u(t,o),f=!0},p(a,d){if(c!==(c=a[5].component)){if(e){ee();const g=e;j(g.$$.fragment,1,0,()=>{z(g,1)}),te()}c?(e=ue(c,r(a)),Q(e.$$.fragment),U(e.$$.fragment,1),G(e,t,o)):e=null}else if(c){const g={};d&1&&(g.collection=a[0]),e.$set(g)}(!f||d&2)&&K(t,"active",a[1]==a[7])},i(a){f||(e&&U(e.$$.fragment,a),f=!0)},o(a){e&&j(e.$$.fragment,a),f=!1},d(a){a&&b(t),e&&z(e)}}}function Ne(s){var E,W,l,i;let t,e,o=s[0].name+"",f,c,r,a,d,g,C,D=s[0].name+"",P,L,R,B,O,N,q,V,$,J,H,I;B=new Ve({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${s[2]}');
+        const base = new Base('${s[2]}');
 
         ...
 
-        await pb.collection('${(E=s[0])==null?void 0:E.name}').requestVerification('test@example.com');
+        await base.collection('${(E=s[0])==null?void 0:E.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${(W=s[0])==null?void 0:W.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${(W=s[0])==null?void 0:W.name}').confirmVerification('VERIFICATION_TOKEN');
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${s[2]}');
+        final base = Base('${s[2]}');
 
         ...
 
-        await pb.collection('${(l=s[0])==null?void 0:l.name}').requestVerification('test@example.com');
+        await base.collection('${(l=s[0])==null?void 0:l.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${(i=s[0])==null?void 0:i.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${(i=s[0])==null?void 0:i.name}').confirmVerification('VERIFICATION_TOKEN');
     `}});let p=F(s[3]),T=[];for(let n=0;n<p.length;n+=1)T[n]=we($e(s,p,n));let A=F(s[3]),_=[];for(let n=0;n<A.length;n+=1)_[n]=ye(ke(s,A,n));const X=n=>j(_[n],1,1,()=>{_[n]=null});return{c(){t=m("h3"),e=M("Account verification ("),f=M(o),c=M(")"),r=y(),a=m("div"),d=m("p"),g=M("Sends "),C=m("strong"),P=M(D),L=M(" account verification request."),R=y(),Q(B.$$.fragment),O=y(),N=m("h6"),N.textContent="API details",q=y(),V=m("div"),$=m("div");for(let n=0;n<T.length;n+=1)T[n].c();J=y(),H=m("div");for(let n=0;n<_.length;n+=1)_[n].c();v(t,"class","m-b-sm"),v(a,"class","content txt-lg m-b-sm"),v(N,"class","m-b-xs"),v($,"class","tabs-header compact"),v(H,"class","tabs-content"),v(V,"class","tabs")},m(n,w){h(n,t,w),u(t,e),u(t,f),u(t,c),h(n,r,w),h(n,a,w),u(a,d),u(d,g),u(d,C),u(C,P),u(d,L),h(n,R,w),G(B,n,w),h(n,O,w),h(n,N,w),h(n,q,w),h(n,V,w),u(V,$);for(let S=0;S<T.length;S+=1)T[S]&&T[S].m($,null);u(V,J),u(V,H);for(let S=0;S<_.length;S+=1)_[S]&&_[S].m(H,null);I=!0},p(n,[w]){var se,ae,ce,re;(!I||w&1)&&o!==(o=n[0].name+"")&&Y(f,o),(!I||w&1)&&D!==(D=n[0].name+"")&&Y(P,D);const S={};if(w&5&&(S.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${n[2]}');
+        const base = new Base('${n[2]}');
 
         ...
 
-        await pb.collection('${(se=n[0])==null?void 0:se.name}').requestVerification('test@example.com');
+        await base.collection('${(se=n[0])==null?void 0:se.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${(ae=n[0])==null?void 0:ae.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${(ae=n[0])==null?void 0:ae.name}').confirmVerification('VERIFICATION_TOKEN');
     `),w&5&&(S.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${n[2]}');
+        final base = Base('${n[2]}');
 
         ...
 
-        await pb.collection('${(ce=n[0])==null?void 0:ce.name}').requestVerification('test@example.com');
+        await base.collection('${(ce=n[0])==null?void 0:ce.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${(re=n[0])==null?void 0:re.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${(re=n[0])==null?void 0:re.name}').confirmVerification('VERIFICATION_TOKEN');
     `),B.$set(S),w&10){p=F(n[3]);let k;for(k=0;k<p.length;k+=1){const Z=$e(n,p,k);T[k]?T[k].p(Z,w):(T[k]=we(Z),T[k].c(),T[k].m($,null))}for(;k<T.length;k+=1)T[k].d(1);T.length=p.length}if(w&11){A=F(n[3]);let k;for(k=0;k<A.length;k+=1){const Z=ke(n,A,k);_[k]?(_[k].p(Z,w),U(_[k],1)):(_[k]=ye(Z),_[k].c(),U(_[k],1),_[k].m(H,null))}for(ee(),k=A.length;k<_.length;k+=1)X(k);te()}},i(n){if(!I){U(B.$$.fragment,n);for(let w=0;w<A.length;w+=1)U(_[w]);I=!0}},o(n){j(B.$$.fragment,n),_=_.filter(Boolean);for(let w=0;w<_.length;w+=1)j(_[w]);I=!1},d(n){n&&(b(t),b(r),b(a),b(R),b(O),b(N),b(q),b(V)),z(B,n),fe(T,n),fe(_,n)}}}function Se(s,t,e){let o,{collection:f}=t;const c=[{title:"Request verification",component:Me},{title:"Confirm verification",component:Be}];let r=0;const a=d=>e(1,r=d);return s.$$set=d=>{"collection"in d&&e(0,f=d.collection)},e(2,o=Ae.getApiExampleUrl(Ie.baseURL)),[f,r,o,c,a]}class Fe extends le{constructor(t){super(),ne(this,t,Se,Ne,ie,{collection:0})}}export{Fe as default};

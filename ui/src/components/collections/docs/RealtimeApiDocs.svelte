@@ -40,58 +40,58 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
         // (Optionally) authenticate
-        await pb.collection('users').authWithPassword('test@example.com', '123456');
+        await base.collection('users').authWithPassword('test@example.com', '123456');
 
         // Subscribe to changes in any ${collection?.name} record
-        pb.collection('${collection?.name}').subscribe('*', function (e) {
+        base.collection('${collection?.name}').subscribe('*', function (e) {
             console.log(e.action);
             console.log(e.record);
         }, { /* other options like: filter, expand, custom headers, etc. */ });
 
         // Subscribe to changes only in the specified record
-        pb.collection('${collection?.name}').subscribe('RECORD_ID', function (e) {
+        base.collection('${collection?.name}').subscribe('RECORD_ID', function (e) {
             console.log(e.action);
             console.log(e.record);
         }, { /* other options like: filter, expand, custom headers, etc. */ });
 
         // Unsubscribe
-        pb.collection('${collection?.name}').unsubscribe('RECORD_ID'); // remove all 'RECORD_ID' subscriptions
-        pb.collection('${collection?.name}').unsubscribe('*'); // remove all '*' topic subscriptions
-        pb.collection('${collection?.name}').unsubscribe(); // remove all subscriptions in the collection
+        base.collection('${collection?.name}').unsubscribe('RECORD_ID'); // remove all 'RECORD_ID' subscriptions
+        base.collection('${collection?.name}').unsubscribe('*'); // remove all '*' topic subscriptions
+        base.collection('${collection?.name}').unsubscribe(); // remove all subscriptions in the collection
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
         // (Optionally) authenticate
-        await pb.collection('users').authWithPassword('test@example.com', '123456');
+        await base.collection('users').authWithPassword('test@example.com', '123456');
 
         // Subscribe to changes in any ${collection?.name} record
-        pb.collection('${collection?.name}').subscribe('*', (e) {
+        base.collection('${collection?.name}').subscribe('*', (e) {
             print(e.action);
             print(e.record);
         }, /* other options like: filter, expand, custom headers, etc. */);
 
         // Subscribe to changes only in the specified record
-        pb.collection('${collection?.name}').subscribe('RECORD_ID', (e) {
+        base.collection('${collection?.name}').subscribe('RECORD_ID', (e) {
             print(e.action);
             print(e.record);
         }, /* other options like: filter, expand, custom headers, etc. */);
 
         // Unsubscribe
-        pb.collection('${collection?.name}').unsubscribe('RECORD_ID'); // remove all 'RECORD_ID' subscriptions
-        pb.collection('${collection?.name}').unsubscribe('*'); // remove all '*' topic subscriptions
-        pb.collection('${collection?.name}').unsubscribe(); // remove all subscriptions in the collection
+        base.collection('${collection?.name}').unsubscribe('RECORD_ID'); // remove all 'RECORD_ID' subscriptions
+        base.collection('${collection?.name}').unsubscribe('*'); // remove all '*' topic subscriptions
+        base.collection('${collection?.name}').unsubscribe(); // remove all subscriptions in the collection
     `}
 />
 

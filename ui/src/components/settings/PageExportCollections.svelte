@@ -53,12 +53,12 @@
     }
 
     function download() {
-        CommonHelper.downloadJson(Object.values(bulkSelected), "pb_schema");
+        CommonHelper.downloadJson(Object.values(bulkSelected), "hz_schema");
     }
 
     function copy() {
-        CommonHelper.copyToClipboard(schema);
-        addInfoToast("The configuration was copied to your clipboard!", 3000);
+        CommonHelper.copyToClibaseoard(schema);
+        addInfoToast("The configuration was copied to your clibaseoard!", 3000);
     }
 
     function toggleSelectAll() {
@@ -110,7 +110,7 @@
                 <div class="content txt-xl m-b-base">
                     <p>
                         Below you'll find your current collections configuration that you could import in
-                        another PocketBase environment.
+                        another Base environment.
                     </p>
                 </div>
 

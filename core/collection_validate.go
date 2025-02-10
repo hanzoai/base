@@ -8,12 +8,12 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core/validators"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core/validators"
+	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/types"
 )
 
 var collectionNameRegex = regexp.MustCompile(`^\w+$`)

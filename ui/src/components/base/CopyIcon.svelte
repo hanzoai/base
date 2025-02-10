@@ -16,7 +16,7 @@
             return;
         }
 
-        CommonHelper.copyToClipboard(value);
+        CommonHelper.copyToClibaseoard(value);
 
         clearTimeout(copyTimeout);
         copyTimeout = setTimeout(() => {
@@ -39,7 +39,7 @@
     tabindex="-1"
     role="button"
     class={copyTimeout ? successClasses : idleClasses}
-    aria-label={"Copy to clipboard"}
+    aria-label={"Copy to clibaseoard"}
     use:tooltipAction={!copyTimeout ? tooltip : undefined}
     on:click|stopPropagation={copy}
 />

@@ -98,21 +98,21 @@
 
     <div class="content m-b-sm">
         <p>
-            When PocketBase is deployed on platforms like Fly or it is accessible through proxies such as
+            When Base is deployed on platforms like Fly or it is accessible through proxies such as
             NGINX, requests from different users will originate from the same IP address (the IP of the proxy
-            connecting to your PocketBase app).
+            connecting to your Base app).
         </p>
         <p>
             In this case to retrieve the actual user IP (used for rate limiting, logging, etc.) you need to
-            properly configure your proxy and list below the trusted headers that PocketBase could use to
+            properly configure your proxy and list below the trusted headers that Base could use to
             extract the user IP.
         </p>
         <p class="txt-bold">When using such proxy, to avoid spoofing it is recommended to:</p>
         <ul class="m-t-0 txt-bold">
             <li>use headers that are controlled only by the proxy and cannot be manually set by the users</li>
-            <li>make sure that the PocketBase server can be accessed only through the proxy</li>
+            <li>make sure that the Base server can be accessed only through the proxy</li>
         </ul>
-        <p>You can clear the headers field if PocketBase is not deployed behind a proxy.</p>
+        <p>You can clear the headers field if Base is not deployed behind a proxy.</p>
     </div>
 
     <div class="grid grid-sm">

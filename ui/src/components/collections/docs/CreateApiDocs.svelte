@@ -77,7 +77,7 @@
         File upload is supported only via <code>multipart/form-data</code>.
         <br />
         For more info and examples you could check the detailed
-        <a href={import.meta.env.PB_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
+        <a href={import.meta.env.HZ_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
             Files upload and handling docs
         </a>.
     </p>
@@ -86,37 +86,37 @@
 <!-- prettier-ignore -->
 <SdkTabs
     js={`
-import PocketBase from 'pocketbase';
+import Base from 'base';
 
-const pb = new PocketBase('${backendAbsUrl}');
+const base = new Base('${backendAbsUrl}');
 
 ...
 
 // example create data
 const data = ${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 4)};
 
-const record = await pb.collection('${collection?.name}').create(data);
+const record = await base.collection('${collection?.name}').create(data);
 ` + (isAuth ?
 `
 // (optional) send an email verification request
-await pb.collection('${collection?.name}').requestVerification('test@example.com');
+await base.collection('${collection?.name}').requestVerification('test@example.com');
 ` : ""
 )}
     dart={`
-import 'package:pocketbase/pocketbase.dart';
+import 'package:hanzoai/base.dart';
 
-final pb = PocketBase('${backendAbsUrl}');
+final base = Base('${backendAbsUrl}');
 
 ...
 
 // example create body
 final body = <String, dynamic>${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 2)};
 
-final record = await pb.collection('${collection?.name}').create(body: body);
+final record = await base.collection('${collection?.name}').create(body: body);
 ` + (isAuth ?
 `
 // (optional) send an email verification request
-await pb.collection('${collection?.name}').requestVerification('test@example.com');
+await base.collection('${collection?.name}').requestVerification('test@example.com');
 ` : ""
 )}
 />

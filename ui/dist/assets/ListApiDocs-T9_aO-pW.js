@@ -7,47 +7,47 @@ import{S as el,i as ll,s as sl,H as ze,h as m,l as h,o as nl,u as e,v as s,L as 
                         wildcard match)`,se=s(),R=e("li"),xt=e("code"),xt.textContent="?!~",V=s(),W=e("em"),W.textContent="Any/At least one of",O=s(),zt=e("span"),zt.textContent=`NOT Like/Contains (if not specified auto wraps the right string OPERAND in a "%" for
                         wildcard match)`,ne=s(),X=e("p"),X.innerHTML=`To group and combine several expressions you could use brackets
         <code>(...)</code>, <code>&amp;&amp;</code> (AND) and <code>||</code> (OR) tokens.`,a(u,"class","txt-danger"),a(yt,"class","filter-op svelte-1w7s5nw"),a(E,"class","txt"),a(it,"class","filter-op svelte-1w7s5nw"),a(Z,"class","txt"),a(U,"class","filter-op svelte-1w7s5nw"),a(rt,"class","txt"),a(Ft,"class","filter-op svelte-1w7s5nw"),a(ct,"class","txt"),a(N,"class","filter-op svelte-1w7s5nw"),a(Lt,"class","txt"),a(At,"class","filter-op svelte-1w7s5nw"),a(Tt,"class","txt"),a(Pt,"class","filter-op svelte-1w7s5nw"),a(Rt,"class","txt"),a(Ot,"class","filter-op svelte-1w7s5nw"),a(ft,"class","txt"),a(St,"class","filter-op svelte-1w7s5nw"),a(Et,"class","txt-hint"),a(ut,"class","txt"),a(Nt,"class","filter-op svelte-1w7s5nw"),a(qt,"class","txt-hint"),a(Dt,"class","txt"),a(mt,"class","filter-op svelte-1w7s5nw"),a(ht,"class","txt-hint"),a(M,"class","txt"),a(Ht,"class","filter-op svelte-1w7s5nw"),a(Mt,"class","txt-hint"),a(bt,"class","txt"),a(It,"class","filter-op svelte-1w7s5nw"),a(Bt,"class","txt-hint"),a(Gt,"class","txt"),a(gt,"class","filter-op svelte-1w7s5nw"),a(_t,"class","txt-hint"),a(jt,"class","txt"),a(Ut,"class","filter-op svelte-1w7s5nw"),a(G,"class","txt-hint"),a(wt,"class","txt"),a(xt,"class","filter-op svelte-1w7s5nw"),a(W,"class","txt-hint"),a(zt,"class","txt")},m($,$t){h($,n,$t),h($,o,$t),h($,i,$t),t(i,f),t(i,b),t(i,p),t(p,u),t(p,C),t(p,_),t(p,x),t(p,d),t(d,Y),t(Y,yt),t(Y,Wt),t(Y,E),t(d,Xt),t(d,D),t(D,it),t(D,P),t(D,Z),t(d,ie),t(d,j),t(j,U),t(j,re),t(j,rt),t(d,vt),t(d,tt),t(tt,Ft),t(tt,ce),t(tt,ct),t(d,dt),t(d,et),t(et,N),t(et,Yt),t(et,Lt),t(d,k),t(d,lt),t(lt,At),t(lt,Zt),t(lt,Tt),t(d,z),t(d,st),t(st,Pt),t(st,te),t(st,Rt),t(d,v),t(d,pt),t(pt,Ot),t(pt,de),t(pt,ft),t(d,pe),t(d,H),t(H,St),t(H,nt),t(H,Et),t(H,F),t(H,ut),t(d,fe),t(d,J),t(J,Nt),t(J,ee),t(J,qt),t(J,le),t(J,Dt),t(d,ue),t(d,L),t(L,mt),t(L,me),t(L,ht),t(L,he),t(L,M),t(d,be),t(d,T),t(T,Ht),t(T,ot),t(T,Mt),t(T,K),t(T,bt),t(d,ge),t(d,I),t(I,It),t(I,y),t(I,Bt),t(I,at),t(I,Gt),t(d,_e),t(d,Q),t(Q,gt),t(Q,we),t(Q,_t),t(Q,xe),t(Q,jt),t(d,$e),t(d,B),t(B,Ut),t(B,Ce),t(B,G),t(B,ke),t(B,wt),t(d,se),t(d,R),t(R,xt),t(R,V),t(R,W),t(R,O),t(R,zt),h($,ne,$t),h($,X,$t)},d($){$&&(m(n),m(o),m(i),m(ne),m(X))}}}function bl(r){let n,o,i,f,b;function p(x,d){return x[0]?hl:ml}let u=p(r),C=u(r),_=r[0]&&Ke();return{c(){n=e("button"),C.c(),o=s(),_&&_.c(),i=ol(),a(n,"class","btn btn-sm btn-secondary m-t-10")},m(x,d){h(x,n,d),C.m(n,null),h(x,o,d),_&&_.m(x,d),h(x,i,d),f||(b=nl(n,"click",r[1]),f=!0)},p(x,[d]){u!==(u=p(x))&&(C.d(1),C=u(x),C&&(C.c(),C.m(n,null))),x[0]?_||(_=Ke(),_.c(),_.m(i.parentNode,i)):_&&(_.d(1),_=null)},i:ze,o:ze,d(x){x&&(m(n),m(o),m(i)),C.d(),_&&_.d(x),f=!1,b()}}}function gl(r,n,o){let i=!1;function f(){o(0,i=!i)}return[i,f]}class _l extends el{constructor(n){super(),ll(this,n,gl,bl,sl,{})}}function Qe(r,n,o){const i=r.slice();return i[8]=n[o],i}function Ve(r,n,o){const i=r.slice();return i[8]=n[o],i}function We(r,n,o){const i=r.slice();return i[13]=n[o],i[15]=o,i}function Xe(r){let n;return{c(){n=e("p"),n.innerHTML="Requires superuser <code>Authorization:TOKEN</code> header",a(n,"class","txt-hint txt-sm txt-right")},m(o,i){h(o,n,i)},d(o){o&&m(n)}}}function Ye(r){let n,o=r[13]+"",i,f=r[15]<r[4].length-1?", ":"",b;return{c(){n=e("code"),i=g(o),b=g(f)},m(p,u){h(p,n,u),t(n,i),h(p,b,u)},p(p,u){u&16&&o!==(o=p[13]+"")&&ve(i,o),u&16&&f!==(f=p[15]<p[4].length-1?", ":"")&&ve(b,f)},d(p){p&&(m(n),m(b))}}}function Ze(r,n){let o,i,f;function b(){return n[7](n[8])}return{key:r,first:null,c(){o=e("button"),o.textContent=`${n[8].code} `,a(o,"type","button"),a(o,"class","tab-item"),Ae(o,"active",n[2]===n[8].code),this.first=o},m(p,u){h(p,o,u),i||(f=nl(o,"click",b),i=!0)},p(p,u){n=p,u&36&&Ae(o,"active",n[2]===n[8].code)},d(p){p&&m(o),i=!1,f()}}}function tl(r,n){let o,i,f,b;return i=new Le({props:{content:n[8].body}}),{key:r,first:null,c(){o=e("div"),Vt(i.$$.fragment),f=s(),a(o,"class","tab-item"),Ae(o,"active",n[2]===n[8].code),this.first=o},m(p,u){h(p,o,u),Qt(i,o,null),t(o,f),b=!0},p(p,u){n=p,(!b||u&36)&&Ae(o,"active",n[2]===n[8].code)},i(p){b||(kt(i.$$.fragment,p),b=!0)},o(p){Ct(i.$$.fragment,p),b=!1},d(p){p&&m(o),Kt(i)}}}function wl(r){var Oe,Se,Ee,Ne,qe,De;let n,o,i=r[0].name+"",f,b,p,u,C,_,x,d=r[0].name+"",Y,yt,Wt,E,Xt,D,it,P,Z,ie,j,U,re,rt,vt=r[0].name+"",tt,Ft,ce,ct,dt,et,N,Yt,Lt,k,lt,At,Zt,Tt,z,st,Pt,te,Rt,v,pt,Ot,de,ft,pe,H,St,nt,Et,F,ut,fe,J,Nt,ee,qt,le,Dt,ue,L,mt,me,ht,he,M,be,T,Ht,ot,Mt,K,bt,ge,I,It,y,Bt,at,Gt,_e,Q,gt,we,_t,xe,jt,$e,B,Ut,Ce,G,ke,wt,se,R,xt,V,W,O=[],zt=new Map,ne,X,$=[],$t=new Map,Jt;E=new al({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${r[3]}');
+        const base = new Base('${r[3]}');
 
         ...
 
         // fetch a paginated records list
-        const resultList = await pb.collection('${(Oe=r[0])==null?void 0:Oe.name}').getList(1, 50, {
+        const resultList = await base.collection('${(Oe=r[0])==null?void 0:Oe.name}').getList(1, 50, {
             filter: 'someField1 != someField2',
         });
 
         // you can also fetch all records at once via getFullList
-        const records = await pb.collection('${(Se=r[0])==null?void 0:Se.name}').getFullList({
+        const records = await base.collection('${(Se=r[0])==null?void 0:Se.name}').getFullList({
             sort: '-someField',
         });
 
         // or fetch only the first record that matches the specified filter
-        const record = await pb.collection('${(Ee=r[0])==null?void 0:Ee.name}').getFirstListItem('someField="test"', {
+        const record = await base.collection('${(Ee=r[0])==null?void 0:Ee.name}').getFirstListItem('someField="test"', {
             expand: 'relField1,relField2.subRelField',
         });
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${r[3]}');
+        final base = Base('${r[3]}');
 
         ...
 
         // fetch a paginated records list
-        final resultList = await pb.collection('${(Ne=r[0])==null?void 0:Ne.name}').getList(
+        final resultList = await base.collection('${(Ne=r[0])==null?void 0:Ne.name}').getList(
           page: 1,
           perPage: 50,
           filter: 'someField1 != someField2',
         );
 
         // you can also fetch all records at once via getFullList
-        final records = await pb.collection('${(qe=r[0])==null?void 0:qe.name}').getFullList(
+        final records = await base.collection('${(qe=r[0])==null?void 0:qe.name}').getFullList(
           sort: '-someField',
         );
 
         // or fetch only the first record that matches the specified filter
-        final record = await pb.collection('${(De=r[0])==null?void 0:De.name}').getFirstListItem(
+        final record = await base.collection('${(De=r[0])==null?void 0:De.name}').getFirstListItem(
           'someField="test"',
           expand: 'relField1,relField2.subRelField',
         );
@@ -78,47 +78,47 @@ import{S as el,i as ll,s as sl,H as ze,h as m,l as h,o as nl,u as e,v as s,L as 
                 <code>getFirstListItem()</code>
                 and
                 <code>getFullList()</code> SDKs methods.</td>`,se=s(),R=e("div"),R.textContent="Responses",xt=s(),V=e("div"),W=e("div");for(let l=0;l<O.length;l+=1)O[l].c();ne=s(),X=e("div");for(let l=0;l<$.length;l+=1)$[l].c();a(n,"class","m-b-sm"),a(u,"class","content txt-lg m-b-sm"),a(D,"class","m-b-xs"),a(Z,"class","label label-primary"),a(j,"class","content"),a(P,"class","alert alert-info"),a(dt,"class","section-title"),a(N,"class","table-compact table-border m-b-base"),a(R,"class","section-title"),a(W,"class","tabs-header compact combined left"),a(X,"class","tabs-content"),a(V,"class","tabs")},m(l,c){h(l,n,c),t(n,o),t(n,f),t(n,b),h(l,p,c),h(l,u,c),t(u,C),t(C,_),t(C,x),t(x,Y),t(C,yt),h(l,Wt,c),Qt(E,l,c),h(l,Xt,c),h(l,D,c),h(l,it,c),h(l,P,c),t(P,Z),t(P,ie),t(P,j),t(j,U),t(U,re),t(U,rt),t(rt,tt),t(U,Ft),t(P,ce),S&&S.m(P,null),h(l,ct,c),h(l,dt,c),h(l,et,c),h(l,N,c),t(N,Yt),t(N,Lt),t(N,k),t(k,lt),t(k,At),t(k,Zt),t(k,Tt),t(k,z),t(z,st),t(z,Pt),t(z,te),t(z,Rt),t(z,v),t(v,pt),t(v,Ot),t(v,de),t(v,ft),t(v,pe),t(v,H),t(v,St),Qt(nt,v,null),t(v,Et),t(v,F),t(F,ut),t(F,fe),t(F,J),t(F,Nt),t(F,ee),t(F,qt),t(F,le),t(F,Dt);for(let w=0;w<A.length;w+=1)A[w]&&A[w].m(F,null);t(k,ue),t(k,L),t(L,mt),t(L,me),t(L,ht),t(L,he),t(L,M),t(M,be),Qt(T,M,null),t(M,Ht),Qt(ot,M,null),t(k,Mt),t(k,K),t(K,bt),t(K,ge),t(K,I),t(K,It),t(K,y),t(y,Bt),Qt(at,y,null),t(y,Gt),t(y,_e),t(y,Q),t(y,gt),t(y,we),t(y,_t),t(y,xe),t(y,jt),t(y,$e),t(y,B),t(y,Ut),t(k,Ce),Qt(G,k,null),t(k,ke),t(k,wt),h(l,se,c),h(l,R,c),h(l,xt,c),h(l,V,c),t(V,W);for(let w=0;w<O.length;w+=1)O[w]&&O[w].m(W,null);t(V,ne),t(V,X);for(let w=0;w<$.length;w+=1)$[w]&&$[w].m(X,null);Jt=!0},p(l,[c]){var He,Me,Ie,Be,Ge,je;(!Jt||c&1)&&i!==(i=l[0].name+"")&&ve(f,i),(!Jt||c&1)&&d!==(d=l[0].name+"")&&ve(Y,d);const w={};if(c&9&&(w.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${l[3]}');
+        const base = new Base('${l[3]}');
 
         ...
 
         // fetch a paginated records list
-        const resultList = await pb.collection('${(He=l[0])==null?void 0:He.name}').getList(1, 50, {
+        const resultList = await base.collection('${(He=l[0])==null?void 0:He.name}').getList(1, 50, {
             filter: 'someField1 != someField2',
         });
 
         // you can also fetch all records at once via getFullList
-        const records = await pb.collection('${(Me=l[0])==null?void 0:Me.name}').getFullList({
+        const records = await base.collection('${(Me=l[0])==null?void 0:Me.name}').getFullList({
             sort: '-someField',
         });
 
         // or fetch only the first record that matches the specified filter
-        const record = await pb.collection('${(Ie=l[0])==null?void 0:Ie.name}').getFirstListItem('someField="test"', {
+        const record = await base.collection('${(Ie=l[0])==null?void 0:Ie.name}').getFirstListItem('someField="test"', {
             expand: 'relField1,relField2.subRelField',
         });
     `),c&9&&(w.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${l[3]}');
+        final base = Base('${l[3]}');
 
         ...
 
         // fetch a paginated records list
-        final resultList = await pb.collection('${(Be=l[0])==null?void 0:Be.name}').getList(
+        final resultList = await base.collection('${(Be=l[0])==null?void 0:Be.name}').getList(
           page: 1,
           perPage: 50,
           filter: 'someField1 != someField2',
         );
 
         // you can also fetch all records at once via getFullList
-        final records = await pb.collection('${(Ge=l[0])==null?void 0:Ge.name}').getFullList(
+        final records = await base.collection('${(Ge=l[0])==null?void 0:Ge.name}').getFullList(
           sort: '-someField',
         );
 
         // or fetch only the first record that matches the specified filter
-        final record = await pb.collection('${(je=l[0])==null?void 0:je.name}').getFirstListItem(
+        final record = await base.collection('${(je=l[0])==null?void 0:je.name}').getFirstListItem(
           'someField="test"',
           expand: 'relField1,relField2.subRelField',
         );

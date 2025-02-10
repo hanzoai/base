@@ -1,4 +1,4 @@
-// Package migratecmd adds a new "migrate" command support to a PocketBase instance.
+// Package migratecmd adds a new "migrate" command support to a Base instance.
 //
 // It also comes with automigrations support and templates generation
 // (both for JS and GO migration files).
@@ -8,7 +8,7 @@
 //	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 //		TemplateLang: migratecmd.TemplateLangJS, // default to migratecmd.TemplateLangGo
 //		Automigrate:  true,
-//		Dir:          "/custom/migrations/dir", // optional template migrations path; default to "pb_migrations" (for JS) and "migrations" (for Go)
+//		Dir:          "/custom/migrations/dir", // optional template migrations path; default to "hz_migrations" (for JS) and "migrations" (for Go)
 //	})
 //
 //	Note: To allow running JS migrations you'll need to enable first
@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/inflector"
-	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/base/tools/osutils"
 	"github.com/spf13/cobra"
 )
 
@@ -33,8 +33,8 @@ import (
 type Config struct {
 	// Dir specifies the directory with the user defined migrations.
 	//
-	// If not set it fallbacks to a relative "pb_data/../pb_migrations" (for js)
-	// or "pb_data/../migrations" (for go) directory.
+	// If not set it fallbacks to a relative "hz_data/../hz_migrations" (for js)
+	// or "hz_data/../migrations" (for go) directory.
 	Dir string
 
 	// Automigrate specifies whether to enable automigrations.
@@ -67,7 +67,7 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 
 	if p.config.Dir == "" {
 		if p.config.TemplateLang == TemplateLangJS {
-			p.config.Dir = filepath.Join(p.app.DataDir(), "../pb_migrations")
+			p.config.Dir = filepath.Join(p.app.DataDir(), "../hz_migrations")
 		} else {
 			p.config.Dir = filepath.Join(p.app.DataDir(), "../migrations")
 		}

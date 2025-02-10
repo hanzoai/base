@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
-	"github.com/pocketbase/pocketbase/tools/inflector"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/security"
 )
 
 var recordProxyType = reflect.TypeOf((*RecordProxy)(nil)).Elem()

@@ -3,7 +3,7 @@
 package core
 
 import (
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	_ "modernc.org/sqlite"
 )
 

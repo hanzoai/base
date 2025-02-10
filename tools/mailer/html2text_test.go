@@ -107,14 +107,14 @@ func TestHTML2Text(t *testing.T) {
 				            <button>test</button>
 				            <p>
 				                Thanks,<br/>
-				                PocketBase team
+				                Base team
 				            </p>
 				        </div>
 				    </div>
 				</body>
 				</html>
 			`,
-			"Lorem ipsum \r\nDolor sit amet \r\n[Verify](a/b/c)  \r\n[Verify2.1 Verify2.2](a/b/c)  \r\n\r\n- ul.test1 \r\n- ul.test2 \r\n- ul.test3  \r\n- ol.test1 \r\n- ol.test2 \r\n- ol.test3         \r\nThanks,\r\nPocketBase team",
+			"Lorem ipsum \r\nDolor sit amet \r\n[Verify](a/b/c)  \r\n[Verify2.1 Verify2.2](a/b/c)  \r\n\r\n- ul.test1 \r\n- ul.test2 \r\n- ul.test3  \r\n- ol.test1 \r\n- ol.test2 \r\n- ol.test3         \r\nThanks,\r\nBase team",
 		},
 	}
 

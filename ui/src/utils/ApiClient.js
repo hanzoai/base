@@ -1,4 +1,4 @@
-import PocketBase, { LocalAuthStore, isTokenExpired } from "pocketbase";
+import Base, { LocalAuthStore, isTokenExpired } from "base";
 // ---
 import { protectedFilesCollectionsCache } from "@/stores/collections";
 import { setErrors } from "@/stores/errors";
@@ -8,14 +8,14 @@ import CommonHelper from "@/utils/CommonHelper";
 import { replace } from "svelte-spa-router";
 import { get } from "svelte/store";
 
-const superuserFileTokenKey = "pb_superuser_file_token";
+const superuserFileTokenKey = "hz_superuser_file_token";
 
 /**
  * Clears the authorized state and redirects to the login page.
  *
  * @param {Boolean} [redirect] Whether to redirect to the login page.
  */
-PocketBase.prototype.logout = function (redirect = true) {
+Base.prototype.logout = function (redirect = true) {
     this.authStore.clear();
 
     if (redirect) {
@@ -30,7 +30,7 @@ PocketBase.prototype.logout = function (redirect = true) {
  * @param  {Boolean} notify     Whether to add a toast notification.
  * @param  {String}  defaultMsg Default toast notification message if the error doesn't have one.
  */
-PocketBase.prototype.error = function (err, notify = true, defaultMsg = "") {
+Base.prototype.error = function (err, notify = true, defaultMsg = "") {
     if (!err || !(err instanceof Error) || err.isAbort) {
         return;
     }
@@ -65,7 +65,7 @@ PocketBase.prototype.error = function (err, notify = true, defaultMsg = "") {
 /**
  * @return {Promise<String>}
  */
-PocketBase.prototype.getSuperuserFileToken = async function (collectionId = "") {
+Base.prototype.getSuperuserFileToken = async function (collectionId = "") {
     let needToken = true;
 
     if (collectionId) {
@@ -103,7 +103,7 @@ class AppAuthStore extends LocalAuthStore {
     /**
      * @inheritdoc
      */
-    constructor(storageKey = "__pb_superuser_auth__") {
+    constructor(storageKey = "__hz_superuser_auth__") {
         super(storageKey);
 
         this.save(this.token, this.record);
@@ -130,10 +130,10 @@ class AppAuthStore extends LocalAuthStore {
     }
 }
 
-const pb = new PocketBase(import.meta.env.PB_BACKEND_URL, new AppAuthStore());
+const base = new Base(import.meta.env.HZ_BACKEND_URL, new AppAuthStore());
 
-if (pb.authStore.isValid) {
-    pb.collection(pb.authStore.record.collectionName)
+if (base.authStore.isValid) {
+    base.collection(base.authStore.record.collectionName)
         .authRefresh()
         .catch((err) => {
             console.warn("Failed to refresh the existing auth token:", err);
@@ -141,9 +141,9 @@ if (pb.authStore.isValid) {
             // clear the store only on invalidated/expired token
             const status = err?.status << 0;
             if (status == 401 || status == 403) {
-                pb.authStore.clear();
+                base.authStore.clear();
             }
         });
 }
 
-export default pb;
+export default base;

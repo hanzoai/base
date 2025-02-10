@@ -4,20 +4,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/store"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/store"
 )
 
 const (
-	DefaultRateLimitMiddlewareId       = "pbRateLimit"
+	DefaultRateLimitMiddlewareId       = "baseRateLimit"
 	DefaultRateLimitMiddlewarePriority = -1000
 )
 
 const (
-	rateLimitersStoreKey       = "__pbRateLimiters__"
-	rateLimitersCronKey        = "__pbRateLimitersCleanup__"
-	rateLimitersSettingsHookId = "__pbRateLimitersSettingsHook__"
+	rateLimitersStoreKey       = "__hzRateLimiters__"
+	rateLimitersCronKey        = "__hzRateLimitersCleanup__"
+	rateLimitersSettingsHookId = "__hzRateLimitersSettingsHook__"
 )
 
 // rateLimit defines the global rate limit middleware.

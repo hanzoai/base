@@ -21,78 +21,78 @@ import{S as se,i as ne,s as oe,X as H,h as b,t as X,a as V,I as Z,Z as ee,_ as y
                   }
                 }
             `}]),[n,d,c,r]}class Be extends se{constructor(t){super(),ne(this,t,Me,De,oe,{collection:0})}}function $e(o,t,e){const n=o.slice();return n[5]=t[e],n[7]=e,n}function Re(o,t,e){const n=o.slice();return n[5]=t[e],n[7]=e,n}function Pe(o){let t,e,n,d,c;function r(){return o[4](o[7])}return{c(){t=p("button"),e=p("div"),e.textContent=`${o[5].title}`,n=S(),k(e,"class","txt"),k(t,"class","tab-item"),L(t,"active",o[1]==o[7])},m(a,f){v(a,t,f),u(t,e),u(t,n),d||(c=ae(t,"click",r),d=!0)},p(a,f){o=a,f&2&&L(t,"active",o[1]==o[7])},d(a){a&&b(t),d=!1,c()}}}function Se(o){let t,e,n,d;var c=o[5].component;function r(a,f){return{props:{collection:a[0]}}}return c&&(e=pe(c,r(o))),{c(){t=p("div"),e&&x(e.$$.fragment),n=S(),k(t,"class","tab-item"),L(t,"active",o[1]==o[7])},m(a,f){v(a,t,f),e&&Q(e,t,null),u(t,n),d=!0},p(a,f){if(c!==(c=a[5].component)){if(e){te();const g=e;X(g.$$.fragment,1,0,()=>{G(g,1)}),le()}c?(e=pe(c,r(a)),x(e.$$.fragment),V(e.$$.fragment,1),Q(e,t,n)):e=null}else if(c){const g={};f&1&&(g.collection=a[0]),e.$set(g)}(!d||f&2)&&L(t,"active",a[1]==a[7])},i(a){d||(e&&V(e.$$.fragment,a),d=!0)},o(a){e&&X(e.$$.fragment,a),d=!1},d(a){a&&b(t),e&&G(e)}}}function Ie(o){var l,s,_,ie;let t,e,n=o[0].name+"",d,c,r,a,f,g,y,F=o[0].name+"",q,J,W,U,O,A,T,C,R,M,j,N,h,K;A=new Ce({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${o[2]}');
+        const base = new Base('${o[2]}');
 
         ...
 
-        await pb.collection('${(l=o[0])==null?void 0:l.name}').requestPasswordReset('test@example.com');
+        await base.collection('${(l=o[0])==null?void 0:l.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(s=o[0])==null?void 0:s.name}').confirmPasswordReset(
+        await base.collection('${(s=o[0])==null?void 0:s.name}').confirmPasswordReset(
             'RESET_TOKEN',
             'NEW_PASSWORD',
             'NEW_PASSWORD_CONFIRM',
         );
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${o[2]}');
+        final base = Base('${o[2]}');
 
         ...
 
-        await pb.collection('${(_=o[0])==null?void 0:_.name}').requestPasswordReset('test@example.com');
+        await base.collection('${(_=o[0])==null?void 0:_.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(ie=o[0])==null?void 0:ie.name}').confirmPasswordReset(
+        await base.collection('${(ie=o[0])==null?void 0:ie.name}').confirmPasswordReset(
           'RESET_TOKEN',
           'NEW_PASSWORD',
           'NEW_PASSWORD_CONFIRM',
         );
     `}});let E=H(o[3]),P=[];for(let i=0;i<E.length;i+=1)P[i]=Pe(Re(o,E,i));let B=H(o[3]),m=[];for(let i=0;i<B.length;i+=1)m[i]=Se($e(o,B,i));const Y=i=>X(m[i],1,1,()=>{m[i]=null});return{c(){t=p("h3"),e=D("Password reset ("),d=D(n),c=D(")"),r=S(),a=p("div"),f=p("p"),g=D("Sends "),y=p("strong"),q=D(F),J=D(" password reset email request."),W=S(),U=p("p"),U.textContent=`On successful password reset all previously issued auth tokens for the specific record will be
         automatically invalidated.`,O=S(),x(A.$$.fragment),T=S(),C=p("h6"),C.textContent="API details",R=S(),M=p("div"),j=p("div");for(let i=0;i<P.length;i+=1)P[i].c();N=S(),h=p("div");for(let i=0;i<m.length;i+=1)m[i].c();k(t,"class","m-b-sm"),k(a,"class","content txt-lg m-b-sm"),k(C,"class","m-b-xs"),k(j,"class","tabs-header compact"),k(h,"class","tabs-content"),k(M,"class","tabs")},m(i,$){v(i,t,$),u(t,e),u(t,d),u(t,c),v(i,r,$),v(i,a,$),u(a,f),u(f,g),u(f,y),u(y,q),u(f,J),u(a,W),u(a,U),v(i,O,$),Q(A,i,$),v(i,T,$),v(i,C,$),v(i,R,$),v(i,M,$),u(M,j);for(let I=0;I<P.length;I+=1)P[I]&&P[I].m(j,null);u(M,N),u(M,h);for(let I=0;I<m.length;I+=1)m[I]&&m[I].m(h,null);K=!0},p(i,[$]){var ce,re,de,ue;(!K||$&1)&&n!==(n=i[0].name+"")&&Z(d,n),(!K||$&1)&&F!==(F=i[0].name+"")&&Z(q,F);const I={};if($&5&&(I.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${i[2]}');
+        const base = new Base('${i[2]}');
 
         ...
 
-        await pb.collection('${(ce=i[0])==null?void 0:ce.name}').requestPasswordReset('test@example.com');
+        await base.collection('${(ce=i[0])==null?void 0:ce.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(re=i[0])==null?void 0:re.name}').confirmPasswordReset(
+        await base.collection('${(re=i[0])==null?void 0:re.name}').confirmPasswordReset(
             'RESET_TOKEN',
             'NEW_PASSWORD',
             'NEW_PASSWORD_CONFIRM',
         );
     `),$&5&&(I.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${i[2]}');
+        final base = Base('${i[2]}');
 
         ...
 
-        await pb.collection('${(de=i[0])==null?void 0:de.name}').requestPasswordReset('test@example.com');
+        await base.collection('${(de=i[0])==null?void 0:de.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(ue=i[0])==null?void 0:ue.name}').confirmPasswordReset(
+        await base.collection('${(ue=i[0])==null?void 0:ue.name}').confirmPasswordReset(
           'RESET_TOKEN',
           'NEW_PASSWORD',
           'NEW_PASSWORD_CONFIRM',

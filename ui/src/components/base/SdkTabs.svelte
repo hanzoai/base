@@ -1,7 +1,7 @@
 <script>
     import CodeBlock from "@/components/base/CodeBlock.svelte";
 
-    const SDK_PREFERENCE_KEY = "pb_sdk_preference";
+    const SDK_PREFERENCE_KEY = "hz_sdk_preference";
 
     let classes = "m-b-sm";
     export { classes as class }; // export reserved keyword
@@ -21,13 +21,13 @@
             title: "JavaScript",
             language: "javascript",
             content: js,
-            url: import.meta.env.PB_JS_SDK_URL,
+            url: import.meta.env.HZ_JS_SDK_URL,
         },
         {
             title: "Dart",
             language: "dart",
             content: dart,
-            url: import.meta.env.PB_DART_SDK_URL,
+            url: import.meta.env.HZ_DART_SDK_URL,
         },
     ];
 </script>

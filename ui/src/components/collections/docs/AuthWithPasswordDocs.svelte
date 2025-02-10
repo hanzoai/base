@@ -57,44 +57,44 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        const authData = await pb.collection('${collection?.name}').authWithPassword(
+        const authData = await base.collection('${collection?.name}').authWithPassword(
             '${exampleIdentityLabel}',
             'YOUR_PASSWORD',
         );
 
         // after the above you can also access the auth data from the authStore
-        console.log(pb.authStore.isValid);
-        console.log(pb.authStore.token);
-        console.log(pb.authStore.record.id);
+        console.log(base.authStore.isValid);
+        console.log(base.authStore.token);
+        console.log(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        final authData = await pb.collection('${collection?.name}').authWithPassword(
+        final authData = await base.collection('${collection?.name}').authWithPassword(
           '${exampleIdentityLabel}',
           'YOUR_PASSWORD',
         );
 
         // after the above you can also access the auth data from the authStore
-        print(pb.authStore.isValid);
-        print(pb.authStore.token);
-        print(pb.authStore.record.id);
+        print(base.authStore.isValid);
+        print(base.authStore.token);
+        print(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
 />
 

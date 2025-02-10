@@ -4,14 +4,14 @@ import (
 	"hash/crc32"
 	"strconv"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
 )
 
 // note: this migration will be deleted in future version
 
 func collectionIdChecksum(typ, name string) string {
-	return "pbc_" + strconv.FormatInt(int64(crc32.ChecksumIEEE([]byte(typ+name))), 10)
+	return "hbc_" + strconv.FormatInt(int64(crc32.ChecksumIEEE([]byte(typ+name))), 10)
 }
 
 func fieldIdChecksum(typ, name string) string {

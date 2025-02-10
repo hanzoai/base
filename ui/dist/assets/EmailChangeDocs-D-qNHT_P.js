@@ -33,35 +33,35 @@ import{S as se,i as oe,s as ie,X as K,h as g,t as X,a as V,I as F,Z as le,_ as R
                   "data": {}
                 }
             `}]),[l,d,i,r]}class Ie extends se{constructor(e){super(),oe(this,e,Ue,Le,ie,{collection:0})}}function Ae(n,e,t){const l=n.slice();return l[5]=e[t],l[7]=t,l}function Te(n,e,t){const l=n.slice();return l[5]=e[t],l[7]=t,l}function qe(n){let e,t,l,d,i;function r(){return n[4](n[7])}return{c(){e=p("button"),t=p("div"),t.textContent=`${n[5].title}`,l=y(),b(t,"class","txt"),b(e,"class","tab-item"),Y(e,"active",n[1]==n[7])},m(a,m){v(a,e,m),u(e,t),u(e,l),d||(i=ce(e,"click",r),d=!0)},p(a,m){n=a,m&2&&Y(e,"active",n[1]==n[7])},d(a){a&&g(e),d=!1,i()}}}function Pe(n){let e,t,l,d;var i=n[5].component;function r(a,m){return{props:{collection:a[0]}}}return i&&(t=be(i,r(n))),{c(){e=p("div"),t&&te(t.$$.fragment),l=y(),b(e,"class","tab-item"),Y(e,"active",n[1]==n[7])},m(a,m){v(a,e,m),t&&ee(t,e,null),u(e,l),d=!0},p(a,m){if(i!==(i=a[5].component)){if(t){ne();const k=t;X(k.$$.fragment,1,0,()=>{x(k,1)}),ae()}i?(t=be(i,r(a)),te(t.$$.fragment),V(t.$$.fragment,1),ee(t,e,l)):t=null}else if(i){const k={};m&1&&(k.collection=a[0]),t.$set(k)}(!d||m&2)&&Y(e,"active",a[1]==a[7])},i(a){d||(t&&V(t.$$.fragment,a),d=!0)},o(a){t&&X(t.$$.fragment,a),d=!1},d(a){a&&g(e),t&&x(t)}}}function Ke(n){var c,f,s,h,R,re;let e,t,l=n[0].name+"",d,i,r,a,m,k,q,G=n[0].name+"",H,J,L,z,B,D,S,N,A,O,P,j,T,W;D=new Me({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${n[2]}');
+        const base = new Base('${n[2]}');
 
         ...
 
-        await pb.collection('${(c=n[0])==null?void 0:c.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${(c=n[0])==null?void 0:c.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${(f=n[0])==null?void 0:f.name}').requestEmailChange('new@example.com');
+        await base.collection('${(f=n[0])==null?void 0:f.name}').requestEmailChange('new@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(s=n[0])==null?void 0:s.name}').confirmEmailChange(
+        await base.collection('${(s=n[0])==null?void 0:s.name}').confirmEmailChange(
             'EMAIL_CHANGE_TOKEN',
             'YOUR_PASSWORD',
         );
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${n[2]}');
+        final base = Base('${n[2]}');
 
         ...
 
-        await pb.collection('${(h=n[0])==null?void 0:h.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${(h=n[0])==null?void 0:h.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${(R=n[0])==null?void 0:R.name}').requestEmailChange('new@example.com');
+        await base.collection('${(R=n[0])==null?void 0:R.name}').requestEmailChange('new@example.com');
 
         ...
 
@@ -70,41 +70,41 @@ import{S as se,i as oe,s as ie,X as K,h as g,t as X,a as V,I as F,Z as le,_ as R
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(re=n[0])==null?void 0:re.name}').confirmEmailChange(
+        await base.collection('${(re=n[0])==null?void 0:re.name}').confirmEmailChange(
           'EMAIL_CHANGE_TOKEN',
           'YOUR_PASSWORD',
         );
     `}});let w=K(n[3]),E=[];for(let o=0;o<w.length;o+=1)E[o]=qe(Te(n,w,o));let M=K(n[3]),_=[];for(let o=0;o<M.length;o+=1)_[o]=Pe(Ae(n,M,o));const Z=o=>X(_[o],1,1,()=>{_[o]=null});return{c(){e=p("h3"),t=U("Email change ("),d=U(l),i=U(")"),r=y(),a=p("div"),m=p("p"),k=U("Sends "),q=p("strong"),H=U(G),J=U(" email change request."),L=y(),z=p("p"),z.textContent=`On successful email change all previously issued auth tokens for the specific record will be
         automatically invalidated.`,B=y(),te(D.$$.fragment),S=y(),N=p("h6"),N.textContent="API details",A=y(),O=p("div"),P=p("div");for(let o=0;o<E.length;o+=1)E[o].c();j=y(),T=p("div");for(let o=0;o<_.length;o+=1)_[o].c();b(e,"class","m-b-sm"),b(a,"class","content txt-lg m-b-sm"),b(N,"class","m-b-xs"),b(P,"class","tabs-header compact"),b(T,"class","tabs-content"),b(O,"class","tabs")},m(o,C){v(o,e,C),u(e,t),u(e,d),u(e,i),v(o,r,C),v(o,a,C),u(a,m),u(m,k),u(m,q),u(q,H),u(m,J),u(a,L),u(a,z),v(o,B,C),ee(D,o,C),v(o,S,C),v(o,N,C),v(o,A,C),v(o,O,C),u(O,P);for(let I=0;I<E.length;I+=1)E[I]&&E[I].m(P,null);u(O,j),u(O,T);for(let I=0;I<_.length;I+=1)_[I]&&_[I].m(T,null);W=!0},p(o,[C]){var de,ue,fe,me,he,pe;(!W||C&1)&&l!==(l=o[0].name+"")&&F(d,l),(!W||C&1)&&G!==(G=o[0].name+"")&&F(H,G);const I={};if(C&5&&(I.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${o[2]}');
+        const base = new Base('${o[2]}');
 
         ...
 
-        await pb.collection('${(de=o[0])==null?void 0:de.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${(de=o[0])==null?void 0:de.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${(ue=o[0])==null?void 0:ue.name}').requestEmailChange('new@example.com');
+        await base.collection('${(ue=o[0])==null?void 0:ue.name}').requestEmailChange('new@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(fe=o[0])==null?void 0:fe.name}').confirmEmailChange(
+        await base.collection('${(fe=o[0])==null?void 0:fe.name}').confirmEmailChange(
             'EMAIL_CHANGE_TOKEN',
             'YOUR_PASSWORD',
         );
     `),C&5&&(I.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${o[2]}');
+        final base = Base('${o[2]}');
 
         ...
 
-        await pb.collection('${(me=o[0])==null?void 0:me.name}').authWithPassword('test@example.com', '1234567890');
+        await base.collection('${(me=o[0])==null?void 0:me.name}').authWithPassword('test@example.com', '1234567890');
 
-        await pb.collection('${(he=o[0])==null?void 0:he.name}').requestEmailChange('new@example.com');
+        await base.collection('${(he=o[0])==null?void 0:he.name}').requestEmailChange('new@example.com');
 
         ...
 
@@ -113,7 +113,7 @@ import{S as se,i as oe,s as ie,X as K,h as g,t as X,a as V,I as F,Z as le,_ as R
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${(pe=o[0])==null?void 0:pe.name}').confirmEmailChange(
+        await base.collection('${(pe=o[0])==null?void 0:pe.name}').confirmEmailChange(
           'EMAIL_CHANGE_TOKEN',
           'YOUR_PASSWORD',
         );

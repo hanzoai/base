@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/logger"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/logger"
 )
 
 func TestBaseAppLoggerLevelDevPrint(t *testing.T) {
@@ -41,7 +41,7 @@ func TestBaseAppLoggerLevelDevPrint(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			const testDataDir = "./pb_base_app_test_data_dir/"
+			const testDataDir = "./hz_base_app_test_data_dir/"
 			defer os.RemoveAll(testDataDir)
 
 			app := NewBaseApp(BaseAppConfig{

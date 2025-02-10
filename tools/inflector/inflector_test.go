@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/inflector"
+	"github.com/hanzoai/base/tools/inflector"
 )
 
 func TestUcFirst(t *testing.T) {

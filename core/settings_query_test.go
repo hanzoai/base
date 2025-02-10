@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/types"
 )
 
 func TestReloadSettings(t *testing.T) {
@@ -80,7 +80,7 @@ func TestReloadSettingsWithEncryption(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	os.Setenv("pb_test_env", strings.Repeat("a", 32))
+	os.Setenv("hz_test_env", strings.Repeat("a", 32))
 
 	// cleanup all stored settings
 	// ---

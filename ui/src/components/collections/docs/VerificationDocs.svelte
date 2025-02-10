@@ -24,34 +24,34 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').requestVerification('test@example.com');
+        await base.collection('${collection?.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${collection?.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${collection?.name}').confirmVerification('VERIFICATION_TOKEN');
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').requestVerification('test@example.com');
+        await base.collection('${collection?.name}').requestVerification('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
-        await pb.collection('${collection?.name}').confirmVerification('VERIFICATION_TOKEN');
+        await base.collection('${collection?.name}').confirmVerification('VERIFICATION_TOKEN');
     `}
 />
 

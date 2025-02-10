@@ -42,7 +42,7 @@
             Multi-factor authentication (MFA) requires the user to authenticate with any 2 different auth
             methods (otp, identity/password, oauth2) before issuing an auth token.
             <a
-                href={import.meta.env.PB_MFA_DOCS}
+                href={import.meta.env.HZ_MFA_DOCS}
                 target="_blank"
                 rel="noopener noreferrer"
                 class="txt-sm link-hint"

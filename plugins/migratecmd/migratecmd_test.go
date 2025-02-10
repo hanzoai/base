@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/plugins/migratecmd"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/migratecmd"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/types"
 )
 
 func TestAutomigrateCollectionCreate(t *testing.T) {
@@ -24,7 +24,7 @@ func TestAutomigrateCollectionCreate(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../pb_data/types.d.ts" />
+/// <reference path="../hz_data/types.d.ts" />
 migrate((app) => {
   const collection = new Collection({
     "authAlert": {
@@ -196,8 +196,8 @@ package _test_migrations
 import (
 	"encoding/json"
 
-	"github.com/pocketbase/pocketbase/core"
-	m "github.com/pocketbase/pocketbase/migrations"
+	"github.com/hanzoai/base/core"
+	m "github.com/hanzoai/base/migrations"
 )
 
 func init() {
@@ -461,7 +461,7 @@ func TestAutomigrateCollectionDelete(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../pb_data/types.d.ts" />
+/// <reference path="../hz_data/types.d.ts" />
 migrate((app) => {
   const collection = app.findCollectionByNameOrId("@TEST_RANDOM");
 
@@ -633,8 +633,8 @@ package _test_migrations
 import (
 	"encoding/json"
 
-	"github.com/pocketbase/pocketbase/core"
-	m "github.com/pocketbase/pocketbase/migrations"
+	"github.com/hanzoai/base/core"
+	m "github.com/hanzoai/base/migrations"
 )
 
 func init() {
@@ -893,7 +893,7 @@ func TestAutomigrateCollectionUpdate(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../pb_data/types.d.ts" />
+/// <reference path="../hz_data/types.d.ts" />
 migrate((app) => {
   const collection = app.findCollectionByNameOrId("@TEST_RANDOM")
 
@@ -1015,8 +1015,8 @@ package _test_migrations
 import (
 	"encoding/json"
 
-	"github.com/pocketbase/pocketbase/core"
-	m "github.com/pocketbase/pocketbase/migrations"
+	"github.com/hanzoai/base/core"
+	m "github.com/hanzoai/base/migrations"
 )
 
 func init() {

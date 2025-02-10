@@ -1,5 +1,5 @@
 // Package jsvm implements pluggable utilities for binding a JS goja runtime
-// to the PocketBase instance (loading migrations, attaching to app hooks, etc.).
+// to the Base instance (loading migrations, attaching to app hooks, etc.).
 //
 // Example:
 //
@@ -28,9 +28,9 @@ import (
 	"github.com/dop251/goja_nodejs/require"
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/plugins/jsvm/internal/types/generated"
-	"github.com/pocketbase/pocketbase/tools/template"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/jsvm/internal/types/generated"
+	"github.com/hanzoai/base/tools/template"
 )
 
 const typesFileName = "types.d.ts"
@@ -50,14 +50,14 @@ type Config struct {
 
 	// HooksDir specifies the JS app hooks directory.
 	//
-	// If not set it fallbacks to a relative "pb_data/../pb_hooks" directory.
+	// If not set it fallbacks to a relative "hz_data/../hz_hooks" directory.
 	HooksDir string
 
 	// HooksFilesPattern specifies a regular expression pattern that
 	// identify which file to load by the hook vm(s).
 	//
-	// If not set it fallbacks to `^.*(\.pb\.js|\.pb\.ts)$`, aka. any
-	// HookdsDir file ending in ".pb.js" or ".pb.ts" (the last one is to enforce IDE linters).
+	// If not set it fallbacks to `^.*(\.base\.js|\.base\.ts)$`, aka. any
+	// HookdsDir file ending in ".base.js" or ".base.ts" (the last one is to enforce IDE linters).
 	HooksFilesPattern string
 
 	// HooksPoolSize specifies how many goja.Runtime instances to prewarm
@@ -69,7 +69,7 @@ type Config struct {
 
 	// MigrationsDir specifies the JS migrations directory.
 	//
-	// If not set it fallbacks to a relative "pb_data/../pb_migrations" directory.
+	// If not set it fallbacks to a relative "hz_data/../hz_migrations" directory.
 	MigrationsDir string
 
 	// If not set it fallbacks to `^.*(\.js|\.ts)$`, aka. any MigrationDir file
@@ -79,7 +79,7 @@ type Config struct {
 	// TypesDir specifies the directory where to store the embedded
 	// TypeScript declarations file.
 	//
-	// If not set it fallbacks to "pb_data".
+	// If not set it fallbacks to "hz_data".
 	//
 	// Note: Avoid using the same directory as the HooksDir when HooksWatch is enabled
 	// to prevent unnecessary app restarts when the types file is initially created.
@@ -108,15 +108,15 @@ func Register(app core.App, config Config) error {
 	p := &plugin{app: app, config: config}
 
 	if p.config.HooksDir == "" {
-		p.config.HooksDir = filepath.Join(app.DataDir(), "../pb_hooks")
+		p.config.HooksDir = filepath.Join(app.DataDir(), "../hz_hooks")
 	}
 
 	if p.config.MigrationsDir == "" {
-		p.config.MigrationsDir = filepath.Join(app.DataDir(), "../pb_migrations")
+		p.config.MigrationsDir = filepath.Join(app.DataDir(), "../hz_migrations")
 	}
 
 	if p.config.HooksFilesPattern == "" {
-		p.config.HooksFilesPattern = `^.*(\.pb\.js|\.pb\.ts)$`
+		p.config.HooksFilesPattern = `^.*(\.base\.js|\.base\.ts)$`
 	}
 
 	if p.config.MigrationsFilesPattern == "" {

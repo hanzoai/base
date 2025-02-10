@@ -88,7 +88,7 @@
         File upload is supported only via <code>multipart/form-data</code>.
         <br />
         For more info and examples you could check the detailed
-        <a href={import.meta.env.PB_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
+        <a href={import.meta.env.HZ_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
             Files upload and handling docs
         </a>.
     </p>
@@ -106,28 +106,28 @@
 <!-- prettier-ignore -->
 <SdkTabs
     js={`
-import PocketBase from 'pocketbase';
+import Base from 'base';
 
-const pb = new PocketBase('${backendAbsUrl}');
+const base = new Base('${backendAbsUrl}');
 
 ...
 
 // example update data
 const data = ${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 4)};
 
-const record = await pb.collection('${collection?.name}').update('RECORD_ID', data);
+const record = await base.collection('${collection?.name}').update('RECORD_ID', data);
     `}
     dart={`
-import 'package:pocketbase/pocketbase.dart';
+import 'package:hanzoai/base.dart';
 
-final pb = PocketBase('${backendAbsUrl}');
+final base = Base('${backendAbsUrl}');
 
 ...
 
 // example update body
 final body = <String, dynamic>${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 2)};
 
-final record = await pb.collection('${collection?.name}').update('RECORD_ID', body: body);
+final record = await base.collection('${collection?.name}').update('RECORD_ID', body: body);
     `}
 />
 

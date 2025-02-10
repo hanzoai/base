@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/hanzoai/base/core"
 )
 
 func recordAuthWithOTP(e *core.RequestEvent) error {
@@ -52,7 +52,7 @@ func recordAuthWithOTP(e *core.RequestEvent) error {
 	}
 
 	// since otps are usually simple digit numbers, enforce an extra rate limit rule as basic enumaration protection
-	err = checkRateLimit(e, "@pb_otp_"+event.Record.Id, core.RateLimitRule{MaxRequests: 5, Duration: 180})
+	err = checkRateLimit(e, "@hz_otp_"+event.Record.Id, core.RateLimitRule{MaxRequests: 5, Duration: 180})
 	if err != nil {
 		return e.TooManyRequestsError("Too many attempts, please try again later with a new OTP.", nil)
 	}

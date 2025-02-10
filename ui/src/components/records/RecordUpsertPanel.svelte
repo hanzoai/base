@@ -1,7 +1,7 @@
 <script>
     import { createEventDispatcher, tick } from "svelte";
     import { slide } from "svelte/transition";
-    import { ClientResponseError } from "pocketbase";
+    import { ClientResponseError } from "base";
     import ApiClient from "@/utils/ApiClient";
     import CommonHelper from "@/utils/CommonHelper";
     import tooltip from "@/actions/tooltip";
@@ -486,8 +486,8 @@
     }
 
     function copyJSON() {
-        CommonHelper.copyToClipboard(JSON.stringify(original, null, 2));
-        addInfoToast("The record JSON was copied to your clipboard!", 3000);
+        CommonHelper.copyToClibaseoard(JSON.stringify(original, null, 2));
+        addInfoToast("The record JSON was copied to your clibaseoard!", 3000);
     }
 </script>
 

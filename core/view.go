@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
-	"github.com/pocketbase/pocketbase/tools/inflector"
-	"github.com/pocketbase/pocketbase/tools/security"
-	"github.com/pocketbase/pocketbase/tools/tokenizer"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/tokenizer"
 )
 
 // DeleteView drops the specified view name.
@@ -456,8 +456,8 @@ type identifiersParser struct {
 func (p *identifiersParser) parse(selectQuery string) error {
 	str := strings.Trim(strings.TrimSpace(selectQuery), ";")
 	str = commentsReplaceRegex.ReplaceAllString(str, " ")
-	str = joinReplaceRegex.ReplaceAllString(str, " __pb_join__ ")
-	str = discardReplaceRegex.ReplaceAllString(str, " __pb_discard__ ")
+	str = joinReplaceRegex.ReplaceAllString(str, " __hz_join__ ")
+	str = discardReplaceRegex.ReplaceAllString(str, " __hz_discard__ ")
 
 	tk := tokenizer.NewFromString(str)
 	tk.Separators(',', ' ', '\n', '\t')
@@ -492,7 +492,7 @@ func (p *identifiersParser) parse(selectQuery string) error {
 			skip = false
 			partType = "from"
 			activeBuilder = &fromParts
-		case "__pb_join__":
+		case "__hz_join__":
 			skip = false
 
 			// the previous part was also a join
@@ -502,7 +502,7 @@ func (p *identifiersParser) parse(selectQuery string) error {
 
 			partType = "join"
 			activeBuilder = &joinParts
-		case "__pb_discard__":
+		case "__hz_discard__":
 			// skip following tokens
 			skip = true
 		default:

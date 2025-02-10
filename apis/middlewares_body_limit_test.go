@@ -6,28 +6,28 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 )
 
 func TestBodyLimitMiddleware(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	pbRouter, err := apis.NewRouter(app)
+	baseRouter, err := apis.NewRouter(app)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pbRouter.POST("/a", func(e *core.RequestEvent) error {
+	baseRouter.POST("/a", func(e *core.RequestEvent) error {
 		return e.String(200, "a")
 	}) // default global BodyLimit check
 
-	pbRouter.POST("/b", func(e *core.RequestEvent) error {
+	baseRouter.POST("/b", func(e *core.RequestEvent) error {
 		return e.String(200, "b")
 	}).Bind(apis.BodyLimit(20))
 
-	mux, err := pbRouter.BuildMux()
+	mux, err := baseRouter.BuildMux()
 	if err != nil {
 		t.Fatal(err)
 	}

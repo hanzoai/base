@@ -3,7 +3,7 @@ package core
 import (
 	"errors"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // FindAllAuthOriginsByRecord returns all AuthOrigin models linked to the provided auth record (in DESC order).

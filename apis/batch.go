@@ -15,10 +15,10 @@ import (
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 )
 

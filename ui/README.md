@@ -1,10 +1,10 @@
-PocketBase Superuser dashboard UI
+Base Superuser dashboard UI
 ======================================================================
 
-This is the PocketBase Superuser dashboard UI (built with Svelte and Vite).
+This is the Base Superuser dashboard UI (built with Svelte and Vite).
 
 Although it could be used independently, it is mainly intended to be embedded
-as part of a PocketBase app executable (hence the `embed.go` file).
+as part of a Base app executable (hence the `embed.go` file).
 
 ## Development
 

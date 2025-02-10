@@ -9,11 +9,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/list"
 )
 
-const StoreKeyCachedCollections = "pbAppCachedCollections"
+const StoreKeyCachedCollections = "baseAppCachedCollections"
 
 // CollectionQuery returns a new Collection select query.
 func (app *BaseApp) CollectionQuery() *dbx.SelectQuery {
@@ -299,7 +299,7 @@ func saveViewCollection(app App, newCollection, oldCollection *Collection) error
 // normalizeViewQueryId wraps (if necessary) the provided view query
 // with a subselect to ensure that the id column is a text since
 // currently we don't support non-string model ids
-// (see https://github.com/pocketbase/pocketbase/issues/3110).
+// (see https://github.com/hanzoai/base/issues/3110).
 func normalizeViewQueryId(app App, query string) (string, error) {
 	query = strings.Trim(strings.TrimSpace(query), ";")
 

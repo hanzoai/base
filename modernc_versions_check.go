@@ -1,4 +1,4 @@
-package pocketbase
+package base
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"runtime/debug"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/hanzoai/base/core"
 )
 
 const (
@@ -15,7 +15,7 @@ const (
 
 	// ModerncDepsCheckHookId is the id of the hook that performs the modernc.org/* deps checks.
 	// It could be used for removing/unbinding the hook if you don't want the checks.
-	ModerncDepsCheckHookId = "pbModerncDepsCheck"
+	ModerncDepsCheckHookId = "baseModerncDepsCheck"
 )
 
 // checkModerncDeps checks whether the current binary was buit with the
@@ -24,7 +24,7 @@ const (
 // This is needed because modernc.org/libc doesn't follow semantic versioning
 // and using a version different from the one in the go.mod of modernc.org/sqlite
 // could have unintended side-effects and cause obscure build and runtime bugs
-// (https://github.com/pocketbase/pocketbase/issues/6136).
+// (https://github.com/hanzoai/base/issues/6136).
 func checkModerncDeps(app core.App) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
