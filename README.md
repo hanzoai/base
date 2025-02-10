@@ -1,6 +1,6 @@
 <p align="center">
     <a href="https://hanzo.io" target="_blank" rel="noopener">
-        <img src="https://i.imgur.com/5qimnm5.png" alt="Base Base - open source backend in 1 file" />
+        <img src="https://i.imgur.com/5qimnm5.png" alt="Hanzo Base - Open Source backend for any app" />
     </a>
 </p>
 
@@ -20,18 +20,18 @@
 - deeply with integrated **[Base AI Platform](https://hanzo.ai)** for
   hyperscalability day one.
 
-**Use [Base App](https://hanzo.app) to rapidly iterate and build new apps!
+**Use [Hanzo App](https://hanzo.app) to rapidly iterate and build new apps!
 
 > [!WARNING]
-> Please keep in mind that Base Base is still under active development
+> Please keep in mind that Base is still under active development
 > and therefore full backward compatibility is not guaranteed before reaching v1.0.0.
 
 ## API SDK clients
 
 The easiest way to interact with the Base Web APIs is to use one of the official SDK clients:
 
-- **JavaScript - [base/js-sdk](https://github.com/hanzoai/js-sdk)** (_Browser, Node.js, React Native_)
-- **Dart - [base/dart-sdk](https://github.com/hanzoai/dart-sdk)** (_Web, Mobile, Desktop, CLI_)
+- **JavaScript - [@hanzoai/js-sdk](https://github.com/hanzoai/js-sdk)** (_Browser, Node.js, React Native_)
+- **Dart - [@hanzoai/dart-sdk](https://github.com/hanzoai/dart-sdk)** (_Web, Mobile, Desktop, CLI_)
 
 You could also check the recommendations in https://docs.hanzo.ai/how-to-use/.
 
@@ -43,7 +43,7 @@ You could also check the recommendations in https://docs.hanzo.ai/how-to-use/.
 You could download the prebuilt executable for your platform from the [Releases page](https://github.com/hanzoai/base/releases).
 Once downloaded, extract the archive and run `./base serve` in the extracted directory.
 
-The prebuilt executables are based on the [`examples/base/main.go` file](https://github.com/hanzoai/base/blob/master/examples/base/main.go) and comes with the JS VM plugin enabled by default which allows to extend Base with JavaScript (_for more details please refer to [Extend with JavaScript](https://docs.hanzo.ai/js-overview/)_).
+The prebuilt executables are based on the [`examples/base/main.go` file](https://github.com/hanzoai/base/blob/master/examples/base/main.go) and comes with a JavaScript plugin enabled by default which allows to extend Base with JavaScript (_for more details please refer to [Extend with JavaScript](https://docs.hanzo.ai/js-overview/)_).
 
 ### Use as a Go framework/toolkit
 
