@@ -6,9 +6,9 @@ import (
 	"slices"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/types"
 )
 
 const CollectionNameAuthOrigins = "_authOrigins"

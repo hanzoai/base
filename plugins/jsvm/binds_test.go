@@ -16,12 +16,12 @@ import (
 
 	"github.com/dop251/goja"
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/mailer"
+	"github.com/hanzoai/base/tools/router"
 	"github.com/spf13/cast"
 )
 
@@ -1573,14 +1573,14 @@ func TestRouterBinds(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pbRouter, err := apis.NewRouter(app)
+	baseRouter, err := apis.NewRouter(app)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	serveEvent := new(core.ServeEvent)
 	serveEvent.App = app
-	serveEvent.Router = pbRouter
+	serveEvent.Router = baseRouter
 	if err = app.OnServe().Trigger(serveEvent); err != nil {
 		t.Fatal(err)
 	}

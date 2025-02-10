@@ -57,7 +57,7 @@
     <p>Authenticate with an OAuth2 provider and returns a new auth token and record data.</p>
     <p>
         For more details please check the
-        <a href={import.meta.env.PB_OAUTH2_EXAMPLE} target="_blank" rel="noopener noreferrer">
+        <a href={import.meta.env.HZ_OAUTH2_EXAMPLE} target="_blank" rel="noopener noreferrer">
             OAuth2 integration documentation
         </a>.
     </p>
@@ -65,53 +65,53 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
         // OAuth2 authentication with a single realtime call.
         //
         // Make sure to register ${backendAbsUrl}/api/oauth2-redirect as redirect url.
-        const authData = await pb.collection('${collection.name}').authWithOAuth2({ provider: 'google' });
+        const authData = await base.collection('${collection.name}').authWithOAuth2({ provider: 'google' });
 
         // OR authenticate with manual OAuth2 code exchange
-        // const authData = await pb.collection('${collection.name}').authWithOAuth2Code(...);
+        // const authData = await base.collection('${collection.name}').authWithOAuth2Code(...);
 
         // after the above you can also access the auth data from the authStore
-        console.log(pb.authStore.isValid);
-        console.log(pb.authStore.token);
-        console.log(pb.authStore.record.id);
+        console.log(base.authStore.isValid);
+        console.log(base.authStore.token);
+        console.log(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
         import 'package:url_launcher/url_launcher.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
         // OAuth2 authentication with a single realtime call.
         //
         // Make sure to register ${backendAbsUrl}/api/oauth2-redirect as redirect url.
-        final authData = await pb.collection('${collection.name}').authWithOAuth2('google', (url) async {
+        final authData = await base.collection('${collection.name}').authWithOAuth2('google', (url) async {
           await launchUrl(url);
         });
 
         // OR authenticate with manual OAuth2 code exchange
-        // final authData = await pb.collection('${collection.name}').authWithOAuth2Code(...);
+        // final authData = await base.collection('${collection.name}').authWithOAuth2Code(...);
 
         // after the above you can also access the auth data from the authStore
-        print(pb.authStore.isValid);
-        print(pb.authStore.token);
-        print(pb.authStore.record.id);
+        print(base.authStore.isValid);
+        print(base.authStore.token);
+        print(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
 />
 

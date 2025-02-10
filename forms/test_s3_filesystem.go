@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/security"
 )
 
 const (
@@ -70,7 +70,7 @@ func (form *TestS3Filesystem) Submit() error {
 	}
 	defer fsys.Close()
 
-	testPrefix := "pb_settings_test_" + security.PseudorandomString(5)
+	testPrefix := "hz_settings_test_" + security.PseudorandomString(5)
 	testFileKey := testPrefix + "/test.txt"
 
 	// try to upload a test file

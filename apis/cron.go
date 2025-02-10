@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/cron"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/routine"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/cron"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/routine"
 )
 
 // bindCronApi registers the crons api endpoint.
@@ -22,10 +22,10 @@ func cronsList(e *core.RequestEvent) error {
 	jobs := e.App.Cron().Jobs()
 
 	slices.SortStableFunc(jobs, func(a, b *cron.Job) int {
-		if strings.HasPrefix(a.Id(), "__pb") {
+		if strings.HasPrefix(a.Id(), "__hz") {
 			return 1
 		}
-		if strings.HasPrefix(b.Id(), "__pb") {
+		if strings.HasPrefix(b.Id(), "__hz") {
 			return -1
 		}
 		return strings.Compare(a.Id(), b.Id())

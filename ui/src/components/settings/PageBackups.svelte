@@ -109,7 +109,7 @@
     <div class="wrapper">
         <div class="panel" autocomplete="off" on:submit|preventDefault={save}>
             <div class="flex m-b-sm flex-gap-10">
-                <span class="txt-xl">Backup and restore your PocketBase data</span>
+                <span class="txt-xl">Backup and restore your Base data</span>
                 <RefreshButton class="btn-sm" tooltip={"Refresh"} on:refresh={refreshList} />
                 <BackupUploadButton class="btn-sm" on:success={refreshList} />
             </div>

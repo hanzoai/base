@@ -1,4 +1,4 @@
-package pocketbase
+package base
 
 import (
 	"io"
@@ -10,26 +10,26 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/pocketbase/cmd"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/routine"
+	"github.com/hanzoai/base/cmd"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/routine"
 	"github.com/spf13/cobra"
 
-	_ "github.com/pocketbase/pocketbase/migrations"
+	_ "github.com/hanzoai/base/migrations"
 )
 
-var _ core.App = (*PocketBase)(nil)
+var _ core.App = (*Base)(nil)
 
-// Version of PocketBase
+// Version of Base
 var Version = "(untracked)"
 
-// PocketBase defines a PocketBase app launcher.
+// Base defines a Base app launcher.
 //
 // It implements [core.App] via embedding and all of the app interface methods
-// could be accessed directly through the instance (eg. PocketBase.DataDir()).
-type PocketBase struct {
+// could be accessed directly through the instance (eg. Base.DataDir()).
+type Base struct {
 	core.App
 
 	devFlag           bool
@@ -42,14 +42,14 @@ type PocketBase struct {
 	RootCmd *cobra.Command
 }
 
-// Config is the PocketBase initialization config struct.
+// Config is the Base initialization config struct.
 type Config struct {
 	// hide the default console server info on app startup
 	HideStartBanner bool
 
 	// optional default values for the console flags
 	DefaultDev           bool
-	DefaultDataDir       string // if not set, it will fallback to "./pb_data"
+	DefaultDataDir       string // if not set, it will fallback to "./hz_data"
 	DefaultEncryptionEnv string
 	DefaultQueryTimeout  time.Duration // default to core.DefaultQueryTimeout (in seconds)
 
@@ -61,15 +61,15 @@ type Config struct {
 	DBConnect        core.DBConnectFunc // default to core.dbConnect
 }
 
-// New creates a new PocketBase instance with the default configuration.
+// New creates a new Base instance with the default configuration.
 // Use [NewWithConfig] if you want to provide a custom configuration.
 //
 // Note that the application will not be initialized/bootstrapped yet,
 // aka. DB connections, migrations, app settings, etc. will not be accessible.
-// Everything will be initialized when [PocketBase.Start] is executed.
-// If you want to initialize the application before calling [PocketBase.Start],
-// then you'll have to manually call [PocketBase.Bootstrap].
-func New() *PocketBase {
+// Everything will be initialized when [Base.Start] is executed.
+// If you want to initialize the application before calling [Base.Start],
+// then you'll have to manually call [Base.Bootstrap].
+func New() *Base {
 	_, isUsingGoRun := inspectRuntime()
 
 	return NewWithConfig(Config{
@@ -77,18 +77,18 @@ func New() *PocketBase {
 	})
 }
 
-// NewWithConfig creates a new PocketBase instance with the provided config.
+// NewWithConfig creates a new Base instance with the provided config.
 //
 // Note that the application will not be initialized/bootstrapped yet,
 // aka. DB connections, migrations, app settings, etc. will not be accessible.
-// Everything will be initialized when [PocketBase.Start] is executed.
-// If you want to initialize the application before calling [PocketBase.Start],
-// then you'll have to manually call [PocketBase.Bootstrap].
-func NewWithConfig(config Config) *PocketBase {
+// Everything will be initialized when [Base.Start] is executed.
+// If you want to initialize the application before calling [Base.Start],
+// then you'll have to manually call [Base.Bootstrap].
+func NewWithConfig(config Config) *Base {
 	// initialize a default data directory based on the executable baseDir
 	if config.DefaultDataDir == "" {
 		baseDir, _ := inspectRuntime()
-		config.DefaultDataDir = filepath.Join(baseDir, "pb_data")
+		config.DefaultDataDir = filepath.Join(baseDir, "hz_data")
 	}
 
 	if config.DefaultQueryTimeout == 0 {
@@ -97,7 +97,7 @@ func NewWithConfig(config Config) *PocketBase {
 
 	executableName := filepath.Base(os.Args[0])
 
-	pb := &PocketBase{
+	base := &Base{
 		RootCmd: &cobra.Command{
 			Use:     executableName,
 			Short:   executableName + " CLI",
@@ -117,18 +117,18 @@ func NewWithConfig(config Config) *PocketBase {
 	}
 
 	// replace with a colored stderr writer
-	pb.RootCmd.SetErr(newErrWriter())
+	base.RootCmd.SetErr(newErrWriter())
 
 	// parse base flags
 	// (errors are ignored, since the full flags parsing happens on Execute())
-	pb.eagerParseFlags(&config)
+	base.eagerParseFlags(&config)
 
 	// initialize the app instance
-	pb.App = core.NewBaseApp(core.BaseAppConfig{
-		IsDev:            pb.devFlag,
-		DataDir:          pb.dataDirFlag,
-		EncryptionEnv:    pb.encryptionEnvFlag,
-		QueryTimeout:     time.Duration(pb.queryTimeout) * time.Second,
+	base.App = core.NewBaseApp(core.BaseAppConfig{
+		IsDev:            base.devFlag,
+		DataDir:          base.dataDirFlag,
+		EncryptionEnv:    base.encryptionEnvFlag,
+		QueryTimeout:     time.Duration(base.queryTimeout) * time.Second,
 		DataMaxOpenConns: config.DataMaxOpenConns,
 		DataMaxIdleConns: config.DataMaxIdleConns,
 		AuxMaxOpenConns:  config.AuxMaxOpenConns,
@@ -137,10 +137,10 @@ func NewWithConfig(config Config) *PocketBase {
 	})
 
 	// hide the default help command (allow only `--help` flag)
-	pb.RootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
+	base.RootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
 
-	// https://github.com/pocketbase/pocketbase/issues/6136
-	pb.OnBootstrap().Bind(&hook.Handler[*core.BootstrapEvent]{
+	// https://github.com/hanzoai/base/issues/6136
+	base.OnBootstrap().Bind(&hook.Handler[*core.BootstrapEvent]{
 		Id: ModerncDepsCheckHookId,
 		Func: func(be *core.BootstrapEvent) error {
 			if err := be.Next(); err != nil {
@@ -157,27 +157,27 @@ func NewWithConfig(config Config) *PocketBase {
 		},
 	})
 
-	return pb
+	return base
 }
 
 // Start starts the application, aka. registers the default system
-// commands (serve, superuser, version) and executes pb.RootCmd.
-func (pb *PocketBase) Start() error {
+// commands (serve, superuser, version) and executes base.RootCmd.
+func (base *Base) Start() error {
 	// register system commands
-	pb.RootCmd.AddCommand(cmd.NewSuperuserCommand(pb))
-	pb.RootCmd.AddCommand(cmd.NewServeCommand(pb, !pb.hideStartBanner))
+	base.RootCmd.AddCommand(cmd.NewSuperuserCommand(base))
+	base.RootCmd.AddCommand(cmd.NewServeCommand(base, !base.hideStartBanner))
 
-	return pb.Execute()
+	return base.Execute()
 }
 
 // Execute initializes the application (if not already) and executes
-// the pb.RootCmd with graceful shutdown support.
+// the base.RootCmd with graceful shutdown support.
 //
-// This method differs from pb.Start() by not registering the default
+// This method differs from base.Start() by not registering the default
 // system commands!
-func (pb *PocketBase) Execute() error {
-	if !pb.skipBootstrap() {
-		if err := pb.Bootstrap(); err != nil {
+func (base *Base) Execute() error {
+	if !base.skipBootstrap() {
+		if err := base.Bootstrap(); err != nil {
 			return err
 		}
 	}
@@ -196,7 +196,7 @@ func (pb *PocketBase) Execute() error {
 	// execute the root command
 	go func() {
 		// note: leave to the commands to decide whether to print their error
-		pb.RootCmd.Execute()
+		base.RootCmd.Execute()
 
 		done <- true
 	}()
@@ -205,44 +205,44 @@ func (pb *PocketBase) Execute() error {
 
 	// trigger cleanups
 	event := new(core.TerminateEvent)
-	event.App = pb
-	return pb.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
+	event.App = base
+	return base.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
 		return e.App.ResetBootstrapState()
 	})
 }
 
-// eagerParseFlags parses the global app flags before calling pb.RootCmd.Execute().
-// so we can have all PocketBase flags ready for use on initialization.
-func (pb *PocketBase) eagerParseFlags(config *Config) error {
-	pb.RootCmd.PersistentFlags().StringVar(
-		&pb.dataDirFlag,
+// eagerParseFlags parses the global app flags before calling base.RootCmd.Execute().
+// so we can have all Base flags ready for use on initialization.
+func (base *Base) eagerParseFlags(config *Config) error {
+	base.RootCmd.PersistentFlags().StringVar(
+		&base.dataDirFlag,
 		"dir",
 		config.DefaultDataDir,
-		"the PocketBase data directory",
+		"the Base data directory",
 	)
 
-	pb.RootCmd.PersistentFlags().StringVar(
-		&pb.encryptionEnvFlag,
+	base.RootCmd.PersistentFlags().StringVar(
+		&base.encryptionEnvFlag,
 		"encryptionEnv",
 		config.DefaultEncryptionEnv,
 		"the env variable whose value of 32 characters will be used \nas encryption key for the app settings (default none)",
 	)
 
-	pb.RootCmd.PersistentFlags().BoolVar(
-		&pb.devFlag,
+	base.RootCmd.PersistentFlags().BoolVar(
+		&base.devFlag,
 		"dev",
 		config.DefaultDev,
 		"enable dev mode, aka. printing logs and sql statements to the console",
 	)
 
-	pb.RootCmd.PersistentFlags().IntVar(
-		&pb.queryTimeout,
+	base.RootCmd.PersistentFlags().IntVar(
+		&base.queryTimeout,
 		"queryTimeout",
 		int(config.DefaultQueryTimeout.Seconds()),
 		"the default SELECT queries timeout in seconds",
 	)
 
-	return pb.RootCmd.ParseFlags(os.Args[1:])
+	return base.RootCmd.ParseFlags(os.Args[1:])
 }
 
 // skipBootstrap eagerly checks if the app should skip the bootstrap process:
@@ -251,9 +251,9 @@ func (pb *PocketBase) eagerParseFlags(config *Config) error {
 // - is the default help command
 // - is the default version command
 //
-// https://github.com/pocketbase/pocketbase/issues/404
-// https://github.com/pocketbase/pocketbase/discussions/1267
-func (pb *PocketBase) skipBootstrap() bool {
+// https://github.com/hanzoai/base/issues/404
+// https://github.com/hanzoai/base/discussions/1267
+func (base *Base) skipBootstrap() bool {
 	flags := []string{
 		"-h",
 		"--help",
@@ -261,11 +261,11 @@ func (pb *PocketBase) skipBootstrap() bool {
 		"--version",
 	}
 
-	if pb.IsBootstrapped() {
+	if base.IsBootstrapped() {
 		return true // already bootstrapped
 	}
 
-	cmd, _, err := pb.RootCmd.Find(os.Args[1:])
+	cmd, _, err := base.RootCmd.Find(os.Args[1:])
 	if err != nil {
 		return true // unknown command
 	}

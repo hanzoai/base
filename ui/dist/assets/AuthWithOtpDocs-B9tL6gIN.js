@@ -33,104 +33,104 @@ import{S as be,i as _e,s as ve,W as ge,X as V,h as b,d as x,t as j,a as J,I as c
                   "data": {}
                 }
             `}]),[l,h,i,c]}class lt extends be{constructor(t){super(),_e(this,t,tt,et,ve,{collection:0})}}function Ve(a,t,e){const l=a.slice();return l[5]=t[e],l[7]=e,l}function Je(a,t,e){const l=a.slice();return l[5]=t[e],l[7]=e,l}function Ne(a){let t,e,l,h,i;function c(){return a[4](a[7])}return{c(){t=d("button"),e=d("div"),e.textContent=`${a[5].title}`,l=T(),g(e,"class","txt"),g(t,"class","tab-item"),N(t,"active",a[1]==a[7])},m(n,m){_(n,t,m),s(t,e),s(t,l),h||(i=$e(t,"click",c),h=!0)},p(n,m){a=n,m&2&&N(t,"active",a[1]==a[7])},d(n){n&&b(t),h=!1,i()}}}function Ee(a){let t,e,l,h;var i=a[5].component;function c(n,m){return{props:{collection:n[0]}}}return i&&(e=Me(i,c(a))),{c(){t=d("div"),e&&te(e.$$.fragment),l=T(),g(t,"class","tab-item"),N(t,"active",a[1]==a[7])},m(n,m){_(n,t,m),e&&ee(e,t,null),s(t,l),h=!0},p(n,m){if(i!==(i=n[5].component)){if(e){ue();const v=e;j(v.$$.fragment,1,0,()=>{x(v,1)}),he()}i?(e=Me(i,c(n)),te(e.$$.fragment),J(e.$$.fragment,1),ee(e,t,l)):e=null}else if(i){const v={};m&1&&(v.collection=n[0]),e.$set(v)}(!h||m&2)&&N(t,"active",n[1]==n[7])},i(n){h||(e&&J(e.$$.fragment,n),h=!0)},o(n){e&&j(e.$$.fragment,n),h=!1},d(n){n&&b(t),e&&x(e)}}}function ot(a){var Y,A,X,E;let t,e,l=a[0].name+"",h,i,c,n,m,v,C,F,B,I,D,Q,M,U;v=new Ke({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${a[2]}');
+        const base = new Base('${a[2]}');
 
         ...
 
         // send OTP email to the provided auth record
-        const req = await pb.collection('${(Y=a[0])==null?void 0:Y.name}').requestOTP('test@example.com');
+        const req = await base.collection('${(Y=a[0])==null?void 0:Y.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        const authData = await pb.collection('${(A=a[0])==null?void 0:A.name}').authWithOTP(
+        const authData = await base.collection('${(A=a[0])==null?void 0:A.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        console.log(pb.authStore.isValid);
-        console.log(pb.authStore.token);
-        console.log(pb.authStore.record.id);
+        console.log(base.authStore.isValid);
+        console.log(base.authStore.token);
+        console.log(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${a[2]}');
+        final base = Base('${a[2]}');
 
         ...
 
         // send OTP email to the provided auth record
-        final req = await pb.collection('${(X=a[0])==null?void 0:X.name}').requestOTP('test@example.com');
+        final req = await base.collection('${(X=a[0])==null?void 0:X.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        final authData = await pb.collection('${(E=a[0])==null?void 0:E.name}').authWithOTP(
+        final authData = await base.collection('${(E=a[0])==null?void 0:E.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        print(pb.authStore.isValid);
-        print(pb.authStore.token);
-        print(pb.authStore.record.id);
+        print(base.authStore.isValid);
+        print(base.authStore.token);
+        print(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}});let y=V(a[3]),O=[];for(let o=0;o<y.length;o+=1)O[o]=Ne(Je(a,y,o));let q=V(a[3]),k=[];for(let o=0;o<q.length;o+=1)k[o]=Ee(Ve(a,q,o));const L=o=>j(k[o],1,1,()=>{k[o]=null});return{c(){t=d("h3"),e=R("Auth with OTP ("),h=R(l),i=R(")"),c=T(),n=d("div"),n.innerHTML=`<p>Authenticate with an one-time password (OTP).</p> <p>Note that when requesting an OTP we return an <code>otpId</code> even if a user with the provided email
         doesn&#39;t exist as a very basic enumeration protection.</p>`,m=T(),te(v.$$.fragment),C=T(),F=d("h6"),F.textContent="API details",B=T(),I=d("div"),D=d("div");for(let o=0;o<O.length;o+=1)O[o].c();Q=T(),M=d("div");for(let o=0;o<k.length;o+=1)k[o].c();g(t,"class","m-b-sm"),g(n,"class","content txt-lg m-b-sm"),g(F,"class","m-b-xs"),g(D,"class","tabs-header compact"),g(M,"class","tabs-content"),g(I,"class","tabs")},m(o,$){_(o,t,$),s(t,e),s(t,h),s(t,i),_(o,c,$),_(o,n,$),_(o,m,$),ee(v,o,$),_(o,C,$),_(o,F,$),_(o,B,$),_(o,I,$),s(I,D);for(let P=0;P<O.length;P+=1)O[P]&&O[P].m(D,null);s(I,Q),s(I,M);for(let P=0;P<k.length;P+=1)k[P]&&k[P].m(M,null);U=!0},p(o,[$]){var z,u,p,S;(!U||$&1)&&l!==(l=o[0].name+"")&&ce(h,l);const P={};if($&5&&(P.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${o[2]}');
+        const base = new Base('${o[2]}');
 
         ...
 
         // send OTP email to the provided auth record
-        const req = await pb.collection('${(z=o[0])==null?void 0:z.name}').requestOTP('test@example.com');
+        const req = await base.collection('${(z=o[0])==null?void 0:z.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        const authData = await pb.collection('${(u=o[0])==null?void 0:u.name}').authWithOTP(
+        const authData = await base.collection('${(u=o[0])==null?void 0:u.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        console.log(pb.authStore.isValid);
-        console.log(pb.authStore.token);
-        console.log(pb.authStore.record.id);
+        console.log(base.authStore.isValid);
+        console.log(base.authStore.token);
+        console.log(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `),$&5&&(P.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${o[2]}');
+        final base = Base('${o[2]}');
 
         ...
 
         // send OTP email to the provided auth record
-        final req = await pb.collection('${(p=o[0])==null?void 0:p.name}').requestOTP('test@example.com');
+        final req = await base.collection('${(p=o[0])==null?void 0:p.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        final authData = await pb.collection('${(S=o[0])==null?void 0:S.name}').authWithOTP(
+        final authData = await base.collection('${(S=o[0])==null?void 0:S.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        print(pb.authStore.isValid);
-        print(pb.authStore.token);
-        print(pb.authStore.record.id);
+        print(base.authStore.isValid);
+        print(base.authStore.token);
+        print(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `),v.$set(P),$&10){y=V(o[3]);let w;for(w=0;w<y.length;w+=1){const Z=Je(o,y,w);O[w]?O[w].p(Z,$):(O[w]=Ne(Z),O[w].c(),O[w].m(D,null))}for(;w<O.length;w+=1)O[w].d(1);O.length=y.length}if($&11){q=V(o[3]);let w;for(w=0;w<q.length;w+=1){const Z=Ve(o,q,w);k[w]?(k[w].p(Z,$),J(k[w],1)):(k[w]=Ee(Z),k[w].c(),J(k[w],1),k[w].m(M,null))}for(ue(),w=q.length;w<k.length;w+=1)L(w);he()}},i(o){if(!U){J(v.$$.fragment,o);for(let $=0;$<q.length;$+=1)J(k[$]);U=!0}},o(o){j(v.$$.fragment,o),k=k.filter(Boolean);for(let $=0;$<k.length;$+=1)j(k[$]);U=!1},d(o){o&&(b(t),b(c),b(n),b(m),b(C),b(F),b(B),b(I)),x(v,o),De(O,o),De(k,o)}}}function at(a,t,e){let l,{collection:h}=t;const i=[{title:"OTP Request",component:lt},{title:"OTP Auth",component:xe}];let c=0;const n=m=>e(1,c=m);return a.$$set=m=>{"collection"in m&&e(0,h=m.collection)},e(2,l=ke.getApiExampleUrl(Xe.baseURL)),[h,c,l,i,n]}class it extends be{constructor(t){super(),_e(this,t,at,ot,ve,{collection:0})}}export{it as default};

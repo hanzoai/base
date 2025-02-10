@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/types"
 )
 
 // Register is a short alias for `AppMigrations.Register()`
@@ -313,7 +313,7 @@ func createSuperusersCollection(txApp core.App) error {
 }
 
 func createUsersCollection(txApp core.App) error {
-	users := core.NewAuthCollection("users", "_pb_users_auth_")
+	users := core.NewAuthCollection("users", "_hz_users_auth_")
 
 	ownerRule := "id = @request.auth.id"
 	users.ListRule = types.Pointer(ownerRule)

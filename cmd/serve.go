@@ -4,13 +4,13 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
 	"github.com/spf13/cobra"
 )
 
 // NewServeCommand creates and returns new command responsible for
-// starting the default PocketBase web server.
+// starting the default Base web server.
 func NewServeCommand(app core.App, showStartBanner bool) *cobra.Command {
 	var allowedOrigins []string
 	var httpAddr string

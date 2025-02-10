@@ -51,22 +51,22 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        const result = await pb.collection('${collection?.name}').listAuthMethods();
+        const result = await base.collection('${collection?.name}').listAuthMethods();
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        final result = await pb.collection('${collection?.name}').listAuthMethods();
+        final result = await base.collection('${collection?.name}').listAuthMethods();
     `}
 />
 

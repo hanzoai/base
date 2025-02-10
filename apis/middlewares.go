@@ -11,17 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/routine"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/routine"
 	"github.com/spf13/cast"
 )
 
 // Common request event store keys used by the middlewares and api handlers.
 const (
-	RequestEventKeyLogMeta = "pbLogMeta" // extra data to store with the request activity log
+	RequestEventKeyLogMeta = "baseLogMeta" // extra data to store with the request activity log
 
 	requestEventKeyExecStart              = "__execStart"                 // the value must be time.Time
 	requestEventKeySkipSuccessActivityLog = "__skipSuccessActivityLogger" // the value must be bool
@@ -29,27 +29,27 @@ const (
 
 const (
 	DefaultWWWRedirectMiddlewarePriority = -99999
-	DefaultWWWRedirectMiddlewareId       = "pbWWWRedirect"
+	DefaultWWWRedirectMiddlewareId       = "baseWWWRedirect"
 
 	DefaultActivityLoggerMiddlewarePriority   = DefaultRateLimitMiddlewarePriority - 40
-	DefaultActivityLoggerMiddlewareId         = "pbActivityLogger"
-	DefaultSkipSuccessActivityLogMiddlewareId = "pbSkipSuccessActivityLog"
-	DefaultEnableAuthIdActivityLog            = "pbEnableAuthIdActivityLog"
+	DefaultActivityLoggerMiddlewareId         = "baseActivityLogger"
+	DefaultSkipSuccessActivityLogMiddlewareId = "baseSkipSuccessActivityLog"
+	DefaultEnableAuthIdActivityLog            = "baseEnableAuthIdActivityLog"
 
 	DefaultPanicRecoverMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 30
-	DefaultPanicRecoverMiddlewareId       = "pbPanicRecover"
+	DefaultPanicRecoverMiddlewareId       = "basePanicRecover"
 
 	DefaultLoadAuthTokenMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 20
-	DefaultLoadAuthTokenMiddlewareId       = "pbLoadAuthToken"
+	DefaultLoadAuthTokenMiddlewareId       = "baseLoadAuthToken"
 
 	DefaultSecurityHeadersMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 10
-	DefaultSecurityHeadersMiddlewareId       = "pbSecurityHeaders"
+	DefaultSecurityHeadersMiddlewareId       = "baseSecurityHeaders"
 
-	DefaultRequireGuestOnlyMiddlewareId                 = "pbRequireGuestOnly"
-	DefaultRequireAuthMiddlewareId                      = "pbRequireAuth"
-	DefaultRequireSuperuserAuthMiddlewareId             = "pbRequireSuperuserAuth"
-	DefaultRequireSuperuserOrOwnerAuthMiddlewareId      = "pbRequireSuperuserOrOwnerAuth"
-	DefaultRequireSameCollectionContextAuthMiddlewareId = "pbRequireSameCollectionContextAuth"
+	DefaultRequireGuestOnlyMiddlewareId                 = "baseRequireGuestOnly"
+	DefaultRequireAuthMiddlewareId                      = "baseRequireAuth"
+	DefaultRequireSuperuserAuthMiddlewareId             = "baseRequireSuperuserAuth"
+	DefaultRequireSuperuserOrOwnerAuthMiddlewareId      = "baseRequireSuperuserOrOwnerAuth"
+	DefaultRequireSameCollectionContextAuthMiddlewareId = "baseRequireSameCollectionContextAuth"
 )
 
 // RequireGuestOnly middleware requires a request to NOT have a valid

@@ -19,8 +19,8 @@
     <div class="flex txt-sm txt-hint m-b-5">
         <p>
             All rules follow the
-            <a href={import.meta.env.PB_RULES_SYNTAX_DOCS} target="_blank" rel="noopener noreferrer">
-                PocketBase filter syntax and operators
+            <a href={import.meta.env.HZ_RULES_SYNTAX_DOCS} target="_blank" rel="noopener noreferrer">
+                Base filter syntax and operators
             </a>.
         </p>
         <button

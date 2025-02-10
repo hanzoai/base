@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/archive"
-	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/archive"
+	"github.com/hanzoai/base/tools/list"
 )
 
 func TestCreateBackup(t *testing.T) {
@@ -54,8 +54,8 @@ func TestCreateBackup(t *testing.T) {
 	}
 
 	expectedFiles := []string{
-		`^pb_backup_` + expectedAppNamePrefix + `_\w+\.zip$`,
-		`^pb_backup_` + expectedAppNamePrefix + `_\w+\.zip.attrs$`,
+		`^hz_backup_` + expectedAppNamePrefix + `_\w+\.zip$`,
+		`^hz_backup_` + expectedAppNamePrefix + `_\w+\.zip.attrs$`,
 		"custom",
 		"custom.attrs",
 	}

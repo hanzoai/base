@@ -20,9 +20,9 @@
  * })
  * ```
  *
- * _Note that this method is available only in pb_hooks context._
+ * _Note that this method is available only in hz_hooks context._
  *
- * @group PocketBase
+ * @group Base
  */
 declare function cronAdd(
   jobId:    string,
@@ -39,9 +39,9 @@ declare function cronAdd(
  * cronRemove("hello")
  * ```
  *
- * _Note that this method is available only in pb_hooks context._
+ * _Note that this method is available only in hz_hooks context._
  *
- * @group PocketBase
+ * @group Base
  */
 declare function cronRemove(jobId: string): void;
 
@@ -60,9 +60,9 @@ declare function cronRemove(jobId: string): void;
  * }, $apis.requireAuth())
  * ```
  *
- * _Note that this method is available only in pb_hooks context._
+ * _Note that this method is available only in hz_hooks context._
  *
- * @group PocketBase
+ * @group Base
  */
 declare function routerAdd(
   method: string,
@@ -84,9 +84,9 @@ declare function routerAdd(
  * })
  * ```
  *
- * _Note that this method is available only in pb_hooks context._
+ * _Note that this method is available only in hz_hooks context._
  *
- * @group PocketBase
+ * @group Base
  */
 declare function routerUse(...middlewares: Array<string|((e: core.RequestEvent) => void)|Middleware>): void;
 
@@ -95,9 +95,9 @@ declare function routerUse(...middlewares: Array<string|((e: core.RequestEvent) 
 // -------------------------------------------------------------------
 
 /**
- * Global helper variable that contains the absolute path to the app pb_hooks directory.
+ * Global helper variable that contains the absolute path to the app hz_hooks directory.
  *
- * @group PocketBase
+ * @group Base
  */
 declare var __hooks: string
 
@@ -112,19 +112,19 @@ type excludeHooks<Type> = {
 // CoreApp without the on* hook methods
 type CoreApp = excludeHooks<core.App>
 
-// PocketBase without the on* hook methods
-type PocketBase = excludeHooks<pocketbase.PocketBase>
+// Base without the on* hook methods
+type Base = excludeHooks<hanzo.Base>
 
 /**
- * `$app` is the current running PocketBase instance that is globally
- * available in each .pb.js file.
+ * `$app` is the current running Base instance that is globally
+ * available in each .base.js file.
  *
- * _Note that this variable is available only in pb_hooks context._
+ * _Note that this variable is available only in hz_hooks context._
  *
  * @namespace
- * @group PocketBase
+ * @group Base
  */
-declare var $app: PocketBase
+declare var $app: Base
 
 /**
  * `$template` is a global helper to load and cache HTML templates on the fly.
@@ -141,10 +141,10 @@ declare var $app: PocketBase
  * ).render({"name": "John"})
  * ```
  *
- * _Note that this method is available only in pb_hooks context._
+ * _Note that this method is available only in hz_hooks context._
  *
  * @namespace
- * @group PocketBase
+ * @group Base
  */
 declare var $template: template.Registry
 
@@ -152,7 +152,7 @@ declare var $template: template.Registry
  * This method is superseded by toString.
  *
  * @deprecated
- * @group PocketBase
+ * @group Base
  */
 declare function readerToString(reader: any, maxBytes?: number): string;
 
@@ -174,7 +174,7 @@ declare function readerToString(reader: any, maxBytes?: number): string;
  * const ex2 = toString([104 101 108 108 111])
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare function toString(val: any, maxBytes?: number): string;
 
@@ -188,7 +188,7 @@ declare function toString(val: any, maxBytes?: number): string;
  * sleep(250) // sleeps for 250ms
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare function sleep(milliseconds: number): void;
 
@@ -204,7 +204,7 @@ declare function sleep(milliseconds: number): void;
  * $app.recordQuery("articles").limit(10).all(records)
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare function arrayOf<T>(model: T): Array<T>;
 
@@ -226,7 +226,7 @@ declare function arrayOf<T>(model: T): Array<T>;
  * })
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class DynamicModel {
   constructor(shape?: { [key:string]: any })
@@ -253,7 +253,7 @@ interface Context extends context.Context{} // merge
  * console.log(sub.value("b")) // 456
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Context implements context.Context {
   constructor(parentCtx?: Context, key?: any, value?: any)
@@ -273,7 +273,7 @@ declare class Context implements context.Context {
  * record.set("description", "...")
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare const Record: {
   new(collection?: core.Collection, data?: { [key:string]: any }): core.Record
@@ -310,7 +310,7 @@ interface Collection extends core.Collection{
  * })
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Collection implements core.Collection {
   constructor(data?: Partial<Collection>)
@@ -320,7 +320,7 @@ interface FieldsList extends core.FieldsList{} // merge
 /**
  * FieldsList model class, usually used to define the Collection.fields.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class FieldsList implements core.FieldsList {
   constructor(data?: Partial<core.FieldsList>)
@@ -330,7 +330,7 @@ interface Field extends core.Field{} // merge
 /**
  * Field model class, usually used as part of the FieldsList model.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Field implements core.Field {
   constructor(data?: Partial<core.Field>)
@@ -340,7 +340,7 @@ interface NumberField extends core.NumberField{} // merge
 /**
  * {@inheritDoc core.NumberField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class NumberField implements core.NumberField {
   constructor(data?: Partial<core.NumberField>)
@@ -350,7 +350,7 @@ interface BoolField extends core.BoolField{} // merge
 /**
  * {@inheritDoc core.BoolField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class BoolField implements core.BoolField {
   constructor(data?: Partial<core.BoolField>)
@@ -360,7 +360,7 @@ interface TextField extends core.TextField{} // merge
 /**
  * {@inheritDoc core.TextField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class TextField implements core.TextField {
   constructor(data?: Partial<core.TextField>)
@@ -370,7 +370,7 @@ interface URLField extends core.URLField{} // merge
 /**
  * {@inheritDoc core.URLField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class URLField implements core.URLField {
   constructor(data?: Partial<core.URLField>)
@@ -380,7 +380,7 @@ interface EmailField extends core.EmailField{} // merge
 /**
  * {@inheritDoc core.EmailField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class EmailField implements core.EmailField {
   constructor(data?: Partial<core.EmailField>)
@@ -390,7 +390,7 @@ interface EditorField extends core.EditorField{} // merge
 /**
  * {@inheritDoc core.EditorField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class EditorField implements core.EditorField {
   constructor(data?: Partial<core.EditorField>)
@@ -400,7 +400,7 @@ interface PasswordField extends core.PasswordField{} // merge
 /**
  * {@inheritDoc core.PasswordField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class PasswordField implements core.PasswordField {
   constructor(data?: Partial<core.PasswordField>)
@@ -410,7 +410,7 @@ interface DateField extends core.DateField{} // merge
 /**
  * {@inheritDoc core.DateField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class DateField implements core.DateField {
   constructor(data?: Partial<core.DateField>)
@@ -420,7 +420,7 @@ interface AutodateField extends core.AutodateField{} // merge
 /**
  * {@inheritDoc core.AutodateField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class AutodateField implements core.AutodateField {
   constructor(data?: Partial<core.AutodateField>)
@@ -430,7 +430,7 @@ interface JSONField extends core.JSONField{} // merge
 /**
  * {@inheritDoc core.JSONField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class JSONField implements core.JSONField {
   constructor(data?: Partial<core.JSONField>)
@@ -440,7 +440,7 @@ interface RelationField extends core.RelationField{} // merge
 /**
  * {@inheritDoc core.RelationField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class RelationField implements core.RelationField {
   constructor(data?: Partial<core.RelationField>)
@@ -450,7 +450,7 @@ interface SelectField extends core.SelectField{} // merge
 /**
  * {@inheritDoc core.SelectField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class SelectField implements core.SelectField {
   constructor(data?: Partial<core.SelectField>)
@@ -460,7 +460,7 @@ interface FileField extends core.FileField{} // merge
 /**
  * {@inheritDoc core.FileField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class FileField implements core.FileField {
   constructor(data?: Partial<core.FileField>)
@@ -484,7 +484,7 @@ interface MailerMessage extends mailer.Message{} // merge
  * $app.newMailClient().send(message)
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class MailerMessage implements mailer.Message {
   constructor(message?: Partial<mailer.Message>)
@@ -505,7 +505,7 @@ interface Command extends cobra.Command{} // merge
  * $app.rootCmd.addCommand(command);
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Command implements cobra.Command {
   constructor(cmd?: Partial<cobra.Command>)
@@ -531,7 +531,7 @@ declare class Command implements cobra.Command {
  * const canAccess = $app.canAccessRecord(record, info, "@request.auth.id != '' && @request.body.name = 123")
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare const RequestInfo: {
   new(info?: Partial<core.RequestInfo>): core.RequestInfo
@@ -553,7 +553,7 @@ declare const RequestInfo: {
  * }, -10))
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Middleware {
   constructor(
@@ -583,7 +583,7 @@ interface Timezone extends time.Location{} // merge
  * $app.cron().setTimezone(zone)
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Timezone implements time.Location {
   constructor(name?: string)
@@ -601,7 +601,7 @@ interface DateTime extends types.DateTime{} // merge
  * const dt1 = new DateTime('2023-07-01 00:00:00.000Z')
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class DateTime implements types.DateTime {
   constructor(date?: string)
@@ -616,7 +616,7 @@ interface ValidationError extends ozzo_validation.Error{} // merge
  * new ValidationError("invalid_title", "Title is not valid")
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class ValidationError implements ozzo_validation.Error {
   constructor(code?: string, message?: string)
@@ -646,7 +646,7 @@ interface Cookie extends http.Cookie{} // merge
  * })
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class Cookie implements http.Cookie {
   constructor(options?: Partial<http.Cookie>)
@@ -667,7 +667,7 @@ interface SubscriptionMessage extends subscriptions.Message{} // merge
  * })
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare class SubscriptionMessage implements subscriptions.Message {
   constructor(options?: Partial<subscriptions.Message>)
@@ -679,9 +679,9 @@ declare class SubscriptionMessage implements subscriptions.Message {
 
 /**
  * `$dbx` defines common utility for working with the DB abstraction.
- * For examples and guides please check the [Database guide](https://pocketbase.io/docs/js-database).
+ * For examples and guides please check the [Database guide](https://docs.hanzo.ai/js-database).
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $dbx {
   /**
@@ -715,7 +715,7 @@ declare namespace $dbx {
  * `$mails` defines helpers to send common
  * auth records emails like verification, password reset, etc.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $mails {
   let sendRecordPasswordReset: mails.sendRecordPasswordReset
@@ -732,7 +732,7 @@ declare namespace $mails {
  * `$security` defines low level helpers for creating
  * and parsing JWTs, random string generation, AES encryption, etc.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $security {
   let randomString:                   security.randomString
@@ -771,9 +771,9 @@ declare namespace $security {
 
 /**
  * `$filesystem` defines common helpers for working
- * with the PocketBase filesystem abstraction.
+ * with the Base filesystem abstraction.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $filesystem {
   let fileFromPath:      filesystem.newFileFromPath
@@ -805,7 +805,7 @@ declare namespace $filesystem {
  * `$filepath` defines common helpers for manipulating filename
  * paths in a way compatible with the target operating system-defined file paths.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $filepath {
   export let base:      filepath.base
@@ -833,7 +833,7 @@ declare namespace $filepath {
  * `$os` defines common helpers for working with the OS level primitives
  * (eg. deleting directories, executing shell commands, etc.).
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $os {
   /**
@@ -884,7 +884,7 @@ declare namespace $os {
 interface AppleClientSecretCreateForm extends forms.AppleClientSecretCreate{} // merge
 /**
  * @inheritDoc
- * @group PocketBase
+ * @group Base
  */
 declare class AppleClientSecretCreateForm implements forms.AppleClientSecretCreate {
   constructor(app: CoreApp)
@@ -893,7 +893,7 @@ declare class AppleClientSecretCreateForm implements forms.AppleClientSecretCrea
 interface RecordUpsertForm extends forms.RecordUpsert{} // merge
 /**
  * @inheritDoc
- * @group PocketBase
+ * @group Base
  */
 declare class RecordUpsertForm implements forms.RecordUpsert {
   constructor(app: CoreApp, record: core.Record)
@@ -902,7 +902,7 @@ declare class RecordUpsertForm implements forms.RecordUpsert {
 interface TestEmailSendForm extends forms.TestEmailSend{} // merge
 /**
  * @inheritDoc
- * @group PocketBase
+ * @group Base
  */
 declare class TestEmailSendForm implements forms.TestEmailSend {
   constructor(app: CoreApp)
@@ -911,7 +911,7 @@ declare class TestEmailSendForm implements forms.TestEmailSend {
 interface TestS3FilesystemForm extends forms.TestS3Filesystem{} // merge
 /**
  * @inheritDoc
- * @group PocketBase
+ * @group Base
  */
 declare class TestS3FilesystemForm implements forms.TestS3Filesystem {
   constructor(app: CoreApp)
@@ -925,7 +925,7 @@ interface ApiError extends router.ApiError{} // merge
 /**
  * @inheritDoc
  *
- * @group PocketBase
+ * @group Base
  */
 declare class ApiError implements router.ApiError {
   constructor(status?: number, message?: string, data?: any)
@@ -935,7 +935,7 @@ interface NotFoundError extends router.ApiError{} // merge
 /**
  * NotFounderor returns 404 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class NotFoundError implements router.ApiError {
   constructor(message?: string, data?: any)
@@ -945,7 +945,7 @@ interface BadRequestError extends router.ApiError{} // merge
 /**
  * BadRequestError returns 400 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class BadRequestError implements router.ApiError {
   constructor(message?: string, data?: any)
@@ -955,7 +955,7 @@ interface ForbiddenError extends router.ApiError{} // merge
 /**
  * ForbiddenError returns 403 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class ForbiddenError implements router.ApiError {
   constructor(message?: string, data?: any)
@@ -965,7 +965,7 @@ interface UnauthorizedError extends router.ApiError{} // merge
 /**
  * UnauthorizedError returns 401 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class UnauthorizedError implements router.ApiError {
   constructor(message?: string, data?: any)
@@ -975,7 +975,7 @@ interface TooManyRequestsError extends router.ApiError{} // merge
 /**
  * TooManyRequestsError returns 429 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class TooManyRequestsError implements router.ApiError {
   constructor(message?: string, data?: any)
@@ -985,16 +985,16 @@ interface InternalServerError extends router.ApiError{} // merge
 /**
  * InternalServerError returns 429 ApiError.
  *
- * @group PocketBase
+ * @group Base
  */
 declare class InternalServerError implements router.ApiError {
   constructor(message?: string, data?: any)
 }
 
 /**
- * `$apis` defines commonly used PocketBase api helpers and middlewares.
+ * `$apis` defines commonly used Base api helpers and middlewares.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $apis {
   /**
@@ -1041,7 +1041,7 @@ interface FormData {
 /**
  * `$http` defines common methods for working with HTTP requests.
  *
- * @group PocketBase
+ * @group Base
  */
 declare namespace $http {
   /**
@@ -1089,96 +1089,96 @@ declare namespace $http {
 /**
  * Migrate defines a single migration upgrade/downgrade action.
  *
- * _Note that this method is available only in pb_migrations context._
+ * _Note that this method is available only in hz_migrations context._
  *
- * @group PocketBase
+ * @group Base
  */
 declare function migrate(
   up: (txApp: CoreApp) => void,
   down?: (txApp: CoreApp) => void
 ): void;
-/** @group PocketBase */declare function onBackupCreate(handler: (e: core.BackupEvent) => void): void
-/** @group PocketBase */declare function onBackupRestore(handler: (e: core.BackupEvent) => void): void
-/** @group PocketBase */declare function onBatchRequest(handler: (e: core.BatchRequestEvent) => void): void
-/** @group PocketBase */declare function onBootstrap(handler: (e: core.BootstrapEvent) => void): void
-/** @group PocketBase */declare function onCollectionAfterCreateError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionAfterCreateSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionAfterDeleteError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionAfterDeleteSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionAfterUpdateError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionAfterUpdateSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionCreate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionCreateExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionCreateRequest(handler: (e: core.CollectionRequestEvent) => void): void
-/** @group PocketBase */declare function onCollectionDelete(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionDeleteExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionDeleteRequest(handler: (e: core.CollectionRequestEvent) => void): void
-/** @group PocketBase */declare function onCollectionUpdate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionUpdateExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionUpdateRequest(handler: (e: core.CollectionRequestEvent) => void): void
-/** @group PocketBase */declare function onCollectionValidate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onCollectionViewRequest(handler: (e: core.CollectionRequestEvent) => void): void
-/** @group PocketBase */declare function onCollectionsImportRequest(handler: (e: core.CollectionsImportRequestEvent) => void): void
-/** @group PocketBase */declare function onCollectionsListRequest(handler: (e: core.CollectionsListRequestEvent) => void): void
-/** @group PocketBase */declare function onFileDownloadRequest(handler: (e: core.FileDownloadRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onFileTokenRequest(handler: (e: core.FileTokenRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerRecordAuthAlertSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerRecordEmailChangeSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerRecordOTPSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerRecordPasswordResetSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerRecordVerificationSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onMailerSend(handler: (e: core.MailerEvent) => void): void
-/** @group PocketBase */declare function onModelAfterCreateError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelAfterCreateSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelAfterDeleteError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelAfterDeleteSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelAfterUpdateError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelAfterUpdateSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelCreate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelCreateExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelDelete(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelDeleteExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelUpdate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelUpdateExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onModelValidate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRealtimeConnectRequest(handler: (e: core.RealtimeConnectRequestEvent) => void): void
-/** @group PocketBase */declare function onRealtimeMessageSend(handler: (e: core.RealtimeMessageEvent) => void): void
-/** @group PocketBase */declare function onRealtimeSubscribeRequest(handler: (e: core.RealtimeSubscribeRequestEvent) => void): void
-/** @group PocketBase */declare function onRecordAfterCreateError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAfterCreateSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAfterDeleteError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAfterDeleteSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAfterUpdateError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAfterUpdateSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAuthRefreshRequest(handler: (e: core.RecordAuthRefreshRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAuthRequest(handler: (e: core.RecordAuthRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAuthWithOAuth2Request(handler: (e: core.RecordAuthWithOAuth2RequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAuthWithOTPRequest(handler: (e: core.RecordAuthWithOTPRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordAuthWithPasswordRequest(handler: (e: core.RecordAuthWithPasswordRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordConfirmEmailChangeRequest(handler: (e: core.RecordConfirmEmailChangeRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordConfirmPasswordResetRequest(handler: (e: core.RecordConfirmPasswordResetRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordConfirmVerificationRequest(handler: (e: core.RecordConfirmVerificationRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordCreate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordCreateExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordCreateRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordDelete(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordDeleteExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordDeleteRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordEnrich(handler: (e: core.RecordEnrichEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordRequestEmailChangeRequest(handler: (e: core.RecordRequestEmailChangeRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordRequestOTPRequest(handler: (e: core.RecordCreateOTPRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordRequestPasswordResetRequest(handler: (e: core.RecordRequestPasswordResetRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordRequestVerificationRequest(handler: (e: core.RecordRequestVerificationRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordUpdate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordUpdateExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordUpdateRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordValidate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordViewRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onRecordsListRequest(handler: (e: core.RecordsListRequestEvent) => void, ...tags: string[]): void
-/** @group PocketBase */declare function onSettingsListRequest(handler: (e: core.SettingsListRequestEvent) => void): void
-/** @group PocketBase */declare function onSettingsReload(handler: (e: core.SettingsReloadEvent) => void): void
-/** @group PocketBase */declare function onSettingsUpdateRequest(handler: (e: core.SettingsUpdateRequestEvent) => void): void
-/** @group PocketBase */declare function onTerminate(handler: (e: core.TerminateEvent) => void): void
+/** @group Base */declare function onBackupCreate(handler: (e: core.BackupEvent) => void): void
+/** @group Base */declare function onBackupRestore(handler: (e: core.BackupEvent) => void): void
+/** @group Base */declare function onBatchRequest(handler: (e: core.BatchRequestEvent) => void): void
+/** @group Base */declare function onBootstrap(handler: (e: core.BootstrapEvent) => void): void
+/** @group Base */declare function onCollectionAfterCreateError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionAfterCreateSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionAfterDeleteError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionAfterDeleteSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionAfterUpdateError(handler: (e: core.CollectionErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionAfterUpdateSuccess(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionCreate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionCreateExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionCreateRequest(handler: (e: core.CollectionRequestEvent) => void): void
+/** @group Base */declare function onCollectionDelete(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionDeleteExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionDeleteRequest(handler: (e: core.CollectionRequestEvent) => void): void
+/** @group Base */declare function onCollectionUpdate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionUpdateExecute(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionUpdateRequest(handler: (e: core.CollectionRequestEvent) => void): void
+/** @group Base */declare function onCollectionValidate(handler: (e: core.CollectionEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onCollectionViewRequest(handler: (e: core.CollectionRequestEvent) => void): void
+/** @group Base */declare function onCollectionsImportRequest(handler: (e: core.CollectionsImportRequestEvent) => void): void
+/** @group Base */declare function onCollectionsListRequest(handler: (e: core.CollectionsListRequestEvent) => void): void
+/** @group Base */declare function onFileDownloadRequest(handler: (e: core.FileDownloadRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onFileTokenRequest(handler: (e: core.FileTokenRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerRecordAuthAlertSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerRecordEmailChangeSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerRecordOTPSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerRecordPasswordResetSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerRecordVerificationSend(handler: (e: core.MailerRecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onMailerSend(handler: (e: core.MailerEvent) => void): void
+/** @group Base */declare function onModelAfterCreateError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelAfterCreateSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelAfterDeleteError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelAfterDeleteSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelAfterUpdateError(handler: (e: core.ModelErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelAfterUpdateSuccess(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelCreate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelCreateExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelDelete(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelDeleteExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelUpdate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelUpdateExecute(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onModelValidate(handler: (e: core.ModelEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRealtimeConnectRequest(handler: (e: core.RealtimeConnectRequestEvent) => void): void
+/** @group Base */declare function onRealtimeMessageSend(handler: (e: core.RealtimeMessageEvent) => void): void
+/** @group Base */declare function onRealtimeSubscribeRequest(handler: (e: core.RealtimeSubscribeRequestEvent) => void): void
+/** @group Base */declare function onRecordAfterCreateError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAfterCreateSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAfterDeleteError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAfterDeleteSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAfterUpdateError(handler: (e: core.RecordErrorEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAfterUpdateSuccess(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAuthRefreshRequest(handler: (e: core.RecordAuthRefreshRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAuthRequest(handler: (e: core.RecordAuthRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAuthWithOAuth2Request(handler: (e: core.RecordAuthWithOAuth2RequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAuthWithOTPRequest(handler: (e: core.RecordAuthWithOTPRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordAuthWithPasswordRequest(handler: (e: core.RecordAuthWithPasswordRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordConfirmEmailChangeRequest(handler: (e: core.RecordConfirmEmailChangeRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordConfirmPasswordResetRequest(handler: (e: core.RecordConfirmPasswordResetRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordConfirmVerificationRequest(handler: (e: core.RecordConfirmVerificationRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordCreate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordCreateExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordCreateRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordDelete(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordDeleteExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordDeleteRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordEnrich(handler: (e: core.RecordEnrichEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordRequestEmailChangeRequest(handler: (e: core.RecordRequestEmailChangeRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordRequestOTPRequest(handler: (e: core.RecordCreateOTPRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordRequestPasswordResetRequest(handler: (e: core.RecordRequestPasswordResetRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordRequestVerificationRequest(handler: (e: core.RecordRequestVerificationRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordUpdate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordUpdateExecute(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordUpdateRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordValidate(handler: (e: core.RecordEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordViewRequest(handler: (e: core.RecordRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onRecordsListRequest(handler: (e: core.RecordsListRequestEvent) => void, ...tags: string[]): void
+/** @group Base */declare function onSettingsListRequest(handler: (e: core.SettingsListRequestEvent) => void): void
+/** @group Base */declare function onSettingsReload(handler: (e: core.SettingsReloadEvent) => void): void
+/** @group Base */declare function onSettingsUpdateRequest(handler: (e: core.SettingsUpdateRequestEvent) => void): void
+/** @group Base */declare function onTerminate(handler: (e: core.TerminateEvent) => void): void
 type _TygojaDict = { [key:string | number | symbol]: any; }
 type _TygojaAny = any
 
@@ -5406,13 +5406,13 @@ namespace dbx {
 }
 
 /**
- * Package core is the backbone of PocketBase.
+ * Package core is the backbone of Base.
  * 
- * It defines the main PocketBase App interface and its base implementation.
+ * It defines the main Base App interface and its base implementation.
  */
 namespace core {
  /**
-  * App defines the main PocketBase app interface.
+  * App defines the main Base app interface.
   * 
   * Note that the interface is not intended to be implemented manually by users
   * and instead they should use core.BaseApp (either directly or as embedded field in a custom struct).
@@ -5516,7 +5516,7 @@ namespace core {
    */
   reloadSettings(): void
   /**
-   * CreateBackup creates a new backup of the current app pb_data directory.
+   * CreateBackup creates a new backup of the current app hz_data directory.
    * 
    * Backups can be stored on S3 if it is configured in app.Settings().Backups.
    * 
@@ -5529,7 +5529,7 @@ namespace core {
    * the current running application process.
    * 
    * The safely perform the restore it is recommended to have free disk space
-   * for at least 2x the size of the restored pb_data backup.
+   * for at least 2x the size of the restored hz_data backup.
    * 
    * Please refer to the godoc of the specific CoreApp implementation
    * for details on the restore procedures.
@@ -5557,11 +5557,11 @@ namespace core {
    */
   runAllMigrations(): void
   /**
-   * DB returns the default app data db instance (pb_data/data.db).
+   * DB returns the default app data db instance (hz_data/data.db).
    */
   db(): dbx.Builder
   /**
-   * NonconcurrentDB returns the nonconcurrent app data db instance (pb_data/data.db).
+   * NonconcurrentDB returns the nonconcurrent app data db instance (hz_data/data.db).
    * 
    * The returned db instance is limited only to a single open connection,
    * meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -5576,11 +5576,11 @@ namespace core {
    */
   nonconcurrentDB(): dbx.Builder
   /**
-   * AuxDB returns the default app auxiliary db instance (pb_data/auxiliary.db).
+   * AuxDB returns the default app auxiliary db instance (hz_data/auxiliary.db).
    */
   auxDB(): dbx.Builder
   /**
-   * AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (pb_data/auxiliary.db)..
+   * AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (hz_data/auxiliary.db)..
    * 
    * The returned db instance is limited only to a single open connection,
    * meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -7165,7 +7165,7 @@ namespace core {
   isDev: boolean
  }
  /**
-  * BaseApp implements CoreApp and defines the base PocketBase app structure.
+  * BaseApp implements CoreApp and defines the base Base app structure.
   */
  interface BaseApp {
  }
@@ -7231,13 +7231,13 @@ namespace core {
  }
  interface BaseApp {
   /**
-   * DB returns the default app data db instance (pb_data/data.db).
+   * DB returns the default app data db instance (hz_data/data.db).
    */
   db(): dbx.Builder
  }
  interface BaseApp {
   /**
-   * NonconcurrentDB returns the nonconcurrent app data db instance (pb_data/data.db).
+   * NonconcurrentDB returns the nonconcurrent app data db instance (hz_data/data.db).
    * 
    * The returned db instance is limited only to a single open connection,
    * meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -7254,13 +7254,13 @@ namespace core {
  }
  interface BaseApp {
   /**
-   * AuxDB returns the default app auxiliary db instance (pb_data/auxiliary.db).
+   * AuxDB returns the default app auxiliary db instance (hz_data/auxiliary.db).
    */
   auxDB(): dbx.Builder
  }
  interface BaseApp {
   /**
-   * AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (pb_data/auxiliary.db).
+   * AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (hz_data/auxiliary.db).
    * 
    * The returned db instance is limited only to a single open connection,
    * meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -7626,7 +7626,7 @@ namespace core {
  }
  interface BaseApp {
   /**
-   * CreateBackup creates a new backup of the current app pb_data directory.
+   * CreateBackup creates a new backup of the current app hz_data directory.
    * 
    * If name is empty, it will be autogenerated.
    * If backup with the same name exists, the new backup file will replace it.
@@ -7635,13 +7635,13 @@ namespace core {
    * will be temporary "blocked" until the backup file is generated.
    * 
    * To safely perform the backup, it is recommended to have free disk space
-   * for at least 2x the size of the pb_data directory.
+   * for at least 2x the size of the hz_data directory.
    * 
-   * By default backups are stored in pb_data/backups
+   * By default backups are stored in hz_data/backups
    * (the backups directory itself is excluded from the generated backup).
    * 
    * When using S3 storage for the uploaded collection files, you have to
-   * take care manually to backup those since they are not part of the pb_data.
+   * take care manually to backup those since they are not part of the hz_data.
    * 
    * Backups can be stored on S3 if it is configured in app.Settings().Backups.
    */
@@ -7655,7 +7655,7 @@ namespace core {
    * NB! This feature is experimental and currently is expected to work only on UNIX based systems.
    * 
    * To safely perform the restore it is recommended to have free disk space
-   * for at least 2x the size of the restored pb_data backup.
+   * for at least 2x the size of the restored hz_data backup.
    * 
    * The performed steps are:
    * 
@@ -7664,29 +7664,29 @@ namespace core {
    *     (this is in case of S3; otherwise it creates a temp copy of the zip)
    * ```
    * 
-   *  2. Extract the backup in a temp directory inside the app "pb_data"
+   *  2. Extract the backup in a temp directory inside the app "hz_data"
    * ```
-   *     (eg. "pb_data/.pb_temp_to_delete/pb_restore").
+   *     (eg. "hz_data/.hz_temp_to_delete/hz_restore").
    * ```
    * 
-   *  3. Move the current app "pb_data" content (excluding the local backups and the special temp dir)
+   *  3. Move the current app "hz_data" content (excluding the local backups and the special temp dir)
    * ```
    *     under another temp sub dir that will be deleted on the next app start up
-   *     (eg. "pb_data/.pb_temp_to_delete/old_pb_data").
+   *     (eg. "hz_data/.hz_temp_to_delete/old_hz_data").
    *     This is because on some environments it may not be allowed
-   *     to delete the currently open "pb_data" files.
+   *     to delete the currently open "hz_data" files.
    * ```
    * 
-   *  4. Move the extracted dir content to the app "pb_data".
+   *  4. Move the extracted dir content to the app "hz_data".
    * 
-   *  5. Restart the app (on successful app bootstap it will also remove the old pb_data).
+   *  5. Restart the app (on successful app bootstap it will also remove the old hz_data).
    * 
    * If a failure occure during the restore process the dir changes are reverted.
    * If for whatever reason the revert is not possible, it panics.
    * 
-   * Note that if your pb_data has custom network mounts as subdirectories, then
+   * Note that if your hz_data has custom network mounts as subdirectories, then
    * it is possible the restore to fail during the `os.Rename` operations
-   * (see https://github.com/pocketbase/pocketbase/issues/4647).
+   * (see https://github.com/hanzoai/base/issues/4647).
    */
   restoreBackup(ctx: context.Context, name: string): void
  }
@@ -8084,7 +8084,7 @@ namespace core {
    * 
    * This usually shouldn't be needed but some OAuth2 vendors, like the LinkedIn OIDC,
    * may require manual adjustment due to returning error if extra parameters are added to the request
-   * (https://github.com/pocketbase/pocketbase/discussions/3799#discussioncomment-7640312)
+   * (https://github.com/hanzoai/base/discussions/3799#discussioncomment-7640312)
    */
   pkce?: boolean
   name: string
@@ -8568,7 +8568,7 @@ namespace core {
  interface txAppInfo {
  }
  /**
-  * RequestEvent defines the PocketBase router handler event.
+  * RequestEvent defines the Base router handler event.
   */
  type _sBcXdXq = router.Event
  interface RequestEvent extends _sBcXdXq {
@@ -8702,7 +8702,7 @@ namespace core {
    * a short-lived auth token (e.g. systemSuperuser.NewStaticAuthToken(30 * time.Minute))
    * and concatenate it as query param for your installer page
    * (if you are using the client-side SDKs, you can then load the
-   * token with pb.authStore.save(token) and perform any Web API request
+   * token with base.authStore.save(token) and perform any Web API request
    * e.g. creating a new superuser).
    * 
    * Set it to nil if you want to skip the installer.
@@ -11900,7 +11900,7 @@ namespace core {
    * CustomData returns a shallow copy ONLY of the custom record fields data,
    * aka. fields that are neither defined by the collection, nor special system ones.
    * 
-   * Note that custom fields prefixed with "@pbInternal" are always skipped.
+   * Note that custom fields prefixed with "@baseInternal" are always skipped.
    */
   customData(): _TygojaDict
  }
@@ -12507,7 +12507,7 @@ namespace core {
   logs: LogsConfig
  }
  /**
-  * Settings defines the PocketBase app settings.
+  * Settings defines the Base app settings.
   */
  type _sYhOTrQ = settings
  interface Settings extends _sYhOTrQ {
@@ -13168,13 +13168,13 @@ namespace apis {
  }
  interface wrapStdHandler {
   /**
-   * WrapStdHandler wraps Go [http.Handler] into a PocketBase handler func.
+   * WrapStdHandler wraps Go [http.Handler] into a Base handler func.
    */
   (h: http.Handler): (_arg0: core.RequestEvent) => void
  }
  interface wrapStdMiddleware {
   /**
-   * WrapStdMiddleware wraps Go [func(http.Handler) http.Handle] into a PocketBase middleware func.
+   * WrapStdMiddleware wraps Go [func(http.Handler) http.Handle] into a Base middleware func.
    */
   (m: (_arg0: http.Handler) => http.Handler): (_arg0: core.RequestEvent) => void
  }
@@ -13205,7 +13205,7 @@ namespace apis {
    * Example:
    * 
    * ```
-   * 	fsys := os.DirFS("./pb_public")
+   * 	fsys := os.DirFS("./hz_public")
    * 	router.GET("/files/{path...}", apis.Static(fsys, false))
    * ```
    */
@@ -13247,13 +13247,13 @@ namespace apis {
  }
  interface defaultInstallerFunc {
   /**
-   * DefaultInstallerFunc is the default PocketBase installer function.
+   * DefaultInstallerFunc is the default Base installer function.
    * 
    * It will attempt to open a link in the browser (with a short-lived auth
    * token for the systemSuperuser) to the installer UI so that users can
    * create their own custom superuser record.
    * 
-   * See https://github.com/pocketbase/pocketbase/discussions/5814.
+   * See https://github.com/hanzoai/base/discussions/5814.
    */
   (app: CoreApp, systemSuperuser: core.Record, baseURL: string): void
  }
@@ -13737,22 +13737,22 @@ namespace apis {
  }
 }
 
-namespace pocketbase {
+namespace base {
  /**
-  * PocketBase defines a PocketBase app launcher.
+  * Base defines a Base app launcher.
   * 
   * It implements [CoreApp] via embedding and all of the app interface methods
-  * could be accessed directly through the instance (eg. PocketBase.DataDir()).
+  * could be accessed directly through the instance (eg. Base.DataDir()).
   */
  type _sqrHKgR = CoreApp
- interface PocketBase extends _sqrHKgR {
+ interface Base extends _sqrHKgR {
   /**
    * RootCmd is the main console command
    */
   rootCmd?: cobra.Command
  }
  /**
-  * Config is the PocketBase initialization config struct.
+  * Config is the Base initialization config struct.
   */
  interface Config {
   /**
@@ -13763,7 +13763,7 @@ namespace pocketbase {
    * optional default values for the console flags
    */
   defaultDev: boolean
-  defaultDataDir: string // if not set, it will fallback to "./pb_data"
+  defaultDataDir: string // if not set, it will fallback to "./hz_data"
   defaultEncryptionEnv: string
   defaultQueryTimeout: time.Duration // default to core.DefaultQueryTimeout (in seconds)
   /**
@@ -13777,42 +13777,42 @@ namespace pocketbase {
  }
  interface _new {
   /**
-   * New creates a new PocketBase instance with the default configuration.
+   * New creates a new Base instance with the default configuration.
    * Use [NewWithConfig] if you want to provide a custom configuration.
    * 
    * Note that the application will not be initialized/bootstrapped yet,
    * aka. DB connections, migrations, app settings, etc. will not be accessible.
-   * Everything will be initialized when [PocketBase.Start] is executed.
-   * If you want to initialize the application before calling [PocketBase.Start],
-   * then you'll have to manually call [PocketBase.Bootstrap].
+   * Everything will be initialized when [Base.Start] is executed.
+   * If you want to initialize the application before calling [Base.Start],
+   * then you'll have to manually call [Base.Bootstrap].
    */
-  (): (PocketBase)
+  (): (Base)
  }
  interface newWithConfig {
   /**
-   * NewWithConfig creates a new PocketBase instance with the provided config.
+   * NewWithConfig creates a new Base instance with the provided config.
    * 
    * Note that the application will not be initialized/bootstrapped yet,
    * aka. DB connections, migrations, app settings, etc. will not be accessible.
-   * Everything will be initialized when [PocketBase.Start] is executed.
-   * If you want to initialize the application before calling [PocketBase.Start],
-   * then you'll have to manually call [PocketBase.Bootstrap].
+   * Everything will be initialized when [Base.Start] is executed.
+   * If you want to initialize the application before calling [Base.Start],
+   * then you'll have to manually call [Base.Bootstrap].
    */
-  (config: Config): (PocketBase)
+  (config: Config): (Base)
  }
- interface PocketBase {
+ interface Base {
   /**
    * Start starts the application, aka. registers the default system
-   * commands (serve, superuser, version) and executes pb.RootCmd.
+   * commands (serve, superuser, version) and executes base.RootCmd.
    */
   start(): void
  }
- interface PocketBase {
+ interface Base {
   /**
    * Execute initializes the application (if not already) and executes
-   * the pb.RootCmd with graceful shutdown support.
+   * the base.RootCmd with graceful shutdown support.
    * 
-   * This method differs from pb.Start() by not registering the default
+   * This method differs from base.Start() by not registering the default
    * system commands!
    */
   execute(): void
@@ -23422,7 +23422,7 @@ namespace http {
   * goal is to mitigate the risk of cross-origin information leakage, and provide
   * some protection against cross-site request forgery attacks.
   * 
-  * See https://tools.ietf.org/html/draft-ietf-httpbis-cookie-same-site-00 for details.
+  * See https://tools.ietf.org/html/draft-ietf-httbaseis-cookie-same-site-00 for details.
   */
  interface SameSite extends Number{}
  // @ts-ignore

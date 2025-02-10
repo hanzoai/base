@@ -1,4 +1,4 @@
-module github.com/pocketbase/pocketbase
+module github.com/hanzoai/base
 
 go 1.23
 
@@ -19,8 +19,8 @@ require (
 	github.com/ganigeorgiev/fexpr v0.4.1
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
-	github.com/pocketbase/dbx v1.11.0
-	github.com/pocketbase/tygoja v0.0.0-20250103200817-ca580d8c5119
+	github.com/hanzoai/dbx v1.11.0
+	github.com/hanzoai/tygoja v0.0.0-20250103200817-ca580d8c5119
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.8.1
 	gocloud.dev v0.40.0

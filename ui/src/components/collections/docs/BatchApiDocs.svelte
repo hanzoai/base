@@ -99,13 +99,13 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        const batch = pb.createBatch();
+        const batch = base.createBatch();
 
         batch.collection('${collection?.name}').create({ ... });
         batch.collection('${collection?.name}').update('RECORD_ID', { ... });
@@ -115,13 +115,13 @@
         const result = await batch.send();
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        final batch = pb.createBatch();
+        final batch = base.createBatch();
 
         batch.collection('${collection?.name}').create(body: { ... });
         batch.collection('${collection?.name}').update('RECORD_ID', body: { ... });

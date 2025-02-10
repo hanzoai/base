@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 	"golang.org/x/crypto/bcrypt"
 )
 

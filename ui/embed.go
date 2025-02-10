@@ -1,4 +1,4 @@
-// Package ui handles the PocketBase Superuser frontend embedding.
+// Package ui handles the Base Superuser frontend embedding.
 package ui
 
 import (

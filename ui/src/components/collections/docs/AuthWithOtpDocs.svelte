@@ -28,56 +28,56 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
         // send OTP email to the provided auth record
-        const req = await pb.collection('${collection?.name}').requestOTP('test@example.com');
+        const req = await base.collection('${collection?.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        const authData = await pb.collection('${collection?.name}').authWithOTP(
+        const authData = await base.collection('${collection?.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        console.log(pb.authStore.isValid);
-        console.log(pb.authStore.token);
-        console.log(pb.authStore.record.id);
+        console.log(base.authStore.isValid);
+        console.log(base.authStore.token);
+        console.log(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
         // send OTP email to the provided auth record
-        final req = await pb.collection('${collection?.name}').requestOTP('test@example.com');
+        final req = await base.collection('${collection?.name}').requestOTP('test@example.com');
 
         // ... show a screen/popup to enter the password from the email ...
 
         // authenticate with the requested OTP id and the email password
-        final authData = await pb.collection('${collection?.name}').authWithOTP(
+        final authData = await base.collection('${collection?.name}').authWithOTP(
             req.otpId,
             "YOUR_OTP",
         );
 
         // after the above you can also access the auth data from the authStore
-        print(pb.authStore.isValid);
-        print(pb.authStore.token);
-        print(pb.authStore.record.id);
+        print(base.authStore.isValid);
+        print(base.authStore.token);
+        print(base.authStore.record.id);
 
         // "logout"
-        pb.authStore.clear();
+        base.authStore.clear();
     `}
 />
 

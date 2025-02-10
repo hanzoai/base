@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/hanzoai/base/tools/hook"
 )
 
 func TestRouterGroupGroup(t *testing.T) {

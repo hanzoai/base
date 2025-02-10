@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/router"
 )
 
 // StaticWildcardParam is the name of Static handler wildcard parameter.
@@ -17,7 +17,7 @@ const StaticWildcardParam = "path"
 
 // NewRouter returns a new router instance loaded with the default app middlewares and api routes.
 func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
-	pbRouter := router.NewRouter(func(w http.ResponseWriter, r *http.Request) (*core.RequestEvent, router.EventCleanupFunc) {
+	baseRouter := router.NewRouter(func(w http.ResponseWriter, r *http.Request) (*core.RequestEvent, router.EventCleanupFunc) {
 		event := new(core.RequestEvent)
 		event.Response = w
 		event.Request = r
@@ -27,14 +27,14 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	})
 
 	// register default middlewares
-	pbRouter.Bind(activityLogger())
-	pbRouter.Bind(panicRecover())
-	pbRouter.Bind(rateLimit())
-	pbRouter.Bind(loadAuthToken())
-	pbRouter.Bind(securityHeaders())
-	pbRouter.Bind(BodyLimit(DefaultMaxBodySize))
+	baseRouter.Bind(activityLogger())
+	baseRouter.Bind(panicRecover())
+	baseRouter.Bind(rateLimit())
+	baseRouter.Bind(loadAuthToken())
+	baseRouter.Bind(securityHeaders())
+	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
 
-	apiGroup := pbRouter.Group("/api")
+	apiGroup := baseRouter.Group("/api")
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
@@ -47,10 +47,10 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindRealtimeApi(app, apiGroup)
 	bindHealthApi(app, apiGroup)
 
-	return pbRouter, nil
+	return baseRouter, nil
 }
 
-// WrapStdHandler wraps Go [http.Handler] into a PocketBase handler func.
+// WrapStdHandler wraps Go [http.Handler] into a Base handler func.
 func WrapStdHandler(h http.Handler) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		h.ServeHTTP(e.Response, e.Request)
@@ -58,7 +58,7 @@ func WrapStdHandler(h http.Handler) func(*core.RequestEvent) error {
 	}
 }
 
-// WrapStdMiddleware wraps Go [func(http.Handler) http.Handle] into a PocketBase middleware func.
+// WrapStdMiddleware wraps Go [func(http.Handler) http.Handle] into a Base middleware func.
 func WrapStdMiddleware(m func(http.Handler) http.Handler) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) (err error) {
 		m(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +98,7 @@ func MustSubFS(fsys fs.FS, dir string) fs.FS {
 //
 // Example:
 //
-//	fsys := os.DirFS("./pb_public")
+//	fsys := os.DirFS("./hz_public")
 //	router.GET("/files/{path...}", apis.Static(fsys, false))
 func Static(fsys fs.FS, indexFallback bool) func(*core.RequestEvent) error {
 	if fsys == nil {

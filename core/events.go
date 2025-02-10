@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/pocketbase/pocketbase/tools/auth"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
+	"github.com/hanzoai/base/tools/auth"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/mailer"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/subscriptions"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -114,7 +114,7 @@ type ServeEvent struct {
 	// a short-lived auth token (e.g. systemSuperuser.NewStaticAuthToken(30 * time.Minute))
 	// and concatenate it as query param for your installer page
 	// (if you are using the client-side SDKs, you can then load the
-	// token with pb.authStore.save(token) and perform any Web API request
+	// token with base.authStore.save(token) and perform any Web API request
 	// e.g. creating a new superuser).
 	//
 	// Set it to nil if you want to skip the installer.

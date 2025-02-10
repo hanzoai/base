@@ -1,11 +1,11 @@
 import{S as St,i as At,s as Lt,V as Mt,W as Ht,X as Q,h as d,d as Re,t as Y,a as x,I as jt,Z as Pt,_ as Nt,C as Ut,$ as Jt,D as zt,l as u,n as t,m as Te,E as Wt,G as Gt,u as o,A as _,v as i,c as Pe,w as b,J as Ft,p as Kt,k as ee,o as Vt}from"./index-CvNz_7Om.js";function Bt(a,s,n){const c=a.slice();return c[6]=s[n],c}function Et(a,s,n){const c=a.slice();return c[6]=s[n],c}function Ot(a,s){let n,c,y;function f(){return s[5](s[6])}return{key:a,first:null,c(){n=o("button"),n.textContent=`${s[6].code} `,b(n,"class","tab-item"),ee(n,"active",s[1]===s[6].code),this.first=n},m(r,h){u(r,n,h),c||(y=Vt(n,"click",f),c=!0)},p(r,h){s=r,h&10&&ee(n,"active",s[1]===s[6].code)},d(r){r&&d(n),c=!1,y()}}}function It(a,s){let n,c,y,f;return c=new Ht({props:{content:s[6].body}}),{key:a,first:null,c(){n=o("div"),Pe(c.$$.fragment),y=i(),b(n,"class","tab-item"),ee(n,"active",s[1]===s[6].code),this.first=n},m(r,h){u(r,n,h),Te(c,n,null),t(n,y),f=!0},p(r,h){s=r,(!f||h&10)&&ee(n,"active",s[1]===s[6].code)},i(r){f||(x(c.$$.fragment,r),f=!0)},o(r){Y(c.$$.fragment,r),f=!1},d(r){r&&d(n),Re(c)}}}function Xt(a){var pt,mt,bt,ht,ft,_t,yt,kt;let s,n,c=a[0].name+"",y,f,r,h,F,g,U,Fe,P,B,Be,E,Ee,Oe,te,le,q,oe,O,ae,I,se,H,ne,J,ie,w,ce,Ie,re,S,z,He,k,W,Se,de,Ae,C,G,Le,ue,Me,K,je,pe,Ne,D,Ue,me,Je,ze,We,V,Ge,X,Ke,be,Ve,he,Xe,fe,Ze,p,_e,Qe,ye,Ye,ke,xe,$e,et,ge,tt,ve,lt,ot,at,Ce,st,R,De,A,qe,T,L,v=[],nt=new Map,it,M,$=[],ct=new Map,j,we,rt;q=new Mt({props:{js:`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${a[2]}');
+        const base = new Base('${a[2]}');
 
         ...
 
-        const batch = pb.createBatch();
+        const batch = base.createBatch();
 
         batch.collection('${(pt=a[0])==null?void 0:pt.name}').create({ ... });
         batch.collection('${(mt=a[0])==null?void 0:mt.name}').update('RECORD_ID', { ... });
@@ -14,13 +14,13 @@ import{S as St,i as At,s as Lt,V as Mt,W as Ht,X as Q,h as d,d as Re,t as Y,a as
 
         const result = await batch.send();
     `,dart:`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${a[2]}');
+        final base = Base('${a[2]}');
 
         ...
 
-        final batch = pb.createBatch();
+        final batch = base.createBatch();
 
         batch.collection('${(ft=a[0])==null?void 0:ft.name}').create(body: { ... });
         batch.collection('${(_t=a[0])==null?void 0:_t.name}').update('RECORD_ID', body: { ... });
@@ -72,13 +72,13 @@ import{S as St,i as At,s as Lt,V as Mt,W as Ht,X as Q,h as d,d as Re,t as Y,a as
                     If you don't use the SDKs or prefer manually to construct the `),Ce=o("code"),Ce.textContent="FormData",st=_(`
                     body, then it could look something like:
                     `),Pe(R.$$.fragment),De=i(),A=o("div"),A.textContent="Responses",qe=i(),T=o("div"),L=o("div");for(let e=0;e<v.length;e+=1)v[e].c();it=i(),M=o("div");for(let e=0;e<$.length;e+=1)$[e].c();b(s,"class","m-b-sm"),b(h,"class","content txt-lg m-b-sm"),b(U,"class","icon"),b(E,"href","/settings"),b(P,"class","content"),b(g,"class","alert alert-warning"),b(O,"class","m-b-xs"),b(I,"class","api-route alert alert-success"),b(H,"class","section-title"),b(z,"valign","top"),b(W,"class","label"),b(V,"class","txt-hint"),b(w,"class","table-compact table-border m-t-xs m-b-base"),b(A,"class","section-title"),b(L,"class","tabs-header compact combined left"),b(M,"class","tabs-content"),b(T,"class","tabs")},m(e,l){u(e,s,l),t(s,n),t(s,y),t(s,f),u(e,r,l),u(e,h,l),u(e,F,l),u(e,g,l),t(g,U),t(g,Fe),t(g,P),t(P,B),t(B,Be),t(B,E),t(B,Ee),t(P,Oe),t(P,te),u(e,le,l),Te(q,e,l),u(e,oe,l),u(e,O,l),u(e,ae,l),u(e,I,l),u(e,se,l),u(e,H,l),u(e,ne,l),u(e,J,l),u(e,ie,l),u(e,w,l),t(w,ce),t(w,Ie),t(w,re),t(re,S),t(S,z),t(S,He),t(S,k),t(k,W),t(k,Se),t(k,de),t(k,Ae),t(k,C),t(C,G),t(G,Le),t(G,ue),t(C,Me),t(C,K),t(K,je),t(K,pe),t(C,Ne),t(C,D),t(D,Ue),t(D,me),t(D,Je),t(D,ze),t(D,We),t(D,V),t(C,Ge),t(C,X),t(X,Ke),t(X,be),t(k,Ve),t(k,he),t(k,Xe),t(k,fe),t(k,Ze),t(k,p),t(p,_e),t(p,Qe),t(p,ye),t(p,Ye),t(p,ke),t(p,xe),t(p,$e),t(p,et),t(p,ge),t(p,tt),t(p,ve),t(p,lt),t(p,ot),t(p,at),t(p,Ce),t(p,st),Te(R,p,null),u(e,De,l),u(e,A,l),u(e,qe,l),u(e,T,l),t(T,L);for(let m=0;m<v.length;m+=1)v[m]&&v[m].m(L,null);t(T,it),t(T,M);for(let m=0;m<$.length;m+=1)$[m]&&$[m].m(M,null);j=!0,we||(rt=Wt(Gt.call(null,E)),we=!0)},p(e,[l]){var gt,vt,Ct,Dt,qt,wt,Rt,Tt;(!j||l&1)&&c!==(c=e[0].name+"")&&jt(y,c);const m={};l&5&&(m.js=`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${e[2]}');
+        const base = new Base('${e[2]}');
 
         ...
 
-        const batch = pb.createBatch();
+        const batch = base.createBatch();
 
         batch.collection('${(gt=e[0])==null?void 0:gt.name}').create({ ... });
         batch.collection('${(vt=e[0])==null?void 0:vt.name}').update('RECORD_ID', { ... });
@@ -87,13 +87,13 @@ import{S as St,i as At,s as Lt,V as Mt,W as Ht,X as Q,h as d,d as Re,t as Y,a as
 
         const result = await batch.send();
     `),l&5&&(m.dart=`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${e[2]}');
+        final base = Base('${e[2]}');
 
         ...
 
-        final batch = pb.createBatch();
+        final batch = base.createBatch();
 
         batch.collection('${(qt=e[0])==null?void 0:qt.name}').create(body: { ... });
         batch.collection('${(wt=e[0])==null?void 0:wt.name}').update('RECORD_ID', body: { ... });

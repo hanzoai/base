@@ -84,7 +84,7 @@
 
             <p>Backup restore is experimental and works only on UNIX based systems.</p>
             <p>
-                The restore operation will attempt to replace your existing <code>pb_data</code> with the one from
+                The restore operation will attempt to replace your existing <code>hz_data</code> with the one from
                 the backup and will restart the application process.
             </p>
             <p>

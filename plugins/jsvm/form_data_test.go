@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/list"
 )
 
 func TestFormDataAppendAndSet(t *testing.T) {

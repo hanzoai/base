@@ -65,22 +65,22 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').delete('RECORD_ID');
+        await base.collection('${collection?.name}').delete('RECORD_ID');
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').delete('RECORD_ID');
+        await base.collection('${collection?.name}').delete('RECORD_ID');
     `}
 />
 

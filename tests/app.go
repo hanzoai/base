@@ -1,4 +1,4 @@
-// Package tests provides common helpers and mocks used in PocketBase application tests.
+// Package tests provides common helpers and mocks used in Base application tests.
 package tests
 
 import (
@@ -9,10 +9,10 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
 
-	_ "github.com/pocketbase/pocketbase/migrations"
+	_ "github.com/hanzoai/base/migrations"
 )
 
 // TestApp is a wrapper app instance used for testing.
@@ -79,7 +79,7 @@ func NewTestApp(optTestDataDir ...string) (*TestApp, error) {
 
 	return NewTestAppWithConfig(core.BaseAppConfig{
 		DataDir:       testDataDir,
-		EncryptionEnv: "pb_test_env",
+		EncryptionEnv: "hz_test_env",
 	})
 }
 
@@ -813,7 +813,7 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 // It is the caller's responsibility to call `os.RemoveAll(tempDir)`
 // when the directory is no longer needed!
 func TempDirClone(dirToClone string) (string, error) {
-	tempDir, err := os.MkdirTemp("", "pb_test_*")
+	tempDir, err := os.MkdirTemp("", "hz_test_*")
 	if err != nil {
 		return "", err
 	}

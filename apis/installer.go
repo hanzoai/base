@@ -9,18 +9,18 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/osutils"
 )
 
-// DefaultInstallerFunc is the default PocketBase installer function.
+// DefaultInstallerFunc is the default Base installer function.
 //
 // It will attempt to open a link in the browser (with a short-lived auth
 // token for the systemSuperuser) to the installer UI so that users can
 // create their own custom superuser record.
 //
-// See https://github.com/pocketbase/pocketbase/discussions/5814.
+// See https://github.com/hanzoai/base/discussions/5814.
 func DefaultInstallerFunc(app core.App, systemSuperuser *core.Record, baseURL string) error {
 	token, err := systemSuperuser.NewStaticAuthToken(30 * time.Minute)
 	if err != nil {
@@ -28,7 +28,7 @@ func DefaultInstallerFunc(app core.App, systemSuperuser *core.Record, baseURL st
 	}
 
 	// launch url (ignore errors and always print a help text as fallback)
-	url := fmt.Sprintf("%s/_/#/pbinstal/%s", strings.TrimRight(baseURL, "/"), token)
+	url := fmt.Sprintf("%s/_/#/baseinstal/%s", strings.TrimRight(baseURL, "/"), token)
 	_ = osutils.LaunchURL(url)
 	color.Magenta("\n(!) Launch the URL below in the browser if it hasn't been open already to create your first superuser account:")
 	color.New(color.Bold).Add(color.FgCyan).Println(url)

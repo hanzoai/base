@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 )
 
 func TestFindAllExternalAuthsByRecord(t *testing.T) {
@@ -150,8 +150,8 @@ func TestFindFirstExternalAuthByExpr(t *testing.T) {
 		expectedId string
 	}{
 		{dbx.HashExp{"collectionRef": "invalid"}, ""},
-		{dbx.HashExp{"collectionRef": "_pb_users_auth_"}, "5eto7nmys833164"},
-		{dbx.HashExp{"collectionRef": "_pb_users_auth_", "provider": "gitlab"}, "dlmflokuq1xl342"},
+		{dbx.HashExp{"collectionRef": "_hz_users_auth_"}, "5eto7nmys833164"},
+		{dbx.HashExp{"collectionRef": "_hz_users_auth_", "provider": "gitlab"}, "dlmflokuq1xl342"},
 	}
 
 	for i, s := range scenarios {
