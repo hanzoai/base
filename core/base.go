@@ -16,16 +16,16 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/cron"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/logger"
-	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pocketbase/pocketbase/tools/routine"
-	"github.com/pocketbase/pocketbase/tools/store"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/cron"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/logger"
+	"github.com/hanzoai/base/tools/mailer"
+	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/tools/store"
+	"github.com/hanzoai/base/tools/subscriptions"
+	"github.com/hanzoai/base/tools/types"
 )
 
 const (
@@ -37,7 +37,7 @@ const (
 
 	LocalStorageDirName       string = "storage"
 	LocalBackupsDirName       string = "backups"
-	LocalTempDirName          string = ".pb_temp_to_delete" // temp pb_data sub directory that will be deleted on each app.Bootstrap()
+	LocalTempDirName          string = ".hz_temp_to_delete" // temp hz_data sub directory that will be deleted on each app.Bootstrap()
 	LocalAutocertCacheDirName string = ".autocert_cache"
 )
 
@@ -66,7 +66,7 @@ type BaseAppConfig struct {
 // ensures that the BaseApp implements the App interface.
 var _ App = (*BaseApp)(nil)
 
-// BaseApp implements core.App and defines the base PocketBase app structure.
+// BaseApp implements core.App and defines the base Base app structure.
 type BaseApp struct {
 	config              *BaseAppConfig
 	txInfo              *txAppInfo
@@ -414,7 +414,7 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
-		// try to cleanup the pb_data temp directory (if any)
+		// try to cleanup the hz_data temp directory (if any)
 		_ = os.RemoveAll(filepath.Join(app.DataDir(), LocalTempDirName))
 
 		return nil
@@ -466,12 +466,12 @@ func (app *BaseApp) ResetBootstrapState() error {
 	return nil
 }
 
-// DB returns the default app data db instance (pb_data/data.db).
+// DB returns the default app data db instance (hz_data/data.db).
 func (app *BaseApp) DB() dbx.Builder {
 	return app.concurrentDB
 }
 
-// NonconcurrentDB returns the nonconcurrent app data db instance (pb_data/data.db).
+// NonconcurrentDB returns the nonconcurrent app data db instance (hz_data/data.db).
 //
 // The returned db instance is limited only to a single open connection,
 // meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -487,12 +487,12 @@ func (app *BaseApp) NonconcurrentDB() dbx.Builder {
 	return app.nonconcurrentDB
 }
 
-// AuxDB returns the default app auxiliary db instance (pb_data/auxiliary.db).
+// AuxDB returns the default app auxiliary db instance (hz_data/auxiliary.db).
 func (app *BaseApp) AuxDB() dbx.Builder {
 	return app.auxConcurrentDB
 }
 
-// AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (pb_data/auxiliary.db).
+// AuxNonconcurrentDB returns the nonconcurrent app auxiliary db instance (hz_data/auxiliary.db).
 //
 // The returned db instance is limited only to a single open connection,
 // meaning that it can process only 1 db operation at a time (other operations will be queued up).
@@ -569,7 +569,7 @@ func (app *BaseApp) NewMailClient() mailer.Mailer {
 	// register the app level hook
 	if h, ok := client.(mailer.SendInterceptor); ok {
 		h.OnSend().Bind(&hook.Handler[*mailer.SendEvent]{
-			Id: "__pbMailerOnSend__",
+			Id: "__hzMailerOnSend__",
 			Func: func(e *mailer.SendEvent) error {
 				appEvent := new(MailerEvent)
 				appEvent.App = app
@@ -1166,7 +1166,7 @@ func normalizeSQLLog(sql string) string {
 
 func (app *BaseApp) initAuxDB() error {
 	// note: renamed to "auxiliary" because "aux" is a reserved Windows filename
-	// (see https://github.com/pocketbase/pocketbase/issues/5607)
+	// (see https://github.com/hanzoai/base/issues/5607)
 	dbPath := filepath.Join(app.DataDir(), "auxiliary.db")
 
 	concurrentDB, err := app.config.DBConnect(dbPath)
@@ -1209,11 +1209,11 @@ func (app *BaseApp) registerBaseHooks() {
 
 	// try to delete the storage files from deleted Collection, Records, etc. model
 	app.OnModelAfterDeleteSuccess().Bind(&hook.Handler[*ModelEvent]{
-		Id: "__pbFilesManagerDelete__",
+		Id: "__hzFilesManagerDelete__",
 		Func: func(e *ModelEvent) error {
 			if m, ok := e.Model.(FilesManager); ok && m.BaseFilesPath() != "" {
 				// ensure that there is a trailing slash so that the list iterator could start walking from the prefix dir
-				// (https://github.com/pocketbase/pocketbase/discussions/5246#discussioncomment-10128955)
+				// (https://github.com/hanzoai/base/discussions/5246#discussioncomment-10128955)
 				prefix := strings.TrimRight(m.BaseFilesPath(), "/") + "/"
 
 				// run in the background for "optimistic" delete to avoid
@@ -1235,7 +1235,7 @@ func (app *BaseApp) registerBaseHooks() {
 	})
 
 	app.OnServe().Bind(&hook.Handler[*ServeEvent]{
-		Id: "__pbCronStart__",
+		Id: "__hzCronStart__",
 		Func: func(e *ServeEvent) error {
 			app.Cron().Start()
 
@@ -1244,7 +1244,7 @@ func (app *BaseApp) registerBaseHooks() {
 		Priority: 999,
 	})
 
-	app.Cron().Add("__pbDBOptimize__", "0 0 * * *", func() {
+	app.Cron().Add("__hzDBOptimize__", "0 0 * * *", func() {
 		_, execErr := app.NonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
 		if execErr != nil {
 			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the main DB", slog.String("error", execErr.Error()))
@@ -1361,7 +1361,7 @@ func (app *BaseApp) initLogger() error {
 
 	// write all remaining logs before ticker.Stop to avoid races with ResetBootstrap user calls
 	app.OnTerminate().Bind(&hook.Handler[*TerminateEvent]{
-		Id: "__pbAppLoggerOnTerminate__",
+		Id: "__hzAppLoggerOnTerminate__",
 		Func: func(e *TerminateEvent) error {
 			handler.WriteAll(context.Background())
 
@@ -1376,7 +1376,7 @@ func (app *BaseApp) initLogger() error {
 
 	// reload log handler level (if initialized)
 	app.OnSettingsReload().Bind(&hook.Handler[*SettingsReloadEvent]{
-		Id: "__pbAppLoggerOnSettingsReload__",
+		Id: "__hzAppLoggerOnSettingsReload__",
 		Func: func(e *SettingsReloadEvent) error {
 			err := e.Next()
 			if err != nil {
@@ -1414,7 +1414,7 @@ func (app *BaseApp) initLogger() error {
 	})
 
 	// cleanup old logs
-	app.Cron().Add("__pbLogsCleanup__", "0 */6 * * *", func() {
+	app.Cron().Add("__hzLogsCleanup__", "0 */6 * * *", func() {
 		deleteErr := app.DeleteOldLogs(time.Now().AddDate(0, 0, -1*app.Settings().Logs.MaxDays))
 		if deleteErr != nil {
 			app.Logger().Warn("Failed to delete old logs", "error", deleteErr)

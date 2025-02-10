@@ -6,8 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pocketbase/pocketbase/tools/inflector"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/base/tools/router"
 )
 
 // Common request store keys used by the middlewares and api handlers.
@@ -15,7 +15,7 @@ const (
 	RequestEventKeyInfoContext = "infoContext"
 )
 
-// RequestEvent defines the PocketBase router handler event.
+// RequestEvent defines the Base router handler event.
 type RequestEvent struct {
 	App App
 

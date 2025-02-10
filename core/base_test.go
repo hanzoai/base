@@ -10,15 +10,15 @@ import (
 
 	_ "unsafe"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/logger"
-	"github.com/pocketbase/pocketbase/tools/mailer"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/logger"
+	"github.com/hanzoai/base/tools/mailer"
 )
 
 func TestNewBaseApp(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
@@ -57,7 +57,7 @@ func TestNewBaseApp(t *testing.T) {
 }
 
 func TestBaseAppBootstrap(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
@@ -129,7 +129,7 @@ func TestBaseAppBootstrap(t *testing.T) {
 }
 
 func TestNewBaseAppIsTransactional(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
@@ -155,12 +155,12 @@ func TestNewBaseAppIsTransactional(t *testing.T) {
 }
 
 func TestBaseAppNewMailClient(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
 		DataDir:       testDataDir,
-		EncryptionEnv: "pb_test_env",
+		EncryptionEnv: "hz_test_env",
 	})
 	defer app.ResetBootstrapState()
 
@@ -186,7 +186,7 @@ func TestBaseAppNewMailClient(t *testing.T) {
 }
 
 func TestBaseAppNewFilesystem(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
@@ -215,7 +215,7 @@ func TestBaseAppNewFilesystem(t *testing.T) {
 }
 
 func TestBaseAppNewBackupsFilesystem(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./hz_base_app_test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
@@ -340,7 +340,7 @@ func TestBaseAppRefreshSettingsLoggerMinLevelEnabled(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			const testDataDir = "./pb_base_app_test_data_dir/"
+			const testDataDir = "./hz_base_app_test_data_dir/"
 			defer os.RemoveAll(testDataDir)
 
 			app := core.NewBaseApp(core.BaseAppConfig{

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 )
 
 func TestDefaultRateLimitMiddleware(t *testing.T) {
@@ -45,29 +45,29 @@ func TestDefaultRateLimitMiddleware(t *testing.T) {
 		},
 	}
 
-	pbRouter, err := apis.NewRouter(app)
+	baseRouter, err := apis.NewRouter(app)
 	if err != nil {
 		t.Fatal(err)
 	}
-	pbRouter.GET("/norate", func(e *core.RequestEvent) error {
+	baseRouter.GET("/norate", func(e *core.RequestEvent) error {
 		return e.String(200, "norate")
 	}).BindFunc(func(e *core.RequestEvent) error {
 		return e.Next()
 	})
-	pbRouter.GET("/rate/a", func(e *core.RequestEvent) error {
+	baseRouter.GET("/rate/a", func(e *core.RequestEvent) error {
 		return e.String(200, "a")
 	})
-	pbRouter.GET("/rate/b", func(e *core.RequestEvent) error {
+	baseRouter.GET("/rate/b", func(e *core.RequestEvent) error {
 		return e.String(200, "b")
 	})
-	pbRouter.GET("/rate/guest", func(e *core.RequestEvent) error {
+	baseRouter.GET("/rate/guest", func(e *core.RequestEvent) error {
 		return e.String(200, "guest")
 	})
-	pbRouter.GET("/rate/auth", func(e *core.RequestEvent) error {
+	baseRouter.GET("/rate/auth", func(e *core.RequestEvent) error {
 		return e.String(200, "auth")
 	})
 
-	mux, err := pbRouter.BuildMux()
+	mux, err := baseRouter.BuildMux()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/list"
 )
 
 func TestCollectionsList(t *testing.T) {
@@ -1064,7 +1064,7 @@ func TestCollectionUpdate(t *testing.T) {
 			Body: strings.NewReader(`{
 				"name":"new",
 				"fields":[
-					{"type":"text","name":"id","id":"_pbf_text_id_"},
+					{"type":"text","name":"id","id":"_hz_text_id_"},
 					{"type":"text","name":"created"},
 					{"type":"text","name":"updated"},
 					{"type":"text","name":"expand"},

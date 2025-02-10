@@ -113,7 +113,7 @@
             <p class="txt-hint m-t-xs">
                 App cron jobs can be registered only programmatically with
                 <a
-                    href="{import.meta.env.PB_DOCS_URL}/go-jobs-scheduling/"
+                    href="{import.meta.env.HZ_DOCS_URL}/go-jobs-scheduling/"
                     target="_blank"
                     rel="noopener noreferrer"
                 >
@@ -121,7 +121,7 @@
                 </a>
                 or
                 <a
-                    href="{import.meta.env.PB_DOCS_URL}/js-jobs-scheduling/"
+                    href="{import.meta.env.HZ_DOCS_URL}/js-jobs-scheduling/"
                     target="_blank"
                     rel="noopener noreferrer"
                 >

@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/routine"
-	"github.com/pocketbase/pocketbase/ui"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/ui"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -67,17 +67,17 @@ func Serve(app core.App, config ServeConfig) error {
 		return err
 	}
 
-	pbRouter, err := NewRouter(app)
+	baseRouter, err := NewRouter(app)
 	if err != nil {
 		return err
 	}
 
-	pbRouter.Bind(CORS(CORSConfig{
+	baseRouter.Bind(CORS(CORSConfig{
 		AllowOrigins: config.AllowedOrigins,
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
-	pbRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
+	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
 			if e.Request.PathValue(StaticWildcardParam) != "" {
@@ -122,7 +122,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 	// implicit www->non-www redirect(s)
 	if len(wwwRedirects) > 0 {
-		pbRouter.Bind(wwwRedirect(wwwRedirects))
+		baseRouter.Bind(wwwRedirect(wwwRedirects))
 	}
 
 	certManager := &autocert.Manager{
@@ -155,7 +155,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 	serveEvent := new(core.ServeEvent)
 	serveEvent.App = app
-	serveEvent.Router = pbRouter
+	serveEvent.Router = baseRouter
 	serveEvent.Server = server
 	serveEvent.CertManager = certManager
 	serveEvent.InstallerFunc = DefaultInstallerFunc
@@ -170,7 +170,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 	// try to gracefully shutdown the server on app termination
 	app.OnTerminate().Bind(&hook.Handler[*core.TerminateEvent]{
-		Id: "pbGracefulShutdown",
+		Id: "baseGracefulShutdown",
 		Func: func(te *core.TerminateEvent) error {
 			cancelBaseCtx()
 

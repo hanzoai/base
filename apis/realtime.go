@@ -10,14 +10,14 @@ import (
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/picker"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/routine"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/picker"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/subscriptions"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -56,7 +56,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 
 	e.Response.Header().Set("Content-Type", "text/event-stream")
 	e.Response.Header().Set("Cache-Control", "no-store")
-	// https://github.com/pocketbase/pocketbase/discussions/480#discussioncomment-3657640
+	// https://github.com/hanzoai/base/discussions/480#discussioncomment-3657640
 	// https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering
 	e.Response.Header().Set("X-Accel-Buffering", "no")
 
@@ -79,7 +79,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 		connectMsgEvent.RequestEvent = ce.RequestEvent
 		connectMsgEvent.Client = ce.Client
 		connectMsgEvent.Message = &subscriptions.Message{
-			Name: "PB_CONNECT",
+			Name: "HZ_CONNECT",
 			Data: []byte(`{"clientId":"` + ce.Client.Id() + `"}`),
 		}
 		connectMsgErr := ce.App.OnRealtimeMessageSend().Trigger(connectMsgEvent, func(me *core.RealtimeMessageEvent) error {
@@ -92,7 +92,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 		})
 		if connectMsgErr != nil {
 			ce.App.Logger().Debug(
-				"Realtime connection closed (failed to deliver PB_CONNECT)",
+				"Realtime connection closed (failed to deliver HZ_CONNECT)",
 				slog.String("clientId", ce.Client.Id()),
 				slog.String("error", connectMsgErr.Error()),
 			)

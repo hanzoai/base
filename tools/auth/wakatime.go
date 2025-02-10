@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/tools/types"
 	"golang.org/x/oauth2"
 )
 
@@ -74,7 +74,7 @@ func (p *Wakatime) FetchAuthUser(token *oauth2.Token) (*AuthUser, error) {
 		RefreshToken: token.RefreshToken,
 	}
 
-	// note: we don't check for is_email_public field because PocketBase
+	// note: we don't check for is_email_public field because Base
 	// has its own emailVisibility flag which is false by default
 	if extracted.Data.IsEmailConfirmed {
 		user.Email = extracted.Data.Email

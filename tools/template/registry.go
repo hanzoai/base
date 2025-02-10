@@ -28,7 +28,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/pocketbase/pocketbase/tools/store"
+	"github.com/hanzoai/base/tools/store"
 )
 
 // NewRegistry creates and initializes a new templates registry with

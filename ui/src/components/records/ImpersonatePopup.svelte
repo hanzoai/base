@@ -84,22 +84,22 @@
         <SdkTabs
             class="m-b-0"
             js={`
-                import PocketBase from 'pocketbase';
+                import Base from 'base';
 
                 const token = "...";
 
-                const pb = new PocketBase('${backendAbsUrl}');
+                const base = new Base('${backendAbsUrl}');
 
-                pb.authStore.save(token, null);
+                base.authStore.save(token, null);
             `}
             dart={`
-                import 'package:pocketbase/pocketbase.dart';
+                import 'package:hanzoai/base.dart';
 
                 final token = "...";
 
-                final pb = PocketBase('${backendAbsUrl}');
+                final base = Base('${backendAbsUrl}');
 
-                pb.authStore.save(token, null);
+                base.authStore.save(token, null);
             `}
         />
     {:else}

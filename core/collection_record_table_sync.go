@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/base/tools/security"
 )
 
 // SyncRecordTableSchema compares the two provided collections

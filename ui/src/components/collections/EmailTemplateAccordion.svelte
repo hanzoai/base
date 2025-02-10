@@ -54,8 +54,8 @@
 
     function copy(param) {
         param = param.replace("*", ""); // strip wildcard
-        CommonHelper.copyToClipboard(param);
-        addInfoToast(`Copied ${param} to clipboard`, 2000);
+        CommonHelper.copyToClibaseoard(param);
+        addInfoToast(`Copied ${param} to clibaseoard`, 2000);
     }
 
     loadEditorComponent();

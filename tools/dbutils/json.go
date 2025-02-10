@@ -37,7 +37,7 @@ func JSONExtract(column string, path string) string {
 
 	return fmt.Sprintf(
 		// note: the extra object wrapping is needed to workaround the cases where a json_extract is used with non-json columns.
-		"(CASE WHEN json_valid([[%s]]) THEN JSON_EXTRACT([[%s]], '$%s') ELSE JSON_EXTRACT(json_object('pb', [[%s]]), '$.pb%s') END)",
+		"(CASE WHEN json_valid([[%s]]) THEN JSON_EXTRACT([[%s]], '$%s') ELSE JSON_EXTRACT(json_object('base', [[%s]]), '$.base%s') END)",
 		column,
 		column,
 		path,

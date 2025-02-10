@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/subscriptions"
 )
 
 func TestRealtimeConnect(t *testing.T) {
@@ -25,7 +25,7 @@ func TestRealtimeConnect(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`id:`,
-				`event:PB_CONNECT`,
+				`event:HZ_CONNECT`,
 				`data:{"clientId":`,
 			},
 			ExpectedEvents: map[string]int{
@@ -40,7 +40,7 @@ func TestRealtimeConnect(t *testing.T) {
 			},
 		},
 		{
-			Name:           "PB_CONNECT interrupt",
+			Name:           "HZ_CONNECT interrupt",
 			Method:         http.MethodGet,
 			URL:            "/api/realtime",
 			Timeout:        100 * time.Millisecond,
@@ -52,8 +52,8 @@ func TestRealtimeConnect(t *testing.T) {
 			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnRealtimeMessageSend().BindFunc(func(e *core.RealtimeMessageEvent) error {
-					if e.Message.Name == "PB_CONNECT" {
-						return errors.New("PB_CONNECT error")
+					if e.Message.Name == "HZ_CONNECT" {
+						return errors.New("HZ_CONNECT error")
 					}
 					return e.Next()
 				})

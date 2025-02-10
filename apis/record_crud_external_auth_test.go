@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 )
 
 func TestRecordCrudExternalAuthList(t *testing.T) {
@@ -184,7 +184,7 @@ func TestRecordCrudExternalAuthCreate(t *testing.T) {
 	body := func() *strings.Reader {
 		return strings.NewReader(`{
 			"recordRef":     "4q1xlclmfloku33",
-			"collectionRef": "_pb_users_auth_",
+			"collectionRef": "_hz_users_auth_",
 			"provider":      "github",
 			"providerId":    "abc"
 		}`)

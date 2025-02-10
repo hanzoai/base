@@ -15,12 +15,12 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/pocketbase/pocketbase/core/validators"
-	"github.com/pocketbase/pocketbase/tools/cron"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pocketbase/pocketbase/tools/security"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core/validators"
+	"github.com/hanzoai/base/tools/cron"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/mailer"
+	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/types"
 )
 
 const (
@@ -28,7 +28,7 @@ const (
 
 	paramsKeySettings = "settings"
 
-	systemHookIdSettings = "__pbSettingsSystemHook__"
+	systemHookIdSettings = "__hzSettingsSystemHook__"
 )
 
 func (app *BaseApp) registerSettingsHooks() {
@@ -130,7 +130,7 @@ type settings struct {
 	Logs         LogsConfig         `form:"logs" json:"logs"`
 }
 
-// Settings defines the PocketBase app settings.
+// Settings defines the Base app settings.
 type Settings struct {
 	settings
 

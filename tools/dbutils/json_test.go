@@ -3,7 +3,7 @@ package dbutils_test
 import (
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/dbutils"
+	"github.com/hanzoai/base/tools/dbutils"
 )
 
 func TestJSONEach(t *testing.T) {
@@ -37,19 +37,19 @@ func TestJSONExtract(t *testing.T) {
 			"empty path",
 			"a.b",
 			"",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$') ELSE JSON_EXTRACT(json_object('pb', [[a.b]]), '$.pb') END)",
+			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base') END)",
 		},
 		{
 			"starting with array index",
 			"a.b",
 			"[1].a[2]",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$[1].a[2]') ELSE JSON_EXTRACT(json_object('pb', [[a.b]]), '$.pb[1].a[2]') END)",
+			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$[1].a[2]') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base[1].a[2]') END)",
 		},
 		{
 			"starting with key",
 			"a.b",
 			"a.b[2].c",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$.a.b[2].c') ELSE JSON_EXTRACT(json_object('pb', [[a.b]]), '$.pb.a.b[2].c') END)",
+			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$.a.b[2].c') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base.a.b[2].c') END)",
 		},
 	}
 

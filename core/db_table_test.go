@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
 )
 
 func TestHasTable(t *testing.T) {
@@ -146,7 +146,7 @@ func TestTableIndexes(t *testing.T) {
 		{"missing", nil},
 		{
 			core.CollectionNameSuperusers,
-			[]string{"idx_email__pbc_3323866339", "idx_tokenKey__pbc_3323866339"},
+			[]string{"idx_email__hzc_3323866339", "idx_tokenKey__hzc_3323866339"},
 		},
 	}
 

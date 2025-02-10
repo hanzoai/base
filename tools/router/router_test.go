@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/router"
 )
 
 func TestRouter(t *testing.T) {

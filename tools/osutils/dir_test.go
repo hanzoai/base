@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/osutils"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/osutils"
+	"github.com/hanzoai/base/tools/security"
 )
 
 func TestMoveDirContent(t *testing.T) {
@@ -23,7 +23,7 @@ func TestMoveDirContent(t *testing.T) {
 
 	// missing dest path
 	// ---
-	dir1 := filepath.Join(filepath.Dir(testDir), "a", "b", "c", "d", "_pb_move_dir_content_test_"+security.PseudorandomString(4))
+	dir1 := filepath.Join(filepath.Dir(testDir), "a", "b", "c", "d", "_hz_move_dir_content_test_"+security.PseudorandomString(4))
 	defer os.RemoveAll(dir1)
 
 	if err := osutils.MoveDirContent(testDir, dir1, exclude...); err == nil {
@@ -32,7 +32,7 @@ func TestMoveDirContent(t *testing.T) {
 
 	// existing parent dir
 	// ---
-	dir2 := filepath.Join(filepath.Dir(testDir), "_pb_move_dir_content_test_"+security.PseudorandomString(4))
+	dir2 := filepath.Join(filepath.Dir(testDir), "_hz_move_dir_content_test_"+security.PseudorandomString(4))
 	defer os.RemoveAll(dir2)
 
 	if err := osutils.MoveDirContent(testDir, dir2, exclude...); err != nil {

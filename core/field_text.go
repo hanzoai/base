@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core/validators"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core/validators"
+	"github.com/hanzoai/base/tools/security"
 	"github.com/spf13/cast"
 )
 
@@ -174,7 +174,7 @@ func (f *TextField) ValidateValue(ctx context.Context, app App, record *Record) 
 			if oldVal != "" {
 				// no need to further validate because the id can't be updated
 				// and because the id could have been inserted manually by migration from another system
-				// that may not comply with the user defined PocketBase validations
+				// that may not comply with the user defined Base validations
 				return nil
 			}
 		} else {

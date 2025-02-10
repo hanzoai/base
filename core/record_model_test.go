@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 )
 
@@ -438,7 +438,7 @@ func TestRecordMergeExpand(t *testing.T) {
 	t.Parallel()
 
 	collection := core.NewBaseCollection("test")
-	collection.Id = "_pbc_123"
+	collection.Id = "_hbc_123"
 
 	m := core.NewRecord(collection)
 	m.Id = "m"
@@ -523,7 +523,7 @@ func TestRecordMergeExpand(t *testing.T) {
 	}
 	rawStr := string(raw)
 
-	expected := `{"a":{"collectionId":"_pbc_123","collectionName":"test","expand":{"a1":{"collectionId":"_pbc_123","collectionName":"test","id":"a1"},"a23":[{"collectionId":"_pbc_123","collectionName":"test","id":"a2"},{"collectionId":"_pbc_123","collectionName":"test","expand":{"a31":{"collectionId":"_pbc_123","collectionName":"test","id":"a31"},"a32":[{"collectionId":"_pbc_123","collectionName":"test","id":"a32"},{"collectionId":"_pbc_123","collectionName":"test","id":"a32New"}],"a33New":{"collectionId":"_pbc_123","collectionName":"test","id":"a33New"}},"id":"a3"}]},"id":"a"},"b":[{"collectionId":"_pbc_123","collectionName":"test","expand":{"b1":{"collectionId":"_pbc_123","collectionName":"test","id":"b1"}},"id":"b"},{"collectionId":"_pbc_123","collectionName":"test","id":"bNew"}],"c":[{"collectionId":"_pbc_123","collectionName":"test","id":"c"}],"dNew":{"collectionId":"_pbc_123","collectionName":"test","id":"dNew"}}`
+	expected := `{"a":{"collectionId":"_hbc_123","collectionName":"test","expand":{"a1":{"collectionId":"_hbc_123","collectionName":"test","id":"a1"},"a23":[{"collectionId":"_hbc_123","collectionName":"test","id":"a2"},{"collectionId":"_hbc_123","collectionName":"test","expand":{"a31":{"collectionId":"_hbc_123","collectionName":"test","id":"a31"},"a32":[{"collectionId":"_hbc_123","collectionName":"test","id":"a32"},{"collectionId":"_hbc_123","collectionName":"test","id":"a32New"}],"a33New":{"collectionId":"_hbc_123","collectionName":"test","id":"a33New"}},"id":"a3"}]},"id":"a"},"b":[{"collectionId":"_hbc_123","collectionName":"test","expand":{"b1":{"collectionId":"_hbc_123","collectionName":"test","id":"b1"}},"id":"b"},{"collectionId":"_hbc_123","collectionName":"test","id":"bNew"}],"c":[{"collectionId":"_hbc_123","collectionName":"test","id":"c"}],"dNew":{"collectionId":"_hbc_123","collectionName":"test","id":"dNew"}}`
 
 	if expected != rawStr {
 		t.Fatalf("Expected \n%v, \ngot \n%v", expected, rawStr)
@@ -534,7 +534,7 @@ func TestRecordMergeExpandNilCheck(t *testing.T) {
 	t.Parallel()
 
 	collection := core.NewBaseCollection("test")
-	collection.Id = "_pbc_123"
+	collection.Id = "_hbc_123"
 
 	scenarios := []struct {
 		name     string
@@ -544,17 +544,17 @@ func TestRecordMergeExpandNilCheck(t *testing.T) {
 		{
 			"nil expand",
 			nil,
-			`{"collectionId":"_pbc_123","collectionName":"test","id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","id":""}`,
 		},
 		{
 			"empty expand",
 			map[string]any{},
-			`{"collectionId":"_pbc_123","collectionName":"test","id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","id":""}`,
 		},
 		{
 			"non-empty expand",
 			map[string]any{"test": core.NewRecord(collection)},
-			`{"collectionId":"_pbc_123","collectionName":"test","expand":{"test":{"collectionId":"_pbc_123","collectionName":"test","id":""}},"id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","expand":{"test":{"collectionId":"_hbc_123","collectionName":"test","id":""}},"id":""}`,
 		},
 	}
 
@@ -1335,11 +1335,11 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 	f5 := &core.TextField{Name: "field5", Hidden: true}
 
 	colBase := core.NewBaseCollection("test_base")
-	colBase.Id = "_pbc_base_123"
+	colBase.Id = "_hbc_base_123"
 	colBase.Fields.Add(f1, f2, f3, f4, f5)
 
 	colAuth := core.NewAuthCollection("test_auth")
-	colAuth.Id = "_pbc_auth_123"
+	colAuth.Id = "_hbc_auth_123"
 	colAuth.Fields.Add(f1, f2, f3, f4, f5)
 
 	scenarios := []struct {
@@ -1359,7 +1359,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
 		},
 		{
 			"[base] with email visibility",
@@ -1368,7 +1368,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
 		},
 		{
 			"[base] with custom data",
@@ -1377,7 +1377,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
 		},
 		{
 			"[base] with explicit hide and unhide fields",
@@ -1385,7 +1385,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			true,
 			[]string{"field3", "field1", "expand", "collectionId", "collectionName", "email", "tokenKey", "unknown"},
-			[]string{"field4", "@pbInternalAbc"},
+			[]string{"field4", "@baseInternalAbc"},
 			`{"emailVisibility":"test_invalid","field2":"field_2.png","field4":"field_4","id":"test_id","password":"test_passwordHash","verified":true}`,
 		},
 		{
@@ -1394,8 +1394,8 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			true,
 			nil,
-			[]string{"field5", "@pbInternalAbc", "email", "tokenKey", "unknown"},
-			`{"collectionId":"_pbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
+			[]string{"field5", "@baseInternalAbc", "email", "tokenKey", "unknown"},
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
 		},
 
 		// auth
@@ -1406,7 +1406,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
 		},
 		{
 			"[auth] with email visibility",
@@ -1415,7 +1415,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_auth_123","collectionName":"test_auth","email":"test_email","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","email":"test_email","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
 		},
 		{
 			"[auth] with custom data",
@@ -1424,7 +1424,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			nil,
-			`{"collectionId":"_pbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","unknown":"test_unknown","verified":true}`,
 		},
 		{
 			"[auth] with explicit hide and unhide fields",
@@ -1432,7 +1432,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			true,
 			[]string{"field3", "field1", "expand", "collectionId", "collectionName", "email", "unknown"},
-			[]string{"field4", "@pbInternalAbc"},
+			[]string{"field4", "@baseInternalAbc"},
 			`{"emailVisibility":false,"field2":"field_2.png","field4":"field_4","id":"test_id","verified":true}`,
 		},
 		{
@@ -1441,8 +1441,8 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			true,
 			nil,
-			[]string{"field5", "@pbInternalAbc", "tokenKey", "unknown", "email"}, // emailVisibility:false has higher priority
-			`{"collectionId":"_pbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","unknown":"test_unknown","verified":true}`,
+			[]string{"field5", "@baseInternalAbc", "tokenKey", "unknown", "email"}, // emailVisibility:false has higher priority
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","unknown":"test_unknown","verified":true}`,
 		},
 	}
 
@@ -1462,7 +1462,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 		"email":           "test_email",
 		"verified":        true,
 		"tokenKey":        "test_tokenKey",
-		"@pbInternalAbc":  "test_custom_inter", // always hidden
+		"@baseInternalAbc":  "test_custom_inter", // always hidden
 	}
 
 	for _, s := range scenarios {

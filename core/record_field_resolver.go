@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/security"
 	"github.com/spf13/cast"
 )
 

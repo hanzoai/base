@@ -13,20 +13,20 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core/validators"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/inflector"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/store"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core/validators"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/store"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 )
 
 // used as a workaround by some fields for persisting local state between various events
 // (for now is kept private and cannot be changed or cloned outside of the core package)
-const internalCustomFieldKeyPrefix = "@pbInternal"
+const internalCustomFieldKeyPrefix = "@baseInternal"
 
 var (
 	_ Model        = (*Record)(nil)
@@ -49,7 +49,7 @@ type Record struct {
 	ignoreUnchangedFields bool
 }
 
-const systemHookIdRecord = "__pbRecordSystemHook__"
+const systemHookIdRecord = "__hzRecordSystemHook__"
 
 func (app *BaseApp) registerRecordHooks() {
 	app.OnModelValidate().Bind(&hook.Handler[*ModelEvent]{
@@ -785,7 +785,7 @@ func (m *Record) FieldsData() map[string]any {
 // CustomData returns a shallow copy ONLY of the custom record fields data,
 // aka. fields that are neither defined by the collection, nor special system ones.
 //
-// Note that custom fields prefixed with "@pbInternal" are always skipped.
+// Note that custom fields prefixed with "@baseInternal" are always skipped.
 func (m *Record) CustomData() map[string]any {
 	if m.data == nil {
 		return nil

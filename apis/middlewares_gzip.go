@@ -2,7 +2,7 @@ package apis
 
 // -------------------------------------------------------------------
 // This middleware is ported from echo/middleware to minimize the breaking
-// changes and differences in the API behavior from earlier PocketBase versions
+// changes and differences in the API behavior from earlier Base versions
 // (https://github.com/labstack/echo/blob/ec5b858dab6105ab4c3ed2627d1ebdfb6ae1ecb8/middleware/compress.go).
 // -------------------------------------------------------------------
 
@@ -17,9 +17,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/router"
 )
 
 const (
@@ -27,7 +27,7 @@ const (
 )
 
 const (
-	DefaultGzipMiddlewareId = "pbGzip"
+	DefaultGzipMiddlewareId = "baseGzip"
 )
 
 // GzipConfig defines the config for Gzip middleware.

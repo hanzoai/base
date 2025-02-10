@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/base/tools/security"
 )
 
 // Handler defines a single Hook handler.

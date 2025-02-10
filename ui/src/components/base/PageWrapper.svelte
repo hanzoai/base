@@ -16,13 +16,13 @@
         <slot name="footer" />
 
         {#if $superuser?.id}
-            <a href={import.meta.env.PB_DOCS_URL} target="_blank" rel="noopener noreferrer">
+            <a href={import.meta.env.HZ_DOCS_URL} target="_blank" rel="noopener noreferrer">
                 <i class="ri-book-open-line txt-sm" />
                 <span class="txt">Docs</span>
             </a>
             <span class="delimiter">|</span>
-            <a href={import.meta.env.PB_RELEASES} target="_blank" rel="noopener noreferrer" title="Releases">
-                <span class="txt">PocketBase {import.meta.env.PB_VERSION}</span>
+            <a href={import.meta.env.HZ_RELEASES} target="_blank" rel="noopener noreferrer" title="Releases">
+                <span class="txt">Base {import.meta.env.HZ_VERSION}</span>
             </a>
         {/if}
     </footer>

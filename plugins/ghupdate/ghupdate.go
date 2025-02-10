@@ -1,5 +1,5 @@
 // Package ghupdate implements a new command to selfupdate the current
-// PocketBase executable with the latest GitHub release.
+// Base executable with the latest GitHub release.
 //
 // Example usage:
 //
@@ -21,9 +21,9 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/archive"
-	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/archive"
+	"github.com/hanzoai/base/tools/osutils"
 	"github.com/spf13/cobra"
 )
 
@@ -36,14 +36,14 @@ type HttpClient interface {
 //
 // NB! This plugin is considered experimental and its config options may change in the future.
 type Config struct {
-	// Owner specifies the account owner of the repository (default to "pocketbase").
+	// Owner specifies the account owner of the repository (default to "base").
 	Owner string
 
-	// Repo specifies the name of the repository (default to "pocketbase").
+	// Repo specifies the name of the repository (default to "base").
 	Repo string
 
 	// ArchiveExecutable specifies the name of the executable file in the release archive
-	// (default to "pocketbase"; an additional ".exe" check is also performed as a fallback).
+	// (default to "base"; an additional ".exe" check is also performed as a fallback).
 	ArchiveExecutable string
 
 	// Optional context to use when fetching and downloading the latest release.
@@ -71,15 +71,15 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 	}
 
 	if p.config.Owner == "" {
-		p.config.Owner = "pocketbase"
+		p.config.Owner = "base"
 	}
 
 	if p.config.Repo == "" {
-		p.config.Repo = "pocketbase"
+		p.config.Repo = "base"
 	}
 
 	if p.config.ArchiveExecutable == "" {
-		p.config.ArchiveExecutable = "pocketbase"
+		p.config.ArchiveExecutable = "base"
 	}
 
 	if p.config.HttpClient == nil {
@@ -136,7 +136,7 @@ func (p *plugin) updateCmd() *cobra.Command {
 		&withBackup,
 		"backup",
 		true,
-		"Creates a pb_data backup at the end of the update process",
+		"Creates a hz_data backup at the end of the update process",
 	)
 
 	return command
@@ -231,7 +231,7 @@ func (p *plugin) update(withBackup bool) error {
 	}
 
 	if withBackup {
-		color.Yellow("Creating pb_data backup...")
+		color.Yellow("Creating hz_data backup...")
 
 		backupName := fmt.Sprintf("@update_%s.zip", latest.Tag)
 		if err := p.app.CreateBackup(p.config.Context, backupName); err != nil {

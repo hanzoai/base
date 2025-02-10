@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tools/search"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/tools/search"
 )
 
 func TestFilterDataBuildExpr(t *testing.T) {

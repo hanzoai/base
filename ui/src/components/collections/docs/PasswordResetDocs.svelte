@@ -28,40 +28,40 @@
 
 <SdkTabs
     js={`
-        import PocketBase from 'pocketbase';
+        import Base from 'base';
 
-        const pb = new PocketBase('${backendAbsUrl}');
+        const base = new Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').requestPasswordReset('test@example.com');
+        await base.collection('${collection?.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${collection?.name}').confirmPasswordReset(
+        await base.collection('${collection?.name}').confirmPasswordReset(
             'RESET_TOKEN',
             'NEW_PASSWORD',
             'NEW_PASSWORD_CONFIRM',
         );
     `}
     dart={`
-        import 'package:pocketbase/pocketbase.dart';
+        import 'package:hanzoai/base.dart';
 
-        final pb = PocketBase('${backendAbsUrl}');
+        final base = Base('${backendAbsUrl}');
 
         ...
 
-        await pb.collection('${collection?.name}').requestPasswordReset('test@example.com');
+        await base.collection('${collection?.name}').requestPasswordReset('test@example.com');
 
         // ---
         // (optional) in your custom confirmation page:
         // ---
 
         // note: after this call all previously issued auth tokens are invalidated
-        await pb.collection('${collection?.name}').confirmPasswordReset(
+        await base.collection('${collection?.name}').confirmPasswordReset(
           'RESET_TOKEN',
           'NEW_PASSWORD',
           'NEW_PASSWORD_CONFIRM',

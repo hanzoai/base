@@ -724,10 +724,10 @@ export default class CommonHelper {
         const result = [];
 
         const items = (str || "")
-            .replaceAll("\\" + separator, "{_PB_ESCAPED_}")
+            .replaceAll("\\" + separator, "{_HZ_ESCAPED_}")
             .split(separator)
             .map((item) => {
-                return item.replaceAll("{_PB_ESCAPED_}", separator);
+                return item.replaceAll("{_HZ_ESCAPED_}", separator);
             });
 
         for (let item of items) {
@@ -847,19 +847,19 @@ export default class CommonHelper {
     }
 
     /**
-     * Copies text to the user clipboard.
+     * Copies text to the user clibaseoard.
      *
      * @param  {String} text
      * @return {Promise}
      */
-    static async copyToClipboard(text) {
+    static async copyToClibaseoard(text) {
         text = "" + text // ensure that text is string
 
-        if (!text.length || !window?.navigator?.clipboard) {
+        if (!text.length || !window?.navigator?.clibaseoard) {
             return;
         }
 
-        return window.navigator.clipboard.writeText(text).catch((err) => {
+        return window.navigator.clibaseoard.writeText(text).catch((err) => {
             console.warn("Failed to copy.", err);
         })
     }
@@ -1251,7 +1251,7 @@ export default class CommonHelper {
         let url = window.location.href.substring(0, window.location.href.indexOf("/_")) || fallback || '/';
 
         // for broader compatibility replace localhost with 127.0.0.1
-        // (see https://github.com/pocketbase/js-sdk/issues/21)
+        // (see https://github.com/hanzoai/js-sdk/issues/21)
         return url.replace('//localhost', '//127.0.0.1');
     }
 
@@ -1457,7 +1457,7 @@ export default class CommonHelper {
             max_height: 700,
             autoresize_bottom_margin: 30,
             convert_unsafe_embeds: true, // GHSA-5359
-            skin: "pocketbase",
+            skin: "base",
             content_style: "body { font-size: 14px }",
             plugins: [
                 "autoresize",
@@ -1971,11 +1971,11 @@ export default class CommonHelper {
 
         // columns
         const rawColumns = (matches[5] || "")
-            .replace(/,(?=[^\(]*\))/gmi, "{PB_TEMP}") // temporary replace comma within expressions for easier splitting
+            .replace(/,(?=[^\(]*\))/gmi, "{HZ_TEMP}") // temporary replace comma within expressions for easier splitting
             .split(",");                              // split columns
 
         for (let col of rawColumns) {
-            col = col.trim().replaceAll("{PB_TEMP}", ",") // revert temp replacement
+            col = col.trim().replaceAll("{HZ_TEMP}", ",") // revert temp replacement
 
             const colRegex = /^([\s\S]+?)(?:\s+collate\s+([\w]+))?(?:\s+(asc|desc))?$/gmi
             const colMatches = colRegex.exec(col);

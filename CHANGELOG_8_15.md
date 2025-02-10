@@ -4,31 +4,31 @@
 
 ## v0.15.3
 
-- Updated the Admin UI to use the latest JS SDK to resolve the `isNew` record field conflict ([#2385](https://github.com/pocketbase/pocketbase/discussions/2385)).
+- Updated the Admin UI to use the latest JS SDK to resolve the `isNew` record field conflict ([#2385](https://github.com/hanzoai/base/discussions/2385)).
 
-- Fixed `editor` field fullscreen `z-index` ([#2410](https://github.com/pocketbase/pocketbase/issues/2410)).
+- Fixed `editor` field fullscreen `z-index` ([#2410](https://github.com/hanzoai/base/issues/2410)).
 
-- Inserts the default app settings as part of the system init migration so that they are always available when accessed from within a user defined migration ([#2423](https://github.com/pocketbase/pocketbase/discussions/2423)).
+- Inserts the default app settings as part of the system init migration so that they are always available when accessed from within a user defined migration ([#2423](https://github.com/hanzoai/base/discussions/2423)).
 
 
 ## v0.15.2
 
-- Fixed View query `SELECT DISTINCT` identifiers parsing ([#2349-5706019](https://github.com/pocketbase/pocketbase/discussions/2349#discussioncomment-5706019)).
+- Fixed View query `SELECT DISTINCT` identifiers parsing ([#2349-5706019](https://github.com/hanzoai/base/discussions/2349#discussioncomment-5706019)).
 
-- Fixed View collection schema incorrectly resolving multiple aliased fields originating from the same field source ([#2349-5707675](https://github.com/pocketbase/pocketbase/discussions/2349#discussioncomment-5707675)).
+- Fixed View collection schema incorrectly resolving multiple aliased fields originating from the same field source ([#2349-5707675](https://github.com/hanzoai/base/discussions/2349#discussioncomment-5707675)).
 
 - Added OAuth2 redirect fallback message to notify the user to go back to the app in case the browser window is not auto closed.
 
 
 ## v0.15.1
 
-- Trigger the related `Record` model realtime subscription events on [custom model struct](https://pocketbase.io/docs/custom-models/) save ([#2325](https://github.com/pocketbase/pocketbase/discussions/2325)).
+- Trigger the related `Record` model realtime subscription events on [custom model struct](https://docs.hanzo.ai/custom-models/) save ([#2325](https://github.com/hanzoai/base/discussions/2325)).
 
 - Fixed `Ctrl + S` in the `editor` field not propagating the quick save shortcut to the parent form.
 
 - Added `⌘ + S` alias for the record quick save shortcut (_I have no Mac device to test it but it should work based on [`e.metaKey` docs](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/metaKey)_).
 
-- Enabled RTL for the TinyMCE editor ([#2327](https://github.com/pocketbase/pocketbase/issues/2327)).
+- Enabled RTL for the TinyMCE editor ([#2327](https://github.com/hanzoai/base/issues/2327)).
 
 - Reduced the record form vertical layout shifts and slightly improved the rendering speed when loading multiple `relation` fields.
 
@@ -37,15 +37,15 @@
 
 ## v0.15.0
 
-- Simplified the OAuth2 authentication flow in a single "all in one" call ([#55](https://github.com/pocketbase/pocketbase/issues/55)).
+- Simplified the OAuth2 authentication flow in a single "all in one" call ([#55](https://github.com/hanzoai/base/issues/55)).
   Requires JS SDK v0.14.0+ or Dart SDK v0.9.0+.
   The manual code-token exchange flow is still supported but the SDK method is renamed to `authWithOAuth2Code()` (_to minimize the breaking changes the JS SDK has a function overload that will proxy the existing `authWithOauth2` calls to `authWithOAuth2Code`_).
-  For more details and example, you could check https://pocketbase.io/docs/authentication/#oauth2-integration.
+  For more details and example, you could check https://docs.hanzo.ai/authentication/#oauth2-integration.
 
-- Added support for protected files ([#215](https://github.com/pocketbase/pocketbase/issues/215)).
+- Added support for protected files ([#215](https://github.com/hanzoai/base/issues/215)).
   Requires JS SDK v0.14.0+ or Dart SDK v0.9.0+.
   It works with a short lived (~5min) file token passed as query param with the file url.
-  For more details and example, you could check https://pocketbase.io/docs/files-handling/#protected-files.
+  For more details and example, you could check https://docs.hanzo.ai/files-handling/#protected-files.
 
 - ⚠️ Fixed typo in `Record.WithUnkownData()` -> `Record.WithUnknownData()`.
 
@@ -62,21 +62,21 @@
 
 ## v0.14.5
 
-- Added checks for `nil` hooks in `forms.RecordUpsert` when used with custom `Dao` ([#2277](https://github.com/pocketbase/pocketbase/issues/2277)).
+- Added checks for `nil` hooks in `forms.RecordUpsert` when used with custom `Dao` ([#2277](https://github.com/hanzoai/base/issues/2277)).
 
-- Fixed unique detailed field error not returned on record create failure ([#2287](https://github.com/pocketbase/pocketbase/discussions/2287)).
+- Fixed unique detailed field error not returned on record create failure ([#2287](https://github.com/hanzoai/base/discussions/2287)).
 
 
 ## v0.14.4
 
-- Fixed concurrent map write pannic on `list.ExistInSliceWithRegex()` cache ([#2272](https://github.com/pocketbase/pocketbase/issues/2272)).
+- Fixed concurrent map write pannic on `list.ExistInSliceWithRegex()` cache ([#2272](https://github.com/hanzoai/base/issues/2272)).
 
 
 ## v0.14.3
 
-- Fixed Admin UI Logs `meta` visualization in Firefox ([#2221](https://github.com/pocketbase/pocketbase/issues/2221)).
+- Fixed Admin UI Logs `meta` visualization in Firefox ([#2221](https://github.com/hanzoai/base/issues/2221)).
 
-- Downgraded to v1 of the `aws/aws-sdk-go` package since v2 has compatibility issues with GCS ([#2231](https://github.com/pocketbase/pocketbase/issues/2231)).
+- Downgraded to v1 of the `aws/aws-sdk-go` package since v2 has compatibility issues with GCS ([#2231](https://github.com/hanzoai/base/issues/2231)).
 
 - Upgraded the GitHub action to use [min Go 1.20.3](https://github.com/golang/go/issues?q=milestone%3AGo1.20.3+label%3ACherryPickApproved) for the prebuilt executable since it contains some minor `net/http` security fixes.
 
@@ -90,7 +90,7 @@
 
 - Fixed realtime events firing before the files upload completion.
 
-- Updated the underlying S3 lib to use `aws-sdk-go-v2` ([#1346](https://github.com/pocketbase/pocketbase/pull/1346); thanks @yuxiang-gao).
+- Updated the underlying S3 lib to use `aws-sdk-go-v2` ([#1346](https://github.com/hanzoai/base/pull/1346); thanks @yuxiang-gao).
 
 - Updated TinyMCE to v6.4.1.
 
@@ -103,16 +103,16 @@
 
 - Added `@request.headers.*` filter rule support.
 
-- Added support for advanced unique constraints and indexes management ([#345](https://github.com/pocketbase/pocketbase/issues/345), [#544](https://github.com/pocketbase/pocketbase/issues/544))
+- Added support for advanced unique constraints and indexes management ([#345](https://github.com/hanzoai/base/issues/345), [#544](https://github.com/hanzoai/base/issues/544))
 
 - Simplified the collections fields UI to allow easier and quicker scaffolding of the data schema.
 
 - Deprecated `SchemaField.Unique`. Unique constraints are now managed via indexes.
   The `Unique` field is a no-op and will be removed in future version.
 
-- Removed the `COALESCE` wrapping from some of the generated filter conditions to make better use of the indexes ([#1939](https://github.com/pocketbase/pocketbase/issues/1939)).
+- Removed the `COALESCE` wrapping from some of the generated filter conditions to make better use of the indexes ([#1939](https://github.com/hanzoai/base/issues/1939)).
 
-- Detect `id` aliased view columns as single `relation` fields ([#2029](https://github.com/pocketbase/pocketbase/discussions/2029)).
+- Detect `id` aliased view columns as single `relation` fields ([#2029](https://github.com/hanzoai/base/discussions/2029)).
 
 - Optimized single relation lookups.
 
@@ -123,9 +123,9 @@
 - Changed the cost/round factor of bcrypt hash generation from 13 to 12 since several users complained about the slow authWithPassword responses on lower spec hardware.
   _The change will affect only new users. Depending on the demand, we might make it configurable from the auth options._
 
-- Simplified the default mail template styles to allow more control over the template layout ([#1904](https://github.com/pocketbase/pocketbase/issues/1904)).
+- Simplified the default mail template styles to allow more control over the template layout ([#1904](https://github.com/hanzoai/base/issues/1904)).
 
-- Added option to explicitly set the record id from the Admin UI ([#2118](https://github.com/pocketbase/pocketbase/issues/2118)).
+- Added option to explicitly set the record id from the Admin UI ([#2118](https://github.com/hanzoai/base/issues/2118)).
 
 - Added `migrate history-sync` command to clean `_migrations` history table from deleted migration files references.
 
@@ -145,9 +145,9 @@
 - ⚠️ Changed `types.JsonArray` to support specifying a generic type, aka. `types.JsonArray[T]`.
   If you have previously used `types.JsonArray`, you'll have to update it to `types.JsonArray[any]`.
 
-- ⚠️ Registered the `RemoveTrailingSlash` middleware only for the `/api/*` routes since it is causing issues with subpath file serving endpoints ([#2072](https://github.com/pocketbase/pocketbase/issues/2072)).
+- ⚠️ Registered the `RemoveTrailingSlash` middleware only for the `/api/*` routes since it is causing issues with subpath file serving endpoints ([#2072](https://github.com/hanzoai/base/issues/2072)).
 
-- ⚠️ Changed the request logs `method` value to UPPERCASE, eg. "get" => "GET" ([#1956](https://github.com/pocketbase/pocketbase/discussions/1956)).
+- ⚠️ Changed the request logs `method` value to UPPERCASE, eg. "get" => "GET" ([#1956](https://github.com/hanzoai/base/discussions/1956)).
 
 - Other minor UI improvements.
 
@@ -159,19 +159,19 @@
 
 ## v0.13.3
 
-- Fixed view collections import ([#2044](https://github.com/pocketbase/pocketbase/issues/2044)).
+- Fixed view collections import ([#2044](https://github.com/hanzoai/base/issues/2044)).
 
 - Updated the records picker Admin UI to show properly view collection relations.
 
 
 ## v0.13.2
 
-- Fixed Admin UI js error when selecting multiple `file` field as `relation` "Display fields" ([#1989](https://github.com/pocketbase/pocketbase/issues/1989)).
+- Fixed Admin UI js error when selecting multiple `file` field as `relation` "Display fields" ([#1989](https://github.com/hanzoai/base/issues/1989)).
 
 
 ## v0.13.1
 
-- Added `HEAD` request method support for the `/api/files/:collection/:recordId/:filename` route ([#1976](https://github.com/pocketbase/pocketbase/discussions/1976)).
+- Added `HEAD` request method support for the `/api/files/:collection/:recordId/:filename` route ([#1976](https://github.com/hanzoai/base/discussions/1976)).
 
 
 ## v0.13.0
@@ -185,7 +185,7 @@
   - `filter`, `sort` and `expand`
   - List and View API rules
 
-- Added auto fail/retry (default to 8 attempts) for the `SELECT` queries to gracefully handle the `database is locked` errors ([#1795](https://github.com/pocketbase/pocketbase/discussions/1795#discussioncomment-4882169)).
+- Added auto fail/retry (default to 8 attempts) for the `SELECT` queries to gracefully handle the `database is locked` errors ([#1795](https://github.com/hanzoai/base/discussions/1795#discussioncomment-4882169)).
   _The default max attempts can be accessed or changed via `Dao.MaxLockRetries`._
 
 - Added default max query execution timeout (30s).
@@ -241,16 +241,16 @@
 
 ## v0.12.3
 
-- Fixed "Toggle column" reactivity when navigating between collections ([#1836](https://github.com/pocketbase/pocketbase/pull/1836)).
+- Fixed "Toggle column" reactivity when navigating between collections ([#1836](https://github.com/hanzoai/base/pull/1836)).
 
-- Logged the current datetime on server start ([#1822](https://github.com/pocketbase/pocketbase/issues/1822)).
+- Logged the current datetime on server start ([#1822](https://github.com/hanzoai/base/issues/1822)).
 
 
 ## v0.12.2
 
-- Fixed the "Clear" button of the datepicker component not clearing the value ([#1730](https://github.com/pocketbase/pocketbase/discussions/1730)).
+- Fixed the "Clear" button of the datepicker component not clearing the value ([#1730](https://github.com/hanzoai/base/discussions/1730)).
 
-- Increased slightly the fields contrast ([#1742](https://github.com/pocketbase/pocketbase/issues/1742)).
+- Increased slightly the fields contrast ([#1742](https://github.com/hanzoai/base/issues/1742)).
 
 - Auto close the multi-select dropdown if "Max select" is reached.
 
@@ -259,33 +259,33 @@
 
 - Fixed js error on empty relation save.
 
-- Fixed `overlay-active` css class not being removed on nested overlay panel close ([#1718](https://github.com/pocketbase/pocketbase/issues/1718)).
+- Fixed `overlay-active` css class not being removed on nested overlay panel close ([#1718](https://github.com/hanzoai/base/issues/1718)).
 
-- Added the collection name in the page title ([#1711](https://github.com/pocketbase/pocketbase/issues/1711)).
+- Added the collection name in the page title ([#1711](https://github.com/hanzoai/base/issues/1711)).
 
 
 ## v0.12.0
 
-- Refactored the relation picker UI to allow server-side search, sort, create, update and delete of relation records ([#976](https://github.com/pocketbase/pocketbase/issues/976)).
+- Refactored the relation picker UI to allow server-side search, sort, create, update and delete of relation records ([#976](https://github.com/hanzoai/base/issues/976)).
 
 - Added new `RelationOptions.DisplayFields` option to specify custom relation field(s) visualization in the Admin UI.
 
-- Added Authentik OAuth2 provider ([#1377](https://github.com/pocketbase/pocketbase/pull/1377); thanks @pr0ton11).
+- Added Authentik OAuth2 provider ([#1377](https://github.com/hanzoai/base/pull/1377); thanks @pr0ton11).
 
-- Added LiveChat OAuth2 provider ([#1573](https://github.com/pocketbase/pocketbase/pull/1573); thanks @mariosant).
+- Added LiveChat OAuth2 provider ([#1573](https://github.com/hanzoai/base/pull/1573); thanks @mariosant).
 
-- Added Gitea OAuth2 provider ([#1643](https://github.com/pocketbase/pocketbase/pull/1643); thanks @hlanderdev).
+- Added Gitea OAuth2 provider ([#1643](https://github.com/hanzoai/base/pull/1643); thanks @hlanderdev).
 
-- Added PDF file previews ([#1548](https://github.com/pocketbase/pocketbase/pull/1548); thanks @mjadobson).
+- Added PDF file previews ([#1548](https://github.com/hanzoai/base/pull/1548); thanks @mjadobson).
 
 - Added video and audio file previews.
 
-- Added rich text editor (`editor`) field for HTML content based on TinyMCE ([#370](https://github.com/pocketbase/pocketbase/issues/370)).
+- Added rich text editor (`editor`) field for HTML content based on TinyMCE ([#370](https://github.com/hanzoai/base/issues/370)).
   _Currently the new field doesn't have any configuration options or validations but this may change in the future depending on how devs ended up using it._
 
-- Added "Duplicate" Collection and Record options in the Admin UI ([#1656](https://github.com/pocketbase/pocketbase/issues/1656)).
+- Added "Duplicate" Collection and Record options in the Admin UI ([#1656](https://github.com/hanzoai/base/issues/1656)).
 
-- Added `filesystem.GetFile()` helper to read files through the FileSystem abstraction ([#1578](https://github.com/pocketbase/pocketbase/pull/1578); thanks @avarabyeu).
+- Added `filesystem.GetFile()` helper to read files through the FileSystem abstraction ([#1578](https://github.com/hanzoai/base/pull/1578); thanks @avarabyeu).
 
 - Added new auth event hooks for finer control and more advanced auth scenarios handling:
 
@@ -311,7 +311,7 @@
 
 - Added `models.Record.CleanCopy()` helper that creates a new record copy with only the latest data state of the existing one and all other options reset to their defaults.
 
-- Added new helper `apis.RecordAuthResponse(app, httpContext, record, meta)` to return a standard Record auth API response ([#1623](https://github.com/pocketbase/pocketbase/issues/1623)).
+- Added new helper `apis.RecordAuthResponse(app, httpContext, record, meta)` to return a standard Record auth API response ([#1623](https://github.com/hanzoai/base/issues/1623)).
 
 - Refactored `models.Record` expand and data change operations to be concurrent safe.
 
@@ -337,7 +337,7 @@
     ```
     For all those event hooks `*hook.Hook` was replaced with `*hooks.TaggedHook`, but the hook methods signatures are the same so it should behave as it was previously if no tags were specified.
 
-- ⚠️ Fixed the `json` field **string** value normalization ([#1703](https://github.com/pocketbase/pocketbase/issues/1703)).
+- ⚠️ Fixed the `json` field **string** value normalization ([#1703](https://github.com/hanzoai/base/issues/1703)).
 
     In order to support seamlessly both `application/json` and `multipart/form-data`
     requests, the following normalization rules are applied if the `json` field is a
@@ -354,21 +354,21 @@
 
     Additionally, the "Nonempty" `json` field constraint now checks for `null`, `[]`, `{}` and `""` (empty string).
 
-- Added `aria-label` to some of the buttons in the Admin UI for better accessibility ([#1702](https://github.com/pocketbase/pocketbase/pull/1702); thanks @ndarilek).
+- Added `aria-label` to some of the buttons in the Admin UI for better accessibility ([#1702](https://github.com/hanzoai/base/pull/1702); thanks @ndarilek).
 
-- Updated the filename extension checks in the Admin UI to be case-insensitive ([#1707](https://github.com/pocketbase/pocketbase/pull/1707); thanks @hungcrush).
+- Updated the filename extension checks in the Admin UI to be case-insensitive ([#1707](https://github.com/hanzoai/base/pull/1707); thanks @hungcrush).
 
 - Other minor improvements (more detailed API file upload errors, UI optimizations, docs improvements, etc.)
 
 
 ## v0.11.4
 
-- Fixed cascade delete for rel records with the same id as the main record ([#1689](https://github.com/pocketbase/pocketbase/issues/1689)).
+- Fixed cascade delete for rel records with the same id as the main record ([#1689](https://github.com/hanzoai/base/issues/1689)).
 
 
 ## v0.11.3
 
-- Fix realtime API panic on concurrent clients iteration ([#1628](https://github.com/pocketbase/pocketbase/issues/1628))
+- Fix realtime API panic on concurrent clients iteration ([#1628](https://github.com/hanzoai/base/issues/1628))
 
   - `app.SubscriptionsBroker().Clients()` now returns a shallow copy of the underlying map.
 
@@ -379,7 +379,7 @@
 
 ## v0.11.2
 
-- Fixed `fs.DeleteByPrefix()` hang on invalid S3 settings ([#1575](https://github.com/pocketbase/pocketbase/discussions/1575#discussioncomment-4661089)).
+- Fixed `fs.DeleteByPrefix()` hang on invalid S3 settings ([#1575](https://github.com/hanzoai/base/discussions/1575#discussioncomment-4661089)).
 
 - Updated file(s) delete to run in the background on record/collection delete to avoid blocking the delete model transaction.
   _Currently the cascade files delete operation is treated as "non-critical" and in case of an error it is just logged during debug._
@@ -388,7 +388,7 @@
 
 ## v0.11.1
 
-- Unescaped path parameter values ([#1552](https://github.com/pocketbase/pocketbase/issues/1552)).
+- Unescaped path parameter values ([#1552](https://github.com/hanzoai/base/issues/1552)).
 
 
 ## v0.11.0
@@ -447,35 +447,35 @@
 
 - Added `:each` modifier support for the multi-`select` request data and collection field.
   ```js
-  // check if all selected rows has "pb_" prefix
-  roles:each ~ 'pb_%'
+  // check if all selected rows has "hz_" prefix
+  roles:each ~ 'hz_%'
   ```
 
 - Improved the Admin UI filters autocomplete.
 
 - Added `@random` sort key for `RANDOM()` sorted list results.
 
-- Added Strava OAuth2 provider ([#1443](https://github.com/pocketbase/pocketbase/pull/1443); thanks @szsascha).
+- Added Strava OAuth2 provider ([#1443](https://github.com/hanzoai/base/pull/1443); thanks @szsascha).
 
-- Added Gitee OAuth2 provider ([#1448](https://github.com/pocketbase/pocketbase/pull/1448); thanks @yuxiang-gao).
+- Added Gitee OAuth2 provider ([#1448](https://github.com/hanzoai/base/pull/1448); thanks @yuxiang-gao).
 
-- Added IME status check to the textarea keydown handler ([#1370](https://github.com/pocketbase/pocketbase/pull/1370); thanks @tenthree).
+- Added IME status check to the textarea keydown handler ([#1370](https://github.com/hanzoai/base/pull/1370); thanks @tenthree).
 
-- Added `filesystem.NewFileFromBytes()` helper ([#1420](https://github.com/pocketbase/pocketbase/pull/1420); thanks @dschissler).
+- Added `filesystem.NewFileFromBytes()` helper ([#1420](https://github.com/hanzoai/base/pull/1420); thanks @dschissler).
 
 - Added support for reordering uploaded multiple files.
 
-- Added `webp` to the default images mime type presets list ([#1469](https://github.com/pocketbase/pocketbase/pull/1469); thanks @khairulhaaziq).
+- Added `webp` to the default images mime type presets list ([#1469](https://github.com/hanzoai/base/pull/1469); thanks @khairulhaaziq).
 
-- Added the OAuth2 refresh token to the auth meta response ([#1487](https://github.com/pocketbase/pocketbase/issues/1487)).
+- Added the OAuth2 refresh token to the auth meta response ([#1487](https://github.com/hanzoai/base/issues/1487)).
 
-- Fixed the text wrapping in the Admin UI listing searchbar ([#1416](https://github.com/pocketbase/pocketbase/issues/1416)).
+- Fixed the text wrapping in the Admin UI listing searchbar ([#1416](https://github.com/hanzoai/base/issues/1416)).
 
-- Fixed number field value output in the records listing ([#1447](https://github.com/pocketbase/pocketbase/issues/1447)).
+- Fixed number field value output in the records listing ([#1447](https://github.com/hanzoai/base/issues/1447)).
 
-- Fixed duplicated settings view pages caused by uncompleted transitions ([#1498](https://github.com/pocketbase/pocketbase/issues/1498)).
+- Fixed duplicated settings view pages caused by uncompleted transitions ([#1498](https://github.com/hanzoai/base/issues/1498)).
 
-- Allowed sending `Authorization` header with the `/auth-with-password` record and admin login requests ([#1494](https://github.com/pocketbase/pocketbase/discussions/1494)).
+- Allowed sending `Authorization` header with the `/auth-with-password` record and admin login requests ([#1494](https://github.com/hanzoai/base/discussions/1494)).
 
 - `migrate down` now reverts migrations in the applied order.
 
@@ -486,34 +486,34 @@
 
 ## v0.10.4
 
-- Fixed `Record.MergeExpand` panic when the main model expand map is not initialized ([#1365](https://github.com/pocketbase/pocketbase/issues/1365)).
+- Fixed `Record.MergeExpand` panic when the main model expand map is not initialized ([#1365](https://github.com/hanzoai/base/issues/1365)).
 
 
 ## v0.10.3
 
-- ⚠️ Renamed the metadata key `original_filename` to `original-filename` due to an S3 file upload error caused by the underscore character ([#1343](https://github.com/pocketbase/pocketbase/pull/1343); thanks @yuxiang-gao).
+- ⚠️ Renamed the metadata key `original_filename` to `original-filename` due to an S3 file upload error caused by the underscore character ([#1343](https://github.com/hanzoai/base/pull/1343); thanks @yuxiang-gao).
 
-- Fixed request verification docs api url ([#1332](https://github.com/pocketbase/pocketbase/pull/1332); thanks @JoyMajumdar2001)
+- Fixed request verification docs api url ([#1332](https://github.com/hanzoai/base/pull/1332); thanks @JoyMajumdar2001)
 
-- Excluded `collectionId` and `collectionName` from the displayable relation props list ([1322](https://github.com/pocketbase/pocketbase/issues/1322); thanks @dhall2).
+- Excluded `collectionId` and `collectionName` from the displayable relation props list ([1322](https://github.com/hanzoai/base/issues/1322); thanks @dhall2).
 
 
 ## v0.10.2
 
-- Fixed nested multiple expands with shared path ([#586](https://github.com/pocketbase/pocketbase/issues/586#issuecomment-1357784227)).
+- Fixed nested multiple expands with shared path ([#586](https://github.com/hanzoai/base/issues/586#issuecomment-1357784227)).
   A new helper method `models.Record.MergeExpand(map[string]any)` was also added to simplify the expand handling and unit testing.
 
 
 ## v0.10.1
 
-- Fixed nested transactions deadlock when authenticating with OAuth2 ([#1291](https://github.com/pocketbase/pocketbase/issues/1291)).
+- Fixed nested transactions deadlock when authenticating with OAuth2 ([#1291](https://github.com/hanzoai/base/issues/1291)).
 
 
 ## v0.10.0
 
 - Added `/api/health` endpoint (thanks @MarvinJWendt).
 
-- Added support for SMTP `LOGIN` auth for Microsoft/Outlook and other providers that don't support the `PLAIN` auth method ([#1217](https://github.com/pocketbase/pocketbase/discussions/1217#discussioncomment-4387970)).
+- Added support for SMTP `LOGIN` auth for Microsoft/Outlook and other providers that don't support the `PLAIN` auth method ([#1217](https://github.com/hanzoai/base/discussions/1217#discussioncomment-4387970)).
 
 - Reduced memory consumption (you can expect ~20% less allocated memory).
 
@@ -523,11 +523,11 @@
 
 - Removed the unnecessary parenthesis in the generated filter SQL query, reducing the "_parse stack overflow_" errors.
 
-- Fixed `~` expressions backslash literal escaping ([#1231](https://github.com/pocketbase/pocketbase/discussions/1231)).
+- Fixed `~` expressions backslash literal escaping ([#1231](https://github.com/hanzoai/base/discussions/1231)).
 
-- Refactored the `core.app.Bootstrap()` to be called before starting the cobra commands ([#1267](https://github.com/pocketbase/pocketbase/discussions/1267)).
+- Refactored the `core.app.Bootstrap()` to be called before starting the cobra commands ([#1267](https://github.com/hanzoai/base/discussions/1267)).
 
-- ⚠️ Changed `pocketbase.NewWithConfig(config Config)` to `pocketbase.NewWithConfig(config *Config)` and added 4 new config settings:
+- ⚠️ Changed `base.NewWithConfig(config Config)` to `base.NewWithConfig(config *Config)` and added 4 new config settings:
   ```go
   DataMaxOpenConns int // default to core.DefaultDataMaxOpenConns
   DataMaxIdleConns int // default to core.DefaultDataMaxIdleConns
@@ -561,29 +561,29 @@
 
 ## v0.9.2
 
-- Fixed field column name conflict on record deletion ([#1220](https://github.com/pocketbase/pocketbase/discussions/1220)).
+- Fixed field column name conflict on record deletion ([#1220](https://github.com/hanzoai/base/discussions/1220)).
 
 
 ## v0.9.1
 
 - Moved the record file upload and delete out of the db transaction to minimize the locking times.
 
-- Added `Dao` query semaphore and base fail/retry handling to improve the concurrent writes throughput ([#1187](https://github.com/pocketbase/pocketbase/issues/1187)).
+- Added `Dao` query semaphore and base fail/retry handling to improve the concurrent writes throughput ([#1187](https://github.com/hanzoai/base/issues/1187)).
 
 - Fixed records cascade deletion when there are "A<->B" relation references.
 
-- Replaced `c.QueryString()` with `c.QueryParams().Encode()` to allow loading middleware modified query parameters in the default crud actions ([#1210](https://github.com/pocketbase/pocketbase/discussions/1210)).
+- Replaced `c.QueryString()` with `c.QueryParams().Encode()` to allow loading middleware modified query parameters in the default crud actions ([#1210](https://github.com/hanzoai/base/discussions/1210)).
 
-- Fixed the datetime field not triggering the `onChange` event on manual field edit and added a "Clear" button ([#1219](https://github.com/pocketbase/pocketbase/issues/1219)).
+- Fixed the datetime field not triggering the `onChange` event on manual field edit and added a "Clear" button ([#1219](https://github.com/hanzoai/base/issues/1219)).
 
 - Updated the GitHub goreleaser action to use go 1.19.4 since it comes with [some security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.19.4+label%3ACherryPickApproved).
 
 
 ## v0.9.0
 
-- Fixed concurrent multi-relation cascade update/delete ([#1138](https://github.com/pocketbase/pocketbase/issues/1138)).
+- Fixed concurrent multi-relation cascade update/delete ([#1138](https://github.com/hanzoai/base/issues/1138)).
 
-- Added the raw OAuth2 user data (`meta.rawUser`) and OAuth2 access token (`meta.accessToken`) to the auth response ([#654](https://github.com/pocketbase/pocketbase/discussions/654)).
+- Added the raw OAuth2 user data (`meta.rawUser`) and OAuth2 access token (`meta.accessToken`) to the auth response ([#654](https://github.com/hanzoai/base/discussions/654)).
 
 - `BaseModel.UnmarkAsNew()` method was renamed to `BaseModel.MarkAsNotNew()`.
   Additionally, to simplify the insert model queries with custom IDs, it is no longer required to call `MarkAsNew()` for manually initialized models with set ID since now this is the default state.
@@ -623,7 +623,7 @@
   attrs.Metadata["original_name"]
   ```
 
-- Added support for `Partial/Range` file requests ([#1125](https://github.com/pocketbase/pocketbase/issues/1125)).
+- Added support for `Partial/Range` file requests ([#1125](https://github.com/hanzoai/base/issues/1125)).
   This is a minor breaking change if you are using `filesystem.Serve` (eg. as part of a custom `OnFileDownloadRequest` hook):
   ```go
   // old
@@ -638,9 +638,9 @@
   initializing default settings, running data imports, etc., with a JavaScript API very similar to the Go one (_more documentation will be available soon_).
 
   The `migrate` command is available by default for the prebuilt executable,
-  but if you use PocketBase as framework you need register it manually:
+  but if you use Base as framework you need register it manually:
   ```go
-  migrationsDir := "" // default to "pb_migrations" (for js) and "migrations" (for go)
+  migrationsDir := "" // default to "hz_migrations" (for js) and "migrations" (for go)
 
   // load js files if you want to allow loading external JavaScript migrations
   jsvm.MustRegisterMigrations(app, &jsvm.MigrationsOptions{
@@ -658,14 +658,14 @@
   **The refactoring also comes with automigrations support.**
 
   If `Automigrate` is enabled (`true` by default for the prebuilt executable; can be disabled with `--automigrate=0`),
-  PocketBase will generate seamlessly in the background JS (or Go) migration file with your collection changes.
+  Base will generate seamlessly in the background JS (or Go) migration file with your collection changes.
   **The directory with the JS migrations can be committed to your git repo.**
   All migrations (Go and JS) are automatically executed on server start.
   Also note that the auto generated migrations are granural (in contrast to the `migrate collections` snapshot command)
   and allow multiple developers to do changes on the collections independently (even editing the same collection) miniziming the eventual merge conflicts.
   Here is a sample JS migration file that will be generated if you for example edit a single collection name:
   ```js
-  // pb_migrations/1669663597_updated_posts_old.js
+  // hz_migrations/1669663597_updated_posts_old.js
   migrate((db) => {
     // up
     const dao = new Dao(db)
@@ -727,15 +727,15 @@
 
 **⚠️ This release contains breaking changes and requires some manual migration steps!**
 
-The biggest change is the merge of the `User` models and the `profiles` collection per [#376](https://github.com/pocketbase/pocketbase/issues/376).
+The biggest change is the merge of the `User` models and the `profiles` collection per [#376](https://github.com/hanzoai/base/issues/376).
 There is no longer `user` type field and the users are just an "auth" collection (we now support **collection types**, currently only "base" and "auth").
 This should simplify the users management and at the same time allow us to have unlimited multiple "auth" collections each with their own custom fields and authentication options (eg. staff, client, etc.).
 
 In addition to the `Users` and `profiles` merge, this release comes with several other improvements:
 
-- Added indirect expand support [#312](https://github.com/pocketbase/pocketbase/issues/312#issuecomment-1242893496).
+- Added indirect expand support [#312](https://github.com/hanzoai/base/issues/312#issuecomment-1242893496).
 
-- The `json` field type now supports filtering and sorting [#423](https://github.com/pocketbase/pocketbase/issues/423#issuecomment-1258302125).
+- The `json` field type now supports filtering and sorting [#423](https://github.com/hanzoai/base/issues/423#issuecomment-1258302125).
 
 - The `relation` field now allows unlimited `maxSelect` (aka. without upper limit).
 
@@ -751,9 +751,9 @@ In addition to the `Users` and `profiles` merge, this release comes with several
 
 - Added several new OAuth2 providers (Microsoft Azure AD, Spotify, Twitch, Kakao).
 
-- Improved memory usage on large file uploads [#835](https://github.com/pocketbase/pocketbase/discussions/835).
+- Improved memory usage on large file uploads [#835](https://github.com/hanzoai/base/discussions/835).
 
-- More detailed API preview docs and site documentation (the repo is located at https://github.com/pocketbase/site).
+- More detailed API preview docs and site documentation (the repo is located at https://github.com/hanzoai/site).
 
 - Other minor performance improvements (mostly related to the search apis).
 
@@ -770,14 +770,14 @@ The merge of users and profiles comes with several required db changes.
 The easiest way to apply them is to use the new temporary `upgrade` command:
 
 ```sh
-# make sure to have a copy of your pb_data in case something fails
-cp -r ./pb_data ./pb_data_backup
+# make sure to have a copy of your hz_data in case something fails
+cp -r ./hz_data ./hz_data_backup
 
 # run the upgrade command
-./pocketbase08 upgrade
+./base08 upgrade
 
 # start the application as usual
-./pocketbase08 serve
+./base08 serve
 ```
 
 The upgrade command:
@@ -807,17 +807,17 @@ The upgrade command:
 
 Please check the individual SDK package changelog and apply the necessary changes in your code:
 
-- [**JavaScript SDK changelog**](https://github.com/pocketbase/js-sdk/blob/master/CHANGELOG.md)
+- [**JavaScript SDK changelog**](https://github.com/hanzoai/js-sdk/blob/master/CHANGELOG.md)
   ```sh
-  npm install pocketbase@latest --save
+  npm install base@latest --save
   ```
 
-- [**Dart SDK changelog**](https://github.com/pocketbase/dart-sdk/blob/master/CHANGELOG.md)
+- [**Dart SDK changelog**](https://github.com/hanzoai/dart-sdk/blob/master/CHANGELOG.md)
 
   ```sh
-  dart pub add pocketbase:^0.5.0
+  dart pub add base:^0.5.0
   # or with Flutter:
-  flutter pub add pocketbase:^0.5.0
+  flutter pub add base:^0.5.0
   ```
 
 #### API
@@ -1030,7 +1030,7 @@ Please check the individual SDK package changelog and apply the necessary change
 
 #### Internals
 
-> _**You don't have to read this if you are not using PocketBase as framework.**_
+> _**You don't have to read this if you are not using Base as framework.**_
 
 - Removed `forms.New*WithConfig()` factories to minimize ambiguities.
   If you need to pass a transaction Dao you can use the new `SetDao(dao)` method available to the form instances.
@@ -1122,7 +1122,7 @@ Please check the individual SDK package changelog and apply the necessary change
     </tr>
   </table>
 
-- Moved the formatted `ApiError` struct and factories to the `github.com/pocketbase/pocketbase/apis` subpackage:
+- Moved the formatted `ApiError` struct and factories to the `github.com/hanzoai/base/apis` subpackage:
   <table class="d-table" width="100%">
     <tr>
       <th>Old</th>
@@ -1132,8 +1132,8 @@ Please check the individual SDK package changelog and apply the necessary change
       <td colspan="2"><em>Import path</em></td>
     </tr>
     <tr valign="top">
-      <td>github.com/pocketbase/pocketbase/<strong>tools/rest</strong></td>
-      <td>github.com/pocketbase/pocketbase/<strong>apis</strong></td>
+      <td>github.com/hanzoai/base/<strong>tools/rest</strong></td>
+      <td>github.com/hanzoai/base/<strong>apis</strong></td>
     </tr>
     <tr valign="top">
       <td colspan="2"><em>Fields</em></td>

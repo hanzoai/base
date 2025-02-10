@@ -4,9 +4,9 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/router"
 )
 
 var ErrRequestEntityTooLarge = router.NewApiError(http.StatusRequestEntityTooLarge, "Request entity too large", nil)
@@ -14,7 +14,7 @@ var ErrRequestEntityTooLarge = router.NewApiError(http.StatusRequestEntityTooLar
 const DefaultMaxBodySize int64 = 32 << 20
 
 const (
-	DefaultBodyLimitMiddlewareId       = "pbBodyLimit"
+	DefaultBodyLimitMiddlewareId       = "baseBodyLimit"
 	DefaultBodyLimitMiddlewarePriority = DefaultRateLimitMiddlewarePriority + 10
 )
 

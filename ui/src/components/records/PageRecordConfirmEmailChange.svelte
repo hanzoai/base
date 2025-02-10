@@ -1,5 +1,5 @@
 <script>
-    import PocketBase, { getTokenPayload } from "pocketbase";
+    import Base, { getTokenPayload } from "base";
     import ApiClient from "@/utils/ApiClient";
     import CommonHelper from "@/utils/CommonHelper";
     import FullPage from "@/components/base/FullPage.svelte";
@@ -21,7 +21,7 @@
         isLoading = true;
 
         // init a custom client to avoid interfering with the superuser state
-        const client = new PocketBase(import.meta.env.PB_BACKEND_URL);
+        const client = new Base(import.meta.env.HZ_BACKEND_URL);
 
         try {
             const payload = getTokenPayload(params?.token);
