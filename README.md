@@ -1,5 +1,5 @@
 <p align="center">
-    <a href="https://hanzo.io" target="_blank" rel="noopener">
+    <a href="https://hanzo.ai" target="_blank" rel="noopener">
         <img src="https://i.imgur.com/5qimnm5.png" alt="Hanzo Base - Open Source backend for any app" />
     </a>
 </p>
@@ -10,7 +10,7 @@
     <a href="https://pkg.go.dev/github.com/hanzoai/base" target="_blank" rel="noopener"><img src="https://godoc.org/github.com/hanzoai/base?status.svg" alt="Go package documentation" /></a>
 </p>
 
-[Base](https://hanzo.io) is an open source Go backend that includes:
+[Base](https://hanzo.ai/base) is an open source Go backend that includes:
 
 - embedded in-memory, SQL and vector databases with **realtime subscriptions**
 - built-in **files and users management**
@@ -133,7 +133,7 @@ Check also the [Testing guide](http://docs.hanzo.ai/testing) to learn how to wri
 
 ## Security
 
-If you discover a security vulnerability within Base, please send an e-mail to **support at hanzo.io**.
+If you discover a security vulnerability within Base, please send an e-mail to **security at hanzo.ai**.
 
 All reports will be promptly addressed and you'll be credited in the fix release notes.
 
