@@ -146,7 +146,7 @@ func TestTableIndexes(t *testing.T) {
 		{"missing", nil},
 		{
 			core.CollectionNameSuperusers,
-			[]string{"idx_email__hzc_3323866339", "idx_tokenKey__hzc_3323866339"},
+			[]string{"idx_email__hbc_3323866339", "idx_tokenKey__hbc_3323866339"},
 		},
 	}
 
