@@ -49,7 +49,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoxNjQwOTkxNjYxfQ.dff842MO0mgRTHY8dktp0dqG9-7LGQOgRuiAbQpYBls",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njg4MTI4NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.9BHGy4lBsyZKoe84xh6eloSh-JBCGQkXaV1edtbKNQU",
 				"password":"1234567890"
 			}`),
 			ExpectedStatus: 400,
@@ -65,7 +65,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoiX3BiX3VzZXJzX2F1dGhfIiwiZXhwIjoyNTI0NjA0NDYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.ZT3F0Z3iM-xbGgSG3LEKiEzHrPHr8t8IuHLZGGNuxLo",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.jhQ8TO5St_jnNTfceWIaEgdSRTu73NEtR5HPpwYL5Lw",
 				"password":"1234567890"
 			}`),
 			ExpectedStatus: 400,
@@ -81,7 +81,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567891"
 			}`),
 			ExpectedStatus: 400,
@@ -97,7 +97,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567890"
 			}`),
 			ExpectedStatus: 204,
@@ -125,7 +125,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/clients/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567890"
 			}`),
 			ExpectedStatus: 400,
@@ -140,7 +140,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567890"
 			}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
@@ -163,7 +163,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567890"
 			}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
@@ -183,7 +183,7 @@ func TestRecordConfirmEmailChange(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-email-change",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsImNvbGxlY3Rbase25JZCI6Il9wYl91c2Vyc19hdXRoXyIsInR5cGUiOiJlbWFbaseENoYW5nZSIsImVtYWlsIjoidGVzdEBleGFtcGxlLmNvbSIsIm5ld0VtYWlsIjoiY2hhbmdlQGV4YW1wbGUuY29tIiwiZXhwIjoyNTI0NjA0NDYxfQ.Y7mVlaEPhJiNPoIvIqbIosZU4c4lEhwysOrRR8c95iU",
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjQ5MjI0MTY0NzIsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwibmV3RW1haWwiOiJjaGFuZ2VAZXhhbXBsZS5jb20iLCJ0eXBlIjoiZW1haWxDaGFuZ2UifQ.0CPwQ5HzvruHJeYZVSEv69Fx1RbdxHi4aNFqX81lAWs",
 				"password":"1234567890"
 			}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
