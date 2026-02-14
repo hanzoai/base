@@ -226,8 +226,8 @@
 > Existing `hz_data` will be automatically upgraded with the start of the new executable,
 > but custom Go or JSVM (`hz_hooks`, `hz_migrations`) and JS/Dart SDK code will have to be migrated manually.
 > Please refer to the below upgrade guides:
-> - Go:   https://hanzo.io/v023upgrade/go/.
-> - JSVM: https://hanzo.io/v023upgrade/jsvm/.
+> - Go:   https://hanzo.ai/v023upgrade/go/.
+> - JSVM: https://hanzo.ai/v023upgrade/jsvm/.
 >
 > If you had already switched to some of the earlier `<v0.23.0-rc14` versions and have generated a full collections snapshot migration (aka. `./base migrate collections`), then you may have to regenerate the migration file to ensure that it includes the latest changes.
 
@@ -235,7 +235,7 @@ Base v0.23.0 is a major refactor of the internals with the overall goal of makin
 There are a lot of changes but to highlight some of the most notable ones:
 
 - New and more [detailed documentation](https://docs.hanzo.ai/).
-  _The old documentation could be accessed at [hanzo.io/old](https://hanzo.io/old/)._
+  _The old documentation could be accessed at [hanzo.ai/old](https://hanzo.ai/old/)._
 - Replaced `echo` with a new router built on top of the Go 1.22 `net/http` mux enhancements.
 - Merged `daos` packages in `core.App` to simplify the DB operations (_the `models` package structs are also migrated in `core`_).
 - Option to specify custom `DBConnect` function as part of the app configuration to allow different `database/sql` SQLite drivers (_turso/libsql, sqlcipher, etc._) and custom builds.
@@ -265,8 +265,8 @@ There are a lot of changes but to highlight some of the most notable ones:
 
 #### Go/JSVM APIs changes
 
-> - Go:   https://hanzo.io/v023upgrade/go/.
-> - JSVM: https://hanzo.io/v023upgrade/jsvm/.
+> - Go:   https://hanzo.ai/v023upgrade/go/.
+> - JSVM: https://hanzo.ai/v023upgrade/jsvm/.
 
 #### SDKs changes
 

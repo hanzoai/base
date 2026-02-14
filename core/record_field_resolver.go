@@ -16,10 +16,11 @@ import (
 
 // filter modifiers
 const (
-	eachModifier   string = "each"
-	issetModifier  string = "isset"
-	lengthModifier string = "length"
-	lowerModifier  string = "lower"
+	eachModifier    string = "each"
+	issetModifier   string = "isset"
+	lengthModifier  string = "length"
+	lowerModifier   string = "lower"
+	changedModifier string = "changed"
 )
 
 // ensure that `search.FieldResolver` interface is implemented
@@ -385,7 +386,8 @@ func splitModifier(combined string) (string, string, error) {
 	case issetModifier,
 		eachModifier,
 		lengthModifier,
-		lowerModifier:
+		lowerModifier,
+		changedModifier:
 		return parts[0], parts[1], nil
 	}
 
