@@ -10,11 +10,10 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/hanzoai/dbx"
-	"github.com/hanzoai/base/core/validators"
-	"github.com/hanzoai/base/tools/filesystem"
-	"github.com/hanzoai/base/tools/list"
-	"github.com/hanzoai/base/tools/types"
+	"github.com/pocketbase/pocketbase/core/validators"
+	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/pocketbase/pocketbase/tools/types"
 	"github.com/spf13/cast"
 )
 
@@ -357,8 +356,7 @@ func (f *FileField) Intercept(
 		return nil
 	case InterceptorActionAfterCreateError, InterceptorActionAfterUpdateError:
 		// when in transaction we assume that the error was handled by afterRecordExecuteFailure
-		_, insideTransaction := app.DB().(*dbx.Tx)
-		if insideTransaction {
+		if app.IsTransactional() {
 			return actionFunc()
 		}
 

@@ -8,56 +8,37 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/disintegration/imaging"
+	"github.com/fatih/color"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/hanzoai/base/tools/filesystem/internal/s3lite"
-	"github.com/hanzoai/base/tools/list"
-	"gocloud.dev/blob"
-	"gocloud.dev/blob/fileblob"
-	"gocloud.dev/gcerrors"
+	"github.com/pocketbase/pocketbase/tools/filesystem/blob"
+	"github.com/pocketbase/pocketbase/tools/filesystem/internal/fileblob"
+	"github.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob"
+	"github.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob/s3"
+	"github.com/pocketbase/pocketbase/tools/list"
+
+	// explicit webp decoder because disintegration/imaging does not support webp
+	_ "golang.org/x/image/webp"
 )
 
-var gcpIgnoreHeaders = []string{"Accept-Encoding"}
+// note: the same as blob.ErrNotFound for backward compatibility with earlier versions
+var ErrNotFound = blob.ErrNotFound
 
-var ErrNotFound = errors.New("blob not found")
+const metadataOriginalName = "original-filename"
 
 type System struct {
 	ctx    context.Context
 	bucket *blob.Bucket
 }
 
-// -------------------------------------------------------------------
-
-var requestChecksumCalculation = aws.RequestChecksumCalculationWhenRequired
-var responseChecksumValidation = aws.ResponseChecksumValidationWhenRequired
-
-// @todo consider removing after the other non-AWS vendors catched up with the new changes
-// (https://github.com/aws/aws-sdk-go-v2/discussions/2960)
-func init() {
-	reqEnv := os.Getenv("AWS_REQUEST_CHECKSUM_CALCULATION")
-	if reqEnv != "" && strings.EqualFold(reqEnv, "when_supported") {
-		requestChecksumCalculation = aws.RequestChecksumCalculationWhenSupported
-	}
-
-	resEnv := os.Getenv("AWS_RESPONSE_CHECKSUM_VALIDATION")
-	if resEnv != "" && strings.EqualFold(resEnv, "when_supported") {
-		responseChecksumValidation = aws.ResponseChecksumValidationWhenSupported
-	}
-}
-
-// -------------------------------------------------------------------
-
-// NewS3 initializes an S3 filesystem instance.
+// NewS3 initializes a new S3 filesystem instance.
 //
 // NB! Make sure to call `Close()` after you are done working with it.
 func NewS3(
@@ -70,44 +51,21 @@ func NewS3(
 ) (*System, error) {
 	ctx := context.Background() // default context
 
-	cred := credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")
+	client := &s3.S3{
+		Bucket:       bucketName,
+		Region:       region,
+		Endpoint:     endpoint,
+		AccessKey:    accessKey,
+		SecretKey:    secretKey,
+		UsePathStyle: s3ForcePathStyle,
+	}
 
-	cfg, err := config.LoadDefaultConfig(
-		ctx,
-		config.WithCredentialsProvider(cred),
-		config.WithRegion(region),
-	)
+	drv, err := s3blob.New(client)
 	if err != nil {
 		return nil, err
 	}
 
-	cfg.RequestChecksumCalculation = requestChecksumCalculation
-	cfg.ResponseChecksumValidation = responseChecksumValidation
-
-	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
-		// ensure that the endpoint has url scheme for
-		// backward compatibility with v1 of the aws sdk
-		if !strings.Contains(endpoint, "://") {
-			endpoint = "https://" + endpoint
-		}
-		o.BaseEndpoint = aws.String(endpoint)
-
-		o.UsePathStyle = s3ForcePathStyle
-
-		// Google Cloud Storage alters the Accept-Encoding header,
-		// which breaks the v2 request signature
-		// (https://github.com/aws/aws-sdk-go-v2/issues/1816)
-		if strings.Contains(endpoint, "storage.googleapis.com") {
-			ignoreSigningHeaders(o, gcpIgnoreHeaders)
-		}
-	})
-
-	bucket, err := s3lite.OpenBucketV2(ctx, client, bucketName, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return &System{ctx: ctx, bucket: bucket}, nil
+	return &System{ctx: ctx, bucket: blob.NewBucket(drv)}, nil
 }
 
 // NewLocal initializes a new local filesystem instance.
@@ -121,14 +79,14 @@ func NewLocal(dirPath string) (*System, error) {
 		return nil, err
 	}
 
-	bucket, err := fileblob.OpenBucket(dirPath, &fileblob.Options{
+	drv, err := fileblob.New(dirPath, &fileblob.Options{
 		NoTempDir: true,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	return &System{ctx: ctx, bucket: bucket}, nil
+	return &System{ctx: ctx, bucket: blob.NewBucket(drv)}, nil
 }
 
 // SetContext assigns the specified context to the current filesystem.
@@ -142,44 +100,69 @@ func (s *System) Close() error {
 }
 
 // Exists checks if file with fileKey path exists or not.
-//
-// If the file doesn't exist returns false and ErrNotFound.
 func (s *System) Exists(fileKey string) (bool, error) {
-	exists, err := s.bucket.Exists(s.ctx, fileKey)
-
-	if gcerrors.Code(err) == gcerrors.NotFound {
-		err = ErrNotFound
-	}
-
-	return exists, err
+	return s.bucket.Exists(s.ctx, fileKey)
 }
 
 // Attributes returns the attributes for the file with fileKey path.
 //
 // If the file doesn't exist it returns ErrNotFound.
 func (s *System) Attributes(fileKey string) (*blob.Attributes, error) {
-	attrs, err := s.bucket.Attributes(s.ctx, fileKey)
-
-	if gcerrors.Code(err) == gcerrors.NotFound {
-		err = ErrNotFound
-	}
-
-	return attrs, err
+	return s.bucket.Attributes(s.ctx, fileKey)
 }
 
-// GetFile returns a file content reader for the given fileKey.
+// GetReader returns a file content reader for the given fileKey.
 //
 // NB! Make sure to call Close() on the file after you are done working with it.
 //
 // If the file doesn't exist returns ErrNotFound.
-func (s *System) GetFile(fileKey string) (*blob.Reader, error) {
-	br, err := s.bucket.NewReader(s.ctx, fileKey, nil)
+func (s *System) GetReader(fileKey string) (*blob.Reader, error) {
+	return s.bucket.NewReader(s.ctx, fileKey)
+}
 
-	if gcerrors.Code(err) == gcerrors.NotFound {
-		err = ErrNotFound
+// Deprecated: Please use GetReader(fileKey) instead.
+func (s *System) GetFile(fileKey string) (*blob.Reader, error) {
+	color.Yellow("Deprecated: Please replace GetFile with GetReader.")
+	return s.GetReader(fileKey)
+}
+
+// GetReuploadableFile constructs a new reuploadable File value
+// from the associated fileKey blob.Reader.
+//
+// If preserveName is false then the returned File.Name will have
+// a new randomly generated suffix, otherwise it will reuse the original one.
+//
+// This method could be useful in case you want to clone an existing
+// Record file and assign it to a new Record (e.g. in a Record duplicate action).
+//
+// If you simply want to copy an existing file to a new location you
+// could check the Copy(srcKey, dstKey) method.
+func (s *System) GetReuploadableFile(fileKey string, preserveName bool) (*File, error) {
+	attrs, err := s.Attributes(fileKey)
+	if err != nil {
+		return nil, err
 	}
 
-	return br, err
+	name := path.Base(fileKey)
+	originalName := attrs.Metadata[metadataOriginalName]
+	if originalName == "" {
+		originalName = name
+	}
+
+	file := &File{}
+	file.Size = attrs.Size
+	file.OriginalName = originalName
+	file.Reader = openFuncAsReader(func() (io.ReadSeekCloser, error) {
+		return s.GetReader(fileKey)
+	})
+
+	if preserveName {
+		file.Name = name
+	} else {
+		file.Name = normalizeName(file.Reader, originalName)
+	}
+
+	return file, nil
 }
 
 // Copy copies the file stored at srcKey to dstKey.
@@ -188,13 +171,7 @@ func (s *System) GetFile(fileKey string) (*blob.Reader, error) {
 //
 // If dstKey file already exists, it is overwritten.
 func (s *System) Copy(srcKey, dstKey string) error {
-	err := s.bucket.Copy(s.ctx, dstKey, srcKey, nil)
-
-	if gcerrors.Code(err) == gcerrors.NotFound {
-		err = ErrNotFound
-	}
-
-	return err
+	return s.bucket.Copy(s.ctx, dstKey, srcKey)
 }
 
 // List returns a flat list with info for all files under the specified prefix.
@@ -208,7 +185,7 @@ func (s *System) List(prefix string) ([]*blob.ListObject, error) {
 	for {
 		obj, err := iter.Next(s.ctx)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				return nil, err
 			}
 			break
@@ -262,7 +239,7 @@ func (s *System) UploadFile(file *File, fileKey string) error {
 	opts := &blob.WriterOptions{
 		ContentType: mt.String(),
 		Metadata: map[string]string{
-			"original-filename": originalName,
+			metadataOriginalName: originalName,
 		},
 	}
 
@@ -304,7 +281,7 @@ func (s *System) UploadMultipart(fh *multipart.FileHeader, fileKey string) error
 	opts := &blob.WriterOptions{
 		ContentType: mt.String(),
 		Metadata: map[string]string{
-			"original-filename": originalName,
+			metadataOriginalName: originalName,
 		},
 	}
 
@@ -313,7 +290,8 @@ func (s *System) UploadMultipart(fh *multipart.FileHeader, fileKey string) error
 		return err
 	}
 
-	if _, err := w.ReadFrom(f); err != nil {
+	_, err = w.ReadFrom(f)
+	if err != nil {
 		w.Close()
 		return err
 	}
@@ -325,13 +303,7 @@ func (s *System) UploadMultipart(fh *multipart.FileHeader, fileKey string) error
 //
 // If the file doesn't exist returns ErrNotFound.
 func (s *System) Delete(fileKey string) error {
-	err := s.bucket.Delete(s.ctx, fileKey)
-
-	if gcerrors.Code(err) == gcerrors.NotFound {
-		return ErrNotFound
-	}
-
-	return err
+	return s.bucket.Delete(s.ctx, fileKey)
 }
 
 // DeletePrefix deletes everything starting with the specified prefix.
@@ -363,7 +335,7 @@ func (s *System) DeletePrefix(prefix string) []error {
 	for {
 		obj, err := iter.Next(s.ctx)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				failed = append(failed, err)
 			}
 			break
@@ -422,7 +394,7 @@ func (s *System) IsEmptyDir(dir string) bool {
 
 	_, err := iter.Next(s.ctx)
 
-	return err == io.EOF
+	return err != nil && errors.Is(err, io.EOF)
 }
 
 var inlineServeContentTypes = []string{
@@ -439,8 +411,10 @@ var inlineServeContentTypes = []string{
 
 // manualExtensionContentTypes is a map of file extensions to content types.
 var manualExtensionContentTypes = map[string]string{
-	".svg": "image/svg+xml", // (see https://github.com/whatwg/mimesniff/issues/7)
-	".css": "text/css",      // (see https://github.com/gabriel-vasile/mimetype/pull/113)
+	".svg": "image/svg+xml",   // (see https://github.com/whatwg/mimesniff/issues/7)
+	".css": "text/css",        // (see https://github.com/gabriel-vasile/mimetype/pull/113)
+	".js":  "text/javascript", // (see https://github.com/pocketbase/pocketbase/issues/6597)
+	".mjs": "text/javascript",
 }
 
 // forceAttachmentParam is the name of the request query parameter to
@@ -455,7 +429,7 @@ const forceAttachmentParam = "download"
 // Internally this method uses [http.ServeContent] so Range requests,
 // If-Match, If-Unmodified-Since, etc. headers are handled transparently.
 func (s *System) Serve(res http.ResponseWriter, req *http.Request, fileKey string, name string) error {
-	br, readErr := s.GetFile(fileKey)
+	br, readErr := s.GetReader(fileKey)
 	if readErr != nil {
 		return readErr
 	}
@@ -475,7 +449,7 @@ func (s *System) Serve(res http.ResponseWriter, req *http.Request, fileKey strin
 	// make an exception for specific content types and force a custom
 	// content type to send in the response so that it can be loaded properly
 	extContentType := realContentType
-	if ct, found := manualExtensionContentTypes[filepath.Ext(name)]; found && extContentType != ct {
+	if ct, found := manualExtensionContentTypes[filepath.Ext(name)]; found {
 		extContentType = ct
 	}
 
@@ -527,7 +501,7 @@ func (s *System) CreateThumb(originalKey string, thumbKey, thumbSize string) err
 	}
 
 	// fetch the original
-	r, readErr := s.GetFile(originalKey)
+	r, readErr := s.GetReader(originalKey)
 	if readErr != nil {
 		return readErr
 	}
@@ -562,25 +536,38 @@ func (s *System) CreateThumb(originalKey string, thumbKey, thumbSize string) err
 		}
 	}
 
+	originalContentType := r.ContentType()
+
 	opts := &blob.WriterOptions{
-		ContentType: r.ContentType(),
+		ContentType: originalContentType,
 	}
 
-	// open a thumb storage writer (aka. prepare for upload)
-	w, writerErr := s.bucket.NewWriter(s.ctx, thumbKey, opts)
-	if writerErr != nil {
-		return writerErr
-	}
+	var format imaging.Format
 
-	// try to detect the thumb format based on the original file name
-	// (fallbacks to png on error)
-	format, err := imaging.FormatFromFilename(thumbKey)
-	if err != nil {
+	switch originalContentType {
+	case "image/jpeg":
+		format = imaging.JPEG
+	case "image/gif":
+		format = imaging.GIF
+	case "image/tiff":
+		format = imaging.TIFF
+	case "image/bmp":
+		format = imaging.BMP
+	default:
+		// fallback to PNG (this includes webp!)
+		opts.ContentType = "image/png"
 		format = imaging.PNG
 	}
 
+	// open a thumb storage writer (aka. prepare for upload)
+	w, err := s.bucket.NewWriter(s.ctx, thumbKey, opts)
+	if err != nil {
+		return err
+	}
+
 	// thumb encode (aka. upload)
-	if err := imaging.Encode(w, thumbImg, format); err != nil {
+	err = imaging.Encode(w, thumbImg, format)
+	if err != nil {
 		w.Close()
 		return err
 	}

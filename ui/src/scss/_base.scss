@@ -910,7 +910,6 @@ a.thumb:not(.thumb-active) {
 
 .provider-logo {
     $boxSize: 32px;
-    $imgSize: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -919,13 +918,14 @@ a.thumb:not(.thumb-active) {
     height: $boxSize;
     border-radius: var(--baseRadius);
     background: var(--bodyColor);
-    padding: 0;
+    padding: 5px;
     gap: 0;
     img {
-        max-width: $imgSize;
-        max-height: $imgSize;
-        height: auto;
         flex-shrink: 0;
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
     }
 }
 .provider-card {
@@ -956,6 +956,62 @@ a.thumb:not(.thumb-active) {
     }
     &.error {
         border-color: var(--dangerColor);
+    }
+}
+
+.record-info-excerpt {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 5px;
+    max-width: 100%;
+    min-width: 40px;
+    line-height: 18px;;
+    padding-left: 1px; // for visual alignment with the new tab icon
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    .info-content {
+        display: flex;
+        flex-wrap: nowrap;
+        align-items: center;
+        row-gap: 2px;
+        column-gap: 5px;
+        width: auto;
+        min-width: 0;
+        text-align: left;
+        white-space: normal;
+        word-break: break-all;
+        .txt {
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            .col-type-relation & {
+                max-width: 200px;
+            }
+        }
+    }
+    .delimiter {
+        min-width: 0;
+        flex-shrink: 0;
+        font-size: 0.8em;
+        white-space: nowrap;
+        color: var(--txtDisabledColor);
+    }
+    .expand-start,
+    .expand-end {
+        font-weight: bold;
+        color: var(--txtDisabledColor);
+    }
+    .expand-start {
+        margin-right: -2px;
+    }
+    .expand-end {
+        margin-left: -2px;
+    }
+    .record-link {
+        margin-left: 2px;
     }
 }
 

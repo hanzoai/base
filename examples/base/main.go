@@ -5,15 +5,15 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/hanzoai/base"
-	"github.com/hanzoai/base/apis"
-	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/plugins/ghupdate"
-	"github.com/hanzoai/base/plugins/jsvm"
-	"github.com/hanzoai/base/plugins/migratecmd"
-	"github.com/hanzoai/base/tools/hook"
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/plugins/ghupdate"
+	"github.com/pocketbase/pocketbase/plugins/jsvm"
+	"github.com/pocketbase/pocketbase/plugins/migratecmd"
+	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pocketbase/pocketbase/tools/osutils"
 )
 
 func main() {
@@ -123,9 +123,8 @@ func main() {
 
 // the default hz_public dir location is relative to the executable
 func defaultPublicDir() string {
-	if strings.HasPrefix(os.Args[0], os.TempDir()) {
-		// most likely ran with go run
-		return "./hz_public"
+	if osutils.IsProbablyGoRun() {
+		return "./pb_public"
 	}
 
 	return filepath.Join(os.Args[0], "../hz_public")

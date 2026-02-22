@@ -13,14 +13,15 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/hanzoai/dbx"
-	"github.com/hanzoai/base/core/validators"
-	"github.com/hanzoai/base/tools/filesystem"
-	"github.com/hanzoai/base/tools/hook"
-	"github.com/hanzoai/base/tools/inflector"
-	"github.com/hanzoai/base/tools/list"
-	"github.com/hanzoai/base/tools/store"
-	"github.com/hanzoai/base/tools/types"
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core/validators"
+	"github.com/pocketbase/pocketbase/tools/dbutils"
+	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pocketbase/pocketbase/tools/inflector"
+	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/pocketbase/pocketbase/tools/store"
+	"github.com/pocketbase/pocketbase/tools/types"
 	"github.com/spf13/cast"
 )
 
@@ -969,6 +970,13 @@ func (m *Record) GetDateTime(key string) types.DateTime {
 	return d
 }
 
+// GetGeoPoint returns the data value for "key" as a GeoPoint instance.
+func (m *Record) GetGeoPoint(key string) types.GeoPoint {
+	point := types.GeoPoint{}
+	_ = point.Scan(m.Get(key))
+	return point
+}
+
 // GetStringSlice returns the data value for "key" as a slice of non-zero unique strings.
 func (m *Record) GetStringSlice(key string) []string {
 	return list.ToUniqueStringSlice(m.Get(key))
@@ -1523,8 +1531,8 @@ func cascadeRecordDelete(app App, mainRecord *Record, refs map[*Collection][]Fie
 				query.AndWhere(dbx.HashExp{prefixedFieldName: mainRecord.Id})
 			} else {
 				query.AndWhere(dbx.Exists(dbx.NewExp(fmt.Sprintf(
-					`SELECT 1 FROM json_each(CASE WHEN json_valid([[%s]]) THEN [[%s]] ELSE json_array([[%s]]) END) {{__je__}} WHERE [[__je__.value]]={:jevalue}`,
-					prefixedFieldName, prefixedFieldName, prefixedFieldName,
+					`SELECT 1 FROM %s {{__je__}} WHERE [[__je__.value]]={:jevalue}`,
+					dbutils.JSONEach(prefixedFieldName),
 				), dbx.Params{
 					"jevalue": mainRecord.Id,
 				})))

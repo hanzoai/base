@@ -743,11 +743,12 @@ export default class CommonHelper {
     /**
      * Returns a concatenated `items` string.
      *
-     * @param  {String} items
-     * @param  {String} [separator]
+     * @param  {String}  items
+     * @param  {String}  [separator]
+     * @param  {Boolean} [escapeSeparator]
      * @return {Array}
      */
-    static joinNonEmpty(items, separator = ", ") {
+    static joinNonEmpty(items, separator = ", ", escapeSeparator = true) {
         items = items || [];
 
         const result = [];
@@ -756,9 +757,16 @@ export default class CommonHelper {
 
         for (let item of items) {
             item = typeof item === "string" ? item.trim() : "";
-            if (!CommonHelper.isEmpty(item)) {
-                result.push(item.replaceAll(trimmedSeparator, "\\" + trimmedSeparator));
+
+            if (CommonHelper.isEmpty(item)) {
+                continue;
             }
+
+            if (escapeSeparator) {
+                item = item.replaceAll(trimmedSeparator, "\\" + trimmedSeparator);
+            }
+
+            result.push(item);
         }
 
         return result.join(separator);
@@ -847,19 +855,25 @@ export default class CommonHelper {
     }
 
     /**
-     * Copies text to the user clibaseoard.
+     * Serializes the provided data and copies the resulting text into the user clipboard.
      *
-     * @param  {String} text
+     * @param  {Mixed} data
      * @return {Promise}
      */
-    static async copyToClibaseoard(text) {
-        text = "" + text // ensure that text is string
+    static async copyToClipboard(data) {
+        if (typeof data === "object") {
+            try {
+                data = JSON.stringify(data, null, 2)
+            } catch {}
+        }
 
-        if (!text.length || !window?.navigator?.clibaseoard) {
+        data = "" + data // ensure that data is string
+
+        if (!data.length || !window?.navigator?.clipboard) {
             return;
         }
 
-        return window.navigator.clibaseoard.writeText(text).catch((err) => {
+        return window.navigator.clipboard.writeText(data).catch((err) => {
             console.warn("Failed to copy.", err);
         })
     }
@@ -1121,6 +1135,8 @@ export default class CommonHelper {
                 if (field?.maxSelect != 1) {
                     val = [val];
                 }
+            } else if (field.type == "geoPoint") {
+                val = {"lon": 0, "lat": 0};
             } else {
                 val = "test";
             }
@@ -1155,7 +1171,7 @@ export default class CommonHelper {
      * @return {String}
      */
     static getFieldTypeIcon(type) {
-        switch (type?.toLowerCase()) {
+        switch (type) {
             case "primary":
                 return "ri-key-line";
             case "text":
@@ -1184,6 +1200,8 @@ export default class CommonHelper {
                 return "ri-lock-password-line";
             case "autodate":
                 return "ri-calendar-check-line";
+            case "geoPoint":
+                return "ri-map-pin-2-line";
             default:
                 return "ri-star-s-line";
         }
@@ -1197,20 +1215,22 @@ export default class CommonHelper {
      */
     static getFieldValueType(field) {
         switch (field?.type) {
-            case 'bool':
-                return 'Boolean';
-            case 'number':
-                return 'Number';
-            case 'file':
-                return 'File';
-            case 'select':
-            case 'relation':
+            case "bool":
+                return "Boolean";
+            case "number":
+                return "Number";
+            case "geoPoint":
+                return "Object";
+            case "file":
+                return "File";
+            case "select":
+            case "relation":
                 if (field?.maxSelect == 1) {
-                    return 'String';
+                    return "String";
                 }
-                return 'Array<String>';
+                return "Array<String>";
             default:
-                return 'String';
+                return "String";
         }
     }
 
@@ -1227,6 +1247,10 @@ export default class CommonHelper {
 
         if (field?.type === "bool") {
             return "false";
+        }
+
+        if (field?.type === "geoPoint") {
+            return '{"lon":0,"lat":0}';
         }
 
         if (field?.type === "json") {
@@ -1398,6 +1422,7 @@ export default class CommonHelper {
             disableMobile: true,
             allowInput: true,
             enableTime: true,
+            enableSeconds: true,
             time_24hr: true,
             locale: {
                 firstDayOfWeek: 1,
@@ -1749,7 +1774,7 @@ export default class CommonHelper {
     /**
      * Returns an array with all public collection identifiers (collection fields + type specific fields).
      *
-     * @param  {[type]} collection The collection to extract identifiers from.
+     * @param  {Object} collection The collection to extract identifiers from.
      * @param  {String} prefix     Optional prefix for each found identified.
      * @return {Array}
      */
@@ -1768,11 +1793,40 @@ export default class CommonHelper {
 
         const fields = collection.fields || [];
         for (const field of fields) {
-            CommonHelper.pushUnique(result, prefix + field.name);
+            if (field.type == "geoPoint") {
+                CommonHelper.pushUnique(result, prefix + field.name + ".lon");
+                CommonHelper.pushUnique(result, prefix + field.name + ".lat");
+            } else {
+                CommonHelper.pushUnique(result, prefix + field.name);
+            }
         }
 
         return result;
     }
+
+    /**
+     * Returns a wildcard "fields" string with the excerpt modifier applied to all collection fields
+     * (except the primary key and relation fields).
+     *
+     * @param  {Object} collection
+     * @param  {Number} [maxExcerpt]
+     * @return {String}
+     */
+    static getExcerptCollectionFieldsList(collection, maxExcerpt = 200) {
+        let result = ["*"];
+
+        const fields = collection?.fields || [];
+        for (const field of fields) {
+            if (field.primaryKey || field.type == "relation") {
+                continue
+            }
+
+            result.push(`${field.name}:excerpt(${maxExcerpt})`);
+        }
+
+        return result.join(",");
+    }
+
 
     /**
      * Generates recursively a list with all the autocomplete field keys
@@ -1893,13 +1947,14 @@ export default class CommonHelper {
             for (const key of keys) {
                 result.push(key);
 
-                // add ":isset" modifier to non-base keys
+                // add ":isset"/":changed" modifier to non-base keys
                 const parts = key.split(".");
                 if (
                     parts.length === 3 &&
                     // doesn't contain another modifier
                     parts[2].indexOf(":") === -1
                 ) {
+                    result.push(key + ":changed");
                     result.push(key + ":isset");
                 }
             }

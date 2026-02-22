@@ -2,27 +2,38 @@ package auth
 
 import (
 	"context"
-	"crypto/rsa"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"math/big"
-	"net/http"
-	"strings"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/hanzoai/base/tools/security"
-	"github.com/hanzoai/base/tools/types"
+	"github.com/pocketbase/pocketbase/tools/auth/internal/jwk"
+	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/pocketbase/pocketbase/tools/types"
 	"github.com/spf13/cast"
 	"golang.org/x/oauth2"
 )
+
+// idTokenLeeway is the optional leeway for the id_token timestamp fields validation.
+//
+// It can be changed externally using the PB_ID_TOKEN_LEEWAY env variable
+// (the value must be in seconds, e.g. "PB_ID_TOKEN_LEEWAY=60" for 1 minute).
+var idTokenLeeway time.Duration = 5 * time.Minute
 
 func init() {
 	Providers[NameOIDC] = wrapFactory(NewOIDCProvider)
 	Providers[NameOIDC+"2"] = wrapFactory(NewOIDCProvider)
 	Providers[NameOIDC+"3"] = wrapFactory(NewOIDCProvider)
+
+	if leewayStr := os.Getenv("PB_ID_TOKEN_LEEWAY"); leewayStr != "" {
+		leeway, err := strconv.Atoi(leewayStr)
+		if err == nil {
+			idTokenLeeway = time.Duration(leeway) * time.Second
+		}
+	}
 }
 
 var _ Provider = (*OIDC)(nil)
@@ -76,7 +87,7 @@ func (p *OIDC) FetchAuthUser(token *oauth2.Token) (*AuthUser, error) {
 		Username      string `json:"preferred_username"`
 		Picture       string `json:"picture"`
 		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
+		EmailVerified any    `json:"email_verified"` // see #6657
 	}{}
 	if err := json.Unmarshal(data, &extracted); err != nil {
 		return nil, err
@@ -94,7 +105,7 @@ func (p *OIDC) FetchAuthUser(token *oauth2.Token) (*AuthUser, error) {
 
 	user.Expiry, _ = types.ParseDateTime(token.Expiry)
 
-	if extracted.EmailVerified {
+	if cast.ToBool(extracted.EmailVerified) {
 		user.Email = extracted.Email
 	}
 
@@ -124,7 +135,7 @@ func (p *OIDC) parseIdToken(token *oauth2.Token) (jwt.MapClaims, error) {
 	}
 
 	claims := jwt.MapClaims{}
-	t, _, err := jwt.NewParser().ParseUnverified(idToken, claims)
+	_, _, err := jwt.NewParser().ParseUnverified(idToken, claims)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +143,7 @@ func (p *OIDC) parseIdToken(token *oauth2.Token) (jwt.MapClaims, error) {
 	// validate common claims
 	jwtValidator := jwt.NewValidator(
 		jwt.WithIssuedAt(),
+		jwt.WithLeeway(idTokenLeeway),
 		jwt.WithAudience(p.clientId),
 	)
 	err = jwtValidator.Validate(claims)
@@ -164,112 +176,11 @@ func (p *OIDC) parseIdToken(token *oauth2.Token) (jwt.MapClaims, error) {
 	// (see also https://openid.net/specs/openid-connect-core-1_0.html#IDTokenValidation)
 	jwksURL := cast.ToString(p.Extra()["jwksURL"])
 	if jwksURL != "" {
-		kid, _ := t.Header["kid"].(string)
-		err = validateIdTokenSignature(p.ctx, idToken, jwksURL, kid)
+		err = jwk.ValidateTokenSignature(p.ctx, idToken, jwksURL)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("id_token validation failed: %w", err)
 		}
 	}
 
 	return claims, nil
-}
-
-func validateIdTokenSignature(ctx context.Context, idToken string, jwksURL string, kid string) error {
-	// fetch the public key set
-	// ---
-	if kid == "" {
-		return errors.New("missing kid header value")
-	}
-
-	key, err := fetchJWK(ctx, jwksURL, kid)
-	if err != nil {
-		return err
-	}
-
-	// decode the key params per RFC 7518 (https://tools.ietf.org/html/rfc7518#section-6.3)
-	// and construct a valid publicKey from them
-	// ---
-	exponent, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(key.E, "="))
-	if err != nil {
-		return err
-	}
-
-	modulus, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(key.N, "="))
-	if err != nil {
-		return err
-	}
-
-	publicKey := &rsa.PublicKey{
-		// https://tools.ietf.org/html/rfc7517#appendix-A.1
-		E: int(big.NewInt(0).SetBytes(exponent).Uint64()),
-		N: big.NewInt(0).SetBytes(modulus),
-	}
-
-	// verify the signiture
-	// ---
-	parser := jwt.NewParser(jwt.WithValidMethods([]string{key.Alg}))
-
-	parsedToken, err := parser.Parse(idToken, func(t *jwt.Token) (any, error) {
-		return publicKey, nil
-	})
-	if err != nil {
-		return err
-	}
-
-	if !parsedToken.Valid {
-		return errors.New("the parsed id_token is invalid")
-	}
-
-	return nil
-}
-
-type jwk struct {
-	Kty string
-	Kid string
-	Use string
-	Alg string
-	N   string
-	E   string
-}
-
-func fetchJWK(ctx context.Context, jwksURL string, kid string) (*jwk, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", jwksURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	rawBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// http.Client.Get doesn't treat non 2xx responses as error
-	if res.StatusCode >= 400 {
-		return nil, fmt.Errorf(
-			"failed to verify the provided id_token (%d):\n%s",
-			res.StatusCode,
-			string(rawBody),
-		)
-	}
-
-	jwks := struct {
-		Keys []*jwk
-	}{}
-	if err := json.Unmarshal(rawBody, &jwks); err != nil {
-		return nil, err
-	}
-
-	for _, key := range jwks.Keys {
-		if key.Kid == kid {
-			return key, nil
-		}
-	}
-
-	return nil, fmt.Errorf("jwk with kid %q was not found", kid)
 }

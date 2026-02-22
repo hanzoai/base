@@ -9,7 +9,6 @@
 
     let responseTab = 200;
     let responses = [];
-    let baseData = {};
 
     $: isAuth = collection.type === "auth";
 
@@ -56,13 +55,16 @@
         },
     ];
 
-    $: if (isAuth) {
-        baseData = {
-            password: "12345678",
-            passwordConfirm: "12345678",
-        };
-    } else {
-        baseData = {};
+    function getPayload(collection) {
+        let payload = CommonHelper.dummyCollectionSchemaData(collection, true);
+
+        if (isAuth) {
+            payload.password = "12345678";
+            payload.passwordConfirm = "12345678";
+            delete payload.verified;
+        }
+
+        return payload;
     }
 </script>
 
@@ -93,7 +95,7 @@ const base = new Base('${backendAbsUrl}');
 ...
 
 // example create data
-const data = ${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 4)};
+const data = ${JSON.stringify(getPayload(collection), null, 4)};
 
 const record = await base.collection('${collection?.name}').create(data);
 ` + (isAuth ?
@@ -110,7 +112,7 @@ final base = Base('${backendAbsUrl}');
 ...
 
 // example create body
-final body = <String, dynamic>${JSON.stringify(Object.assign({}, baseData, CommonHelper.dummyCollectionSchemaData(collection, true)), null, 2)};
+final body = <String, dynamic>${JSON.stringify(getPayload(collection), null, 2)};
 
 final record = await base.collection('${collection?.name}').create(body: body);
 ` + (isAuth ?
@@ -254,6 +256,8 @@ await base.collection('${collection?.name}').requestVerification('test@example.c
                         Email address.
                     {:else if field.type === "url"}
                         URL address.
+                    {:else if field.type === "geoPoint"}
+                        <code>{`{"lon":x,"lat":y}`}</code> object.
                     {:else if field.type === "file"}
                         File object.<br />
                         Set to empty value (<code>null</code>, <code>""</code> or <code>[]</code>) to delete
