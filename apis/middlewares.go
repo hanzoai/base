@@ -207,11 +207,13 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
 	token := e.Request.Header.Get("Authorization")
-	if token != "" {
-		// the schema prefix is not required and it is only for
-		// compatibility with the defaults of some HTTP clients
-		token = strings.TrimPrefix(token, "Bearer ")
+
+	// the "Bearer" schema prefix is not required by PocketBase and it is
+	// supported only for compatibility with the defaults of some HTTP clients
+	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
+		return token[7:]
 	}
+
 	return token
 }
 
@@ -365,11 +367,25 @@ func logRequest(event *core.RequestEvent, err error) {
 
 	// parse the request error
 	if err != nil {
-		if apiErr, ok := err.(*router.ApiError); ok {
-			status = apiErr.Status
+		apiErr, isPlainApiError := err.(*router.ApiError)
+		if isPlainApiError || errors.As(err, &apiErr) {
+			// the status header wasn't written yet
+			if status == 0 {
+				status = apiErr.Status
+			}
+
+			var errMsg string
+			if isPlainApiError {
+				errMsg = apiErr.Message
+			} else {
+				// wrapped ApiError -> add the full serialized version
+				// of the original error since it could contain more information
+				errMsg = err.Error()
+			}
+
 			attrs = append(
 				attrs,
-				slog.String("error", apiErr.Message),
+				slog.String("error", errMsg),
 				slog.Any("details", apiErr.RawData()),
 			)
 		} else {

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -58,7 +59,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 		loader.Set(jsName, func(callback string, tags ...string) {
 			// overwrite the global $app with the hook scoped instance
 			callback = `function(e) { $app = e.app; return (` + callback + `).call(undefined, e) }`
-			pr := goja.MustCompile("", "{("+callback+").apply(undefined, __args)}", true)
+			pr := goja.MustCompile(defaultScriptPath, "{("+callback+").apply(undefined, __args)}", true)
 
 			tagsAsValues := make([]reflect.Value, len(tags))
 			for i, tag := range tags {
@@ -82,11 +83,9 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 					res, err := executor.RunProgram(pr)
 					executor.Set("__args", goja.Undefined())
 
-					// (legacy) check for returned Go error value
-					if res != nil {
-						if resErr, ok := res.Export().(error); ok {
-							return resErr
-						}
+					// check for returned Go error value
+					if resErr := checkGojaValueForError(app, res); resErr != nil {
+						return resErr
 					}
 
 					return normalizeException(err)
@@ -102,8 +101,8 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 }
 
 func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
-	loader.Set("cronAdd", func(jobId, cronExpr, handler string) {
-		pr := goja.MustCompile("", "{("+handler+").apply(undefined)}", true)
+	cronAdd := func(jobId, cronExpr, handler string) {
+		pr := goja.MustCompile(defaultScriptPath, "{("+handler+").apply(undefined)}", true)
 
 		err := app.Cron().Add(jobId, cronExpr, func() {
 			err := executors.run(func(executor *goja.Runtime) error {
@@ -122,28 +121,27 @@ func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 		if err != nil {
 			panic("[cronAdd] failed to register cron job " + jobId + ": " + err.Error())
 		}
-	})
+	}
+	loader.Set("cronAdd", cronAdd)
 
-	// note: it is not necessary needed but it is here for consistency
-	loader.Set("cronRemove", func(jobId string) {
+	cronRemove := func(jobId string) {
 		app.Cron().Remove(jobId)
-	})
+	}
+	loader.Set("cronRemove", cronRemove)
 
 	// register the removal helper also in the executors to allow removing cron jobs from everywhere
 	oldFactory := executors.factory
 	executors.factory = func() *goja.Runtime {
 		vm := oldFactory()
 
-		vm.Set("cronRemove", func(jobId string) {
-			app.Cron().Remove(jobId)
-		})
+		vm.Set("cronAdd", cronAdd)
+		vm.Set("cronRemove", cronRemove)
 
 		return vm
 	}
 	for _, item := range executors.items {
-		item.vm.Set("cronRemove", func(jobId string) {
-			app.Cron().Remove(jobId)
-		})
+		item.vm.Set("cronAdd", cronAdd)
+		item.vm.Set("cronRemove", cronRemove)
 	}
 }
 
@@ -189,7 +187,7 @@ func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.Request
 		// "native" handler func - no need to wrap
 		return h, nil
 	case func(goja.FunctionCall) goja.Value, string:
-		pr := goja.MustCompile("", "{("+handler.String()+").apply(undefined, __args)}", true)
+		pr := goja.MustCompile(defaultScriptPath, "{("+handler.String()+").apply(undefined, __args)}", true)
 
 		wrappedHandler := func(e *core.RequestEvent) error {
 			return executors.run(func(executor *goja.Runtime) error {
@@ -198,11 +196,9 @@ func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.Request
 				res, err := executor.RunProgram(pr)
 				executor.Set("__args", goja.Undefined())
 
-				// (legacy) check for returned Go error value
-				if res != nil {
-					if v, ok := res.Export().(error); ok {
-						return v
-					}
+				// check for returned Go error value
+				if resErr := checkGojaValueForError(e.App, res); resErr != nil {
+					return resErr
 				}
 
 				return normalizeException(err)
@@ -243,7 +239,7 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 				return nil, errors.New("missing or invalid Middleware function")
 			}
 
-			pr := goja.MustCompile("", "{("+v.serializedFunc+").apply(undefined, __args)}", true)
+			pr := goja.MustCompile(defaultScriptPath, "{("+v.serializedFunc+").apply(undefined, __args)}", true)
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Id:       v.id,
@@ -255,11 +251,9 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 						res, err := executor.RunProgram(pr)
 						executor.Set("__args", goja.Undefined())
 
-						// (legacy) check for returned Go error value
-						if res != nil {
-							if v, ok := res.Export().(error); ok {
-								return v
-							}
+						// check for returned Go error value
+						if resErr := checkGojaValueForError(e.App, res); resErr != nil {
+							return resErr
 						}
 
 						return normalizeException(err)
@@ -267,7 +261,7 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 				},
 			}
 		case func(goja.FunctionCall) goja.Value, string:
-			pr := goja.MustCompile("", "{("+m.String()+").apply(undefined, __args)}", true)
+			pr := goja.MustCompile(defaultScriptPath, "{("+m.String()+").apply(undefined, __args)}", true)
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Func: func(e *core.RequestEvent) error {
@@ -277,11 +271,9 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 						res, err := executor.RunProgram(pr)
 						executor.Set("__args", goja.Undefined())
 
-						// (legacy) check for returned Go error value
-						if res != nil {
-							if v, ok := res.Export().(error); ok {
-								return v
-							}
+						// check for returned Go error value
+						if resErr := checkGojaValueForError(e.App, res); resErr != nil {
+							return resErr
 						}
 
 						return normalizeException(err)
@@ -317,6 +309,44 @@ func baseBinds(vm *goja.Runtime) {
 		return string(bodyBytes), nil
 	})
 
+	// note: throw only on reader error
+	vm.Set("toBytes", func(raw any, maxReaderBytes int) ([]byte, error) {
+		switch v := raw.(type) {
+		case nil:
+			return []byte{}, nil
+		case string:
+			return []byte(v), nil
+		case []byte:
+			return v, nil
+		case types.JSONRaw:
+			return v, nil
+		case io.Reader:
+			if maxReaderBytes == 0 {
+				maxReaderBytes = router.DefaultMaxMemory
+			}
+
+			limitReader := io.LimitReader(v, int64(maxReaderBytes))
+
+			return io.ReadAll(limitReader)
+		default:
+			b, err := cast.ToUint8SliceE(v)
+			if err == nil {
+				return b, nil
+			}
+
+			str, err := cast.ToStringE(v)
+			if err == nil {
+				return []byte(str), nil
+			}
+
+			// as a last attempt try to json encode the value
+			rawBytes, _ := json.Marshal(raw)
+
+			return rawBytes, nil
+		}
+	})
+
+	// note: throw only on reader error
 	vm.Set("toString", func(raw any, maxReaderBytes int) (string, error) {
 		switch v := raw.(type) {
 		case io.Reader:
@@ -399,6 +429,32 @@ func baseBinds(vm *goja.Runtime) {
 		instanceValue.SetPrototype(call.This.Prototype())
 
 		return instanceValue
+	})
+
+	// nullable helpers usually used as DynamicModel shape values
+	vm.Set("nullString", func() *string {
+		var v string
+		return &v
+	})
+	vm.Set("nullFloat", func() *float64 {
+		var v float64
+		return &v
+	})
+	vm.Set("nullInt", func() *int64 {
+		var v int64
+		return &v
+	})
+	vm.Set("nullBool", func() *bool {
+		var v bool
+		return &v
+	})
+	vm.Set("nullArray", func() *types.JSONArray[any] {
+		var v types.JSONArray[any]
+		return &v
+	})
+	vm.Set("nullObject", func() *types.JSONMap[any] {
+		var v types.JSONMap[any]
+		return &v
 	})
 
 	vm.Set("Record", func(call goja.ConstructorCall) *goja.Object {
@@ -503,6 +559,10 @@ func baseBinds(vm *goja.Runtime) {
 		instance := &core.FileField{}
 		return structConstructorUnmarshal(vm, call, instance)
 	})
+	vm.Set("GeoPointField", func(call goja.ConstructorCall) *goja.Object {
+		instance := &core.GeoPointField{}
+		return structConstructorUnmarshal(vm, call, instance)
+	})
 	// ---
 
 	vm.Set("MailerMessage", func(call goja.ConstructorCall) *goja.Object {
@@ -556,9 +616,18 @@ func baseBinds(vm *goja.Runtime) {
 	vm.Set("DateTime", func(call goja.ConstructorCall) *goja.Object {
 		instance := types.NowDateTime()
 
-		val, _ := call.Argument(0).Export().(string)
-		if val != "" {
-			instance, _ = types.ParseDateTime(val)
+		rawDate, _ := call.Argument(0).Export().(string)
+		locName, _ := call.Argument(1).Export().(string)
+		if rawDate != "" && locName != "" {
+			loc, err := time.LoadLocation(locName)
+			if err != nil {
+				loc = time.UTC
+			}
+
+			instance, _ = types.ParseDateTime(cast.ToTimeInDefaultLocation(rawDate, loc))
+		} else if rawDate != "" {
+			// forward directly to ParseDateTime to preserve the original behavior
+			instance, _ = types.ParseDateTime(rawDate)
 		}
 
 		instanceValue := vm.ToValue(instance).(*goja.Object)
@@ -620,6 +689,7 @@ func mailsBinds(vm *goja.Runtime) {
 	obj.Set("sendRecordVerification", mails.SendRecordVerification)
 	obj.Set("sendRecordChangeEmail", mails.SendRecordChangeEmail)
 	obj.Set("sendRecordOTP", mails.SendRecordOTP)
+	obj.Set("sendRecordAuthAlert", mails.SendRecordAuthAlert)
 }
 
 func securityBinds(vm *goja.Runtime) {
@@ -669,6 +739,8 @@ func filesystemBinds(vm *goja.Runtime) {
 	obj := vm.NewObject()
 	vm.Set("$filesystem", obj)
 
+	obj.Set("s3", filesystem.NewS3)
+	obj.Set("local", filesystem.NewLocal)
 	obj.Set("fileFromPath", filesystem.NewFileFromPath)
 	obj.Set("fileFromBytes", filesystem.NewFileFromBytes)
 	obj.Set("fileFromMultipart", filesystem.NewFileFromMultipart)
@@ -715,6 +787,7 @@ func osBinds(vm *goja.Runtime) {
 	obj.Set("exit", os.Exit)
 	obj.Set("getenv", os.Getenv)
 	obj.Set("dirFS", os.DirFS)
+	obj.Set("stat", os.Stat)
 	obj.Set("readFile", os.ReadFile)
 	obj.Set("writeFile", os.WriteFile)
 	obj.Set("readDir", os.ReadDir)
@@ -726,6 +799,8 @@ func osBinds(vm *goja.Runtime) {
 	obj.Set("rename", os.Rename)
 	obj.Set("remove", os.Remove)
 	obj.Set("removeAll", os.RemoveAll)
+	obj.Set("openRoot", os.OpenRoot)
+	obj.Set("openInRoot", os.OpenInRoot)
 }
 
 func formsBinds(vm *goja.Runtime) {
@@ -781,11 +856,15 @@ func httpClientBinds(vm *goja.Runtime) {
 	})
 
 	type sendResult struct {
-		JSON       any                     `json:"json"`
-		Headers    map[string][]string     `json:"headers"`
-		Cookies    map[string]*http.Cookie `json:"cookies"`
-		Raw        string                  `json:"raw"`
-		StatusCode int                     `json:"statusCode"`
+		JSON    any                     `json:"json"`
+		Headers map[string][]string     `json:"headers"`
+		Cookies map[string]*http.Cookie `json:"cookies"`
+
+		// Deprecated: consider using Body instead
+		Raw string `json:"raw"`
+
+		Body       []byte `json:"body"`
+		StatusCode int    `json:"statusCode"`
 	}
 
 	type sendConfig struct {
@@ -890,6 +969,7 @@ func httpClientBinds(vm *goja.Runtime) {
 			Headers:    map[string][]string{},
 			Cookies:    map[string]*http.Cookie{},
 			Raw:        string(bodyRaw),
+			Body:       bodyRaw,
 		}
 
 		for k, v := range res.Header {
@@ -900,7 +980,7 @@ func httpClientBinds(vm *goja.Runtime) {
 			result.Cookies[v.Name] = v
 		}
 
-		if len(result.Raw) != 0 {
+		if len(result.Body) > 0 {
 			// try as map
 			result.JSON = map[string]any{}
 			if err := json.Unmarshal(bodyRaw, &result.JSON); err != nil {
@@ -917,6 +997,29 @@ func httpClientBinds(vm *goja.Runtime) {
 }
 
 // -------------------------------------------------------------------
+
+// checkGojaValueForError resolves the provided goja.Value and tries
+// to extract its underlying error value (if any).
+func checkGojaValueForError(app core.App, value goja.Value) error {
+	if value == nil {
+		return nil
+	}
+
+	exported := value.Export()
+	switch v := exported.(type) {
+	case error:
+		return v
+	case *goja.Promise:
+		// Promise as return result is not officially supported but try to
+		// resolve any thrown exception to avoid silently ignoring it
+		app.Logger().Warn("the handler must a non-async function and not return a Promise")
+		if promiseErr, ok := v.Result().Export().(error); ok {
+			return normalizeException(promiseErr)
+		}
+	}
+
+	return nil
+}
 
 // normalizeException checks if the provided error is a goja.Exception
 // and attempts to return its underlying Go error.
@@ -1019,10 +1122,25 @@ func structConstructorUnmarshal(vm *goja.Runtime, call goja.ConstructorCall, ins
 	return instanceValue
 }
 
-var cachedDynamicModels = store.New[string, *dynamicModelType](nil)
+var cachedDynamicModelStructs = store.New[string, reflect.Type](nil)
 
 // newDynamicModel creates a new dynamic struct with fields based
 // on the specified "shape".
+//
+// The "shape" values are used as defaults and could be of type:
+//
+//   - int64      (ex.: 0)
+//   - *int64     (ex.: nullInt())
+//   - float64    (ex.: -0)
+//   - *float64   (ex.: nullFloat())
+//   - string     (ex.: "")
+//   - *string    (ex.: nullString())
+//   - bool       (ex.: false)
+//   - *bool      (ex.: nullBool())
+//   - slice/arr  (ex.: [])
+//   - *slice/arr (ex.: nullArray())
+//   - map        (ex.: {})
+//   - *map       (ex.: nullObject())
 //
 // Example:
 //
@@ -1031,46 +1149,21 @@ var cachedDynamicModels = store.New[string, *dynamicModelType](nil)
 //		"total": 0,
 //	})
 func newDynamicModel(shape map[string]any) any {
-	var modelType *dynamicModelType
+	info := make([]*shapeFieldInfo, 0, len(shape))
 
-	shapeRaw, err := json.Marshal(shape)
-	if err != nil {
-		modelType = getDynamicModelStruct(shape)
-	} else {
-		modelType = cachedDynamicModels.GetOrSet(string(shapeRaw), func() *dynamicModelType {
-			return getDynamicModelStruct(shape)
-		})
+	var hash strings.Builder
+
+	sortedKeys := make([]string, 0, len(shape))
+	for k := range shape {
+		sortedKeys = append(sortedKeys, k)
 	}
+	sort.Strings(sortedKeys)
 
-	rvShapeValues := make([]reflect.Value, len(modelType.shapeValues))
-	for i, v := range modelType.shapeValues {
-		rvShapeValues[i] = reflect.ValueOf(v)
-	}
-
-	elem := reflect.New(modelType.structType).Elem()
-
-	for i, v := range rvShapeValues {
-		elem.Field(i).Set(v)
-	}
-
-	return elem.Addr().Interface()
-}
-
-type dynamicModelType struct {
-	structType  reflect.Type
-	shapeValues []any
-}
-
-func getDynamicModelStruct(shape map[string]any) *dynamicModelType {
-	result := new(dynamicModelType)
-	result.shapeValues = make([]any, 0, len(shape))
-
-	structFields := make([]reflect.StructField, 0, len(shape))
-
-	for k, v := range shape {
+	for _, k := range sortedKeys {
+		v := shape[k]
 		vt := reflect.TypeOf(v)
 
-		switch kind := vt.Kind(); kind {
+		switch vt.Kind() {
 		case reflect.Map:
 			raw, _ := json.Marshal(v)
 			newV := types.JSONMap[any]{}
@@ -1083,18 +1176,48 @@ func getDynamicModelStruct(shape map[string]any) *dynamicModelType {
 			newV.Scan(raw)
 			v = newV
 			vt = reflect.TypeOf(newV)
+		case reflect.Pointer:
+			// for pointers always fallback to nil as their default value
+			v = nil
 		}
 
-		result.shapeValues = append(result.shapeValues, v)
+		hash.WriteString(k)
+		hash.WriteString(":")
+		hash.WriteString(vt.String()) // it doesn't guarantee to be unique across all types but it should be fine with the primitive types DynamicModel is used
+		hash.WriteString("|")
 
-		structFields = append(structFields, reflect.StructField{
-			Name: inflector.UcFirst(k), // ensures that the field is exportable
-			Type: vt,
-			Tag:  reflect.StructTag(`db:"` + k + `" json:"` + k + `" form:"` + k + `"`),
-		})
+		info = append(info, &shapeFieldInfo{key: k, value: v, valueType: vt})
 	}
 
-	result.structType = reflect.StructOf(structFields)
+	st := cachedDynamicModelStructs.GetOrSet(hash.String(), func() reflect.Type {
+		structFields := make([]reflect.StructField, len(info))
 
-	return result
+		for i, item := range info {
+			structFields[i] = reflect.StructField{
+				Name: inflector.UcFirst(item.key), // ensures that the field is exportable
+				Type: item.valueType,
+				Tag:  reflect.StructTag(`db:"` + item.key + `" json:"` + item.key + `" form:"` + item.key + `"`),
+			}
+		}
+
+		return reflect.StructOf(structFields)
+	})
+
+	elem := reflect.New(st).Elem()
+
+	// load default values into the new model
+	for i, item := range info {
+		if item.value == nil {
+			continue
+		}
+		elem.Field(i).Set(reflect.ValueOf(item.value))
+	}
+
+	return elem.Addr().Interface()
+}
+
+type shapeFieldInfo struct {
+	value     any
+	valueType reflect.Type
+	key       string
 }

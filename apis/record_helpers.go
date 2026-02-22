@@ -8,13 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hanzoai/dbx"
-	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/mails"
-	"github.com/hanzoai/base/tools/router"
-	"github.com/hanzoai/base/tools/routine"
-	"github.com/hanzoai/base/tools/search"
-	"github.com/hanzoai/base/tools/security"
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/mails"
+	"github.com/pocketbase/pocketbase/tools/router"
+	"github.com/pocketbase/pocketbase/tools/routine"
+	"github.com/pocketbase/pocketbase/tools/search"
+	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 const (
@@ -129,7 +130,9 @@ func recordAuthResponse(e *core.RequestEvent, authRecord *core.Record, token str
 			result.Meta = e.Meta
 		}
 
-		return e.JSON(http.StatusOK, result)
+		return execAfterSuccessTx(true, e.App, func() error {
+			return e.JSON(http.StatusOK, result)
+		})
 	})
 }
 
@@ -158,7 +161,11 @@ func wantsMFA(e *core.RequestEvent, record *core.Record) (bool, error) {
 	if err != nil {
 		return true, err
 	}
-	resolver.UpdateQuery(query)
+
+	err = resolver.UpdateQuery(query)
+	if err != nil {
+		return true, err
+	}
 
 	err = query.AndWhere(expr).Limit(1).Row(&exists)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -377,12 +384,18 @@ func expandFetch(app core.App, originalRequestInfo *core.RequestInfo) core.Expan
 
 			if *relCollection.ViewRule != "" {
 				resolver := core.NewRecordFieldResolver(app, relCollection, requestInfoPtr, true)
+
 				expr, err := search.FilterData(*(relCollection.ViewRule)).BuildExpr(resolver)
 				if err != nil {
 					return err
 				}
-				resolver.UpdateQuery(q)
+
 				q.AndWhere(expr)
+
+				err = resolver.UpdateQuery(q)
+				if err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -455,18 +468,24 @@ func autoResolveRecordsFlags(app core.App, records []*core.Record, requestInfo *
 	managedIds := []string{}
 
 	query := app.RecordQuery(collection).
-		Select(app.DB().QuoteSimpleColumnName(collection.Name) + ".id").
-		AndWhere(dbx.In(app.DB().QuoteSimpleColumnName(collection.Name)+".id", recordIds...))
+		Select(app.ConcurrentDB().QuoteSimpleColumnName(collection.Name) + ".id").
+		AndWhere(dbx.In(app.ConcurrentDB().QuoteSimpleColumnName(collection.Name)+".id", recordIds...))
 
 	resolver := core.NewRecordFieldResolver(app, collection, requestInfo, true)
 	expr, err := search.FilterData(*collection.ManageRule).BuildExpr(resolver)
 	if err != nil {
 		return err
 	}
-	resolver.UpdateQuery(query)
+
 	query.AndWhere(expr)
 
-	if err := query.Column(&managedIds); err != nil {
+	err = resolver.UpdateQuery(query)
+	if err != nil {
+		return err
+	}
+
+	err = query.Column(&managedIds)
+	if err != nil {
 		return err
 	}
 	// ---
@@ -535,18 +554,43 @@ func firstApiError(errs ...error) *router.ApiError {
 	return router.NewInternalServerError("", errors.Join(errs...))
 }
 
+// execAfterSuccessTx ensures that fn is executed only after a succesul transaction.
+//
+// If the current app instance is not a transactional or checkTx is false,
+// then fn is directly executed.
+//
+// It could be usually used to allow propagating an error or writing
+// custom response from within the wrapped transaction block.
+func execAfterSuccessTx(checkTx bool, app core.App, fn func() error) error {
+	if txInfo := app.TxInfo(); txInfo != nil && checkTx {
+		txInfo.OnComplete(func(txErr error) error {
+			if txErr == nil {
+				return fn()
+			}
+			return nil
+		})
+		return nil
+	}
+
+	return fn()
+}
+
 // -------------------------------------------------------------------
 
 const maxAuthOrigins = 5
 
 func authAlert(e *core.RequestEvent, authRecord *core.Record) error {
-	// generating fingerprint
+	// generate fingerprint
 	// ---
+	ip := e.RealIP()
+
 	userAgent := e.Request.UserAgent()
-	if len(userAgent) > 300 {
-		userAgent = userAgent[:300]
+	if len(userAgent) > 200 {
+		userAgent = userAgent[:200] + "..."
 	}
-	fingerprint := security.MD5(e.RealIP() + userAgent)
+
+	fingerprint := security.MD5(ip + userAgent)
+	alertInfo := fmt.Sprintf("%s - %s %s", types.NowDateTime().String(), ip, userAgent)
 	// ---
 
 	origins, err := e.App.FindAllAuthOriginsByRecord(authRecord)
@@ -586,7 +630,7 @@ func authAlert(e *core.RequestEvent, authRecord *core.Record) error {
 		})
 
 		routine.FireAndForget(func() {
-			err := mails.SendRecordAuthAlert(e.App, authRecord)
+			err := mails.SendRecordAuthAlert(e.App, authRecord, alertInfo)
 			timer.Stop()
 			mailSent <- err
 		})

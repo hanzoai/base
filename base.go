@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/hanzoai/base/cmd"
-	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/tools/hook"
-	"github.com/hanzoai/base/tools/list"
-	"github.com/hanzoai/base/tools/routine"
+	"github.com/pocketbase/pocketbase/cmd"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/pocketbase/pocketbase/tools/routine"
 	"github.com/spf13/cobra"
 
 	_ "github.com/hanzoai/base/migrations"
@@ -204,6 +205,8 @@ func (base *Base) Execute() error {
 	<-done
 
 	// trigger cleanups
+	//
+	// @todo consider skipping and just call the finalizer in case OnTerminate was already invoked manually?
 	event := new(core.TerminateEvent)
 	event.App = base
 	return base.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
@@ -293,7 +296,7 @@ func (base *Base) skipBootstrap() bool {
 // note: we are using os.Args[0] and not os.Executable() since it could
 // break existing aliased binaries (eg. the community maintained homebrew package)
 func inspectRuntime() (baseDir string, withGoRun bool) {
-	if strings.HasPrefix(os.Args[0], os.TempDir()) {
+	if osutils.IsProbablyGoRun() {
 		// probably ran with go run
 		withGoRun = true
 		baseDir, _ = os.Getwd()

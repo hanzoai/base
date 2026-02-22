@@ -35,7 +35,7 @@ func (app *BaseApp) RecordQuery(collectionModelOrIdentifier any) *dbx.SelectQuer
 		tableName = "@@__invalidCollectionModelOrIdentifier"
 	}
 
-	query := app.DB().Select(app.DB().QuoteSimpleColumnName(tableName) + ".*").From(tableName)
+	query := app.ConcurrentDB().Select(app.ConcurrentDB().QuoteSimpleColumnName(tableName) + ".*").From(tableName)
 
 	// in case of an error attach a new context and cancel it immediately with the error
 	if collectionErr != nil {
@@ -314,9 +314,19 @@ func (app *BaseApp) FindAllRecords(collectionModelOrIdentifier any, exprs ...dbx
 // FindFirstRecordByData returns the first found record matching
 // the provided key-value pair.
 func (app *BaseApp) FindFirstRecordByData(collectionModelOrIdentifier any, key string, value any) (*Record, error) {
+	collection, err := getCollectionByModelOrIdentifier(app, collectionModelOrIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	field := collection.Fields.GetByName(key)
+	if field == nil {
+		return nil, errors.New("invalid or missing field " + key)
+	}
+
 	record := &Record{}
 
-	err := app.RecordQuery(collectionModelOrIdentifier).
+	err = app.RecordQuery(collection).
 		AndWhere(dbx.HashExp{inflector.Columnify(key): value}).
 		Limit(1).
 		One(record)
@@ -397,7 +407,10 @@ func (app *BaseApp) FindRecordsByFilter(
 		}
 	}
 
-	resolver.UpdateQuery(q) // attaches any adhoc joins and aliases
+	err = resolver.UpdateQuery(q) // attaches any adhoc joins and aliases
+	if err != nil {
+		return nil, err
+	}
 	// ---
 
 	if offset > 0 {
@@ -611,7 +624,11 @@ func (app *BaseApp) CanAccessRecord(record *Record, requestInfo *RequestInfo, ac
 	if err != nil {
 		return false, err
 	}
-	resolver.UpdateQuery(query)
+
+	err = resolver.UpdateQuery(query)
+	if err != nil {
+		return false, err
+	}
 
 	err = query.AndWhere(expr).Limit(1).Row(&exists)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
