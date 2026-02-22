@@ -2,7 +2,6 @@ package apis_test
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/url"
 	"os"
@@ -383,9 +382,31 @@ func TestRecordCrudList(t *testing.T) {
 			},
 		},
 		{
-			Name:           "multi-match - at least one of",
+			Name:           "multi-match - at least one of (guest - non-satisfied relation filter API rule)",
 			Method:         http.MethodGet,
 			URL:            "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"page":1`,
+				`"perPage":30`,
+				`"totalPages":0`,
+				`"totalItems":0`,
+				`"items":[]`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       0,
+			},
+		},
+		{
+			Name:   "multi-match - at least one of (clients)",
+			Method: http.MethodGet,
+			URL:    "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
+			Headers: map[string]string{
+				// clients, test@example.com
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImdrMzkwcWVnczR5NDd3biIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoidjg1MXE0cjc5MHJoa25sIiwiZXhwIjoyNTI0NjA0NDYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.0ONnm_BsvPRZyDNT31GN1CKUB6uQRxvVvQ-Wc9AZfG0",
+			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -402,9 +423,13 @@ func TestRecordCrudList(t *testing.T) {
 			},
 		},
 		{
-			Name:           "multi-match - all",
-			Method:         http.MethodGet,
-			URL:            "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length=2"),
+			Name:   "multi-match - all (clients)",
+			Method: http.MethodGet,
+			URL:    "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length=2"),
+			Headers: map[string]string{
+				// clients, test@example.com
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6ImdrMzkwcWVnczR5NDd3biIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoidjg1MXE0cjc5MHJoa25sIiwiZXhwIjoyNTI0NjA0NDYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.0ONnm_BsvPRZyDNT31GN1CKUB6uQRxvVvQ-Wc9AZfG0",
+			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -417,6 +442,32 @@ func TestRecordCrudList(t *testing.T) {
 				"*":                    0,
 				"OnRecordsListRequest": 1,
 			},
+		},
+		{
+			Name:   "OnRecordsListRequest tx body write check",
+			Method: http.MethodGet,
+			URL:    "/api/collections/demo4/records",
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY",
+			},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.OnRecordsListRequest().BindFunc(func(e *core.RecordsListRequestEvent) error {
+					original := e.App
+					return e.App.RunInTransaction(func(txApp core.App) error {
+						e.App = txApp
+						defer func() { e.App = original }()
+
+						if err := e.Next(); err != nil {
+							return err
+						}
+
+						return e.BadRequestError("TX_ERROR", nil)
+					})
+				})
+			},
+			ExpectedStatus:  400,
+			ExpectedEvents:  map[string]int{"OnRecordsListRequest": 1},
+			ExpectedContent: []string{"TX_ERROR"},
 		},
 
 		// auth collection
@@ -862,6 +913,32 @@ func TestRecordCrudView(t *testing.T) {
 				"OnRecordEnrich":      7,
 			},
 		},
+		{
+			Name:   "OnRecordViewRequest tx body write check",
+			Method: http.MethodGet,
+			URL:    "/api/collections/demo1/records/al1h9ijdeojtsjy",
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY",
+			},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.OnRecordViewRequest().BindFunc(func(e *core.RecordRequestEvent) error {
+					original := e.App
+					return e.App.RunInTransaction(func(txApp core.App) error {
+						e.App = txApp
+						defer func() { e.App = original }()
+
+						if err := e.Next(); err != nil {
+							return err
+						}
+
+						return e.BadRequestError("TX_ERROR", nil)
+					})
+				})
+			},
+			ExpectedStatus:  400,
+			ExpectedEvents:  map[string]int{"OnRecordViewRequest": 1},
+			ExpectedContent: []string{"TX_ERROR"},
+		},
 
 		// auth collection
 		// -----------------------------------------------------------
@@ -1209,7 +1286,7 @@ func TestRecordCrudDelete(t *testing.T) {
 			},
 		},
 		{
-			Name:   "OnRecordAfterDeleteSuccessRequest error response",
+			Name:   "OnRecordDeleteRequest tx body write check",
 			Method: http.MethodDelete,
 			URL:    "/api/collections/clients/records/o1y0dd0spd786md",
 			Headers: map[string]string{
@@ -1217,15 +1294,22 @@ func TestRecordCrudDelete(t *testing.T) {
 			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnRecordDeleteRequest().BindFunc(func(e *core.RecordRequestEvent) error {
-					return errors.New("error")
+					original := e.App
+					return e.App.RunInTransaction(func(txApp core.App) error {
+						e.App = txApp
+						defer func() { e.App = original }()
+
+						if err := e.Next(); err != nil {
+							return err
+						}
+
+						return e.BadRequestError("TX_ERROR", nil)
+					})
 				})
 			},
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordDeleteRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"OnRecordDeleteRequest": 1},
+			ExpectedContent: []string{"TX_ERROR"},
 		},
 		{
 			Name:   "authenticated record that match the collection delete rule",
@@ -1563,10 +1647,7 @@ func TestRecordCrudCreate(t *testing.T) {
 			Body:            strings.NewReader(`{"title":"test123"}`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
 			Name:   "auth record submit in restricted collection (rule failure check)",
@@ -1579,10 +1660,7 @@ func TestRecordCrudCreate(t *testing.T) {
 			},
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
 			Name:   "auth record submit in restricted collection (rule pass check) + expand relations",
@@ -1731,10 +1809,7 @@ func TestRecordCrudCreate(t *testing.T) {
 			},
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
 			Name:   "submit via multipart form data with @jsonPayload key and satisfied @request.body rule",
@@ -1801,21 +1876,31 @@ func TestRecordCrudCreate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "OnRecordAfterCreateSuccessRequest error response",
+			Name:   "OnRecordCreateRequest tx body write check",
 			Method: http.MethodPost,
 			URL:    "/api/collections/demo2/records",
 			Body:   strings.NewReader(`{"title":"new"}`),
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY",
+			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnRecordCreateRequest().BindFunc(func(e *core.RecordRequestEvent) error {
-					return errors.New("error")
+					original := e.App
+					return e.App.RunInTransaction(func(txApp core.App) error {
+						e.App = txApp
+						defer func() { e.App = original }()
+
+						if err := e.Next(); err != nil {
+							return err
+						}
+
+						return e.BadRequestError("TX_ERROR", nil)
+					})
 				})
 			},
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"OnRecordCreateRequest": 1},
+			ExpectedContent: []string{"TX_ERROR"},
 		},
 
 		// ID checks
@@ -1974,14 +2059,9 @@ func TestRecordCrudCreate(t *testing.T) {
 				"total+":4,
 				"total-":2
 			}`),
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{}`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
 			Name:   "@request.body.field with compute modifers (rule pass check)",
@@ -2813,21 +2893,31 @@ func TestRecordCrudUpdate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "OnRecordAfterUpdateSuccessRequest error response",
+			Name:   "OnRecordUpdateRequest tx body write check",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/demo2/records/0yxhwia2amd8gec",
 			Body:   strings.NewReader(`{"title":"new"}`),
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY",
+			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnRecordUpdateRequest().BindFunc(func(e *core.RecordRequestEvent) error {
-					return errors.New("error")
+					original := e.App
+					return e.App.RunInTransaction(func(txApp core.App) error {
+						e.App = txApp
+						defer func() { e.App = original }()
+
+						if err := e.Next(); err != nil {
+							return err
+						}
+
+						return e.BadRequestError("TX_ERROR", nil)
+					})
 				})
 			},
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"data":{}`},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordUpdateRequest": 1,
-			},
+			ExpectedEvents:  map[string]int{"OnRecordUpdateRequest": 1},
+			ExpectedContent: []string{"TX_ERROR"},
 		},
 		{
 			Name:   "try to change the id of an existing record",

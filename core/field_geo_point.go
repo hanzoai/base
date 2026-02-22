@@ -4,8 +4,8 @@ import (
 	"context"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/hanzoai/base/core/validators"
-	"github.com/hanzoai/base/tools/types"
+	"github.com/pocketbase/pocketbase/core/validators"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 func init() {

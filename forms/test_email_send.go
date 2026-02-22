@@ -5,8 +5,9 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/mails"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/mails"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 const (
@@ -109,7 +110,8 @@ func (form *TestEmailSend) Submit() error {
 	case TestTemplateOTP:
 		return mails.SendRecordOTP(form.app, record, "_HZ_TEST_OTP_ID_", "123456")
 	case TestTemplateAuthAlert:
-		return mails.SendRecordAuthAlert(form.app, record)
+		testEvent := types.NowDateTime().String() + " - TEST_IP TEST_USER_AGENT"
+		return mails.SendRecordAuthAlert(form.app, record, testEvent)
 	default:
 		return errors.New("unknown template " + form.Template)
 	}

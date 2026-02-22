@@ -35,6 +35,24 @@ import (
 
 const typesFileName = "types.d.ts"
 
+var defaultScriptPath = "pb.js"
+
+func init() {
+	// For backward compatibility and consistency with the Go exposed
+	// methods that operate with relative paths (e.g. `$os.writeFile`),
+	// we define the "current JS module" as if it is a file in the current working directory
+	// (the filename itself doesn't really matter and in our case the hook handlers are executed as separate "programs").
+	//
+	// This is necessary for `require(module)` to properly traverse parents node_modules (goja_nodejs#95).
+	cwd, err := os.Getwd()
+	if err != nil {
+		// truly rare case, log just for debug purposes
+		color.Yellow("Failed to retrieve the current working directory: %v", err)
+	} else {
+		defaultScriptPath = filepath.Join(cwd, defaultScriptPath)
+	}
+}
+
 // Config defines the config options of the jsvm plugin.
 type Config struct {
 	// OnInit is an optional function that will be called
@@ -166,7 +184,13 @@ func (p *plugin) registerMigrations() error {
 		return err
 	}
 
+	absHooksDir, err := filepath.Abs(p.config.HooksDir)
+	if err != nil {
+		return err
+	}
+
 	registry := new(require.Registry) // this can be shared by multiple runtimes
+	templateRegistry := template.NewRegistry()
 
 	for file, content := range files {
 		vm := goja.New()
@@ -182,6 +206,12 @@ func (p *plugin) registerMigrations() error {
 		osBinds(vm)
 		filepathBinds(vm)
 		httpClientBinds(vm)
+		filesystemBinds(vm)
+		formsBinds(vm)
+		mailsBinds(vm)
+
+		vm.Set("$template", templateRegistry)
+		vm.Set("__hooks", absHooksDir)
 
 		vm.Set("migrate", func(up, down func(txApp core.App) error) {
 			core.AppMigrations.Register(up, down, file)
@@ -191,7 +221,7 @@ func (p *plugin) registerMigrations() error {
 			p.config.OnInit(vm)
 		}
 
-		_, err := vm.RunString(string(content))
+		_, err := vm.RunScript(defaultScriptPath, string(content))
 		if err != nil {
 			return fmt.Errorf("failed to run migration %s: %w", file, err)
 		}
@@ -296,7 +326,7 @@ func (p *plugin) registerHooks() error {
 		func() {
 			defer func() {
 				if err := recover(); err != nil {
-					fmtErr := fmt.Errorf("Failed to execute %s:\n - %v", file, err)
+					fmtErr := fmt.Errorf("failed to execute %s:\n - %v", file, err)
 
 					if p.config.HooksWatch {
 						color.Red("%v", fmtErr)
@@ -306,7 +336,7 @@ func (p *plugin) registerHooks() error {
 				}
 			}()
 
-			_, err := loader.RunString(string(content))
+			_, err := loader.RunScript(defaultScriptPath, string(content))
 			if err != nil {
 				panic(err)
 			}
@@ -347,7 +377,7 @@ func (p *plugin) watchHooks() error {
 	if hooksDirInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
 		watchDir, err = filepath.EvalSymlinks(p.config.HooksDir)
 		if err != nil {
-			return fmt.Errorf("failed to resolve hooksDir symink: %w", err)
+			return fmt.Errorf("failed to resolve hooksDir symlink: %w", err)
 		}
 	}
 

@@ -157,8 +157,6 @@ declare var $app: Base
  * ).render({"name": "John"})
  * ` + "```" + `
  *
- * _Note that this method is available only in hz_hooks context._
- *
  * @namespace
  * @group Base
  */
@@ -186,13 +184,45 @@ declare function readerToString(reader: any, maxBytes?: number): string;
  * // io.Reader
  * const ex1 = toString(e.request.body)
  *
- * // slice of bytes ("hello")
- * const ex2 = toString([104 101 108 108 111])
+ * // slice of bytes
+ * const ex2 = toString([104 101 108 108 111]) // "hello"
+ *
+ * // null
+ * const ex3 = toString(null) // ""
  * ` + "```" + `
  *
  * @group Base
  */
 declare function toString(val: any, maxBytes?: number): string;
+
+/**
+ * toBytes converts the specified value into a bytes slice.
+ *
+ * Support optional second maxBytes argument to limit the max read bytes
+ * when the value is a io.Reader (default to 32MB).
+ *
+ * Types that don't have Go slice representation (bool, objects, etc.)
+ * are serialized to UTF8 string and its bytes slice is returned.
+ *
+ * Example:
+ *
+ * ` + "```" + `js
+ * // io.Reader
+ * const ex1 = toBytes(e.request.body)
+ *
+ * // string
+ * const ex2 = toBytes("hello") // [104 101 108 108 111]
+ *
+ * // object (the same as the string '{"test":1}')
+ * const ex3 = toBytes({"test":1}) // [123 34 116 101 115 116 34 58 49 125]
+ *
+ * // null
+ * const ex4 = toBytes(null) // []
+ * ` + "```" + `
+ *
+ * @group PocketBase
+ */
+declare function toBytes(val: any, maxBytes?: number): Array<number>;
 
 /**
  * sleep pauses the current goroutine for at least the specified user duration (in ms).
@@ -227,26 +257,79 @@ declare function arrayOf<T>(model: T): Array<T>;
 /**
  * DynamicModel creates a new dynamic model with fields from the provided data shape.
  *
- * Note that in order to use 0 as double/float initialization number you have to use negative zero (` + "`-0`" + `).
+ * Caveats:
+ * - In order to use 0 as double/float initialization number you have to negate it (` + "`-0`" + `).
+ * - You need to use lowerCamelCase when accessing the model fields (e.g. ` + "`model.roles`" + ` and not ` + "`model.Roles`" + ` even if in the model shape and in the DB table the column is capitalized).
+ * - Objects are loaded into types.JSONMap, meaning that they need to be accessed with ` + "`get(key)`" + ` (e.g. ` + "`model.meta.get('something')`" + `).
+ * - For describing nullable types you can use the ` + "`null*()`" + ` helpers - ` + "`nullString()`" + `, ` + "`nullInt()`" + `, ` + "`nullFloat()`" + `, ` + "`nullBool()`" + `, ` + "`nullArray()`" + `, ` + "`nullObject()`" + `.
  *
  * Example:
  *
  * ` + "```" + `js
  * const model = new DynamicModel({
- *     name:       ""
- *     age:        0,  // int64
- *     totalSpent: -0, // float64
- *     active:     false,
- *     roles:      [],
- *     meta:       {}
+ *     name:       ""     // or nullString() if nullable
+ *     age:        0,     // or nullInt() if nullable
+ *     totalSpent: -0,    // or nullFloat() if nullable
+ *     active:     false, // or nullBool() if nullable
+ *     Roles:      [],    // or nullArray() if nullable; maps to "Roles" in the DB/JSON but the prop would be accessible via "model.roles"
+ *     meta:       {},    // or nullObject() if nullable
  * })
  * ` + "```" + `
  *
  * @group Base
  */
 declare class DynamicModel {
+  [key: string]: any;
   constructor(shape?: { [key:string]: any })
 }
+
+/**
+ * nullString creates an empty Go string pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` string value.
+ *
+ * @group PocketBase
+ */
+declare function nullString(): string;
+
+/**
+ * nullInt creates an empty Go int64 pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` int value.
+ *
+ * @group PocketBase
+ */
+declare function nullInt(): number;
+
+/**
+ * nullFloat creates an empty Go float64 pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` float value.
+ *
+ * @group PocketBase
+ */
+declare function nullFloat(): number;
+
+/**
+ * nullBool creates an empty Go bool pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` bool value.
+ *
+ * @group PocketBase
+ */
+declare function nullBool(): boolean;
+
+/**
+ * nullArray creates an empty Go types.JSONArray pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` JSON array value.
+ *
+ * @group PocketBase
+ */
+declare function nullArray(): Array<any>;
+
+/**
+ * nullObject creates an empty Go types.JSONMap pointer usually used for
+ * describing a **nullable** ` + "`DynamicModel`" + ` JSON object value.
+ *
+ * @group PocketBase
+ */
+declare function nullObject(): { get(key:string):any; set(key:string,value:any):void };
 
 interface Context extends context.Context{} // merge
 /**
@@ -482,6 +565,16 @@ declare class FileField implements core.FileField {
   constructor(data?: Partial<core.FileField>)
 }
 
+interface GeoPointField extends core.GeoPointField{} // merge
+/**
+ * {@inheritDoc core.GeoPointField}
+ *
+ * @group PocketBase
+ */
+declare class GeoPointField implements core.GeoPointField {
+  constructor(data?: Partial<core.GeoPointField>)
+}
+
 interface MailerMessage extends mailer.Message{} // merge
 /**
  * MailerMessage defines a single email message.
@@ -608,19 +701,27 @@ declare class Timezone implements time.Location {
 interface DateTime extends types.DateTime{} // merge
 /**
  * DateTime defines a single DateTime type instance.
+ * The returned date is always represented in UTC.
  *
  * Example:
  *
  * ` + "```" + `js
  * const dt0 = new DateTime() // now
  *
+ * // full datetime string
  * const dt1 = new DateTime('2023-07-01 00:00:00.000Z')
+ *
+ * // datetime string with default "parse in" timezone location
+ * //
+ * // similar to new DateTime('2023-07-01 00:00:00 +01:00') or new DateTime('2023-07-01 00:00:00 +02:00')
+ * // but accounts for the daylight saving time (DST)
+ * const dt2 = new DateTime('2023-07-01 00:00:00', 'Europe/Amsterdam')
  * ` + "```" + `
  *
  * @group Base
  */
 declare class DateTime implements types.DateTime {
-  constructor(date?: string)
+  constructor(date?: string, defaultParseInLocation?: string)
 }
 
 interface ValidationError extends ozzo_validation.Error{} // merge
@@ -738,6 +839,7 @@ declare namespace $mails {
   let sendRecordVerification:  mails.sendRecordVerification
   let sendRecordChangeEmail:   mails.sendRecordChangeEmail
   let sendRecordOTP:           mails.sendRecordOTP
+  let sendRecordAuthAlert:     mails.sendRecordAuthAlert
 }
 
 // -------------------------------------------------------------------
@@ -768,17 +870,17 @@ declare namespace $security {
   /**
    * {@inheritDoc security.newJWT}
    */
-  export function createJWT(payload: { [key:string]: any }, signingKey: string, secDuration: number): string
+  function createJWT(payload: { [key:string]: any }, signingKey: string, secDuration: number): string
 
   /**
    * {@inheritDoc security.parseUnverifiedJWT}
    */
-  export function parseUnverifiedJWT(token: string): _TygojaDict
+  function parseUnverifiedJWT(token: string): _TygojaDict
 
   /**
    * {@inheritDoc security.parseJWT}
    */
-  export function parseJWT(token: string, verificationKey: string): _TygojaDict
+  function parseJWT(token: string, verificationKey: string): _TygojaDict
 }
 
 // -------------------------------------------------------------------
@@ -797,6 +899,24 @@ declare namespace $filesystem {
   let fileFromMultipart: filesystem.newFileFromMultipart
 
   /**
+   * Initializes a new S3-only filesystem instance
+   * (make sure to call ` + "`" + `close()` + "`" + ` after you are done working with it).
+   *
+   * Most users should prefer ` + "`" + `$app.newFilesystem()` + "`" + ` which will
+   * construct a local or S3 filesystem based on the configured application settings.
+   */
+  let s3: filesystem.newS3
+
+  /**
+   * Initializes a new local-only filesystem instance
+   * (make sure to call ` + "`" + `close()` + "`" + ` after you are done working with it).
+   *
+   * Most users should prefer ` + "`" + `$app.newFilesystem()` + "`" + ` which will
+   * construct a local or S3 filesystem based on the configured application settings.
+   */
+  let local: filesystem.newLocal
+
+  /**
    * fileFromURL creates a new File from the provided url by
    * downloading the resource and creating a BytesReader.
    *
@@ -810,7 +930,7 @@ declare namespace $filesystem {
    * const file2 = $filesystem.fileFromURL("https://...", 15)
    * ` + "```" + `
    */
-  export function fileFromURL(url: string, secTimeout?: number): filesystem.File
+  function fileFromURL(url: string, secTimeout?: number): filesystem.File
 }
 
 // -------------------------------------------------------------------
@@ -824,21 +944,21 @@ declare namespace $filesystem {
  * @group Base
  */
 declare namespace $filepath {
-  export let base:      filepath.base
-  export let clean:     filepath.clean
-  export let dir:       filepath.dir
-  export let ext:       filepath.ext
-  export let fromSlash: filepath.fromSlash
-  export let glob:      filepath.glob
-  export let isAbs:     filepath.isAbs
-  export let join:      filepath.join
-  export let match:     filepath.match
-  export let rel:       filepath.rel
-  export let split:     filepath.split
-  export let splitList: filepath.splitList
-  export let toSlash:   filepath.toSlash
-  export let walk:      filepath.walk
-  export let walkDir:   filepath.walkDir
+  let base:      filepath.base
+  let clean:     filepath.clean
+  let dir:       filepath.dir
+  let ext:       filepath.ext
+  let fromSlash: filepath.fromSlash
+  let glob:      filepath.glob
+  let isAbs:     filepath.isAbs
+  let join:      filepath.join
+  let match:     filepath.match
+  let rel:       filepath.rel
+  let split:     filepath.split
+  let splitList: filepath.splitList
+  let toSlash:   filepath.toSlash
+  let walk:      filepath.walk
+  let walkDir:   filepath.walkDir
 }
 
 // -------------------------------------------------------------------
@@ -855,7 +975,7 @@ declare namespace $os {
   /**
    * Legacy alias for $os.cmd().
    */
-  export let exec: exec.command
+  let exec: exec.command
 
   /**
    * Prepares an external OS command.
@@ -870,27 +990,30 @@ declare namespace $os {
    * const output = toString(cmd.output());
    * ` + "```" + `
    */
-  export let cmd: exec.command
+  let cmd: exec.command
 
   /**
    * Args hold the command-line arguments, starting with the program name.
    */
-  export let args: Array<string>
+  let args: Array<string>
 
-  export let exit:      os.exit
-  export let getenv:    os.getenv
-  export let dirFS:     os.dirFS
-  export let readFile:  os.readFile
-  export let writeFile: os.writeFile
-  export let readDir:   os.readDir
-  export let tempDir:   os.tempDir
-  export let truncate:  os.truncate
-  export let getwd:     os.getwd
-  export let mkdir:     os.mkdir
-  export let mkdirAll:  os.mkdirAll
-  export let rename:    os.rename
-  export let remove:    os.remove
-  export let removeAll: os.removeAll
+  let exit:       os.exit
+  let getenv:     os.getenv
+  let dirFS:      os.dirFS
+  let readFile:   os.readFile
+  let writeFile:  os.writeFile
+  let stat:       os.stat
+  let readDir:    os.readDir
+  let tempDir:    os.tempDir
+  let truncate:   os.truncate
+  let getwd:      os.getwd
+  let mkdir:      os.mkdir
+  let mkdirAll:   os.mkdirAll
+  let rename:     os.rename
+  let remove:     os.remove
+  let removeAll:  os.removeAll
+  let openRoot:   os.openRoot
+  let openInRoot: os.openInRoot
 }
 
 // -------------------------------------------------------------------
@@ -1019,7 +1142,7 @@ declare namespace $apis {
    * If a file resource is missing and indexFallback is set, the request
    * will be forwarded to the base index.html (useful for SPA).
    */
-  export function static(dir: string, indexFallback: boolean): (e: core.RequestEvent) => void
+  function static(dir: string, indexFallback: boolean): (e: core.RequestEvent) => void
 
   let requireGuestOnly:              apis.requireGuestOnly
   let requireAuth:                   apis.requireAuth
@@ -1041,7 +1164,7 @@ declare namespace $apis {
    * Set authMethod to empty string if you want to ignore the MFA checks and the login alerts
    * (can be also adjusted additionally via the onRecordAuthRequest hook).
    */
-  export function recordAuthResponse(e: core.RequestEvent, authRecord: core.Record, authMethod: string, meta?: any): void
+  function recordAuthResponse(e: core.RequestEvent, authRecord: core.Record, authMethod: string, meta?: any): void
 }
 
 // -------------------------------------------------------------------
@@ -1076,7 +1199,7 @@ declare namespace $http {
    * console.log(res.statusCode) // the response HTTP status code
    * console.log(res.headers)    // the response headers (eg. res.headers['X-Custom'][0])
    * console.log(res.cookies)    // the response cookies (eg. res.cookies.sessionId.value)
-   * console.log(res.raw)        // the response body as plain text
+   * console.log(res.body)       // the response body as raw bytes slice
    * console.log(res.json)       // the response body as parsed json array or map
    * ` + "```" + `
    */
@@ -1093,8 +1216,11 @@ declare namespace $http {
     statusCode: number,
     headers:    { [key:string]: Array<string> },
     cookies:    { [key:string]: http.Cookie },
-    raw:        string,
     json:       any,
+    body:       Array<number>,
+
+    // @deprecated please use toString(result.body) instead
+    raw: string,
   };
 }
 
@@ -1157,7 +1283,6 @@ func main() {
 			"pflag.*":      "any",
 			"flag.*":       "any",
 			"log.*":        "any",
-			"aws.*":        "any",
 			"http.Client":  "any",
 			"mail.Address": "{ address: string; name?: string; }", // prevents the LSP to complain in case no name is provided
 		},

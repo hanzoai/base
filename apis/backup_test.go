@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/base/apis"
-	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/tests"
-	"gocloud.dev/blob"
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tests"
+	"github.com/pocketbase/pocketbase/tools/filesystem/blob"
 )
 
 func TestBackupsList(t *testing.T) {
@@ -490,7 +490,7 @@ func TestBackupsDownload(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			ExpectedStatus:  400,
+			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
