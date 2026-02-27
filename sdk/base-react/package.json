@@ -1,0 +1,51 @@
+{
+  "name": "@hanzoai/base-react",
+  "version": "0.1.0",
+  "description": "React hooks for @hanzoai/base -- reactive queries, optimistic mutations, realtime, and CRDT collaboration",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "@hanzoai/base": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0",
+    "@hanzoai/base": "file:../base-js"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/base.git",
+    "directory": "sdk/base-react"
+  },
+  "keywords": [
+    "hanzo",
+    "base",
+    "react",
+    "hooks",
+    "realtime",
+    "crdt",
+    "optimistic-updates"
+  ]
+}
