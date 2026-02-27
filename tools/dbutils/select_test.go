@@ -3,7 +3,7 @@ package dbutils_test
 import (
 	"testing"
 
-	"github.com/pocketbase/pocketbase/tools/dbutils"
+	"github.com/hanzoai/base/tools/dbutils"
 )
 
 func TestAliasOrIdentifier(t *testing.T) {

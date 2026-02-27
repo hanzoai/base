@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/logger"
 )

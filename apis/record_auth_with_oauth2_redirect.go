@@ -60,7 +60,7 @@ func oauth2SubscriptionRedirect(e *core.RequestEvent) error {
 	defer client.Unsubscribe(oauth2SubscriptionTopic)
 
 	// temporary store the Apple user's name so that it can be later retrieved with the authWithOAuth2 call
-	// (see https://github.com/pocketbase/pocketbase/issues/7090)
+	// (see https://github.com/hanzoai/base/issues/7090)
 	if data.AppleUser != "" && data.Error == "" && data.Code != "" {
 		nameErr := parseAndStoreAppleRedirectName(
 			e.App,

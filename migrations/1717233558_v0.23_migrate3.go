@@ -4,7 +4,7 @@ import (
 	"hash/crc32"
 	"strconv"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/core"
 )
 

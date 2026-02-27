@@ -3,7 +3,7 @@ package apis
 import (
 	"net/http"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"

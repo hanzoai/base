@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pocketbase/pocketbase/tools/auth/internal/jwk"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/tools/auth/internal/jwk"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 	"golang.org/x/oauth2"
 )
