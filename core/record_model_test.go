@@ -15,11 +15,11 @@ import (
 	"time"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
 )
 

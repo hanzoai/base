@@ -50,7 +50,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pocketbase/pocketbase/tools/filesystem/blob"
+	"github.com/hanzoai/base/tools/filesystem/blob"
 )
 
 const defaultPageSize = 1000

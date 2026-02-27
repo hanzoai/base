@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/types"
 )
 
 func TestRecordFieldResolverAllowedFields(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/search"
 )
 

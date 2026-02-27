@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 )
 
 // TableColumns returns all column names of a single table by its name.
