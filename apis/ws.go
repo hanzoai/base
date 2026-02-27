@@ -35,14 +35,7 @@ const (
 
 // WebSocket close codes.
 const (
-	wsCloseNormal       = 1000
-	wsCloseGoingAway    = 1001
-	wsCloseProtocolErr  = 1002
-	wsCloseUnsupported  = 1003
-	wsCloseAbnormal     = 1006
-	wsCloseInvalidData  = 1007
-	wsClosePolicyViolation = 1008
-	wsCloseTooLarge     = 1009
+	wsCloseGoingAway = 1001
 )
 
 // wsGUID is the magic GUID from RFC 6455 section 4.2.2.

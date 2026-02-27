@@ -272,9 +272,10 @@ export class CollectionService {
   }
 
   /** Unsubscribe from a specific topic or all topics for this collection. */
-  unsubscribe(_topic?: string): void {
-    // The primary unsubscribe mechanism is the function returned by subscribe().
-    // This method exists for API compat; callers should prefer the returned fn.
+  unsubscribe(topic?: string): void {
+    this._realtime.unsubscribe(
+      topic ? `${this.collectionIdOrName}/${topic}` : this.collectionIdOrName,
+    )
   }
 
   // ---- Auth methods (for auth collections) --------------------------------

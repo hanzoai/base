@@ -38,7 +38,8 @@ type PresenceCallback func(change PresenceChange)
 type presenceChannel struct {
 	mu        sync.RWMutex
 	entries   map[string]*PresenceEntry // clientId -> entry
-	callbacks []PresenceCallback
+	callbacks map[uint64]PresenceCallback
+	nextID    uint64
 }
 
 // PresenceManager tracks online presence across channels.
@@ -71,7 +72,8 @@ func (pm *PresenceManager) getOrCreateChannel(channel string) *presenceChannel {
 		return ch
 	}
 	ch = &presenceChannel{
-		entries: make(map[string]*PresenceEntry),
+		entries:   make(map[string]*PresenceEntry),
+		callbacks: make(map[uint64]PresenceCallback),
 	}
 	pm.channels[channel] = ch
 	return ch
@@ -89,8 +91,10 @@ func (pm *PresenceManager) Join(channel, clientID string, state map[string]any) 
 		JoinedAt:  now,
 		UpdatedAt: now,
 	}
-	callbacks := make([]PresenceCallback, len(ch.callbacks))
-	copy(callbacks, ch.callbacks)
+	callbacks := make([]PresenceCallback, 0, len(ch.callbacks))
+	for _, cb := range ch.callbacks {
+		callbacks = append(callbacks, cb)
+	}
 	ch.mu.Unlock()
 
 	change := PresenceChange{
@@ -116,8 +120,10 @@ func (pm *PresenceManager) Leave(channel, clientID string) {
 	ch.mu.Lock()
 	_, existed := ch.entries[clientID]
 	delete(ch.entries, clientID)
-	callbacks := make([]PresenceCallback, len(ch.callbacks))
-	copy(callbacks, ch.callbacks)
+	callbacks := make([]PresenceCallback, 0, len(ch.callbacks))
+	for _, cb := range ch.callbacks {
+		callbacks = append(callbacks, cb)
+	}
 	ch.mu.Unlock()
 
 	if !existed {
@@ -163,8 +169,10 @@ func (pm *PresenceManager) Update(channel, clientID string, state map[string]any
 		entry.State = state
 		entry.UpdatedAt = time.Now()
 	}
-	callbacks := make([]PresenceCallback, len(ch.callbacks))
-	copy(callbacks, ch.callbacks)
+	callbacks := make([]PresenceCallback, 0, len(ch.callbacks))
+	for _, cb := range ch.callbacks {
+		callbacks = append(callbacks, cb)
+	}
 	ch.mu.Unlock()
 
 	if !exists {
@@ -207,16 +215,15 @@ func (pm *PresenceManager) OnChange(channel string, callback PresenceCallback) f
 	ch := pm.getOrCreateChannel(channel)
 
 	ch.mu.Lock()
-	idx := len(ch.callbacks)
-	ch.callbacks = append(ch.callbacks, callback)
+	id := ch.nextID
+	ch.nextID++
+	ch.callbacks[id] = callback
 	ch.mu.Unlock()
 
 	return func() {
 		ch.mu.Lock()
 		defer ch.mu.Unlock()
-		if idx < len(ch.callbacks) {
-			ch.callbacks = append(ch.callbacks[:idx], ch.callbacks[idx+1:]...)
-		}
+		delete(ch.callbacks, id)
 	}
 }
 
