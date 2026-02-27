@@ -11,7 +11,6 @@ export type { AuthStore, AuthChangeCallback, ClientConfig, ListOptions, ListResu
 // Collection
 export { CollectionService, ClientResponseError } from './collection.js'
 export type {
-  ListResult as CollectionListResult,
   RecordQueryOptions,
   RecordFullListOptions,
   FileOptions,
