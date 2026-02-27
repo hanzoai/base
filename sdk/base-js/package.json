@@ -1,0 +1,61 @@
+{
+  "name": "@hanzoai/base",
+  "version": "0.1.0",
+  "description": "Hanzo Base SDK - Reactive queries, query deduplication, and optimistic updates",
+  "type": "module",
+  "main": "./dist/core/index.js",
+  "module": "./dist/core/index.js",
+  "types": "./dist/core/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/core/index.js",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    },
+    "./crdt": {
+      "import": "./dist/crdt/index.js",
+      "types": "./dist/crdt/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "react": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hanzoai/base.git",
+    "directory": "sdk/base-js"
+  },
+  "keywords": [
+    "hanzo",
+    "base",
+    "sdk",
+    "realtime",
+    "reactive",
+    "optimistic-updates"
+  ]
+}

@@ -21,3 +21,10 @@ CHANGELOG.html
 CHANGELOG_16_22.html
 CHANGELOG_8_15.html
 LICENSE.html
+
+# SDK build artifacts
+node_modules/
+dist/
+
+# typegen binary
+/typegen
