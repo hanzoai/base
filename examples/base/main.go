@@ -6,14 +6,14 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/plugins/ghupdate"
-	"github.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pocketbase/pocketbase/plugins/migratecmd"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/hanzoai/base"
+	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/ghupdate"
+	"github.com/hanzoai/base/plugins/jsvm"
+	"github.com/hanzoai/base/plugins/migratecmd"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/osutils"
 )
 
 func main() {

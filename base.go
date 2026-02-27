@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/pocketbase/cmd"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/list"
-	"github.com/pocketbase/pocketbase/tools/osutils"
-	"github.com/pocketbase/pocketbase/tools/routine"
+	"github.com/hanzoai/base/cmd"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/base/tools/osutils"
+	"github.com/hanzoai/base/tools/routine"
 	"github.com/spf13/cobra"
 
 	_ "github.com/hanzoai/base/migrations"

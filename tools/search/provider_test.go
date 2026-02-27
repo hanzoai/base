@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/list"
 	_ "modernc.org/sqlite"
 )
