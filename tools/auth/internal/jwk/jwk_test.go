@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pocketbase/pocketbase/tools/auth/internal/jwk"
+	"github.com/hanzoai/base/tools/auth/internal/jwk"
 )
 
 type publicKey interface {

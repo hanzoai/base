@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/list"
 )
 

@@ -18,11 +18,11 @@ import (
 	"github.com/disintegration/imaging"
 	"github.com/fatih/color"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/pocketbase/pocketbase/tools/filesystem/blob"
-	"github.com/pocketbase/pocketbase/tools/filesystem/internal/fileblob"
-	"github.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob"
-	"github.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob/s3"
-	"github.com/pocketbase/pocketbase/tools/list"
+	"github.com/hanzoai/base/tools/filesystem/blob"
+	"github.com/hanzoai/base/tools/filesystem/internal/fileblob"
+	"github.com/hanzoai/base/tools/filesystem/internal/s3blob"
+	"github.com/hanzoai/base/tools/filesystem/internal/s3blob/s3"
+	"github.com/hanzoai/base/tools/list"
 
 	// explicit webp decoder because disintegration/imaging does not support webp
 	_ "golang.org/x/image/webp"
@@ -413,7 +413,7 @@ var inlineServeContentTypes = []string{
 var manualExtensionContentTypes = map[string]string{
 	".svg": "image/svg+xml",   // (see https://github.com/whatwg/mimesniff/issues/7)
 	".css": "text/css",        // (see https://github.com/gabriel-vasile/mimetype/pull/113)
-	".js":  "text/javascript", // (see https://github.com/pocketbase/pocketbase/issues/6597)
+	".js":  "text/javascript", // (see https://github.com/hanzoai/base/issues/6597)
 	".mjs": "text/javascript",
 }
 

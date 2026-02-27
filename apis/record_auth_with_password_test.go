@@ -213,7 +213,7 @@ func TestRecordAuthWithPassword(t *testing.T) {
 			},
 		},
 		{
-			// https://github.com/pocketbase/pocketbase/issues/7256
+			// https://github.com/hanzoai/base/issues/7256
 			Name:   "valid non-email identity field with a value that is a properly formatted email",
 			Method: http.MethodPost,
 			URL:    "/api/collections/clients/auth-with-password",

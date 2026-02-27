@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 )
 
 // UniqueId checks whether a field string id already exists in the specified table.

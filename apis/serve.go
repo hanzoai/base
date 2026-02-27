@@ -202,7 +202,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 	serveEvent := new(core.ServeEvent)
 	serveEvent.App = app
-	serveEvent.Router = pbRouter
+	serveEvent.Router = baseRouter
 	serveEvent.Server = server
 	serveEvent.CertManager = certManager
 	serveEvent.InstallerFunc = DefaultInstallerFunc

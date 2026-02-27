@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/mails"
-	"github.com/pocketbase/pocketbase/tools/router"
-	"github.com/pocketbase/pocketbase/tools/routine"
-	"github.com/pocketbase/pocketbase/tools/search"
-	"github.com/pocketbase/pocketbase/tools/security"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/mails"
+	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/types"
 )
 
 const (
