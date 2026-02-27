@@ -110,8 +110,23 @@ func CreateTenantProject(tenantSlug string, config PlatformConfig) (string, erro
 	return result.Environment.ID, nil
 }
 
+// kmsTokenCache caches the KMS access token to avoid re-authenticating on every call.
+var (
+	kmsTokenMu      sync.Mutex
+	kmsTokenValue   string
+	kmsTokenExpires time.Time
+)
+
 // authenticateKMS obtains a short-lived access token via Universal Auth.
+// Caches the token and reuses it until 1 minute before expiry.
 func authenticateKMS(config PlatformConfig) (string, error) {
+	kmsTokenMu.Lock()
+	defer kmsTokenMu.Unlock()
+
+	if kmsTokenValue != "" && time.Now().Before(kmsTokenExpires) {
+		return kmsTokenValue, nil
+	}
+
 	endpoint := config.KMSEndpoint
 	if endpoint == "" {
 		return "", fmt.Errorf("kms: endpoint not configured")
@@ -143,12 +158,21 @@ func authenticateKMS(config PlatformConfig) (string, error) {
 
 	var result struct {
 		AccessToken string `json:"accessToken"`
+		ExpiresIn   int    `json:"expiresIn"` // seconds
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("kms: decode auth response: %w", err)
 	}
 
-	return result.AccessToken, nil
+	kmsTokenValue = result.AccessToken
+	// Cache until 1 minute before expiry, default to 4 minutes if not provided.
+	ttl := time.Duration(result.ExpiresIn)*time.Second - time.Minute
+	if ttl <= 0 {
+		ttl = 4 * time.Minute
+	}
+	kmsTokenExpires = time.Now().Add(ttl)
+
+	return kmsTokenValue, nil
 }
 
 // --------------------------------------------------------------------------
