@@ -16,7 +16,7 @@ import (
 	"testing"
 
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/hanzoai/base/tools/filesystem"
 )
 
 func TestFileSystemExists(t *testing.T) {

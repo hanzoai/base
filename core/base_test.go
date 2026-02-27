@@ -11,7 +11,7 @@ import (
 
 	_ "unsafe"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/logger"
@@ -563,7 +563,7 @@ func TestBaseAppTriggerOnTerminate(t *testing.T) {
 	event.App = app
 
 	// trigger OnTerminate multiple times to ensure that it doesn't deadlock
-	// https://github.com/pocketbase/pocketbase/pull/7305
+	// https://github.com/hanzoai/base/pull/7305
 	app.OnTerminate().Trigger(event)
 	app.OnTerminate().Trigger(event)
 	app.OnTerminate().Trigger(event)

@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/security"

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/pocketbase/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/list"
@@ -536,7 +536,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 				return nil, fmt.Errorf("failed to initialize back relation field %q", backField.GetName())
 			}
 			if backRelField.CollectionId != collection.Id {
-				// https://github.com/pocketbase/pocketbase/discussions/6590#discussioncomment-12496581
+				// https://github.com/hanzoai/base/discussions/6590#discussioncomment-12496581
 				if r.nullifyMisingField {
 					return &search.ResolverResult{Identifier: "NULL"}, nil
 				}

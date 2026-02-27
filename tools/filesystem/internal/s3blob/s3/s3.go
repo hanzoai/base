@@ -5,7 +5,7 @@
 // such as objects list, get, copy, delete and upload.
 //
 // For more details why we don't use the official aws-sdk-go-v2, you could check
-// https://github.com/pocketbase/pocketbase/discussions/6562.
+// https://github.com/hanzoai/base/discussions/6562.
 //
 // Example:
 //
@@ -66,7 +66,7 @@ type S3 struct {
 // Note that the path will be URL escaped based on the AWS [UriEncode rules]
 // for broader compatibility with some providers that expect the same
 // path format as the one in the canonical signed header
-// (see also https://github.com/pocketbase/pocketbase/issues/7153).
+// (see also https://github.com/hanzoai/base/issues/7153).
 //
 // [UriEncode rules]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html
 func (s3 *S3) URL(path string) string {
@@ -151,7 +151,7 @@ func (s3 *S3) SignAndSend(req *http.Request) (*http.Response, error) {
 // https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_sigv-create-signed-request.html#create-signed-request-steps
 func (s3 *S3) sign(req *http.Request) {
 	// explicitly set Accept-Encoding to avoid transparent decompression
-	// and Content-Length zeroing (https://github.com/pocketbase/pocketbase/issues/7523)
+	// and Content-Length zeroing (https://github.com/hanzoai/base/issues/7523)
 	if req.Header.Get("Accept-Encoding") == "" {
 		req.Header.Set("Accept-Encoding", "identity")
 	}

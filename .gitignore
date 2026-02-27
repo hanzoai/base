@@ -6,6 +6,9 @@
 # goreleaser builds folder
 /.builds/
 
+# compiled binary
+/base
+
 # tests coverage
 coverage.out
 
