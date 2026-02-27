@@ -9,7 +9,7 @@
  * SSE connection through the RealtimeService ref-counting.
  */
 
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { BaseRecord, ListOptions } from '@hanzoai/base'
 import { useBaseClient } from './provider.js'
 
@@ -43,6 +43,13 @@ export function useQuery<T extends BaseRecord = BaseRecord>(
   const filter = options?.filter ?? ''
   const enabled = options?.enabled !== false
   const realtimeEnabled = options?.realtime !== false
+
+  // Stable serialization of options for dependency tracking.
+  const optionsKey = useMemo(() => {
+    if (!options) return ''
+    const { enabled: _e, realtime: _r, ...rest } = options
+    return JSON.stringify(rest)
+  }, [options])
 
   // Stable reference for the current snapshot from the store.
   const snapshotRef = useRef<T[]>(
@@ -104,13 +111,13 @@ export function useQuery<T extends BaseRecord = BaseRecord>(
       errorRef.current = err instanceof Error ? err : new Error(String(err))
       loadingRef.current = false
     }
-  }, [client, collection, options])
+  }, [client, collection, optionsKey])
 
-  // Initial fetch on mount.
+  // Initial fetch on mount and when options change.
   useEffect(() => {
     if (!enabled) return
     refetch()
-  }, [enabled, collection, filter]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [enabled, collection, optionsKey, refetch])
 
   // Realtime subscription (ref-counted via subscribeAndSync).
   useEffect(() => {

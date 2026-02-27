@@ -68,17 +68,17 @@ func MustRegister(app core.App, config PlatformConfig) {
 
 // Register registers the platform plugin to the provided app instance.
 func Register(app core.App, config PlatformConfig) error {
+	if config.IAMEndpoint == "" {
+		config.IAMEndpoint = "https://hanzo.id"
+	}
+	if config.KMSEndpoint == "" {
+		config.KMSEndpoint = "https://kms.hanzo.ai"
+	}
+
 	p := &plugin{
 		app:    app,
 		config: config,
 		iam:    NewIAMClient(config.IAMEndpoint),
-	}
-
-	if p.config.IAMEndpoint == "" {
-		p.config.IAMEndpoint = "https://hanzo.id"
-	}
-	if p.config.KMSEndpoint == "" {
-		p.config.KMSEndpoint = "https://kms.hanzo.ai"
 	}
 
 	// Bootstrap: ensure system collections exist.
@@ -484,7 +484,7 @@ func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 	}
 	token := strings.TrimPrefix(authHeader, "Bearer ")
 
-	user, err := ValidateIAMToken(token, p.config)
+	user, err := p.iam.ValidateToken(token)
 	if err != nil {
 		return nil, e.UnauthorizedError("invalid or expired token", err)
 	}
