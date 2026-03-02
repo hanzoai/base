@@ -930,8 +930,8 @@ func (c *Collection) initIdField() {
 			PrimaryKey:          true,
 			Required:            true,
 			Min:                 15,
-			Max:                 15,
-			Pattern:             defaultLowercaseRecordIdPattern,
+			Max:                 36,
+			Pattern:             `^[a-z0-9\-]+$`,
 			AutogeneratePattern: `[a-z0-9]{15}`,
 		}
 
