@@ -49,7 +49,7 @@
     }
 
     async function devAutoLogin() {
-        const email = 'admin@hanzo.ai';
+        const email = 'admin@example.com';
         const pass = 'admin1234567890';
         identity = '';
         password = '';
