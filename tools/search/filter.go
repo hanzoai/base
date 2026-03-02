@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/store"
 	"github.com/spf13/cast"

@@ -5,7 +5,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 var _ dbx.Builder = (*dualDBBuilder)(nil)

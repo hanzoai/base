@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // RunInTransaction wraps fn into a transaction for the regular app database.

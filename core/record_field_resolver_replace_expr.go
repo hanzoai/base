@@ -3,7 +3,7 @@ package core
 import (
 	"strings"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 var _ dbx.Expression = (*replaceWithExpression)(nil)
