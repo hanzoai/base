@@ -1,9 +1,8 @@
 // Package s3blob provides a blob.Bucket S3 driver implementation.
 //
-// NB! To minimize breaking changes with older PocketBase releases,
-// the driver is based of the previously used gocloud.dev/blob/s3blob,
+// NB! The driver is based on gocloud.dev/blob/s3blob,
 // hence many of the below doc comments, struct options and interface
-// implementations are the same.
+// implementations follow the same conventions.
 //
 // The blob abstraction supports all UTF-8 strings; to make this work with services lacking
 // full UTF-8 support, strings must be escaped (during writes) and unescaped

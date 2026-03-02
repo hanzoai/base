@@ -19,8 +19,8 @@ import (
 
 // idTokenLeeway is the optional leeway for the id_token timestamp fields validation.
 //
-// It can be changed externally using the PB_ID_TOKEN_LEEWAY env variable
-// (the value must be in seconds, e.g. "PB_ID_TOKEN_LEEWAY=60" for 1 minute).
+// It can be changed externally using the HZ_ID_TOKEN_LEEWAY env variable
+// (the value must be in seconds, e.g. "HZ_ID_TOKEN_LEEWAY=60" for 1 minute).
 var idTokenLeeway time.Duration = 5 * time.Minute
 
 func init() {
@@ -28,7 +28,7 @@ func init() {
 	Providers[NameOIDC+"2"] = wrapFactory(NewOIDCProvider)
 	Providers[NameOIDC+"3"] = wrapFactory(NewOIDCProvider)
 
-	if leewayStr := os.Getenv("PB_ID_TOKEN_LEEWAY"); leewayStr != "" {
+	if leewayStr := os.Getenv("HZ_ID_TOKEN_LEEWAY"); leewayStr != "" {
 		leeway, err := strconv.Atoi(leewayStr)
 		if err == nil {
 			idTokenLeeway = time.Duration(leeway) * time.Second
