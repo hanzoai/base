@@ -17,9 +17,10 @@ import (
 	"github.com/hanzoai/base/tools/security"
 )
 
-// OldToNewCollectionID maps old PocketBase IDs to new Hanzo Base IDs
+// OldToNewCollectionID maps old collection IDs to current IDs
 var OldToNewCollectionID = map[string]string{
-	"_pb_users_auth_": "_hz_users_auth_",
+	"_pb_users_auth_": "_users_auth_",
+	"_hz_users_auth_": "_users_auth_",
 	"pbc_3142635823":  "hbc_3142635823",
 }
 
@@ -322,9 +323,10 @@ func regenerateToken(oldToken string, secretMapping map[string]map[string]string
 	expTime := time.Unix(payload.Exp, 0)
 	duration := time.Until(expTime)
 	if duration < 0 {
-		// Token already expired, use a long duration for testing
-		duration = 86400 * 365 * 100 * time.Second // 100 years
-		claims["exp"] = time.Now().Add(duration).Unix()
+		// Token is expired. Keep the original expiry so test semantics are preserved.
+		// The exp claim set here overrides the one NewJWT would generate.
+		claims["exp"] = payload.Exp
+		duration = 1 * time.Hour // positive for signing (exp claim overrides)
 	}
 
 	// Generate new token

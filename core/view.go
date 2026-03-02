@@ -476,8 +476,8 @@ type identifiersParser struct {
 func (p *identifiersParser) parse(selectQuery string) error {
 	str := strings.Trim(strings.TrimSpace(selectQuery), ";")
 	str = commentsReplaceRegex.ReplaceAllString(str, " ")
-	str = joinReplaceRegex.ReplaceAllString(str, " __hz_join__ ")
-	str = discardReplaceRegex.ReplaceAllString(str, " __hz_discard__ ")
+	str = joinReplaceRegex.ReplaceAllString(str, " __join__ ")
+	str = discardReplaceRegex.ReplaceAllString(str, " __discard__ ")
 
 	tk := tokenizer.NewFromString(str)
 	tk.Separators(',', ' ', '\n', '\t')
@@ -512,7 +512,7 @@ func (p *identifiersParser) parse(selectQuery string) error {
 			skip = false
 			partType = "from"
 			activeBuilder = &fromParts
-		case "__hz_join__":
+		case "__join__":
 			skip = false
 
 			// the previous part was also a join
@@ -522,7 +522,7 @@ func (p *identifiersParser) parse(selectQuery string) error {
 
 			partType = "join"
 			activeBuilder = &joinParts
-		case "__hz_discard__":
+		case "__discard__":
 			// skip following tokens
 			skip = true
 		default:
