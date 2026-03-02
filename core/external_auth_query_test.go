@@ -150,8 +150,8 @@ func TestFindFirstExternalAuthByExpr(t *testing.T) {
 		expectedId string
 	}{
 		{dbx.HashExp{"collectionRef": "invalid"}, ""},
-		{dbx.HashExp{"collectionRef": "_hz_users_auth_"}, "5eto7nmys833164"},
-		{dbx.HashExp{"collectionRef": "_hz_users_auth_", "provider": "gitlab"}, "dlmflokuq1xl342"},
+		{dbx.HashExp{"collectionRef": "_users_auth_"}, "5eto7nmys833164"},
+		{dbx.HashExp{"collectionRef": "_users_auth_", "provider": "gitlab"}, "dlmflokuq1xl342"},
 	}
 
 	for i, s := range scenarios {
