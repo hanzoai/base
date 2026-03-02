@@ -242,7 +242,7 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 			return fmt.Errorf("data.db file is missing or invalid: %w", err)
 		}
 
-		oldTempDataDir := filepath.Join(localTempDir, "old_pb_data_"+security.PseudorandomString(8))
+		oldTempDataDir := filepath.Join(localTempDir, "old_hz_data_"+security.PseudorandomString(8))
 
 		replaceErr := e.App.RunInTransaction(func(txApp App) error {
 			return txApp.AuxRunInTransaction(func(txApp App) error {
