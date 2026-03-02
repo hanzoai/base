@@ -22,7 +22,7 @@
             </a>
             <span class="delimiter">|</span>
             <a href={import.meta.env.HZ_RELEASES} target="_blank" rel="noopener noreferrer" title="Releases">
-                <span class="txt">Hanzo Base {import.meta.env.HZ_VERSION}</span>
+                <span class="txt">Base {import.meta.env.HZ_VERSION}</span>
             </a>
         {/if}
     </footer>
