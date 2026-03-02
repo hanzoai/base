@@ -11,7 +11,7 @@ const LogsTableName = "_logs"
 type Log struct {
 	BaseModel
 
-	Created types.DateTime     `db:"created" json:"created"`
+	Created types.DateTime     `db:"created" json:"createdAt"`
 	Data    types.JSONMap[any] `db:"data" json:"data"`
 	Message string             `db:"message" json:"message"`
 	Level   int                `db:"level" json:"level"`

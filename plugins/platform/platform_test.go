@@ -63,11 +63,11 @@ func TestRoleHasPermission(t *testing.T) {
 	}
 }
 
-func TestTenantPrefix(t *testing.T) {
-	got := TenantPrefix("acme")
+func TestOrgPrefix(t *testing.T) {
+	got := OrgPrefix("acme")
 	want := "t_acme_"
 	if got != want {
-		t.Errorf("TenantPrefix(\"acme\") = %q, want %q", got, want)
+		t.Errorf("OrgPrefix(\"acme\") = %q, want %q", got, want)
 	}
 }
 
@@ -194,12 +194,12 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 	client := NewKMSClient(server.URL, "test-kms-token")
 
 	// Set.
-	if err := client.SetSecret("tenant1", "db-password", "s3cret"); err != nil {
+	if err := client.SetSecret("org1", "db-password", "s3cret"); err != nil {
 		t.Fatalf("SetSecret: %v", err)
 	}
 
 	// Get.
-	val, err := client.GetSecret("tenant1", "db-password")
+	val, err := client.GetSecret("org1", "db-password")
 	if err != nil {
 		t.Fatalf("GetSecret: %v", err)
 	}
@@ -208,7 +208,7 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 	}
 
 	// Cached get.
-	val2, err := client.GetSecret("tenant1", "db-password")
+	val2, err := client.GetSecret("org1", "db-password")
 	if err != nil {
 		t.Fatalf("cached GetSecret: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 	}
 
 	// Delete.
-	if err := client.DeleteSecret("tenant1", "db-password"); err != nil {
+	if err := client.DeleteSecret("org1", "db-password"); err != nil {
 		t.Fatalf("DeleteSecret: %v", err)
 	}
 }

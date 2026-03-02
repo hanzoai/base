@@ -13,7 +13,7 @@ import (
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/auth"
 	"github.com/hanzoai/base/tools/dbutils"
@@ -366,7 +366,7 @@ func oauth2Submit(e *core.RecordAuthWithOAuth2RequestEvent, optExternalAuth *cor
 func sendOAuth2RecordCreateRequest(txApp core.App, e *core.RecordAuthWithOAuth2RequestEvent, payload map[string]any) (*core.Record, error) {
 	ir := &core.InternalRequest{
 		Method: http.MethodPost,
-		URL:    "/api/collections/" + e.Collection.Name + "/records",
+		URL:    "/v1/base/collections/" + e.Collection.Name + "/records",
 		Body:   payload,
 	}
 

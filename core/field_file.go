@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 
@@ -47,7 +46,7 @@ var (
 // FileField defines "file" type field for managing record file(s).
 //
 // Only the file name is stored as part of the record value.
-// New files (aka. files to upload) are expected to be of *filesytem.File.
+// New files (aka. files to upload) are expected to be of *filesystem.File.
 //
 // If MaxSelect is not set or <= 1, then the field value is expected to be a single record id.
 //
@@ -641,8 +640,7 @@ func (f *FileField) FindGetter(key string) GetterFunc {
 			return f.extractUploadableFiles(f.toSliceValue(record.GetRaw(f.Name)))
 		}
 	case f.Name + ":uploaded":
-		// deprecated
-		log.Println("[file field getter] please replace :uploaded with :unsaved")
+		// Deprecated: use :unsaved instead.
 		return func(record *Record) any {
 			return f.extractUploadableFiles(f.toSliceValue(record.GetRaw(f.Name)))
 		}

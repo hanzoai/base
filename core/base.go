@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -15,7 +16,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
@@ -73,6 +74,17 @@ type BaseAppConfig struct {
 	// AuxDSN is an optional PostgreSQL DSN for the auxiliary database.
 	// When set, overrides the file-path-based SQLite aux connection.
 	AuxDSN string
+
+	// MultiTenant enables per-org database isolation.
+	// When true, OrgDB(orgID) returns a separate database per org.
+	// Also enabled automatically when MasterKey is set.
+	MultiTenant bool
+
+	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
+	// When set, multi-tenancy is automatically enabled and per-org databases
+	// are encrypted with HKDF-derived keys.
+	// Can be set via MASTER_KEY environment variable (hex-encoded).
+	MasterKey []byte
 }
 
 // ensures that the BaseApp implements the App interface.
@@ -91,6 +103,7 @@ type BaseApp struct {
 	nonconcurrentDB     dbx.Builder
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
+	tenants             *TenantRegistry
 
 	// app event hooks
 	onBootstrap     *hook.Hook[*BootstrapEvent]
@@ -234,6 +247,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 
 	app.initHooks()
 	app.registerBaseHooks()
+	registerNATSHooks(app)
 
 	return app
 }
@@ -418,6 +432,8 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
+		app.initTenants()
+
 		if err := app.initLogger(); err != nil {
 			return err
 		}
@@ -477,6 +493,14 @@ func (app *BaseApp) ResetBootstrapState() error {
 			}
 		}
 		*db = nil
+	}
+
+	// Close tenant databases
+	if app.tenants != nil {
+		if err := app.tenants.Close(); err != nil {
+			errs = append(errs, err)
+		}
+		app.tenants = nil
 	}
 
 	if len(errs) > 0 {
@@ -582,6 +606,29 @@ func (app *BaseApp) AuxConcurrentDB() dbx.Builder {
 // In a transaction the AuxConcurrentDB() and AuxNonconcurrentDB() refer to the same *dbx.TX instance.
 func (app *BaseApp) AuxNonconcurrentDB() dbx.Builder {
 	return app.auxNonconcurrentDB
+}
+
+// OrgDB returns the data.db builder for a specific org.
+// Returns nil, nil if multi-tenancy is not enabled.
+func (app *BaseApp) OrgDB(orgID string) (dbx.Builder, error) {
+	if app.tenants == nil {
+		return nil, nil
+	}
+	return app.tenants.OrgDB(orgID)
+}
+
+// OrgNonconcurrentDB returns the write-only builder for a specific org.
+// Returns nil, nil if multi-tenancy is not enabled.
+func (app *BaseApp) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
+	if app.tenants == nil {
+		return nil, nil
+	}
+	return app.tenants.OrgNonconcurrentDB(orgID)
+}
+
+// Tenants returns the TenantRegistry, or nil if multi-tenancy is not enabled.
+func (app *BaseApp) Tenants() *TenantRegistry {
+	return app.tenants
 }
 
 // DataDir returns the app data directory path.
@@ -1179,6 +1226,42 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // Helpers
 // -------------------------------------------------------------------
 
+// initTenants initializes the TenantRegistry if multi-tenancy is enabled.
+// Multi-tenancy activates when config.MultiTenant is true OR config.MasterKey is set,
+// OR the MULTI_TENANT env var is "true", OR the MASTER_KEY env var is set.
+func (app *BaseApp) initTenants() {
+	multiTenant := app.config.MultiTenant
+	masterKey := app.config.MasterKey
+
+	// Check env vars as fallback
+	if !multiTenant && os.Getenv("MULTI_TENANT") == "true" {
+		multiTenant = true
+	}
+	if len(masterKey) == 0 {
+		if envKey := os.Getenv("MASTER_KEY"); envKey != "" {
+			decoded, err := hex.DecodeString(envKey)
+			if err == nil && len(decoded) == 32 {
+				masterKey = decoded
+			}
+		}
+	}
+
+	// Master key implies multi-tenancy
+	if len(masterKey) == 32 {
+		multiTenant = true
+	}
+
+	if !multiTenant {
+		return
+	}
+
+	app.tenants = NewTenantRegistry(&TenantConfig{
+		DataDir:   app.config.DataDir,
+		MasterKey: masterKey,
+		DBConnect: app.config.DBConnect,
+	})
+}
+
 func (app *BaseApp) initDataDB() error {
 	var connectFunc func() (*dbx.DB, error)
 
@@ -1239,7 +1322,7 @@ var sqlLogReplacements = []struct {
 	{regexp.MustCompile(`<nil>`), "NULL"},
 }
 
-// normalizeSQLLog replaces common query builder charactes with their plain SQL version for easier debugging.
+// normalizeSQLLog replaces common query builder characters with their plain SQL version for easier debugging.
 // The query is still not suitable for execution and should be used only for log and debug purposes
 // (the normalization is done here to avoid breaking changes in dbx).
 func normalizeSQLLog(sql string) string {
@@ -1331,7 +1414,7 @@ func (app *BaseApp) registerBaseHooks() {
 		return nil
 	}
 
-	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("PB_FILES_DELETE_MAX_WORKERS"))
+	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("FILES_DELETE_MAX_WORKERS"))
 	if maxFilesDeleteWorkers <= 0 {
 		maxFilesDeleteWorkers = 2000 // the value is arbitrary chosen and may change in the future
 	}

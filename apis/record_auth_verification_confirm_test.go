@@ -1,6 +1,8 @@
 package apis_test
 
 import (
+	"bytes"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,6 +13,17 @@ import (
 
 func TestRecordConfirmVerification(t *testing.T) {
 	t.Parallel()
+
+	// shared buffers for scenarios that need dynamically generated tokens
+	var nonVerifTokenBody bytes.Buffer
+	var nonAuthCollBody bytes.Buffer
+	var diffAuthCollBody bytes.Buffer
+	var validTokenBody bytes.Buffer
+	var alreadyVerifiedBody bytes.Buffer
+	var noLoginBody bytes.Buffer
+	var txCheckBody bytes.Buffer
+	var rateLimit1Body bytes.Buffer
+	var rateLimit2Body bytes.Buffer
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -39,7 +52,7 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-verification",
 			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njg4MTI3MTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.BPWlwM7N_2UxQH5UFeZz8lvnuzmoXGm9y7Cgy9DV_7I"
+				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njg4MTI3MTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.qzfMNo4_lbCMIRnU433kYj97eMfUod15wzxm4uXW1cI"
 			}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -52,9 +65,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "non-verification token",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njg4MTgxMTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InBhc3N3b3JkUmVzZXQifQ.3DdKH9oVdG-lO0p6qpQSeQ1hpZuBFa_CNqz9hPYU60w"
-			}`),
+			Body:   &nonVerifTokenBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewPasswordResetToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				nonVerifTokenBody.Reset()
+				fmt.Fprintf(&nonVerifTokenBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{`,
@@ -66,9 +89,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "non auth collection",
 			Method: http.MethodPost,
 			URL:    "/api/collections/demo1/confirm-verification?expand=rel,missing",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.m1H9Wm8qqnYPmbf6KBQnvFNI2bLLV4UmI-Tvt95G-MA"
-			}`),
+			Body:   &nonAuthCollBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				nonAuthCollBody.Reset()
+				fmt.Fprintf(&nonAuthCollBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -77,9 +110,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "different auth collection",
 			Method: http.MethodPost,
 			URL:    "/api/collections/clients/confirm-verification?expand=rel,missing",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.m1H9Wm8qqnYPmbf6KBQnvFNI2bLLV4UmI-Tvt95G-MA"
-			}`),
+			Body:   &diffAuthCollBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				diffAuthCollBody.Reset()
+				fmt.Fprintf(&diffAuthCollBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{"token":{"code":"validation_token_collection_mismatch"`,
@@ -90,9 +133,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "valid token",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.m1H9Wm8qqnYPmbf6KBQnvFNI2bLLV4UmI-Tvt95G-MA"
-			}`),
+			Body:   &validTokenBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				validTokenBody.Reset()
+				fmt.Fprintf(&validTokenBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
 				"*":                                  0,
@@ -111,9 +164,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "valid token (already verified)",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3QyQGV4YW1wbGUuY29tIiwiZXhwIjoxNzY5NDIxMTE4LCJpZCI6Im9hcDY0MGNvdDR5cnUycyIsInR5cGUiOiJ2ZXJpZmljYXRpb24ifQ.8001FsRg9CVSClt4hWU1vAbi9b2wXHLaS8MDBT0-S4o"
-			}`),
+			Body:   &alreadyVerifiedBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test2@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				alreadyVerifiedBody.Reset()
+				fmt.Fprintf(&alreadyVerifiedBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
 				"*":                                  0,
@@ -124,9 +187,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "valid verification token from a collection without allowed login",
 			Method: http.MethodPost,
 			URL:    "/api/collections/nologin/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiZGM0OWs2amdlam40MGgzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.4rWr4xE3le0FrCmoEwBHngm1cD0JNUJ9iNrMHoRqNJU"
-			}`),
+			Body:   &noLoginBody,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("nologin", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				noLoginBody.Reset()
+				fmt.Fprintf(&noLoginBody, `{"token":"%s"}`, token)
+			},
 			ExpectedStatus:  204,
 			ExpectedContent: []string{},
 			ExpectedEvents: map[string]int{
@@ -146,10 +219,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "OnRecordConfirmVerificationRequest tx body write check",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfaHpfdXNlcnNfYXV0aF8iLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.m1H9Wm8qqnYPmbf6KBQnvFNI2bLLV4UmI-Tvt95G-MA"
-			}`),
+			Body:   &txCheckBody,
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("users", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				txCheckBody.Reset()
+				fmt.Fprintf(&txCheckBody, `{"token":"%s"}`, token)
+
 				app.OnRecordConfirmVerificationRequest().BindFunc(func(e *core.RecordConfirmVerificationRequestEvent) error {
 					original := e.App
 					return e.App.RunInTransaction(func(txApp core.App) error {
@@ -175,10 +257,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "RateLimit rule - nologin:confirmVerification",
 			Method: http.MethodPost,
 			URL:    "/api/collections/nologin/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiZGM0OWs2amdlam40MGgzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.4rWr4xE3le0FrCmoEwBHngm1cD0JNUJ9iNrMHoRqNJU"
-			}`),
+			Body:   &rateLimit1Body,
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("nologin", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				rateLimit1Body.Reset()
+				fmt.Fprintf(&rateLimit1Body, `{"token":"%s"}`, token)
+
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
 					{MaxRequests: 100, Label: "abc"},
@@ -194,10 +285,19 @@ func TestRecordConfirmVerification(t *testing.T) {
 			Name:   "RateLimit rule - *:confirmVerification",
 			Method: http.MethodPost,
 			URL:    "/api/collections/nologin/confirm-verification",
-			Body: strings.NewReader(`{
-				"token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiZGM0OWs2amdlam40MGgzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.4rWr4xE3le0FrCmoEwBHngm1cD0JNUJ9iNrMHoRqNJU"
-			}`),
+			Body:   &rateLimit2Body,
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindAuthRecordByEmail("nologin", "test@example.com")
+				if err != nil {
+					t.Fatal(err)
+				}
+				token, err := user.NewVerificationToken()
+				if err != nil {
+					t.Fatal(err)
+				}
+				rateLimit2Body.Reset()
+				fmt.Fprintf(&rateLimit2Body, `{"token":"%s"}`, token)
+
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
 					{MaxRequests: 100, Label: "abc"},
