@@ -361,8 +361,17 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
 	token := e.Request.Header.Get("Authorization")
 
-	// the "Bearer" prefix is not required but is supported for compatibility
-	// with the defaults of standard HTTP clients
+	// Fall back to X-Authorization (alias when Authorization is consumed by a proxy/CDN).
+	if token == "" {
+		token = e.Request.Header.Get("X-Authorization")
+	}
+
+	// Fall back to legacy X-Auth-Token header.
+	if token == "" {
+		token = e.Request.Header.Get("X-Auth-Token")
+	}
+
+	// Strip optional "Bearer " prefix for compatibility with standard HTTP clients.
 	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
 		return token[7:]
 	}
