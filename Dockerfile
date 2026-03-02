@@ -27,8 +27,8 @@ WORKDIR /app
 COPY --from=builder /build/base /app/base
 RUN mkdir -p /data /migrations /hooks /app/public && chown -R hanzo:hanzo /app /data /migrations /hooks
 USER hanzo
-EXPOSE 8080
+EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/api/health || exit 1
+    CMD curl -f http://localhost:8090/api/health || exit 1
 ENTRYPOINT ["/app/base"]
-CMD ["serve", "--http=0.0.0.0:8080", "--dir=/data", "--migrationsDir=/migrations", "--hooksDir=/hooks"]
+CMD ["serve", "--http=0.0.0.0:8090", "--dir=/data", "--migrationsDir=/migrations", "--hooksDir=/hooks"]
