@@ -270,7 +270,7 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 		if !hasSuperuserAuth && collection.CreateRule != nil {
 			dummyRecord := record.Clone()
 
-			dummyRandomPart := "__pb_create__" + security.PseudorandomString(6)
+			dummyRandomPart := "__hzf_create__" + security.PseudorandomString(6)
 
 			// set an id if it doesn't have already
 			// (the value doesn't matter; it is used only to minimize the breaking changes with earlier versions)
@@ -292,7 +292,7 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			var param string
 			for k, v := range dummyExport {
 				k = inflector.Columnify(k) // columnify is just as extra measure in case of custom fields
-				param = "__pb_create__" + k
+				param = "__hzf_create__" + k
 				dummyParams[param] = v
 				selects = append(selects, "{:"+param+"} AS [["+k+"]]")
 			}
