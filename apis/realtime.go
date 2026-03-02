@@ -76,18 +76,29 @@ func realtimeConnect(e *core.RequestEvent) error {
 		ce.App.Logger().Debug("Realtime connection established.", slog.String("clientId", ce.Client.Id()))
 
 		// signalize established connection (aka. fire "connect" message)
+		connectData := []byte(`{"clientId":"` + ce.Client.Id() + `"}`)
+
 		connectMsgEvent := new(core.RealtimeMessageEvent)
 		connectMsgEvent.RequestEvent = ce.RequestEvent
 		connectMsgEvent.Client = ce.Client
 		connectMsgEvent.Message = &subscriptions.Message{
 			Name: "CONNECT",
-			Data: []byte(`{"clientId":"` + ce.Client.Id() + `"}`),
+			Data: connectData,
 		}
 		connectMsgErr := ce.App.OnRealtimeMessageSend().Trigger(connectMsgEvent, func(me *core.RealtimeMessageEvent) error {
 			err := me.Message.WriteSSE(me.Response, me.Client.Id())
 			if err != nil {
 				return err
 			}
+
+			// Send legacy PB_CONNECT for backwards compat with old JS SDK clients.
+			// Client handles whichever event arrives first; remove after one release cycle.
+			legacyMsg := &subscriptions.Message{
+				Name: "PB_CONNECT",
+				Data: me.Message.Data,
+			}
+			_ = legacyMsg.WriteSSE(me.Response, me.Client.Id())
+
 			return me.Flush()
 		})
 		if connectMsgErr != nil {
