@@ -85,6 +85,12 @@ func Serve(app core.App, config ServeConfig) error {
 		})
 	}
 
+	// Skip admin dashboard entirely when BASE_DISABLE_ADMIN_UI is set.
+	if os.Getenv("BASE_DISABLE_ADMIN_UI") != "" {
+		baseRouter.GET("/_/{path...}", func(e *core.RequestEvent) error {
+			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
+		})
+	} else {
 	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
@@ -100,6 +106,7 @@ func Serve(app core.App, config ServeConfig) error {
 			return e.Next()
 		}).
 		Bind(Gzip())
+	}
 
 	// start http server
 	// ---
