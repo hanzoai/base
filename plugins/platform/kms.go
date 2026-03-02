@@ -57,9 +57,9 @@ func FetchSecret(path string, config PlatformConfig) (string, error) {
 	return result.Secret.SecretValue, nil
 }
 
-// CreateTenantProject creates a KMS project (workspace environment) for a
-// tenant identified by slug. Returns the project/environment ID.
-func CreateTenantProject(tenantSlug string, config PlatformConfig) (string, error) {
+// CreateOrgProject creates a KMS project (workspace environment) for an
+// org identified by slug. Returns the project/environment ID.
+func CreateOrgProject(orgSlug string, config PlatformConfig) (string, error) {
 	endpoint := config.KMSEndpoint
 	if endpoint == "" {
 		return "", fmt.Errorf("kms: endpoint not configured")
@@ -72,8 +72,8 @@ func CreateTenantProject(tenantSlug string, config PlatformConfig) (string, erro
 	}
 
 	payload, err := json.Marshal(map[string]string{
-		"name": "tenant-" + tenantSlug,
-		"slug": tenantSlug,
+		"name": "org-" + orgSlug,
+		"slug": orgSlug,
 	})
 	if err != nil {
 		return "", fmt.Errorf("kms: marshal payload: %w", err)
@@ -208,12 +208,12 @@ func NewKMSClient(baseURL, authToken string) *KMSClient {
 }
 
 // GetSecret fetches a secret with caching (1 min TTL).
-func (c *KMSClient) GetSecret(tenantId, secretPath string) (string, error) {
+func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 	if err := c.checkConfig(); err != nil {
 		return "", err
 	}
 
-	cacheKey := tenantId + "/" + secretPath
+	cacheKey := orgId + "/" + secretPath
 
 	c.mu.RLock()
 	entry, ok := c.cache[cacheKey]
@@ -223,7 +223,7 @@ func (c *KMSClient) GetSecret(tenantId, secretPath string) (string, error) {
 		return entry.value, nil
 	}
 
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, tenantId, secretPath)
+	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return "", fmt.Errorf("kms: create request: %w", err)
@@ -264,12 +264,12 @@ func (c *KMSClient) GetSecret(tenantId, secretPath string) (string, error) {
 }
 
 // SetSecret creates or updates a secret.
-func (c *KMSClient) SetSecret(tenantId, secretPath, value string) error {
+func (c *KMSClient) SetSecret(orgId, secretPath, value string) error {
 	if err := c.checkConfig(); err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, tenantId, secretPath)
+	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
 	payload, _ := json.Marshal(map[string]string{"value": value})
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
@@ -290,7 +290,7 @@ func (c *KMSClient) SetSecret(tenantId, secretPath, value string) error {
 		return fmt.Errorf("kms: set secret returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	cacheKey := tenantId + "/" + secretPath
+	cacheKey := orgId + "/" + secretPath
 	c.mu.Lock()
 	delete(c.cache, cacheKey)
 	c.mu.Unlock()
@@ -299,12 +299,12 @@ func (c *KMSClient) SetSecret(tenantId, secretPath, value string) error {
 }
 
 // DeleteSecret removes a secret.
-func (c *KMSClient) DeleteSecret(tenantId, secretPath string) error {
+func (c *KMSClient) DeleteSecret(orgId, secretPath string) error {
 	if err := c.checkConfig(); err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, tenantId, secretPath)
+	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
 	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return fmt.Errorf("kms: create request: %w", err)
@@ -322,7 +322,7 @@ func (c *KMSClient) DeleteSecret(tenantId, secretPath string) error {
 		return fmt.Errorf("kms: delete secret returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	cacheKey := tenantId + "/" + secretPath
+	cacheKey := orgId + "/" + secretPath
 	c.mu.Lock()
 	delete(c.cache, cacheKey)
 	c.mu.Unlock()
@@ -353,9 +353,9 @@ func (c *KMSClient) evictExpiredLocked() {
 	}
 }
 
-// InvalidateCache clears all cached secrets for a tenant.
-func (c *KMSClient) InvalidateCache(tenantId string) {
-	prefix := tenantId + "/"
+// InvalidateCache clears all cached secrets for an org.
+func (c *KMSClient) InvalidateCache(orgId string) {
+	prefix := orgId + "/"
 	c.mu.Lock()
 	for k := range c.cache {
 		if strings.HasPrefix(k, prefix) {
