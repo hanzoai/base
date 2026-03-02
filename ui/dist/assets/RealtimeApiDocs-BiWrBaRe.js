@@ -1,4 +1,4 @@
-import{S as le,i as re,s as be,V as ue,W as me,J as B,j as o,d as oe,t as ne,a as ie,I as pe,n,o as y,m as ae,u,A as I,v as r,c as ce,w as m,b as de}from"./index-CzlWNNWT.js";function he(t){var U,W,A,L,P,H,T,j,q,J,M,z;let i,p,a=t[0].name+"",b,d,D,h,_,f,S,c,w,$,C,g,E,v,O,l,R;return c=new ue({props:{js:`
+import{S as le,i as re,s as be,V as ue,W as me,J as B,j as o,d as oe,t as ne,a as ie,I as pe,n,o as y,m as ae,u,A as I,v as r,c as ce,w as m,b as de}from"./index-D7eFJ7oc.js";function he(t){var U,W,A,L,P,H,T,j,q,J,M,z;let i,p,a=t[0].name+"",b,d,D,h,_,f,S,c,w,$,C,g,E,v,O,l,R;return c=new ue({props:{js:`
         import Base from 'base';
 
         const base = new Base('${t[1]}');
