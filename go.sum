@@ -74,8 +74,8 @@ github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 h1:B+8ClL/kCQkRiU82d9xajR
 github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3/go.mod h1:NbCUVmiS4foBGBHOYlCT25+YmGpJ32dZPi75pGEUpj4=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 h1:HWRh5R2+9EifMyIHV7ZV+MIZqgz+PMpZ14Jynv3O2Zs=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0/go.mod h1:JfhWUomR1baixubs02l85lZYYOm7LV6om4ceouMv45c=
-github.com/hanzoai/dbx v1.12.0 h1:JASwb/bAEs6HfkJLE8RogNZpGmq3SidTOiAbyeur1Fg=
-github.com/hanzoai/dbx v1.12.0/go.mod h1:WIRkg1f2Mc+vXo2gpWk+hgPsJPFZBNUFCkSFJ4M5s4k=
+github.com/hanzoai/dbx v1.13.0 h1:IVCfz4NMKJ1EfAOEo3Nyfs67qj8v5Kx6aIjAja/9ANA=
+github.com/hanzoai/dbx v1.13.0/go.mod h1:WIRkg1f2Mc+vXo2gpWk+hgPsJPFZBNUFCkSFJ4M5s4k=
 github.com/hanzoai/kms/sdk/go v1.0.0 h1:rY7LDkRvjPotwJ4ydqDfRkQ+2Ob4QW3ptRydAa52x9g=
 github.com/hanzoai/kms/sdk/go v1.0.0/go.mod h1:kPPvEuE3K+fcOY+S6hiNO8nffxDNChvC1Uc4fR5Y+xk=
 github.com/hanzoai/tygoja v0.0.2 h1:0wb1nm+k8LYfLDWdiiqQtKyVGEAXkuSlBpH3g/lUsIE=

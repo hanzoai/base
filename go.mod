@@ -13,7 +13,7 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/dbx v1.12.0
+	github.com/hanzoai/dbx v1.13.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
