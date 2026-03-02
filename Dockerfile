@@ -30,6 +30,6 @@ RUN mkdir -p /data /migrations /hooks /app/public && chown -R hanzo:hanzo /app /
 USER hanzo
 EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8090/api/health || exit 1
+    CMD curl -f http://localhost:8090/healthz || exit 1
 ENTRYPOINT ["/app/base"]
 CMD ["serve", "--http=0.0.0.0:8090", "--dir=/data", "--migrationsDir=/migrations", "--hooksDir=/hooks"]
