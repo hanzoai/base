@@ -313,7 +313,7 @@ func createSuperusersCollection(txApp core.App) error {
 }
 
 func createUsersCollection(txApp core.App) error {
-	users := core.NewAuthCollection("users", "_hz_users_auth_")
+	users := core.NewAuthCollection("users", "_users_auth_")
 
 	ownerRule := "id = @request.auth.id"
 	users.ListRule = types.Pointer(ownerRule)

@@ -724,10 +724,10 @@ export default class CommonHelper {
         const result = [];
 
         const items = (str || "")
-            .replaceAll("\\" + separator, "{_HZ_ESCAPED_}")
+            .replaceAll("\\" + separator, "{_ESCAPED_}")
             .split(separator)
             .map((item) => {
-                return item.replaceAll("{_HZ_ESCAPED_}", separator);
+                return item.replaceAll("{_ESCAPED_}", separator);
             });
 
         for (let item of items) {
