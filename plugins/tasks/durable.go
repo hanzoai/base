@@ -81,11 +81,16 @@ func DefaultDurableConfig() DurableConfig {
 }
 
 // DurableStore implements durable task execution via Temporal.
-// Provides submit/cancel/signal/status for workflows that survive process restarts.
+// Supports multi-tenant org isolation via per-namespace client connections.
 type DurableStore struct {
-	Client    client.Client
+	Client    client.Client // default namespace client
+	addr      string
 	namespace string
 	connected bool
+
+	// orgClients caches per-org Temporal client connections.
+	// Key is org ID (= Temporal namespace).
+	orgClients map[string]client.Client
 }
 
 // NewDurableStore connects to the Temporal service.
@@ -97,11 +102,43 @@ func NewDurableStore(addr, namespace string) (*DurableStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("tasks: failed to connect to %s: %w", addr, err)
 	}
-	return &DurableStore{Client: c, namespace: namespace, connected: true}, nil
+	return &DurableStore{
+		Client:     c,
+		addr:       addr,
+		namespace:  namespace,
+		connected:  true,
+		orgClients: make(map[string]client.Client),
+	}, nil
 }
 
-// Close shuts down the client connection.
+// ClientForOrg returns a Temporal client scoped to the given org namespace.
+// Connections are cached. Falls back to the default client if org is empty.
+func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
+	if orgID == "" || orgID == ds.namespace {
+		return ds.Client, nil
+	}
+
+	if c, ok := ds.orgClients[orgID]; ok {
+		return c, nil
+	}
+
+	c, err := client.Dial(client.Options{
+		HostPort:  ds.addr,
+		Namespace: orgID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tasks: failed to connect to namespace %s: %w", orgID, err)
+	}
+	ds.orgClients[orgID] = c
+	return c, nil
+}
+
+// Close shuts down all client connections.
 func (ds *DurableStore) Close() {
+	for _, c := range ds.orgClients {
+		c.Close()
+	}
+	ds.orgClients = nil
 	if ds.Client != nil {
 		ds.Client.Close()
 		ds.connected = false
@@ -114,8 +151,14 @@ func (ds *DurableStore) IsConnected() bool {
 }
 
 // SubmitTask starts a durable workflow execution for a task.
-// The task queue defaults to task.SpaceID (org-as-namespace for multi-tenant).
+// Uses task.OrgID as the Temporal namespace for multi-tenant isolation.
+// Falls back to default namespace if OrgID is empty.
 func (ds *DurableStore) SubmitTask(ctx context.Context, task *Task) error {
+	c, err := ds.ClientForOrg(task.OrgID)
+	if err != nil {
+		return err
+	}
+
 	queue := task.SpaceID
 	if queue == "" {
 		queue = "default"
@@ -137,7 +180,7 @@ func (ds *DurableStore) SubmitTask(ctx context.Context, task *Task) error {
 		}
 	}
 
-	_, err := ds.Client.ExecuteWorkflow(ctx, opts, AgentTaskWorkflow, task)
+	_, err = c.ExecuteWorkflow(ctx, opts, AgentTaskWorkflow, task)
 	if err != nil {
 		return fmt.Errorf("tasks: failed to submit workflow: %w", err)
 	}
@@ -147,6 +190,11 @@ func (ds *DurableStore) SubmitTask(ctx context.Context, task *Task) error {
 
 // SubmitWorkflow starts a pipeline or fan-out workflow.
 func (ds *DurableStore) SubmitWorkflow(ctx context.Context, wf *Workflow, tasks []*Task, parallel bool) error {
+	c, err := ds.ClientForOrg(wf.OrgID)
+	if err != nil {
+		return err
+	}
+
 	queue := wf.SpaceID
 	if queue == "" {
 		queue = "default"
@@ -164,7 +212,7 @@ func (ds *DurableStore) SubmitWorkflow(ctx context.Context, wf *Workflow, tasks 
 		wfFunc = PipelineWorkflow
 	}
 
-	_, err := ds.Client.ExecuteWorkflow(ctx, opts, wfFunc, wf, tasks)
+	_, err = c.ExecuteWorkflow(ctx, opts, wfFunc, wf, tasks)
 	if err != nil {
 		return fmt.Errorf("tasks: failed to submit workflow: %w", err)
 	}
@@ -173,8 +221,13 @@ func (ds *DurableStore) SubmitWorkflow(ctx context.Context, wf *Workflow, tasks 
 }
 
 // GetTaskStatus queries a running workflow for its current state.
-func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string) (TaskState, string, error) {
-	desc, err := ds.Client.DescribeWorkflowExecution(ctx, taskID, "")
+// orgID selects the Temporal namespace. Empty string uses the default.
+func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string, orgID ...string) (TaskState, string, error) {
+	c, err := ds.clientForOrgVar(orgID)
+	if err != nil {
+		return TaskPending, "", err
+	}
+	desc, err := c.DescribeWorkflowExecution(ctx, taskID, "")
 	if err != nil {
 		return TaskPending, "", err
 	}
@@ -197,19 +250,39 @@ func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string) (TaskS
 }
 
 // CancelTask cancels a running workflow.
-func (ds *DurableStore) CancelTask(ctx context.Context, taskID string) error {
-	return ds.Client.CancelWorkflow(ctx, taskID, "")
+func (ds *DurableStore) CancelTask(ctx context.Context, taskID string, orgID ...string) error {
+	c, err := ds.clientForOrgVar(orgID)
+	if err != nil {
+		return err
+	}
+	return c.CancelWorkflow(ctx, taskID, "")
 }
 
 // SignalTask sends a signal to a running workflow.
-func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName string, data interface{}) error {
-	return ds.Client.SignalWorkflow(ctx, taskID, "", signalName, data)
+func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName string, data interface{}, orgID ...string) error {
+	c, err := ds.clientForOrgVar(orgID)
+	if err != nil {
+		return err
+	}
+	return c.SignalWorkflow(ctx, taskID, "", signalName, data)
+}
+
+// clientForOrgVar extracts the first orgID from a variadic param.
+func (ds *DurableStore) clientForOrgVar(orgID []string) (client.Client, error) {
+	if len(orgID) > 0 && orgID[0] != "" {
+		return ds.ClientForOrg(orgID[0])
+	}
+	return ds.Client, nil
 }
 
 // ListTasks returns tasks in a space by querying workflow visibility.
-func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string) ([]*Task, error) {
+func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, orgID ...string) ([]*Task, error) {
+	c, err := ds.clientForOrgVar(orgID)
+	if err != nil {
+		return nil, err
+	}
 	query := fmt.Sprintf(`TaskQueue = "%s"`, spaceID)
-	resp, err := ds.Client.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
+	resp, err := c.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
 		Query: query,
 	})
 	if err != nil {
@@ -244,8 +317,8 @@ func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string) ([]*Task,
 }
 
 // GetNextTask finds the next pending task in a space and claims it for the agent.
-func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string) (*Task, error) {
-	tasks, err := ds.ListTasks(ctx, spaceID)
+func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string, orgID ...string) (*Task, error) {
+	tasks, err := ds.ListTasks(ctx, spaceID, orgID...)
 	if err != nil {
 		return nil, err
 	}
@@ -259,9 +332,13 @@ func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string
 }
 
 // ListWorkflows returns workflows in a space by querying visibility.
-func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string) ([]*Workflow, error) {
+func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID ...string) ([]*Workflow, error) {
+	c, err := ds.clientForOrgVar(orgID)
+	if err != nil {
+		return nil, err
+	}
 	query := fmt.Sprintf(`TaskQueue = "%s" AND WorkflowType IN ("PipelineWorkflow", "FanOutWorkflow")`, spaceID)
-	resp, err := ds.Client.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
+	resp, err := c.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
 		Query: query,
 	})
 	if err != nil {
