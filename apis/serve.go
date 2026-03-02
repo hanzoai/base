@@ -137,11 +137,6 @@ func Serve(app core.App, config ServeConfig) error {
 	defer cancelBaseCtx()
 
 	server := &http.Server{
-		TLSConfig: &tls.Config{
-			MinVersion:     tls.VersionTLS12,
-			GetCertificate: certManager.GetCertificate,
-			NextProtos:     []string{acme.ALPNProto},
-		},
 		// higher defaults to accommodate large file uploads/downloads
 		WriteTimeout:      5 * time.Minute,
 		ReadTimeout:       5 * time.Minute,
@@ -151,6 +146,18 @@ func Serve(app core.App, config ServeConfig) error {
 			return baseCtx
 		},
 		ErrorLog: log.New(&serverErrorLogWriter{app: app}, "", 0),
+	}
+
+	// Only set TLS config when HTTPS is explicitly enabled.
+	// Without this guard, Go's http.Server auto-upgrades connections
+	// to TLS when TLSConfig is present, breaking HTTP health probes
+	// and ingress backends that connect via plain HTTP.
+	if config.HttpsAddr != "" {
+		server.TLSConfig = &tls.Config{
+			MinVersion:     tls.VersionTLS12,
+			GetCertificate: certManager.GetCertificate,
+			NextProtos:     []string{acme.ALPNProto},
+		}
 	}
 
 	var listener net.Listener
