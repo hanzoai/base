@@ -42,9 +42,12 @@ jobs:
           BRANCH="${GITHUB_REF#refs/heads/}"
           SHA="${GITHUB_SHA::8}"
           TAGS="${IMAGE}:${BRANCH},${IMAGE}:${BRANCH}-${SHA}"
+          if [[ "$BRANCH" == "main" ]]; then
+            TAGS="${TAGS},${IMAGE}:latest"
+          fi
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
-            TAGS="${IMAGE}:${TAG},${IMAGE}:latest"
+            TAGS="${TAGS},${IMAGE}:${TAG}"
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
