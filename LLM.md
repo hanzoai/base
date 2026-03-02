@@ -125,7 +125,7 @@ See the full alignment guide below. Summary of conflicts:
 | Soft delete | Hard delete only | `Deleted bool` flag | MISSING |
 | Multi-tenancy | None | Per-org SQLite + CEK | MISSING |
 | Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS) | PARTIAL (superuser OIDC done) |
-| SSE event name | `HZ_CONNECT` (server) | `HZ_CONNECT` | SDK still says `PB_CONNECT` |
+| SSE event name | `CONNECT` | `CONNECT` | OK (server + SDK aligned) |
 | Error format | `{status, message, data}` | `{status, message, data}` | OK |
 | Pagination | `{items, page, perPage, totalItems, totalPages}` | Same | OK |
 
