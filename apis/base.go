@@ -48,6 +48,9 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindRealtimeApi(app, apiGroup)
 	bindHealthApi(app, apiGroup)
 
+	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
+	bindSuperuserOIDCApi(app, baseRouter)
+
 	return baseRouter, nil
 }
 
