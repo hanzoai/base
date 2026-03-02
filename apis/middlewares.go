@@ -301,8 +301,14 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		return nil, fmt.Errorf("collection %q is not an auth collection", collectionName)
 	}
 
+	// Base requires record IDs >= 15 chars. Pad short IAM subs with underscores.
+	recordID := sub
+	for len(recordID) < 15 {
+		recordID += "_"
+	}
+
 	// Try to find existing user by IAM sub (used directly as Base record ID).
-	record, err := e.App.FindRecordById(collection, sub)
+	record, err := e.App.FindRecordById(collection, recordID)
 	if err == nil {
 		return record, nil
 	}
@@ -317,7 +323,7 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 
 	// Auto-create a new Base user record for this IAM identity.
 	record = core.NewRecord(collection)
-	record.Id = sub
+	record.Id = recordID
 	record.Set("email", email)
 	if name != "" {
 		record.Set("name", name)
