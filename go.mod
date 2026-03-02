@@ -13,13 +13,13 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/dbx v1.13.0
+	github.com/hanzoai/dbx v1.15.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
+	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/zap v0.2.0
-	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	go.temporal.io/api v1.62.6
@@ -35,7 +35,6 @@ require (
 require (
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
-	github.com/hanzoai/pubsub-go v1.0.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
@@ -121,5 +120,3 @@ require (
 )
 
 replace github.com/hanzoai/replicate => /Users/z/work/hanzo/replicate
-
-replace github.com/hanzoai/dbx => /Users/z/work/hanzo/dbx
