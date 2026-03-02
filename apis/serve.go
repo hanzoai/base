@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,10 +78,12 @@ func Serve(app core.App, config ServeConfig) error {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
-	// redirect root to the admin dashboard
-	baseRouter.GET("/", func(e *core.RequestEvent) error {
-		return e.Redirect(http.StatusTemporaryRedirect, "/_/")
-	})
+	// redirect root to the admin dashboard (only if not overridden by app)
+	if os.Getenv("BASE_SKIP_ROOT_REDIRECT") == "" {
+		baseRouter.GET("/", func(e *core.RequestEvent) error {
+			return e.Redirect(http.StatusTemporaryRedirect, "/_/")
+		})
+	}
 
 	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
 		BindFunc(func(e *core.RequestEvent) error {
