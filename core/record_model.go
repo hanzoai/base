@@ -28,6 +28,31 @@ import (
 // (for now is kept private and cannot be changed or cloned outside of the core package)
 const internalCustomFieldKeyPrefix = "@baseInternal"
 
+// fieldJSONAlias maps internal DB field names to their ORM-convention JSON names.
+// DB columns remain unchanged; only the JSON serialization layer uses these aliases.
+var fieldJSONAliases = map[string]string{
+	"created": "createdAt",
+	"updated": "updatedAt",
+}
+
+// fieldJSONAlias returns the JSON alias for a field name, or the name itself if no alias exists.
+func fieldJSONAlias(name string) string {
+	if alias, ok := fieldJSONAliases[name]; ok {
+		return alias
+	}
+	return name
+}
+
+// fieldDBName returns the DB field name for a JSON alias, or the name itself if it is not an alias.
+func fieldDBName(name string) string {
+	for db, alias := range fieldJSONAliases {
+		if alias == name {
+			return db
+		}
+	}
+	return name
+}
+
 var (
 	_ Model        = (*Record)(nil)
 	_ HookTagger   = (*Record)(nil)
@@ -1263,7 +1288,7 @@ func (record *Record) PublicExport() map[string]any {
 	customVisibility := record.customVisibility.GetAll()
 
 	// export schema fields
-	var fieldName string
+	var fieldName, jsonName string
 	for _, f := range record.collection.Fields {
 		fieldName = f.GetName()
 
@@ -1276,7 +1301,8 @@ func (record *Record) PublicExport() map[string]any {
 			continue
 		}
 
-		export[fieldName] = record.Get(fieldName)
+		jsonName = fieldJSONAlias(fieldName)
+		export[jsonName] = record.Get(fieldName)
 	}
 
 	// export custom fields
@@ -1326,11 +1352,25 @@ func (m Record) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements the [json.Unmarshaler] interface.
+//
+// Accepts both ORM-convention names (createdAt, updatedAt) and
+// DB column names (created, updated) on input for backwards compatibility.
 func (m *Record) UnmarshalJSON(data []byte) error {
 	result := map[string]any{}
 
 	if err := json.Unmarshal(data, &result); err != nil {
 		return err
+	}
+
+	// resolve JSON aliases to DB field names on input
+	// (accept both "createdAt" and "created"; normalize to DB column name "created")
+	for dbName, jsonAlias := range fieldJSONAliases {
+		if v, ok := result[jsonAlias]; ok {
+			if _, hasDB := result[dbName]; !hasDB {
+				result[dbName] = v
+			}
+			delete(result, jsonAlias)
+		}
 	}
 
 	m.Load(result)

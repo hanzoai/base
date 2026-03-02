@@ -130,7 +130,7 @@ class AppAuthStore extends LocalAuthStore {
     }
 }
 
-const base = new Base(import.meta.env.HZ_BACKEND_URL, new AppAuthStore());
+const base = new Base(import.meta.env.BASE_BACKEND_URL, new AppAuthStore());
 
 if (base.authStore.isValid) {
     base.collection(base.authStore.record.collectionName || "_superusers")

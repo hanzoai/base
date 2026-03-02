@@ -16,13 +16,13 @@
         <slot name="footer" />
 
         {#if $superuser?.id}
-            <a href={import.meta.env.HZ_DOCS_URL} target="_blank" rel="noopener noreferrer">
+            <a href={import.meta.env.BASE_DOCS_URL} target="_blank" rel="noopener noreferrer">
                 <i class="ri-book-open-line txt-sm" />
                 <span class="txt">Docs</span>
             </a>
             <span class="delimiter">|</span>
-            <a href={import.meta.env.HZ_RELEASES} target="_blank" rel="noopener noreferrer" title="Releases">
-                <span class="txt">Base {import.meta.env.HZ_VERSION}</span>
+            <a href={import.meta.env.BASE_RELEASES} target="_blank" rel="noopener noreferrer" title="Releases">
+                <span class="txt">Base {import.meta.env.BASE_VERSION}</span>
             </a>
         {/if}
     </footer>
