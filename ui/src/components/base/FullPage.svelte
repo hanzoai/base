@@ -12,11 +12,11 @@
                 <figure class="logo">
                     <img
                         src={$logoUrl || `${import.meta.env.BASE_URL}images/logo.svg`}
-                        alt={$appName || "Base"}
+                        alt={$appName || "Hanzo Base"}
                         width="40"
                         height="40"
                     />
-                    <span class="txt"><strong>{$appName || "Base"}</strong></span>
+                    <span class="txt"><strong>{$appName || "Hanzo Base"}</strong></span>
                 </figure>
             </div>
             <div class="clearfix" />
