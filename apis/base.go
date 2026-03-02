@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -34,7 +35,11 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	baseRouter.Bind(securityHeaders())
 	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
 
-	apiGroup := baseRouter.Group("/api")
+	apiPrefix := os.Getenv("BASE_API_PREFIX")
+	if apiPrefix == "" {
+		apiPrefix = "/api"
+	}
+	apiGroup := baseRouter.Group(apiPrefix)
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
