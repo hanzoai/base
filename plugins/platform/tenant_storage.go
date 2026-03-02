@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 )
 
@@ -78,52 +79,62 @@ func (s *TenantStorage) UserSSEKey(orgSlug, userId string) string {
 }
 
 // BucketPolicy returns a MinIO/S3 bucket policy JSON that enforces per-org
-// and per-user path isolation. Each IAM user is constrained to their own prefix.
+// path isolation. Uses encoding/json to prevent injection via orgSlug/iamUser.
 func (s *TenantStorage) BucketPolicy(orgSlug, iamUser string) string {
-	return fmt.Sprintf(`{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": ["%s"]},
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"],
-      "Resource": [
-        "arn:aws:s3:::%s/tenants/%s/*"
-      ],
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": ["tenants/%s/*"]
-        }
-      }
-    }
-  ]
-}`, iamUser, s.Bucket, orgSlug, orgSlug)
+	if err := validateSlug(orgSlug); err != nil {
+		return "{}"
+	}
+	policy := map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{
+			{
+				"Effect":    "Allow",
+				"Principal": map[string]any{"AWS": []string{iamUser}},
+				"Action":    []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"},
+				"Resource":  []string{fmt.Sprintf("arn:aws:s3:::%s/tenants/%s/*", s.Bucket, orgSlug)},
+				"Condition": map[string]any{
+					"StringLike": map[string]any{
+						"s3:prefix": []string{fmt.Sprintf("tenants/%s/*", orgSlug)},
+					},
+				},
+			},
+		},
+	}
+	b, _ := json.MarshalIndent(policy, "", "  ")
+	return string(b)
 }
 
 // UserBucketPolicy returns a policy restricting a user to their own prefix only.
 func (s *TenantStorage) UserBucketPolicy(orgSlug, userId, iamUser string) string {
-	return fmt.Sprintf(`{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": ["%s"]},
-      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
-      "Resource": [
-        "arn:aws:s3:::%s/tenants/%s/users/%s/*"
-      ]
-    },
-    {
-      "Effect": "Allow",
-      "Principal": {"AWS": ["%s"]},
-      "Action": ["s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::%s"],
-      "Condition": {
-        "StringLike": {
-          "s3:prefix": ["tenants/%s/users/%s/*"]
-        }
-      }
-    }
-  ]
-}`, iamUser, s.Bucket, orgSlug, userId, iamUser, s.Bucket, orgSlug, userId)
+	if err := validateSlug(orgSlug); err != nil {
+		return "{}"
+	}
+	if err := validateSlug(userId); err != nil {
+		return "{}"
+	}
+	prefix := fmt.Sprintf("tenants/%s/users/%s/*", orgSlug, userId)
+	policy := map[string]any{
+		"Version": "2012-10-17",
+		"Statement": []map[string]any{
+			{
+				"Effect":    "Allow",
+				"Principal": map[string]any{"AWS": []string{iamUser}},
+				"Action":    []string{"s3:GetObject", "s3:PutObject", "s3:DeleteObject"},
+				"Resource":  []string{fmt.Sprintf("arn:aws:s3:::%s/%s", s.Bucket, prefix)},
+			},
+			{
+				"Effect":    "Allow",
+				"Principal": map[string]any{"AWS": []string{iamUser}},
+				"Action":    []string{"s3:ListBucket"},
+				"Resource":  []string{fmt.Sprintf("arn:aws:s3:::%s", s.Bucket)},
+				"Condition": map[string]any{
+					"StringLike": map[string]any{
+						"s3:prefix": []string{prefix},
+					},
+				},
+			},
+		},
+	}
+	b, _ := json.MarshalIndent(policy, "", "  ")
+	return string(b)
 }
