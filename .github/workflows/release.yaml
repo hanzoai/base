@@ -1,22 +1,21 @@
-name: basebuild
+name: release
 
 on:
-  pull_request:
   push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
 
 jobs:
-  goreleaser:
+  build:
     runs-on: ubuntu-latest
     env:
       flags: ""
     steps:
-      # re-enable auto-snapshot from goreleaser-action@v3
-      # (https://github.com/goreleaser/goreleaser-action-v4-auto-snapshot-example)
       - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: echo "flags=--snapshot" >> $GITHUB_ENV
 
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -24,35 +23,23 @@ jobs:
         with:
           version: latest
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'pnpm'
+          cache: pnpm
           cache-dependency-path: ui/pnpm-lock.yaml
 
-      - name: Set up Go
-        uses: actions/setup-go@v6
+      - uses: actions/setup-go@v6
         with:
           go-version: '>=1.26.1'
 
-      # This step usually is not needed because the /ui/dist is pregenerated locally
-      # but its here to ensure that each release embeds the latest admin ui artifacts.
-      # If the artificats differs, a "dirty error" is thrown - https://goreleaser.com/errors/dirty/
-      - name: Build Admin dashboard UI
+      - name: Build admin UI
         run: cd ui && pnpm install --frozen-lockfile && pnpm build
 
-      # Temporary disable as the types can have random generated identifiers making it non-deterministic.
-      #
-      # # Similar to the above, the jsvm types are pregenerated locally
-      # # but its here to ensure that it wasn't forgotten to be executed.
-      # - name: Generate jsvm types
-      #   run: go run ./plugins/jsvm/internal/types/types.go
-
-      - name: Run tests
+      - name: Test
         run: go test ./...
 
-      - name: Run GoReleaser
+      - name: GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           distribution: goreleaser
