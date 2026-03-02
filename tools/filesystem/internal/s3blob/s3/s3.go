@@ -1,8 +1,8 @@
 // Package s3 implements a lightweight client for interacting with the
 // REST APIs of any S3 compatible service.
 //
-// It implements only the minimal functionality required by PocketBase
-// such as objects list, get, copy, delete and upload.
+// It implements only the minimal functionality required by Base:
+// objects list, get, copy, delete and upload.
 //
 // For more details why we don't use the official aws-sdk-go-v2, you could check
 // https://github.com/hanzoai/base/discussions/6562.

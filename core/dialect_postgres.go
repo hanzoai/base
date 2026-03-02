@@ -73,7 +73,7 @@ func (d *PostgresDialect) Strftime(format, column string) string {
 		pgFormat = strings.ReplaceAll(pgFormat, sqliteFmt, pgFmt)
 	}
 
-	// Handle the common PocketBase datetime format: %Y-%m-%d %H:%M:%fZ
+	// Handle the datetime format: %Y-%m-%d %H:%M:%fZ
 	// After replacement this becomes: YYYY-MM-DD HH24:MI:SS.USZ
 	return fmt.Sprintf("to_char(%s, '%s')", column, pgFormat)
 }
