@@ -186,7 +186,7 @@
 
         <button
             type="submit"
-            class="btn btn-lg btn-block btn-next"
+            class="btn btn-lg btn-block btn-primary"
             class:btn-disabled={isBusy}
             class:btn-loading={isLoading}
         >

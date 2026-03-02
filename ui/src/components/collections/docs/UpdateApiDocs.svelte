@@ -91,7 +91,7 @@
         File upload is supported only via <code>multipart/form-data</code>.
         <br />
         For more info and examples you could check the detailed
-        <a href={import.meta.env.HZ_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
+        <a href={import.meta.env.BASE_FILE_UPLOAD_DOCS} target="_blank" rel="noopener noreferrer">
             Files upload and handling docs
         </a>.
     </p>

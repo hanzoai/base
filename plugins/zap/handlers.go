@@ -336,7 +336,7 @@ func (h *handler) broadcastEvent(collection string, action string, record *core.
 			continue
 		}
 
-		if err := h.node.Send(peer, MsgTypeRealtime, msg); err != nil {
+		if err := h.node.Send(context.Background(), peer, msg); err != nil {
 			h.logger.Debug("zap: send to peer failed, removing subscription",
 				"peer", peer, "error", err)
 			// Remove dead peer (defer unlock already held as RLock, so schedule cleanup)

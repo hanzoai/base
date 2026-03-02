@@ -1,9 +1,8 @@
 // Package fileblob provides a blob.Bucket driver implementation.
 //
-// NB! To minimize breaking changes with older PocketBase releases,
-// the driver is a stripped down and adapted version of the previously
-// used gocloud.dev/blob/fileblob, hence many of the below doc comments,
-// struct options and interface implementations are the same.
+// NB! The driver is a stripped down and adapted version of
+// gocloud.dev/blob/fileblob, hence many of the below doc comments,
+// struct options and interface implementations follow the same conventions.
 //
 // To avoid partial writes, fileblob writes to a temporary file and then renames
 // the temporary file to the final path on Close. By default, it creates these

@@ -48,7 +48,7 @@ var ValidBatchActions = map[*regexp.Regexp]BatchActionHandlerFunc{
 				// ---
 				params["id"] = id // required for the path value
 				ir.Method = "PATCH"
-				ir.URL = "/api/collections/" + params["collection"] + "/records/" + id + params["query"]
+				ir.URL = "/v1/base/collections/" + params["collection"] + "/records/" + id + params["query"]
 				return recordUpdate(false, next)
 			}
 		}
@@ -56,7 +56,7 @@ var ValidBatchActions = map[*regexp.Regexp]BatchActionHandlerFunc{
 		// create
 		// ---
 		ir.Method = "POST"
-		ir.URL = "/api/collections/" + params["collection"] + "/records" + params["query"]
+		ir.URL = "/v1/base/collections/" + params["collection"] + "/records" + params["query"]
 		return recordCreate(false, next)
 	},
 	regexp.MustCompile(`^POST /api/collections/(?P<collection>[^\/\?]+)/records(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
@@ -88,7 +88,7 @@ func (brs batchRequestsForm) validate() error {
 }
 
 // NB! When the request is submitted as multipart/form-data,
-// the regular fields data is expected to be submitted as serailized
+// the regular fields data is expected to be submitted as serialized
 // json under the @jsonPayload field and file keys need to follow the
 // pattern "requests.N.fileField" or  requests[N].fileField.
 func batchTransaction(e *core.RequestEvent) error {
@@ -364,6 +364,7 @@ func processInternalRequest(
 	// assign request
 	event.Request = r
 	event.Request.Body = &router.RereadableReadCloser{ReadCloser: r.Body} // enables multiple reads
+	defer event.Request.Body.Close()
 
 	// assign response
 	rec := httptest.NewRecorder()

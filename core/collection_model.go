@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/security"
@@ -369,8 +369,8 @@ type baseCollection struct {
 	Type    string                  `db:"type" json:"type" form:"type"`
 	Fields  FieldsList              `db:"fields" json:"fields" form:"fields"`
 	Indexes types.JSONArray[string] `db:"indexes" json:"indexes" form:"indexes"`
-	Created types.DateTime          `db:"created" json:"created"`
-	Updated types.DateTime          `db:"updated" json:"updated"`
+	Created types.DateTime          `db:"created" json:"createdAt"`
+	Updated types.DateTime          `db:"updated" json:"updatedAt"`
 
 	// System prevents the collection rename, deletion and rules change.
 	// It is used primarily for internal purposes for collections like "_superusers", "_externalAuths", etc.
@@ -545,7 +545,7 @@ func (m *Collection) UnmarshalJSON(b []byte) error {
 // MarshalJSON implements the [json.Marshaler] interface.
 //
 // Note that non-type related fields are ignored from the serialization
-// (ex. for "view" colections the "auth" fields are skipped).
+// (ex. for "view" collections the "auth" fields are skipped).
 func (m Collection) MarshalJSON() ([]byte, error) {
 	switch m.Type {
 	case CollectionTypeView:
@@ -930,8 +930,8 @@ func (c *Collection) initIdField() {
 			PrimaryKey:          true,
 			Required:            true,
 			Min:                 15,
-			Max:                 15,
-			Pattern:             defaultLowercaseRecordIdPattern,
+			Max:                 36,
+			Pattern:             `^[a-z0-9\-]+$`,
 			AutogeneratePattern: `[a-z0-9]{15}`,
 		}
 

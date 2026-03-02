@@ -210,3 +210,132 @@ func (c *IAMClient) InvalidateToken(token string) {
 	delete(c.cache, token)
 	c.mu.Unlock()
 }
+
+// ── API Key Resolution (pk-/sk-/hk- keys managed by IAM) ────────────────
+
+// IAMKey represents an API key from IAM's Key table.
+type IAMKey struct {
+	Owner       string `json:"owner"`
+	Name        string `json:"name"`
+	Type        string `json:"type"`        // Organization, Application, User
+	Org         string `json:"organization"`
+	Application string `json:"application"`
+	User        string `json:"user"`
+	AccessKey   string `json:"accessKey"`
+	State       string `json:"state"`
+}
+
+// Hanzo key prefix standard (always hyphen, never underscore):
+//
+//   pk-  publishable key  (frontend-safe, read-only API access)
+//   sk-  secret key       (backend-only, full API access)
+//   hk-  hanzo key        (IAM user API key, legacy)
+//   hi-  hanzo insights   (analytics event ingestion)
+//   ha-  hanzo analytics  (lightweight web analytics)
+//   hz-  hanzo widget     (restricted chat/embed key)
+//
+// All managed by IAM. One key store. One prefix convention.
+
+// IsPublishableKey returns true if the token has a publishable key prefix.
+func IsPublishableKey(token string) bool {
+	return strings.HasPrefix(token, "pk-")
+}
+
+// IsSecretKey returns true if the token has a secret key prefix.
+func IsSecretKey(token string) bool {
+	return strings.HasPrefix(token, "sk-")
+}
+
+// IsAPIKey returns true if the token is any type of IAM API key.
+func IsAPIKey(token string) bool {
+	return strings.HasPrefix(token, "hk-") ||
+		strings.HasPrefix(token, "pk-") ||
+		strings.HasPrefix(token, "sk-")
+}
+
+// IsAnalyticsKey returns true if the token is an insights or analytics key.
+func IsAnalyticsKey(token string) bool {
+	return strings.HasPrefix(token, "hi-") ||
+		strings.HasPrefix(token, "ha-")
+}
+
+// IsWidgetKey returns true if the token is a widget embed key.
+func IsWidgetKey(token string) bool {
+	return strings.HasPrefix(token, "hz-")
+}
+
+// ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
+// Uses IAM's GET /api/get-user?accessKey= endpoint. Results cached 5 minutes.
+func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
+	// Check cache (same cache as JWT tokens)
+	c.mu.RLock()
+	entry, ok := c.cache[accessKey]
+	c.mu.RUnlock()
+
+	if ok && time.Now().Before(entry.expires) {
+		return entry.user, nil
+	}
+
+	user, err := c.fetchUserByKey(accessKey)
+	if err != nil {
+		c.mu.Lock()
+		delete(c.cache, accessKey)
+		c.mu.Unlock()
+		return nil, err
+	}
+
+	c.mu.Lock()
+	c.cache[accessKey] = &tokenCacheEntry{
+		user:    user,
+		expires: time.Now().Add(tokenCacheTTL),
+	}
+	if len(c.cache) > 1000 {
+		c.evictExpiredLocked()
+	}
+	c.mu.Unlock()
+
+	return user, nil
+}
+
+func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
+	u := c.baseURL + "/api/get-user?accessKey=" + url.QueryEscape(accessKey)
+
+	req, err := http.NewRequest("GET", u, nil)
+	if err != nil {
+		return nil, fmt.Errorf("iam: create key request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("iam: key request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return nil, fmt.Errorf("iam: get-user returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Data struct {
+			Owner string `json:"owner"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+			ID    string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("iam: decode key user: %w", err)
+	}
+
+	if result.Data.Name == "" {
+		return nil, fmt.Errorf("iam: key resolved to empty user")
+	}
+
+	return &IAMUser{
+		ID:     result.Data.ID,
+		Name:   result.Data.Name,
+		Email:  result.Data.Email,
+		OrgIDs: []string{result.Data.Owner},
+	}, nil
+}

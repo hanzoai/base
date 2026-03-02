@@ -27,6 +27,9 @@
     let otpEmail = "";
     let otpPassword = "";
 
+    // OIDC state
+    let oidcConfig = { enabled: false };
+
     $: {
         totalSteps = 1;
         currentStep = 1;
@@ -48,7 +51,40 @@
         }
     }
 
+    async function devAutoLogin() {
+        const email = 'admin@example.com';
+        const pass = 'admin1234567890';
+        identity = '';
+        password = '';
+        // Animate typing email
+        for (const ch of email) {
+            identity += ch;
+            await new Promise(r => setTimeout(r, 30));
+        }
+        await new Promise(r => setTimeout(r, 150));
+        // Animate typing password
+        for (const ch of pass) {
+            password += ch;
+            await new Promise(r => setTimeout(r, 20));
+        }
+        await new Promise(r => setTimeout(r, 200));
+        // Auto submit
+        authWithPassword();
+    }
+
+    loadOIDCConfig();
     loadAuthMethods();
+
+    async function loadOIDCConfig() {
+        try {
+            const resp = await fetch("/_/api/oidc/config");
+            if (resp.ok) {
+                oidcConfig = await resp.json();
+            }
+        } catch (err) {
+            // OIDC not available, keep disabled
+        }
+    }
 
     async function loadAuthMethods() {
         if (isLoading) {
@@ -148,23 +184,50 @@
 
         otpAuthSubmitting = false;
     }
+
+    function redirectToOIDC() {
+        window.location.href = "/_/auth/oidc/redirect";
+    }
 </script>
 
 <FullPage>
     <div class="content txt-center m-b-base">
-        <h4>
-            Superuser login
-            {#if totalSteps > 1}
-                ({currentStep}/{totalSteps})
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <h4 style="margin: 0;">
+                Login as Superuser
+                {#if !oidcConfig.enabled && totalSteps > 1}
+                    ({currentStep}/{totalSteps})
+                {/if}
+            </h4>
+            {#if !oidcConfig.enabled && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')}
+                <button
+                    type="button"
+                    class="btn btn-sm"
+                    style="border-radius: 999px; padding: 2px 12px; font-size: 11px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #a1a1aa; cursor: pointer;"
+                    on:click={devAutoLogin}
+                >
+                    dev
+                </button>
             {/if}
-        </h4>
+        </div>
     </div>
 
     {#if isLoading}
         <div class="block txt-center">
             <span class="loader" />
         </div>
-    {:else if authMethods.password.enabled && !mfaId}
+    {:else if oidcConfig.enabled}
+        <!-- OIDC-only mode: show sign-in button, hide email/password -->
+        <div class="block">
+            <button
+                type="button"
+                class="btn btn-lg btn-block btn-primary"
+                on:click={redirectToOIDC}
+            >
+                <span class="txt">Sign in</span>
+            </button>
+        </div>
+    {:else if authMethods.password?.enabled && !mfaId}
         <!-- auth with password -->
         <form class="block" on:submit|preventDefault={authWithPassword}>
             <Field class="form-field required" name="identity" let:uniqueId>
@@ -197,15 +260,15 @@
 
             <button
                 type="submit"
-                class="btn btn-lg btn-block btn-next"
+                class="btn btn-lg btn-block btn-primary"
                 class:btn-disabled={passwordAuthSubmitting}
                 class:btn-loading={passwordAuthSubmitting}
             >
                 <span class="txt">{totalSteps > 1 ? "Next" : "Login"}</span>
-                <i class="ri-arrow-right-line" />
             </button>
+
         </form>
-    {:else if authMethods.otp.enabled}
+    {:else if authMethods.otp?.enabled}
         {#if !otpId}
             <!-- request otp -->
             <form class="block" on:submit|preventDefault={requestOTP}>

@@ -1,5 +1,6 @@
 <script>
     import PageWrapper from "@/components/base/PageWrapper.svelte";
+    import { appName, logoUrl } from "@/stores/app";
 
     export let nobranding = false;
 </script>
@@ -10,12 +11,12 @@
             <div class="block txt-center m-b-lg">
                 <figure class="logo">
                     <img
-                        src="{import.meta.env.BASE_URL}images/logo.svg"
-                        alt="Base logo"
+                        src={$logoUrl || `${import.meta.env.BASE_URL}images/logo.svg`}
+                        alt={$appName || "Base"}
                         width="40"
                         height="40"
                     />
-                    <span class="txt">Base <strong>Base</strong></span>
+                    <span class="txt"><strong>{$appName || "Base"}</strong></span>
                 </figure>
             </div>
             <div class="clearfix" />

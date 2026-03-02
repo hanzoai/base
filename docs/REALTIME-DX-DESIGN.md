@@ -10,7 +10,7 @@ in Hanzo Base's Go backend with SSE/WebSocket transport.
 
 ## 1. Reactive Queries (Convex-Inspired)
 
-### Current: PocketBase SSE Subscriptions
+### Current: Base SSE Subscriptions
 ```typescript
 // Subscribe to all changes in a collection
 base.collection('tasks').subscribe('*', callback)

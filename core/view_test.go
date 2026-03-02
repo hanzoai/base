@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 )
@@ -326,7 +326,7 @@ func TestCreateViewFields(t *testing.T) {
 			},
 		},
 		{
-			"query with multiple froms, joins and style of aliasses",
+			"query with multiple froms, joins and style of aliases",
 			`
 				select
 					a.id as id,

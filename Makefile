@@ -1,3 +1,9 @@
+ui:
+	cd ui && pnpm install && pnpm build
+
+build: ui
+	go build -o base ./examples/base/main.go
+
 lint:
 	golangci-lint run -c ./golangci.yml ./...
 

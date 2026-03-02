@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/security"
 )
 

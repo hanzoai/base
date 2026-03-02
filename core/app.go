@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
@@ -215,6 +215,29 @@ type App interface {
 	//
 	// In a transaction the AuxConcurrentDB() and AuxNonconcurrentDB() refer to the same *dbx.TX instance.
 	AuxNonconcurrentDB() dbx.Builder
+
+	// ---------------------------------------------------------------
+	// Multi-tenant DB methods
+	// ---------------------------------------------------------------
+
+	// OrgDB returns the data.db builder for a specific org.
+	//
+	// Returns nil, nil if multi-tenancy is not enabled.
+	// Returns an error if the org ID is invalid or the database cannot be opened.
+	//
+	// The returned builder routes SELECTs to a concurrent pool and writes
+	// to a nonconcurrent pool, same as DB().
+	//
+	// Multi-tenancy activates only when MULTI_TENANT=true or MASTER_KEY is set.
+	OrgDB(orgID string) (dbx.Builder, error)
+
+	// OrgNonconcurrentDB returns the write-only builder for a specific org.
+	//
+	// Returns nil, nil if multi-tenancy is not enabled.
+	OrgNonconcurrentDB(orgID string) (dbx.Builder, error)
+
+	// Tenants returns the TenantRegistry, or nil if multi-tenancy is not enabled.
+	Tenants() *TenantRegistry
 
 	// HasTable checks if a table (or view) with the provided name exists (case insensitive).
 	// in the data.db.

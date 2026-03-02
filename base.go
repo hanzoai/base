@@ -50,7 +50,7 @@ type Config struct {
 
 	// optional default values for the console flags
 	DefaultDev           bool
-	DefaultDataDir       string // if not set, it will fallback to "./hz_data"
+	DefaultDataDir       string // if not set, it will fallback to "./data"
 	DefaultEncryptionEnv string
 	DefaultQueryTimeout  time.Duration // default to core.DefaultQueryTimeout (in seconds)
 
@@ -89,7 +89,7 @@ func NewWithConfig(config Config) *Base {
 	// initialize a default data directory based on the executable baseDir
 	if config.DefaultDataDir == "" {
 		baseDir, _ := inspectRuntime()
-		config.DefaultDataDir = filepath.Join(baseDir, "hz_data")
+		config.DefaultDataDir = filepath.Join(baseDir, "data")
 	}
 
 	if config.DefaultQueryTimeout == 0 {

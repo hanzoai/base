@@ -11,7 +11,7 @@ import (
 
 	_ "unsafe"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/logger"
@@ -134,7 +134,7 @@ func TestBaseAppBootstrap(t *testing.T) {
 }
 
 func TestNewBaseAppTx(t *testing.T) {
-	const testDataDir = "./pb_base_app_test_data_dir/"
+	const testDataDir = "./test_data_dir/"
 	defer os.RemoveAll(testDataDir)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
