@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // default retries intervals (in ms)

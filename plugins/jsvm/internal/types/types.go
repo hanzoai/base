@@ -1272,7 +1272,7 @@ func main() {
 	gen := tygoja.New(tygoja.Config{
 		Packages: map[string][]string{
 			"github.com/go-ozzo/ozzo-validation/v4":             {"Error"},
-			"github.com/pocketbase/dbx":                         {"*"},
+			"github.com/hanzoai/dbx":                         {"*"},
 			"github.com/hanzoai/base/tools/security":   {"*"},
 			"github.com/hanzoai/base/tools/filesystem": {"*"},
 			"github.com/hanzoai/base/tools/template":   {"*"},

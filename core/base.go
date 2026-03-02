@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
