@@ -134,13 +134,17 @@ func Register(app core.App, config PlatformConfig) error {
 		return p.ensureSystemCollections()
 	})
 
-	// Configure IAM JWKS fallback for Base's loadAuthToken middleware.
-	// This enables all Base routes to accept IAM-issued JWTs transparently.
+	// Configure the external identity provider as the exclusive auth source.
+	// All Base routes accept OIDC/JWKS tokens; built-in auth endpoints
+	// (password, OTP, email-change, etc.) are disabled for non-superuser
+	// collections.
 	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
-	app.Store().Set(apis.StoreKeyIAMJWKSURL, jwksURL)
+	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 
-	app.Logger().Info("platform: IAM JWKS fallback configured",
+	app.Logger().Info("platform: external auth enabled — built-in auth disabled for non-superuser collections",
 		slog.String("jwksURL", jwksURL),
+		slog.String("authEndpoint", config.IAMEndpoint),
 	)
 
 	// Serve: register API routes, identity header middleware, and org-scoping.
@@ -160,9 +164,9 @@ func Register(app core.App, config PlatformConfig) error {
 					email := re.Auth.GetString("email")
 					orgId := re.Auth.GetString("org_id")
 
-					// If org_id wasn't on the record, check IAM claims stored by loadAuthToken.
+					// If org_id wasn't on the record, check claims stored by loadAuthToken.
 					if orgId == "" {
-						if v, _ := re.Get("iamOwner").(string); v != "" {
+						if v, _ := re.Get("authOwner").(string); v != "" {
 							orgId = v
 						}
 					}
