@@ -86,7 +86,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 			// add a default CSP
 			if e.Response.Header().Get("Content-Security-Policy") == "" {
-				e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' http://127.0.0.1:* https: data: blob:; connect-src 'self' http://127.0.0.1:* https:; script-src 'self' 'unsafe-inline' https://analytics.hanzo.ai")
+				e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' http://127.0.0.1:* https: data: blob:; connect-src 'self' http://127.0.0.1:* https:; script-src 'self' 'unsafe-inline' https://analytics.hanzo.ai")
 			}
 
 			return e.Next()
