@@ -17,7 +17,7 @@ jobs:
   dispatch-to-universe:
     needs: docker
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && secrets.UNIVERSE_DISPATCH_TOKEN != ''
     steps:
       - name: Compute image tag
         id: meta
