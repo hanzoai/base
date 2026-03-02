@@ -69,7 +69,7 @@
 </script>
 
 <svelte:head>
-    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName, "Hanzo Base"], " - ", false)}</title>
+    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName, "Base"], " - ", false)}</title>
 
     {#if window.location.protocol == "https:"}
         <link
@@ -86,7 +86,7 @@
             <a href="/" class="logo logo-sm" use:link>
                 <img
                     src="{import.meta.env.BASE_URL}images/logo.svg"
-                    alt="Base logo"
+                    alt="Hanzo"
                     width="40"
                     height="40"
                 />
