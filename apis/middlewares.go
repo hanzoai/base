@@ -260,9 +260,16 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 
 	// Extract identity claims from the IAM JWT.
 	// IAM uses "sub" for user ID, "owner" for org, "email" for email.
+	// Casdoor may leave "sub" empty — fall back to preferred_username then name.
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return nil, errors.New("iam token missing sub claim")
+		sub, _ = claims["preferred_username"].(string)
+	}
+	if sub == "" {
+		sub, _ = claims["name"].(string)
+	}
+	if sub == "" {
+		return nil, errors.New("iam token missing sub/preferred_username/name claim")
 	}
 
 	owner, _ := claims["owner"].(string)
@@ -294,8 +301,12 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		return nil, fmt.Errorf("collection %q is not an auth collection", collectionName)
 	}
 
-	// Try to find existing user by IAM sub (stored as the record ID).
-	record, err := e.App.FindRecordById(collection, sub)
+	// Try to find existing user by IAM sub (truncated to 15 chars for Base ID limit).
+	shortId := sub
+	if len(shortId) > 15 {
+		shortId = strings.ReplaceAll(shortId, "-", "")[:15]
+	}
+	record, err := e.App.FindRecordById(collection, shortId)
 	if err == nil {
 		return record, nil
 	}
@@ -309,8 +320,9 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 	}
 
 	// Auto-create a new Base user record for this IAM identity.
+	// Base record IDs are max 15 chars; IAM sub is a UUID (36 chars).
 	record = core.NewRecord(collection)
-	record.Id = sub
+	record.Id = shortId
 	record.Set("email", email)
 	if name != "" {
 		record.Set("name", name)
