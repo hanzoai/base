@@ -27,6 +27,9 @@
     let otpEmail = "";
     let otpPassword = "";
 
+    // OIDC state
+    let oidcConfig = { enabled: false };
+
     $: {
         totalSteps = 1;
         currentStep = 1;
@@ -69,7 +72,19 @@
         authWithPassword();
     }
 
+    loadOIDCConfig();
     loadAuthMethods();
+
+    async function loadOIDCConfig() {
+        try {
+            const resp = await fetch("/_/api/oidc/config");
+            if (resp.ok) {
+                oidcConfig = await resp.json();
+            }
+        } catch (err) {
+            // OIDC not available, keep disabled
+        }
+    }
 
     async function loadAuthMethods() {
         if (isLoading) {
@@ -169,6 +184,10 @@
 
         otpAuthSubmitting = false;
     }
+
+    function redirectToOIDC() {
+        window.location.href = "/_/auth/oidc/redirect";
+    }
 </script>
 
 <FullPage>
@@ -176,11 +195,11 @@
         <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
             <h4 style="margin: 0;">
                 Login as Superuser
-                {#if totalSteps > 1}
+                {#if !oidcConfig.enabled && totalSteps > 1}
                     ({currentStep}/{totalSteps})
                 {/if}
             </h4>
-            {#if window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
+            {#if !oidcConfig.enabled && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')}
                 <button
                     type="button"
                     class="btn btn-sm"
@@ -197,7 +216,18 @@
         <div class="block txt-center">
             <span class="loader" />
         </div>
-    {:else if authMethods.password.enabled && !mfaId}
+    {:else if oidcConfig.enabled}
+        <!-- OIDC-only mode: show sign-in button, hide email/password -->
+        <div class="block">
+            <button
+                type="button"
+                class="btn btn-lg btn-block btn-primary"
+                on:click={redirectToOIDC}
+            >
+                <span class="txt">Sign in</span>
+            </button>
+        </div>
+    {:else if authMethods.password?.enabled && !mfaId}
         <!-- auth with password -->
         <form class="block" on:submit|preventDefault={authWithPassword}>
             <Field class="form-field required" name="identity" let:uniqueId>
@@ -238,7 +268,7 @@
             </button>
 
         </form>
-    {:else if authMethods.otp.enabled}
+    {:else if authMethods.otp?.enabled}
         {#if !otpId}
             <!-- request otp -->
             <form class="block" on:submit|preventDefault={requestOTP}>
