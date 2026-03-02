@@ -78,10 +78,20 @@ type PlatformConfig struct {
 	TenantIsolation string
 
 	// TenantEncryptionKey is the master key for deriving per-tenant DEKs.
-	// When set with TenantIsolation="sqlite", each tenant's SQLite is
-	// encrypted with HMAC-SHA256(masterKey, tenantSlug) as the DEK.
-	// If empty, SQLite files are unencrypted (dev mode).
+	// Used for both SQLite encryption AND S3 SSE-C key derivation.
+	// Each org gets: HMAC-SHA256(masterKey, orgSlug)
+	// Each user gets: HMAC-SHA256(masterKey, orgSlug:userId)
+	// If empty, encryption is disabled (dev mode).
 	TenantEncryptionKey string
+
+	// TenantStorageEndpoint is the S3-compatible storage endpoint for per-tenant
+	// object storage (e.g., "s3.hanzo.space" or "s3.hanzo.ai").
+	// Each org and user gets isolated prefixes with SSE-C encryption.
+	// If empty, no per-tenant S3 storage is provisioned.
+	TenantStorageEndpoint string
+
+	// TenantStorageBucket is the root S3 bucket name (default: "tenants").
+	TenantStorageBucket string
 
 	// DefaultTemplates defines collection schemas cloned per tenant on creation.
 	// If nil, no default tenant collections are created.
