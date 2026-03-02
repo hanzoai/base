@@ -14,6 +14,12 @@ func bindHealthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	subGroup.GET("", healthCheck)
 }
 
+// BindHealthzRoute registers /healthz at the root of the given router.
+// This is the platform-standard health check endpoint.
+func BindHealthzRoute(rg *router.Router[*core.RequestEvent]) {
+	rg.GET("/healthz", healthCheck)
+}
+
 // healthCheck returns a 200 OK response if the server is healthy.
 func healthCheck(e *core.RequestEvent) error {
 	resp := struct {
