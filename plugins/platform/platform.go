@@ -241,6 +241,10 @@ func Register(app core.App, config PlatformConfig) error {
 						re.Request.Header.Set("X-User-Email", email)
 					}
 				}
+				// Preserve gateway-injected identity headers if Base auth didn't resolve.
+				// The gateway validates the JWT and sets X-User-Id from the sub claim.
+				// This is the standard path for IAM-authenticated requests.
+				// Do NOT clear headers that the gateway already set.
 				return re.Next()
 			},
 		})

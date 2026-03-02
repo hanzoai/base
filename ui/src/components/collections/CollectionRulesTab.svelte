@@ -20,7 +20,7 @@
         <p>
             All rules follow the
             <a href={import.meta.env.HZ_RULES_SYNTAX_DOCS} target="_blank" rel="noopener noreferrer">
-                Hanzo Base filter syntax and operators
+                Base filter syntax and operators
             </a>.
         </p>
         <button
