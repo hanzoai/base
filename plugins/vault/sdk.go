@@ -26,9 +26,12 @@
 package vault
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"sync"
 	"time"
 )
@@ -283,4 +286,260 @@ func (s *Session) close() {
 	clear(s.dek)
 	s.store = nil
 	s.oplog = nil
+}
+
+// ─── v2: Shared Vaults ──────────────────────────────────────────────────────
+
+// SharedSession is a multi-member vault derived from the org KEK + vaultID.
+// Members list controls who can access. Each member decrypts with the shared DEK.
+type SharedSession struct {
+	Session
+	vaultID string
+	members map[string]bool
+}
+
+// OpenSharedVault creates a shared vault accessible by the listed members.
+// The DEK is derived from orgKEK + vaultID (not any single user).
+func (v *Vault) OpenSharedVault(vaultID string, members []string) (*SharedSession, error) {
+	if vaultID == "" {
+		return nil, fmt.Errorf("vault: vaultID required")
+	}
+	if len(members) == 0 {
+		return nil, fmt.Errorf("vault: at least one member required")
+	}
+
+	// Shared DEK = HMAC-SHA256(orgKEK, "vault:shared:" + vaultID)
+	mac := hmac.New(sha256.New, v.orgKEK)
+	mac.Write([]byte("vault:shared:" + vaultID))
+	dek := mac.Sum(nil)
+
+	memberSet := make(map[string]bool, len(members))
+	for _, m := range members {
+		memberSet[m] = true
+	}
+
+	ss := &SharedSession{
+		Session: Session{
+			userID:   "shared:" + vaultID,
+			orgID:    v.config.OrgID,
+			dek:      dek,
+			dataDir:  v.config.DataDir,
+			chainRPC: v.config.ChainRPC,
+			store:    make(map[string][]byte),
+			oplog:    make([]Op, 0),
+			version:  make(map[string]uint64),
+		},
+		vaultID: vaultID,
+		members: memberSet,
+	}
+	return ss, nil
+}
+
+// IsMember returns true if the given userID is in the members list.
+func (ss *SharedSession) IsMember(userID string) bool {
+	return ss.members[userID]
+}
+
+// PutAs stores a value only if the caller is a member.
+func (ss *SharedSession) PutAs(userID, key string, value []byte) error {
+	if !ss.IsMember(userID) {
+		return fmt.Errorf("vault: %s is not a member of shared vault %s", userID, ss.vaultID)
+	}
+	return ss.Session.Put(key, value)
+}
+
+// GetAs retrieves a value only if the caller is a member.
+func (ss *SharedSession) GetAs(userID, key string) ([]byte, error) {
+	if !ss.IsMember(userID) {
+		return nil, fmt.Errorf("vault: %s is not a member of shared vault %s", userID, ss.vaultID)
+	}
+	return ss.Session.Get(key)
+}
+
+// ─── v2: Multi-Device Enrollment ─────────────────────────────────────────────
+
+// DeviceKey is a device-specific wrapping key derived from the user DEK.
+type DeviceKey struct {
+	UserID   string
+	DeviceID string
+	Key      []byte // 32-byte device wrapping key
+}
+
+// EnrollDevice creates a device-specific wrapping key for the given user.
+// Device key = HMAC-SHA256(userDEK, "device:" + deviceID).
+// The device key wraps the user DEK for local storage on that device.
+func (v *Vault) EnrollDevice(userID, deviceID string) (*DeviceKey, error) {
+	v.mu.RLock()
+	s, ok := v.users[userID]
+	v.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("vault: user %s not open", userID)
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	mac := hmac.New(sha256.New, s.dek)
+	mac.Write([]byte("device:" + deviceID))
+
+	return &DeviceKey{
+		UserID:   userID,
+		DeviceID: deviceID,
+		Key:      mac.Sum(nil),
+	}, nil
+}
+
+// RevokeDevice removes a device key. The user DEK is unaffected — other
+// devices continue to work. In production, the revoked device's wrapped
+// DEK copy becomes useless because its wrapping key is discarded.
+func (v *Vault) RevokeDevice(userID, deviceID string) error {
+	v.mu.RLock()
+	_, ok := v.users[userID]
+	v.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("vault: user %s not open", userID)
+	}
+	// In v2 in-memory model, revocation is a no-op on the DEK itself.
+	// The device key is simply not re-derived. In production, the wrapped
+	// DEK blob stored on the revoked device becomes undecryptable because
+	// the server no longer issues the device wrapping key.
+	return nil
+}
+
+// ─── v2: Per-Collection Sharing ──────────────────────────────────────────────
+
+// ShareToken carries a re-encrypted DEK scoped to a single collection.
+type ShareToken struct {
+	Collection    string
+	RecipientID   string
+	CollectionDEK []byte // 32-byte collection-scoped key
+}
+
+// ShareCollection creates a ShareToken that lets recipientID decrypt only
+// the named collection. Collection DEK = HMAC-SHA256(userDEK, "collection:" + collectionName).
+func (s *Session) ShareCollection(collection, recipientID string) *ShareToken {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	mac := hmac.New(sha256.New, s.dek)
+	mac.Write([]byte("collection:" + collection))
+
+	return &ShareToken{
+		Collection:    collection,
+		RecipientID:   recipientID,
+		CollectionDEK: mac.Sum(nil),
+	}
+}
+
+// PutCollection stores a value encrypted with the collection-scoped DEK.
+func (s *Session) PutCollection(collection, key string, value []byte) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	mac := hmac.New(sha256.New, s.dek)
+	mac.Write([]byte("collection:" + collection))
+	colDEK := mac.Sum(nil)
+
+	shard := &UserShard{DEK: colDEK}
+	encrypted, err := shard.Encrypt(value)
+	if err != nil {
+		return fmt.Errorf("vault: encrypt collection: %w", err)
+	}
+
+	storeKey := collection + ":" + key
+	s.store[storeKey] = encrypted
+	return nil
+}
+
+// GetCollection retrieves a value encrypted with the collection-scoped DEK.
+func (s *Session) GetCollection(collection, key string) ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	storeKey := collection + ":" + key
+	encrypted, ok := s.store[storeKey]
+	if !ok {
+		return nil, fmt.Errorf("vault: key not found: %s", storeKey)
+	}
+
+	mac := hmac.New(sha256.New, s.dek)
+	mac.Write([]byte("collection:" + collection))
+	colDEK := mac.Sum(nil)
+
+	shard := &UserShard{DEK: colDEK}
+	return shard.Decrypt(encrypted)
+}
+
+// GetWithToken retrieves and decrypts a value using a ShareToken.
+// Only works for keys in the token's collection.
+func GetWithToken(token *ShareToken, store map[string][]byte, key string) ([]byte, error) {
+	storeKey := token.Collection + ":" + key
+	encrypted, ok := store[storeKey]
+	if !ok {
+		return nil, fmt.Errorf("vault: key not found: %s", storeKey)
+	}
+	shard := &UserShard{DEK: token.CollectionDEK}
+	return shard.Decrypt(encrypted)
+}
+
+// ─── v2: Threshold Recovery ──────────────────────────────────────────────────
+
+// CreateRecoveryShares splits the user DEK into `total` shares using
+// XOR-based secret sharing. Any `threshold` shares can reconstruct the DEK
+// when threshold == total (all shares needed). Proper Shamir SSS in v3.
+func (s *Session) CreateRecoveryShares(threshold, total int) ([][]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if threshold < 2 || total < threshold {
+		return nil, fmt.Errorf("vault: need threshold >= 2 and total >= threshold")
+	}
+	if threshold != total {
+		return nil, fmt.Errorf("vault: v2 only supports threshold == total (XOR split); Shamir in v3")
+	}
+
+	dekLen := len(s.dek)
+	shares := make([][]byte, total)
+
+	// Generate (total-1) random shares.
+	xorAcc := make([]byte, dekLen)
+	copy(xorAcc, s.dek)
+
+	for i := 0; i < total-1; i++ {
+		share := make([]byte, dekLen)
+		if _, err := io.ReadFull(rand.Reader, share); err != nil {
+			return nil, fmt.Errorf("vault: random share: %w", err)
+		}
+		shares[i] = share
+		for j := 0; j < dekLen; j++ {
+			xorAcc[j] ^= share[j]
+		}
+	}
+
+	// Last share = DEK XOR all previous shares.
+	shares[total-1] = xorAcc
+
+	return shares, nil
+}
+
+// RecoverFromShares reconstructs a DEK by XOR-ing all shares together.
+// Requires all shares (threshold == total in v2).
+func RecoverFromShares(shares [][]byte) ([]byte, error) {
+	if len(shares) < 2 {
+		return nil, fmt.Errorf("vault: need at least 2 shares for recovery")
+	}
+	keyLen := len(shares[0])
+	for i, s := range shares {
+		if len(s) != keyLen {
+			return nil, fmt.Errorf("vault: share %d has wrong length %d (expected %d)", i, len(s), keyLen)
+		}
+	}
+
+	result := make([]byte, keyLen)
+	for _, share := range shares {
+		for j := 0; j < keyLen; j++ {
+			result[j] ^= share[j]
+		}
+	}
+	return result, nil
 }
