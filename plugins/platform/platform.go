@@ -53,6 +53,12 @@ type PlatformConfig struct {
 	// IAMClientSecret is the OAuth2 client secret for IAM authentication.
 	IAMClientSecret string
 
+	// IAMOrg is the IAM organization identifier (optional, used by auth proxy).
+	IAMOrg string
+
+	// IAMApp is the IAM application identifier (optional, used by auth proxy).
+	IAMApp string
+
 	// ComplianceEndpoint is the base URL for Lux Compliance service (optional).
 	// If set, enables KYC/AML screening and payment compliance for tenants.
 	ComplianceEndpoint string
@@ -100,6 +106,7 @@ func Register(app core.App, config PlatformConfig) error {
 	// Serve: register API routes and tenant-scoping middleware.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		p.registerRoutes(e.Router)
+		p.registerAuthRoutes(e.Router)
 		return e.Next()
 	})
 
