@@ -14815,7 +14815,7 @@ namespace pocketbase {
    * optional default values for the console flags
    */
   defaultDev: boolean
-  defaultDataDir: string // if not set, it will fallback to "./pb_data"
+  defaultDataDir: string // if not set, it will fallback to "./data"
   defaultEncryptionEnv: string
   defaultQueryTimeout: time.Duration // default to core.DefaultQueryTimeout (in seconds)
   /**
