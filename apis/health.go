@@ -8,12 +8,6 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// bindHealthApi registers the health api endpoint.
-func bindHealthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
-	subGroup := rg.Group("/health")
-	subGroup.GET("", healthCheck)
-}
-
 // BindHealthzRoute registers /healthz at the root of the given router.
 // This is the platform-standard health check endpoint.
 func BindHealthzRoute(rg *router.Router[*core.RequestEvent]) {
