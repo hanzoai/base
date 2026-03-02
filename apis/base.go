@@ -37,7 +37,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 
 	apiPrefix := os.Getenv("BASE_API_PREFIX")
 	if apiPrefix == "" {
-		apiPrefix = "/api"
+		apiPrefix = "/v1/base"
 	}
 	apiGroup := baseRouter.Group(apiPrefix)
 	bindSettingsApi(app, apiGroup)
