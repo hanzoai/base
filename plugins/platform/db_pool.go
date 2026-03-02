@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/hanzoai/base/core"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // DBPool holds a dual-pool connection pair for one SQLite database.

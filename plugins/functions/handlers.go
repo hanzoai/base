@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/hanzoai/base/core"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // handleDeployFunction handles POST /api/functions

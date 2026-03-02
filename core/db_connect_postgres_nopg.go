@@ -5,7 +5,7 @@ package core
 import (
 	"errors"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 )
 
 // PostgresDBConnect is a stub when the pg driver is excluded via the no_pg_driver build tag.
