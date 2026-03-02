@@ -1331,7 +1331,7 @@ func (app *BaseApp) registerBaseHooks() {
 		return nil
 	}
 
-	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("PB_FILES_DELETE_MAX_WORKERS"))
+	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("HZ_FILES_DELETE_MAX_WORKERS"))
 	if maxFilesDeleteWorkers <= 0 {
 		maxFilesDeleteWorkers = 2000 // the value is arbitrary chosen and may change in the future
 	}
