@@ -97,9 +97,9 @@
             </p>
             <p>Below is an oversimplified version of the restore flow:</p>
             <ol>
-                <li>Replaces the current <code>pb_data</code> with the content from the backup</li>
+                <li>Replaces the current <code>data</code> directory with the content from the backup</li>
                 <li>Triggers app restart</li>
-                <li>Applies all migrations that are missing in the restored <code>pb_data</code></li>
+                <li>Applies all migrations that are missing in the restored <code>data</code> directory</li>
                 <li>Initializes the app server as usual</li>
             </ol>
         </div>
