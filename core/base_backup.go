@@ -132,7 +132,7 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 //
 //  3. Move the current app "hz_data" content (excluding the local backups and the special temp dir)
 //     under another temp sub dir that will be deleted on the next app start up
-//     (eg. "hz_data/.hz_temp_to_delete/old_hz_data").
+//     (eg. "hz_data/.hz_temp_to_delete/old_data").
 //     This is because on some environments it may not be allowed
 //     to delete the currently open "hz_data" files.
 //
@@ -306,7 +306,7 @@ func (app *BaseApp) registerAutobackupHooks() {
 		}
 
 		app.Cron().Add(jobId, rawSchedule, func() {
-			const autoPrefix = "@auto_hz_backup_"
+			const autoPrefix = "@auto_backup_"
 
 			name := generateBackupName(app, autoPrefix)
 
