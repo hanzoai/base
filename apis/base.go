@@ -56,6 +56,9 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
 	bindSuperuserOIDCApi(app, baseRouter)
 
+	// Platform-standard health check at root level.
+	BindHealthzRoute(baseRouter)
+
 	return baseRouter, nil
 }
 
