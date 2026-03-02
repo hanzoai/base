@@ -51,7 +51,7 @@ func GetSuperuserAuthToken(app core.App, recordId string) (string, error) {
 
 // Common test record IDs (matching tests/data/data.db)
 const (
-	// Users collection (_hz_users_auth_)
+	// Users collection (_users_auth_)
 	TestUserID1 = "4q1xlclmfloku33" // test@example.com
 	TestUserID2 = "oap640cot4yru2s" // test2@example.com
 	TestUserID3 = "bgs820n361vj1qd" // test3@example.com

@@ -724,10 +724,10 @@ export default class CommonHelper {
         const result = [];
 
         const items = (str || "")
-            .replaceAll("\\" + separator, "{_HZ_ESCAPED_}")
+            .replaceAll("\\" + separator, "{_ESCAPED_}")
             .split(separator)
             .map((item) => {
-                return item.replaceAll("{_HZ_ESCAPED_}", separator);
+                return item.replaceAll("{_ESCAPED_}", separator);
             });
 
         for (let item of items) {
@@ -2026,11 +2026,11 @@ export default class CommonHelper {
 
         // columns
         const rawColumns = (matches[5] || "")
-            .replace(/,(?=[^\(]*\))/gmi, "{HZ_TEMP}") // temporary replace comma within expressions for easier splitting
+            .replace(/,(?=[^\(]*\))/gmi, "{_COMMA_}") // temporary replace comma within expressions for easier splitting
             .split(",");                              // split columns
 
         for (let col of rawColumns) {
-            col = col.trim().replaceAll("{HZ_TEMP}", ",") // revert temp replacement
+            col = col.trim().replaceAll("{_COMMA_}", ",") // revert temp replacement
 
             const colRegex = /^([\s\S]+?)(?:\s+collate\s+([\w]+))?(?:\s+(asc|desc))?$/gmi
             const colMatches = colRegex.exec(col);

@@ -1,14 +1,4 @@
-<p align="center">
-    <a href="https://hanzo.ai" target="_blank" rel="noopener">
-        <img src="https://i.imgur.com/5qimnm5.png" alt="Hanzo Base - Open Source backend for any app" />
-    </a>
-</p>
-
-<p align="center">
-    <a href="https://github.com/hanzoai/base/actions/workflows/release.yaml" target="_blank" rel="noopener"><img src="https://github.com/hanzoai/base/actions/workflows/release.yaml/badge.svg" alt="build" /></a>
-    <a href="https://github.com/hanzoai/base/releases" target="_blank" rel="noopener"><img src="https://img.shields.io/github/release/hanzoai/base.svg" alt="Latest releases" /></a>
-    <a href="https://pkg.go.dev/github.com/hanzoai/base" target="_blank" rel="noopener"><img src="https://godoc.org/github.com/hanzoai/base?status.svg" alt="Go package documentation" /></a>
-</p>
+# base
 
 [Base](https://hanzo.ai/base) is an open source Go backend that includes:
 
@@ -17,7 +7,7 @@
 - convenient **Admin dashboard UI**
 - and simple **GraphQL** && **REST-ish API**
 - native **Analytics and LLM observability**
-- deeply with integrated **[Base AI Platform](https://hanzo.ai)** for
+- deeply with integrated **[Hanzo AI Platform](https://hanzo.ai)** for
   hyperscalability day one.
 
 **Use [Hanzo App](https://hanzo.app) to rapidly iterate and build new apps!
@@ -52,7 +42,7 @@ your own custom app specific business logic and still have a single portable exe
 
 Here is a minimal example:
 
-0. [Install Go 1.23+](https://go.dev/doc/install) (_if you haven't already_)
+0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
 
 1. Create a new project directory with the following `main.go` file inside it:
     ```go
@@ -95,7 +85,7 @@ _For more details please refer to [Extend with Go](https://docs.hanzo.ai/go-over
 
 To build the minimal standalone executable, like the prebuilt ones in the releases page, you can simply run `go build` inside the `examples/base` directory:
 
-0. [Install Go 1.24+](https://go.dev/doc/install) (_if you haven't already_)
+0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
 1. Clone/download the repo
 2. Navigate to `examples/base`
 3. Run `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`
@@ -132,6 +122,18 @@ go test ./...
 ```
 
 Check also the [Testing guide](http://docs.hanzo.ai/testing) to learn how to write your own custom application tests.
+
+## SQLite Replication
+
+Base uses SQLite per org (encrypted via `hanzoai/sqlite` with per-principal CEK).
+The `hanzoai/replicate` sidecar streams WAL changes to S3, encrypted with `luxfi/age`.
+
+K8s sidecar pattern:
+- **Init container**: restores the latest snapshot from S3 on startup
+- **Sidecar**: continuously replicates WAL to S3 while the service runs
+
+Config: `litestream.yml` with `age-identities` / `age-recipients` fields for
+end-to-end encryption of replicated data.
 
 ## Security
 

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/picker"
@@ -76,12 +76,14 @@ func realtimeConnect(e *core.RequestEvent) error {
 		ce.App.Logger().Debug("Realtime connection established.", slog.String("clientId", ce.Client.Id()))
 
 		// signalize established connection (aka. fire "connect" message)
+		connectData := []byte(`{"clientId":"` + ce.Client.Id() + `"}`)
+
 		connectMsgEvent := new(core.RealtimeMessageEvent)
 		connectMsgEvent.RequestEvent = ce.RequestEvent
 		connectMsgEvent.Client = ce.Client
 		connectMsgEvent.Message = &subscriptions.Message{
-			Name: "HZ_CONNECT",
-			Data: []byte(`{"clientId":"` + ce.Client.Id() + `"}`),
+			Name: "CONNECT",
+			Data: connectData,
 		}
 		connectMsgErr := ce.App.OnRealtimeMessageSend().Trigger(connectMsgEvent, func(me *core.RealtimeMessageEvent) error {
 			err := me.Message.WriteSSE(me.Response, me.Client.Id())
@@ -92,7 +94,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 		})
 		if connectMsgErr != nil {
 			ce.App.Logger().Debug(
-				"Realtime connection closed (failed to deliver HZ_CONNECT)",
+				"Realtime connection closed (failed to deliver CONNECT)",
 				slog.String("clientId", ce.Client.Id()),
 				slog.String("error", connectMsgErr.Error()),
 			)
@@ -289,7 +291,7 @@ func bindRealtimeEvents(app core.App) {
 	})
 
 	// remove the client(s) associated to the deleted auth model
-	// (note: works also with custom model for backward compatibility)
+	// (note: works also with custom model for legacy)
 	app.OnModelAfterDeleteSuccess().Bind(&hook.Handler[*core.ModelEvent]{
 		Func: func(e *core.ModelEvent) error {
 			collection := realtimeResolveRecordCollection(e.App, e.Model)
@@ -501,7 +503,7 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 		(collection.Name + "/*?"):                 collection.ListRule,
 		(collection.Id + "/*?"):                   collection.ListRule,
 
-		// @deprecated: the same as the wildcard topic but kept for backward compatibility
+		// @deprecated: the same as the wildcard topic but kept for legacy
 		(collection.Name + "?"): collection.ListRule,
 		(collection.Id + "?"):   collection.ListRule,
 	}

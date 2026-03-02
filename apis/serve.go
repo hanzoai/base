@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,6 +78,20 @@ func Serve(app core.App, config ServeConfig) error {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
+	// Root redirect: disabled by default. Set BASE_ENABLE_ROOT_REDIRECT=1 to redirect / → /_/
+	if os.Getenv("BASE_ENABLE_ROOT_REDIRECT") == "1" {
+		baseRouter.GET("/", func(e *core.RequestEvent) error {
+			return e.Redirect(http.StatusTemporaryRedirect, "/_/")
+		})
+	}
+
+	// Admin UI: disabled by default. Set BASE_ENABLE_ADMIN_UI=1 to serve /_/ dashboard.
+	// Production services are headless APIs — no UI surface exposed.
+	if os.Getenv("BASE_ENABLE_ADMIN_UI") != "1" {
+		baseRouter.GET("/_/{path...}", func(e *core.RequestEvent) error {
+			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
+		})
+	} else {
 	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
@@ -86,12 +101,13 @@ func Serve(app core.App, config ServeConfig) error {
 
 			// add a default CSP
 			if e.Response.Header().Get("Content-Security-Policy") == "" {
-				e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' http://127.0.0.1:* https://tile.openstreetmap.org data: blob:; connect-src 'self' http://127.0.0.1:* https://nominatim.openstreetmap.org; script-src 'self' 'sha256-GRUzBA7PzKYug7pqxv5rJaec5bwDCw1Vo6/IXwvD3Tc='")
+				e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' http://127.0.0.1:* https: data: blob:; connect-src 'self' http://127.0.0.1:* https:; script-src 'self' 'unsafe-inline'")
 			}
 
 			return e.Next()
 		}).
 		Bind(Gzip())
+	}
 
 	// start http server
 	// ---
@@ -137,11 +153,6 @@ func Serve(app core.App, config ServeConfig) error {
 	defer cancelBaseCtx()
 
 	server := &http.Server{
-		TLSConfig: &tls.Config{
-			MinVersion:     tls.VersionTLS12,
-			GetCertificate: certManager.GetCertificate,
-			NextProtos:     []string{acme.ALPNProto},
-		},
 		// higher defaults to accommodate large file uploads/downloads
 		WriteTimeout:      5 * time.Minute,
 		ReadTimeout:       5 * time.Minute,
@@ -151,6 +162,18 @@ func Serve(app core.App, config ServeConfig) error {
 			return baseCtx
 		},
 		ErrorLog: log.New(&serverErrorLogWriter{app: app}, "", 0),
+	}
+
+	// Only set TLS config when HTTPS is explicitly enabled.
+	// Without this guard, Go's http.Server auto-upgrades connections
+	// to TLS when TLSConfig is present, breaking HTTP health probes
+	// and ingress backends that connect via plain HTTP.
+	if config.HttpsAddr != "" {
+		server.TLSConfig = &tls.Config{
+			MinVersion:     tls.VersionTLS12,
+			GetCertificate: certManager.GetCertificate,
+			NextProtos:     []string{acme.ALPNProto},
+		}
 	}
 
 	var listener net.Listener
@@ -279,7 +302,11 @@ func Serve(app core.App, config ServeConfig) error {
 		)
 
 		regular := color.New()
-		regular.Printf("├─ REST API:  %s\n", color.CyanString("%s/api/", baseURL))
+		apiPfx := os.Getenv("BASE_API_PREFIX")
+		if apiPfx == "" {
+			apiPfx = "/api"
+		}
+		regular.Printf("├─ REST API:  %s\n", color.CyanString("%s%s/", baseURL, apiPfx))
 		regular.Printf("└─ Dashboard: %s\n", color.CyanString("%s/_/", baseURL))
 	}
 

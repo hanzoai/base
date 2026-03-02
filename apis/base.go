@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -34,7 +36,35 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	baseRouter.Bind(securityHeaders())
 	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
 
-	apiGroup := baseRouter.Group("/api")
+	// External auth mode: allow JWKS-based auth without the platform plugin.
+	// EXTERNAL_AUTH_ONLY=true disables all built-in auth endpoints for
+	// non-superuser collections and requires JWKS_URL for token validation.
+	// The platform plugin sets these store keys directly; env vars provide
+	// the same behavior for standalone Base deployments.
+	if os.Getenv("EXTERNAL_AUTH_ONLY") == "true" {
+		jwksURL := os.Getenv("JWKS_URL")
+		if jwksURL != "" {
+			app.Store().Set(StoreKeyJWKSURL, jwksURL)
+		} else {
+			app.Logger().Warn("EXTERNAL_AUTH_ONLY is set but JWKS_URL is empty — token validation will fail")
+		}
+		app.Store().Set(StoreKeyExternalAuthOnly, true)
+
+		usersCollection := os.Getenv("AUTH_USERS_COLLECTION")
+		if usersCollection != "" {
+			app.Store().Set(StoreKeyAuthUsersCollection, usersCollection)
+		}
+
+		app.Logger().Info("external auth enabled via env — built-in auth disabled for non-superuser collections",
+			slog.String("jwksURL", jwksURL),
+		)
+	}
+
+	apiPrefix := os.Getenv("BASE_API_PREFIX")
+	if apiPrefix == "" {
+		apiPrefix = "/api"
+	}
+	apiGroup := baseRouter.Group(apiPrefix)
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
@@ -44,8 +74,15 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindCronApi(app, apiGroup)
 	bindFileApi(app, apiGroup)
 	bindBatchApi(app, apiGroup)
-	bindRealtimeApi(app, apiGroup)
+	bindTasksApi(app, apiGroup)
 	bindHealthApi(app, apiGroup)
+	bindRealtimeApi(app, apiGroup)
+	bindPrivateApi(app, apiGroup)
+	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
+	bindSuperuserOIDCApi(app, baseRouter)
+
+	// Platform-standard health check at root level.
+	BindHealthzRoute(baseRouter)
 
 	return baseRouter, nil
 }
@@ -98,7 +135,7 @@ func MustSubFS(fsys fs.FS, dir string) fs.FS {
 //
 // Example:
 //
-//	fsys := os.DirFS("./hz_public")
+//	fsys := os.DirFS("./public")
 //	router.GET("/files/{path...}", apis.Static(fsys, false))
 func Static(fsys fs.FS, indexFallback bool) func(*core.RequestEvent) error {
 	if fsys == nil {

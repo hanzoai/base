@@ -5,7 +5,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/pocketbase/dbx"
+	"github.com/hanzoai/dbx"
 	_ "github.com/jackc/pgx/v5/stdlib" // register "pgx" driver
 )
 

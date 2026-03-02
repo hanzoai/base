@@ -1,0 +1,45 @@
+// _hanzo-tokens.scss
+//
+// Shared design tokens from @hanzo/ui/admin/tokens.css.
+// Duplicated here for Svelte SCSS build compatibility.
+// Source of truth: @hanzo/ui/src/admin/tokens.css
+
+:root {
+    // Surface
+    --dash-bg: #0a0a0a;
+    --dash-surface: #141419;
+    --dash-surface-hover: #1a1a22;
+    --dash-surface-active: #22222c;
+    --dash-border: rgba(255, 255, 255, 0.06);
+    --dash-border-hover: rgba(255, 255, 255, 0.12);
+
+    // Text
+    --dash-text: #f4f4f5;
+    --dash-text-muted: #a1a1aa;
+    --dash-text-dim: #71717a;
+
+    // Primary
+    --dash-primary: #3b82f6;
+    --dash-primary-hover: #2563eb;
+    --dash-primary-text: #ffffff;
+
+    // Status
+    --dash-success: #10b981;
+    --dash-success-dim: #065f46;
+    --dash-warning: #f59e0b;
+    --dash-warning-dim: #78350f;
+    --dash-error: #ef4444;
+    --dash-error-dim: #7f1d1d;
+
+    // Sizing
+    --dash-radius: 0.5rem;
+    --dash-radius-sm: 0.375rem;
+    --dash-radius-lg: 0.75rem;
+    --dash-sidebar-width: 240px;
+    --dash-sidebar-collapsed-width: 64px;
+    --dash-header-height: 56px;
+
+    // Transitions
+    --dash-transition-fast: 150ms ease;
+    --dash-transition-base: 200ms ease;
+}

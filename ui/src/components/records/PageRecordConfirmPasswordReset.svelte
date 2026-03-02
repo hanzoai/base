@@ -22,7 +22,7 @@
         isLoading = true;
 
         // init a custom client to avoid interfering with the superuser state
-        const client = new Base(import.meta.env.HZ_BACKEND_URL);
+        const client = new Base(import.meta.env.BASE_BACKEND_URL);
 
         try {
             const payload = getTokenPayload(params?.token);

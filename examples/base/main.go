@@ -40,7 +40,7 @@ func main() {
 		&hooksWatch,
 		"hooksWatch",
 		true,
-		"auto restart the app on hz_hooks file change; it has no effect on Windows",
+		"auto restart the app on hooks file change; it has no effect on Windows",
 	)
 
 	var hooksPool int
@@ -89,7 +89,7 @@ func main() {
 	// Plugins and hooks:
 	// ---------------------------------------------------------------
 
-	// load jsvm (hz_hooks and hz_migrations)
+	// load jsvm (hooks and migrations)
 	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: migrationsDir,
 		HooksDir:      hooksDir,
@@ -151,11 +151,11 @@ func main() {
 	}
 }
 
-// the default hz_public dir location is relative to the executable
+// the default public dir location is relative to the executable
 func defaultPublicDir() string {
 	if osutils.IsProbablyGoRun() {
-		return "./pb_public"
+		return "./public"
 	}
 
-	return filepath.Join(os.Args[0], "../hz_public")
+	return filepath.Join(os.Args[0], "../public")
 }

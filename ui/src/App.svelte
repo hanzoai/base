@@ -6,7 +6,7 @@
     import TinyMCE from "@/components/base/TinyMCE.svelte";
     import Toasts from "@/components/base/Toasts.svelte";
     import Toggler from "@/components/base/Toggler.svelte";
-    import { appName, hideControls, pageTitle } from "@/stores/app";
+    import { appName, logoUrl, hideControls, pageTitle } from "@/stores/app";
     import { resetConfirmation } from "@/stores/confirmation";
     import { setErrors } from "@/stores/errors";
     import { superuser } from "@/stores/superuser";
@@ -55,6 +55,7 @@
                 $cancelKey: "initialAppSettings",
             });
             $appName = settings?.meta?.appName || "";
+            $logoUrl = settings?.meta?.logoUrl || "";
             $hideControls = !!settings?.meta?.hideControls;
         } catch (err) {
             if (!err?.isAbort) {
@@ -69,7 +70,7 @@
 </script>
 
 <svelte:head>
-    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName, "PocketBase"], " - ", false)}</title>
+    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName || "Base"], " - ", false)}</title>
 
     {#if window.location.protocol == "https:"}
         <link
@@ -85,8 +86,8 @@
         <aside class="app-sidebar">
             <a href="/" class="logo logo-sm" use:link>
                 <img
-                    src="{import.meta.env.BASE_URL}images/logo.svg"
-                    alt="Base logo"
+                    src={$logoUrl || `${import.meta.env.BASE_URL}images/logo.svg`}
+                    alt={$appName || "Base"}
                     width="40"
                     height="40"
                 />

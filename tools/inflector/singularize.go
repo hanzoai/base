@@ -1,7 +1,6 @@
 package inflector
 
 import (
-	"log"
 	"regexp"
 
 	"github.com/hanzoai/base/tools/store"
@@ -75,8 +74,6 @@ func Singularize(word string) string {
 			return re
 		})
 		if re == nil {
-			// log only for debug purposes
-			log.Println("[Singularize] failed to retrieve/compile rule pattern " + rule.pattern)
 			continue
 		}
 

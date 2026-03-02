@@ -1,7 +1,7 @@
 /**
  * CollectionService -- typed CRUD + auth + realtime for a single collection.
  *
- * API-compatible with PocketBase JS SDK's RecordService, extended with
+ * API-compatible with the upstream RecordService interface, extended with
  * reactive features (subscribe/unsubscribe, optimistic writes).
  */
 

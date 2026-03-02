@@ -19,12 +19,15 @@ const (
 )
 
 // SyncMessage is the wire format for CRDT sync messages.
+// Every message carries Envelopes — sealed ops produced by SealOps.
+// There is no plaintext-ops field; PlaintextPrivacy produces envelopes
+// that happen to contain JSON as the "ciphertext". One wire format.
 type SyncMessage struct {
-	Type        string       `json:"type"`
-	DocID       string       `json:"docId"`
-	ClientID    string       `json:"clientId,omitempty"`
-	StateVector StateVersion `json:"stateVector,omitempty"`
-	Ops         []Operation  `json:"ops,omitempty"`
+	Type        string        `json:"type"`
+	DocID       string        `json:"docId"`
+	ClientID    string        `json:"clientId,omitempty"`
+	StateVector StateVersion  `json:"stateVector,omitempty"`
+	Envelopes   []OpEnvelope  `json:"envelopes,omitempty"`
 }
 
 // SyncBroadcastFunc is called when operations need to be broadcast to other clients.
@@ -68,13 +71,13 @@ func (sm *SyncManager) GetDocument(id string) *Document {
 }
 
 // GetOrCreateDocument returns an existing document or creates a new one.
-func (sm *SyncManager) GetOrCreateDocument(id string, nodeID NodeID) *Document {
+func (sm *SyncManager) GetOrCreateDocument(id string, nodeID NodeID, opts ...DocumentOption) *Document {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	if doc, ok := sm.docs[id]; ok {
 		return doc
 	}
-	doc := NewDocument(id, nodeID)
+	doc := NewDocument(id, nodeID, opts...)
 	sm.docs[id] = doc
 	return doc
 }
@@ -116,11 +119,16 @@ func (sm *SyncManager) HandleSync(clientID string, raw []byte) ([]byte, error) {
 func (sm *SyncManager) handleSyncStep1(doc *Document, clientID string, msg SyncMessage) ([]byte, error) {
 	ops := doc.Diff(msg.StateVector)
 
+	envs, err := doc.SealOps(ops)
+	if err != nil {
+		return nil, fmt.Errorf("sync step1 seal: %w", err)
+	}
+
 	response := SyncMessage{
 		Type:        SyncStep2,
 		DocID:       msg.DocID,
 		StateVector: doc.Version(),
-		Ops:         ops,
+		Envelopes:   envs,
 	}
 
 	return json.Marshal(response)
@@ -128,29 +136,37 @@ func (sm *SyncManager) handleSyncStep1(doc *Document, clientID string, msg SyncM
 
 // handleSyncStep2 processes ops from a client that we are missing.
 func (sm *SyncManager) handleSyncStep2(doc *Document, clientID string, msg SyncMessage) ([]byte, error) {
-	if len(msg.Ops) == 0 {
+	ops, envs, err := sm.resolveOps(doc, msg)
+	if err != nil {
+		return nil, fmt.Errorf("sync step2 resolve: %w", err)
+	}
+	if len(ops) == 0 {
 		return nil, nil
 	}
 
-	if err := sm.applyOps(doc, msg.Ops); err != nil {
+	if err := sm.applyOps(doc, ops); err != nil {
 		return nil, fmt.Errorf("apply ops: %w", err)
 	}
 
-	sm.broadcastOps(msg.DocID, clientID, msg.Ops)
+	sm.broadcastEnvelopes(msg.DocID, clientID, envs)
 	return nil, nil
 }
 
 // handleSyncUpdate processes an incremental update from a client.
 func (sm *SyncManager) handleSyncUpdate(doc *Document, clientID string, msg SyncMessage) ([]byte, error) {
-	if len(msg.Ops) == 0 {
+	ops, envs, err := sm.resolveOps(doc, msg)
+	if err != nil {
+		return nil, fmt.Errorf("sync update resolve: %w", err)
+	}
+	if len(ops) == 0 {
 		return nil, nil
 	}
 
-	if err := sm.applyOps(doc, msg.Ops); err != nil {
+	if err := sm.applyOps(doc, ops); err != nil {
 		return nil, fmt.Errorf("apply ops: %w", err)
 	}
 
-	sm.broadcastOps(msg.DocID, clientID, msg.Ops)
+	sm.broadcastEnvelopes(msg.DocID, clientID, envs)
 	return nil, nil
 }
 
@@ -222,20 +238,37 @@ func (sm *SyncManager) applyOps(doc *Document, ops []Operation) error {
 	return nil
 }
 
-// BroadcastOps broadcasts operations to all clients connected to a document.
-func (sm *SyncManager) BroadcastOps(docID string, ops []Operation) {
-	sm.broadcastOps(docID, "", ops)
+// resolveOps opens the envelopes in a SyncMessage via the document's
+// Privacy backend. One path. Tag mismatch or docID mismatch fails loud.
+func (sm *SyncManager) resolveOps(doc *Document, msg SyncMessage) ([]Operation, []OpEnvelope, error) {
+	ops, err := doc.OpenOps(msg.Envelopes)
+	return ops, msg.Envelopes, err
 }
 
-func (sm *SyncManager) broadcastOps(docID string, excludeClient string, ops []Operation) {
-	if sm.broadcast == nil || len(ops) == 0 {
+// BroadcastOps seals and broadcasts operations to all clients connected to a document.
+func (sm *SyncManager) BroadcastOps(docID string, ops []Operation) {
+	sm.mu.RLock()
+	doc := sm.docs[docID]
+	sm.mu.RUnlock()
+	if doc == nil {
+		return
+	}
+	envs, err := doc.SealOps(ops)
+	if err != nil {
+		return
+	}
+	sm.broadcastEnvelopes(docID, "", envs)
+}
+
+func (sm *SyncManager) broadcastEnvelopes(docID string, excludeClient string, envs []OpEnvelope) {
+	if sm.broadcast == nil || len(envs) == 0 {
 		return
 	}
 
 	msg := SyncMessage{
-		Type:  SyncUpdate,
-		DocID: docID,
-		Ops:   ops,
+		Type:      SyncUpdate,
+		DocID:     docID,
+		Envelopes: envs,
 	}
 
 	data, err := json.Marshal(msg)

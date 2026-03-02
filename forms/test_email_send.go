@@ -95,7 +95,7 @@ func (form *TestEmailSend) Submit() error {
 		if field.GetHidden() {
 			continue
 		}
-		record.Set(field.GetName(), "__hz_test_"+field.GetName()+"__")
+		record.Set(field.GetName(), "__test_"+field.GetName()+"__")
 	}
 	record.RefreshTokenKey()
 	record.SetEmail(form.Email)
@@ -108,7 +108,7 @@ func (form *TestEmailSend) Submit() error {
 	case TestTemplateEmailChange:
 		return mails.SendRecordChangeEmail(form.app, record, form.Email)
 	case TestTemplateOTP:
-		return mails.SendRecordOTP(form.app, record, "_HZ_TEST_OTP_ID_", "123456")
+		return mails.SendRecordOTP(form.app, record, "_TEST_OTP_ID_", "123456")
 	case TestTemplateAuthAlert:
 		testEvent := types.NowDateTime().String() + " - TEST_IP TEST_USER_AGENT"
 		return mails.SendRecordAuthAlert(form.app, record, testEvent)

@@ -1,5 +1,14 @@
 @include scrollbar();
 
+/* Remixicon base styles */
+[class^="ri-"]:before,
+[class*=" ri-"]:before {
+    font-family: var(--iconFontFamily) !important;
+    font-style: normal;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 :focus-visible {
     outline-color: var(--primaryColor);
     outline-style: solid;
@@ -1145,4 +1154,35 @@ a.thumb:not(.thumb-active) {
             padding-right: 10px;
         }
     }
+}
+
+/* Force all filled buttons: proper contrast */
+.btn.btn-primary,
+.btn.btn-info,
+.btn.btn-success,
+.btn.btn-warning,
+.btn.btn-danger,
+.btn.btn-hint,
+.btn.btn-secondary,
+.btn.btn-expanded,
+.btn.btn-expanded-sm,
+.btn.btn-expanded-lg {
+    color: #000000 !important;
+    border-radius: 8px;
+    &:before {
+        border-radius: 8px;
+    }
+    .txt, span {
+        color: #000000 !important;
+    }
+    i {
+        color: #000000 !important;
+    }
+}
+/* Primary/info specifically get white bg */
+.btn.btn-primary,
+.btn.btn-info {
+    background: #ffffff !important;
+    &:before { display: none !important; }
+    &:hover { background: #e5e5e5 !important; }
 }
