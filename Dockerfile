@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 FROM node:20-alpine AS ui-builder
+RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /ui
-COPY ui/package.json ui/package-lock.json ./
-RUN npm ci
+COPY ui/package.json ui/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY ui/ .
-RUN npm run build
+RUN pnpm build
 
 FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
