@@ -53,10 +53,8 @@ func (p *plugin) proxyToIAM(e *core.RequestEvent, method, path string, body []by
 	req.Header.Set("Content-Type", "application/json")
 
 	// Forward auth headers from the original request.
-	for _, h := range []string{"Authorization", "tenant-authorization"} {
-		if v := e.Request.Header.Get(h); v != "" {
-			req.Header.Set(h, v)
-		}
+	if v := e.Request.Header.Get("Authorization"); v != "" {
+		req.Header.Set("Authorization", v)
 	}
 
 	resp, err := client.Do(req)

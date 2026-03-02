@@ -127,7 +127,6 @@ func TestProxyToIAM(t *testing.T) {
 
 	e, rec := makeEvent(http.MethodPost, "/test", `{"test":true}`)
 	e.Request.Header.Set("Authorization", "Bearer my-token")
-	e.Request.Header.Set("tenant-authorization", "Bearer tenant-tok")
 
 	err := p.proxyToIAM(e, http.MethodPost, "/api/login", []byte(`{"username":"test"}`))
 	if err != nil {
@@ -150,10 +149,9 @@ func TestProxyToIAM(t *testing.T) {
 }
 
 func TestProxyToIAM_ForwardsHeaders(t *testing.T) {
-	var gotAuth, gotTenantAuth string
+	var gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
-		gotTenantAuth = r.Header.Get("tenant-authorization")
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer srv.Close()
@@ -161,15 +159,11 @@ func TestProxyToIAM_ForwardsHeaders(t *testing.T) {
 	p := newTestPlugin(srv.URL)
 	e, _ := makeEvent(http.MethodPost, "/test", `{}`)
 	e.Request.Header.Set("Authorization", "Bearer abc")
-	e.Request.Header.Set("tenant-authorization", "Bearer xyz")
 
 	p.proxyToIAM(e, http.MethodPost, "/api/login", []byte(`{}`))
 
 	if gotAuth != "Bearer abc" {
 		t.Errorf("Authorization not forwarded: got %q", gotAuth)
-	}
-	if gotTenantAuth != "Bearer xyz" {
-		t.Errorf("tenant-authorization not forwarded: got %q", gotTenantAuth)
 	}
 }
 
