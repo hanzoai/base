@@ -197,13 +197,22 @@
 
             <button
                 type="submit"
-                class="btn btn-lg btn-block btn-next"
+                class="btn btn-lg btn-block btn-primary"
                 class:btn-disabled={passwordAuthSubmitting}
                 class:btn-loading={passwordAuthSubmitting}
             >
                 <span class="txt">{totalSteps > 1 ? "Next" : "Login"}</span>
-                <i class="ri-arrow-right-line" />
             </button>
+
+            {#if window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
+                <button
+                    type="button"
+                    class="btn btn-lg btn-block btn-outline m-t-sm"
+                    on:click={() => { identity = 'admin@hanzo.ai'; password = 'admin1234567890'; }}
+                >
+                    <span class="txt">Fill dev credentials</span>
+                </button>
+            {/if}
         </form>
     {:else if authMethods.otp.enabled}
         {#if !otpId}
