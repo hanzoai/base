@@ -65,6 +65,14 @@ type BaseAppConfig struct {
 	AuxMaxOpenConns  int
 	AuxMaxIdleConns  int
 	IsDev            bool
+
+	// DataDSN is an optional PostgreSQL DSN for the main data database.
+	// When set, overrides the file-path-based SQLite connection.
+	DataDSN string
+
+	// AuxDSN is an optional PostgreSQL DSN for the auxiliary database.
+	// When set, overrides the file-path-based SQLite aux connection.
+	AuxDSN string
 }
 
 // ensures that the BaseApp implements the App interface.
@@ -1172,9 +1180,20 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // -------------------------------------------------------------------
 
 func (app *BaseApp) initDataDB() error {
-	dbPath := filepath.Join(app.DataDir(), "data.db")
+	var connectFunc func() (*dbx.DB, error)
 
-	concurrentDB, err := app.config.DBConnect(dbPath)
+	if app.config.DataDSN != "" {
+		connectFunc = func() (*dbx.DB, error) {
+			return PostgresDBConnect(app.config.DataDSN)
+		}
+	} else {
+		dbPath := filepath.Join(app.DataDir(), "data.db")
+		connectFunc = func() (*dbx.DB, error) {
+			return app.config.DBConnect(dbPath)
+		}
+	}
+
+	concurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
@@ -1182,7 +1201,7 @@ func (app *BaseApp) initDataDB() error {
 	concurrentDB.DB().SetMaxIdleConns(app.config.DataMaxIdleConns)
 	concurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
 
-	nonconcurrentDB, err := app.config.DBConnect(dbPath)
+	nonconcurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
@@ -1232,11 +1251,22 @@ func normalizeSQLLog(sql string) string {
 }
 
 func (app *BaseApp) initAuxDB() error {
-	// note: renamed to "auxiliary" because "aux" is a reserved Windows filename
-	// (see https://github.com/hanzoai/base/issues/5607)
-	dbPath := filepath.Join(app.DataDir(), "auxiliary.db")
+	var connectFunc func() (*dbx.DB, error)
 
-	concurrentDB, err := app.config.DBConnect(dbPath)
+	if app.config.AuxDSN != "" {
+		connectFunc = func() (*dbx.DB, error) {
+			return PostgresDBConnect(app.config.AuxDSN)
+		}
+	} else {
+		// note: renamed to "auxiliary" because "aux" is a reserved Windows filename
+		// (see https://github.com/hanzoai/base/issues/5607)
+		dbPath := filepath.Join(app.DataDir(), "auxiliary.db")
+		connectFunc = func() (*dbx.DB, error) {
+			return app.config.DBConnect(dbPath)
+		}
+	}
+
+	concurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
@@ -1244,7 +1274,7 @@ func (app *BaseApp) initAuxDB() error {
 	concurrentDB.DB().SetMaxIdleConns(app.config.AuxMaxIdleConns)
 	concurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
 
-	nonconcurrentDB, err := app.config.DBConnect(dbPath)
+	nonconcurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
