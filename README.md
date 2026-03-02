@@ -123,6 +123,18 @@ go test ./...
 
 Check also the [Testing guide](http://docs.hanzo.ai/testing) to learn how to write your own custom application tests.
 
+## SQLite Replication
+
+Base uses SQLite per org (encrypted via `hanzoai/sqlite` with per-principal CEK).
+The `hanzoai/replicate` sidecar streams WAL changes to S3, encrypted with `luxfi/age`.
+
+K8s sidecar pattern:
+- **Init container**: restores the latest snapshot from S3 on startup
+- **Sidecar**: continuously replicates WAL to S3 while the service runs
+
+Config: `litestream.yml` with `age-identities` / `age-recipients` fields for
+end-to-end encryption of replicated data.
+
 ## Security
 
 If you discover a security vulnerability within Base, please send an e-mail to **security at hanzo.ai**.
