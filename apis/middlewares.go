@@ -253,16 +253,11 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 					return e.Next()
 				}
 
-				// JWKS failed — fall back to local token ONLY for _superusers.
+				// JWKS failed — no fallback. IAM is the sole auth source.
 				if jwksErr != nil {
-					e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed, trying superuser fallback",
+					e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
 						"error", jwksErr,
 					)
-				}
-				suRecord, suErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
-				if suErr == nil && suRecord != nil && suRecord.Collection().Name == core.CollectionNameSuperusers {
-					e.Auth = suRecord
-					return e.Next()
 				}
 
 				return e.Next()
@@ -333,13 +328,52 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		name = displayName
 	}
 
+	// Check if this IAM user is an admin/superuser.
+	isAdmin, _ := claims["isAdmin"].(bool)
+	if !isAdmin {
+		// Also check string "true" (some OIDC providers serialize bools as strings).
+		if v, ok := claims["isAdmin"].(string); ok && v == "true" {
+			isAdmin = true
+		}
+	}
+
 	// Store resolved claims on the request for downstream middleware.
 	e.Set("authSub", sub)
 	e.Set("authOwner", owner)
 	e.Set("authEmail", email)
 	e.Set("authName", name)
 
-	// Determine which collection to use.
+	// IAM admins map to Base superusers — they bypass all collection rules.
+	if isAdmin {
+		suCollection, suErr := e.App.FindCachedCollectionByNameOrId(core.CollectionNameSuperusers)
+		if suErr == nil {
+			// Find or create superuser record for this IAM admin.
+			recordID := subToRecordID(sub)
+			record, err := e.App.FindRecordById(suCollection, recordID)
+			if err == nil {
+				return record, nil
+			}
+			if email != "" {
+				record, err = e.App.FindAuthRecordByEmail(suCollection, email)
+				if err == nil {
+					return record, nil
+				}
+			}
+			// Auto-create superuser record.
+			record = core.NewRecord(suCollection)
+			record.Id = recordID
+			record.Set("email", email)
+			record.SetRandomPassword()
+			record.SetVerified(true)
+			if saveErr := e.App.Save(record); saveErr != nil {
+				e.App.Logger().Debug("IAM admin → superuser auto-create failed (using unsaved record)",
+					slog.String("email", email), slog.String("error", saveErr.Error()))
+			}
+			return record, nil
+		}
+	}
+
+	// Determine which collection to use for regular users.
 	collectionName := "users"
 	if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 		collectionName = v
