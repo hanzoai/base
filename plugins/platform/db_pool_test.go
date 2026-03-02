@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/hanzoai/base/core"
 )
@@ -15,9 +16,11 @@ func testPoolManager(t *testing.T, maxPools int) (*DBPoolManager, string) {
 	t.Helper()
 	dir := t.TempDir()
 	m := NewDBPoolManager(DBPoolConfig{
-		MaxPools:  maxPools,
-		ReadConns: 4,
-		Connect:   core.DefaultDBConnect,
+		MaxPools:    maxPools,
+		ReadConns:   4,
+		NumShards:   1, // single shard for deterministic test behavior
+		IdleTimeout: -1, // disable sweeper in tests
+		Connect:     core.DefaultDBConnect,
 	})
 	t.Cleanup(func() { m.Close() })
 	return m, dir
@@ -224,6 +227,180 @@ func TestPoolManager_DataPersists(t *testing.T) {
 	}
 	if val != "bar" {
 		t.Fatalf("expected 'bar', got %q", val)
+	}
+}
+
+func TestPoolManager_IdleEviction(t *testing.T) {
+	dir := t.TempDir()
+	m := NewDBPoolManager(DBPoolConfig{
+		MaxPools:      10,
+		ReadConns:     4,
+		NumShards:     1,
+		IdleTimeout:   50 * time.Millisecond,
+		SweepInterval: 20 * time.Millisecond,
+		Connect:       core.DefaultDBConnect,
+	})
+	t.Cleanup(func() { m.Close() })
+
+	// Open 3 pools and release them
+	for i := 0; i < 3; i++ {
+		p, err := m.Get(dbPath(dir, i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p.Nonconcurrent.NewQuery("CREATE TABLE IF NOT EXISTS t (id INTEGER)").Execute()
+		p.Release()
+	}
+	if m.Len() != 3 {
+		t.Fatalf("expected 3 pools, got %d", m.Len())
+	}
+
+	// Wait for idle timeout + sweep interval to pass
+	time.Sleep(150 * time.Millisecond)
+
+	// All 3 should have been evicted by the sweeper
+	if m.Len() != 0 {
+		t.Fatalf("expected 0 pools after idle eviction, got %d", m.Len())
+	}
+
+	stats := m.Stats()
+	if stats.IdleEvictions != 3 {
+		t.Fatalf("expected 3 idle evictions, got %d", stats.IdleEvictions)
+	}
+}
+
+func TestPoolManager_IdleEviction_SkipsInUse(t *testing.T) {
+	dir := t.TempDir()
+	m := NewDBPoolManager(DBPoolConfig{
+		MaxPools:      10,
+		ReadConns:     4,
+		NumShards:     1,
+		IdleTimeout:   50 * time.Millisecond,
+		SweepInterval: 20 * time.Millisecond,
+		Connect:       core.DefaultDBConnect,
+	})
+	t.Cleanup(func() { m.Close() })
+
+	// Open pool 0 and hold reference (in-use)
+	p0, _ := m.Get(dbPath(dir, 0))
+
+	// Open pool 1 and release it (idle)
+	p1, _ := m.Get(dbPath(dir, 1))
+	p1.Release()
+
+	// Wait for idle sweep
+	time.Sleep(150 * time.Millisecond)
+
+	// Pool 1 should be evicted, pool 0 should remain (in-use)
+	if m.Len() != 1 {
+		t.Fatalf("expected 1 pool (in-use), got %d", m.Len())
+	}
+
+	stats := m.Stats()
+	if stats.IdleEvictions != 1 {
+		t.Fatalf("expected 1 idle eviction, got %d", stats.IdleEvictions)
+	}
+
+	p0.Release()
+}
+
+func TestPoolManager_HitRate(t *testing.T) {
+	m, dir := testPoolManager(t, 10)
+
+	// 1 miss (cold open)
+	p, _ := m.Get(dbPath(dir, 0))
+	p.Release()
+
+	// 3 hits (reuse)
+	for i := 0; i < 3; i++ {
+		p, _ := m.Get(dbPath(dir, 0))
+		p.Release()
+	}
+
+	stats := m.Stats()
+	if stats.Hits != 3 {
+		t.Fatalf("expected 3 hits, got %d", stats.Hits)
+	}
+	if stats.Misses != 1 {
+		t.Fatalf("expected 1 miss, got %d", stats.Misses)
+	}
+
+	rate := stats.HitRate()
+	if rate < 0.74 || rate > 0.76 {
+		t.Fatalf("expected hit rate ~0.75, got %f", rate)
+	}
+}
+
+func TestPoolManager_MaxPoolsCap(t *testing.T) {
+	// Verify that MaxPools is capped at 2000
+	dir := t.TempDir()
+	m := NewDBPoolManager(DBPoolConfig{
+		MaxPools:    5000, // over the cap
+		NumShards:   1,
+		IdleTimeout: -1,
+		Connect:     core.DefaultDBConnect,
+	})
+	defer m.Close()
+
+	// The pool should still work; we just verify it doesn't panic
+	// and that pool creation succeeds
+	p, err := m.Get(dbPath(dir, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Release()
+}
+
+func TestPoolManager_LastAccess(t *testing.T) {
+	m, dir := testPoolManager(t, 10)
+
+	before := time.Now()
+	p, _ := m.Get(dbPath(dir, 0))
+
+	la := p.LastAccess()
+	if la.Before(before) {
+		t.Fatalf("LastAccess %v is before Get time %v", la, before)
+	}
+	if la.After(time.Now()) {
+		t.Fatalf("LastAccess %v is in the future", la)
+	}
+	p.Release()
+}
+
+func TestDefaultPoolConfig(t *testing.T) {
+	c := DefaultPoolConfig()
+	if c.MaxPools != 2000 {
+		t.Fatalf("expected MaxPools=2000, got %d", c.MaxPools)
+	}
+	if c.IdleTimeout != 30*time.Second {
+		t.Fatalf("expected IdleTimeout=30s, got %v", c.IdleTimeout)
+	}
+	if c.ReadConns != 4 {
+		t.Fatalf("expected ReadConns=4, got %d", c.ReadConns)
+	}
+	if c.NumShards < 1 {
+		t.Fatalf("expected NumShards >= 1, got %d", c.NumShards)
+	}
+}
+
+func TestDefaultPoolConfig_EnvOverride(t *testing.T) {
+	t.Setenv("DB_POOL_MAX", "500")
+	t.Setenv("DB_POOL_IDLE_TIMEOUT", "1m")
+	t.Setenv("DB_POOL_SHARDS", "8")
+	t.Setenv("DB_POOL_READ_CONNS", "16")
+
+	c := DefaultPoolConfig()
+	if c.MaxPools != 500 {
+		t.Fatalf("expected MaxPools=500, got %d", c.MaxPools)
+	}
+	if c.IdleTimeout != time.Minute {
+		t.Fatalf("expected IdleTimeout=1m, got %v", c.IdleTimeout)
+	}
+	if c.NumShards != 8 {
+		t.Fatalf("expected NumShards=8, got %d", c.NumShards)
+	}
+	if c.ReadConns != 16 {
+		t.Fatalf("expected ReadConns=16, got %d", c.ReadConns)
 	}
 }
 

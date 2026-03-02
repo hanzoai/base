@@ -121,17 +121,16 @@ func Register(app core.App, config PlatformConfig) error {
 
 	kmsClient := NewKMSClient(config.KMSEndpoint, "")
 
+	poolConfig := DefaultPoolConfig()
+
 	p := &plugin{
 		app:        app,
 		config:     config,
 		iam:        NewIAMClient(config.IAMEndpoint),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
-		orgDB: NewOrgDB(app, config.OrgEncryptionKey),
-		dbPool: NewDBPoolManager(DBPoolConfig{
-			MaxPools:  256,
-			ReadConns: 4,
-		}),
+		orgDB:      NewOrgDB(app, config.OrgEncryptionKey),
+		dbPool:     NewDBPoolManager(poolConfig),
 	}
 
 	// Bootstrap: ensure system collections exist.
@@ -349,7 +348,9 @@ func Register(app core.App, config PlatformConfig) error {
 
 			app.Logger().Info("platform: per-org SQLite isolation enabled",
 				"dataDir", app.DataDir(),
-				"maxPools", 256,
+				"maxPools", poolConfig.MaxPools,
+				"idleTimeout", poolConfig.IdleTimeout.String(),
+				"shards", poolConfig.NumShards,
 			)
 		}
 

@@ -28,7 +28,7 @@ require (
 	golang.org/x/net v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	modernc.org/sqlite v1.48.0
+	modernc.org/sqlite v1.48.1
 )
 
 require (
@@ -116,3 +116,5 @@ require (
 )
 
 replace github.com/hanzoai/replicate => /Users/z/work/hanzo/replicate
+
+replace github.com/hanzoai/dbx => /Users/z/work/hanzo/dbx
