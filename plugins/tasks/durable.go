@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 
@@ -12,6 +13,10 @@ import (
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 )
+
+// validIDPattern restricts space/org IDs to safe characters, preventing
+// injection into Temporal visibility queries.
+var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,128}$`)
 
 // DurableConfig holds connection settings for durable task execution.
 // When enabled, tasks are submitted as Temporal workflows for crash-safe execution.
@@ -119,6 +124,9 @@ func NewDurableStore(addr, namespace string) (*DurableStore, error) {
 func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
 	if orgID == "" || orgID == ds.namespace {
 		return ds.Client, nil
+	}
+	if !validIDPattern.MatchString(orgID) {
+		return nil, fmt.Errorf("tasks: invalid org ID: %q", orgID)
 	}
 
 	// Fast path: read lock.
@@ -295,6 +303,9 @@ func (ds *DurableStore) clientForOrgVar(orgID []string) (client.Client, error) {
 
 // ListTasks returns tasks in a space by querying workflow visibility.
 func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, orgID ...string) ([]*Task, error) {
+	if spaceID != "" && !validIDPattern.MatchString(spaceID) {
+		return nil, fmt.Errorf("tasks: invalid space ID: %q", spaceID)
+	}
 	c, err := ds.clientForOrgVar(orgID)
 	if err != nil {
 		return nil, err
@@ -351,6 +362,9 @@ func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string
 
 // ListWorkflows returns workflows in a space by querying visibility.
 func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID ...string) ([]*Workflow, error) {
+	if spaceID != "" && !validIDPattern.MatchString(spaceID) {
+		return nil, fmt.Errorf("tasks: invalid space ID: %q", spaceID)
+	}
 	c, err := ds.clientForOrgVar(orgID)
 	if err != nil {
 		return nil, err
