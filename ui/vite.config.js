@@ -26,7 +26,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': __dirname + '/src',
-            'base': 'pocketbase',
+            'base': '@hanzo/base/compat',
         }
     },
 })
