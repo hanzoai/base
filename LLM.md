@@ -4,7 +4,7 @@
 
 Hanzo Base is the **local-first application runtime for Lux**.
 
-Not "PocketBase but nicer." The Web5 client runtime.
+Not a fork, not a wrapper. The Web5 client runtime.
 
 ## Architecture
 
