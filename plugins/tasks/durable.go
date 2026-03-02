@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sync"
 	"time"
 
 	"go.temporal.io/api/workflowservice/v1"
@@ -90,6 +91,7 @@ type DurableStore struct {
 
 	// orgClients caches per-org Temporal client connections.
 	// Key is org ID (= Temporal namespace).
+	mu         sync.RWMutex
 	orgClients map[string]client.Client
 }
 
@@ -112,11 +114,24 @@ func NewDurableStore(addr, namespace string) (*DurableStore, error) {
 }
 
 // ClientForOrg returns a Temporal client scoped to the given org namespace.
-// Connections are cached. Falls back to the default client if org is empty.
+// Connections are cached and protected by a mutex. Falls back to the default
+// client if org is empty or matches the default namespace.
 func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
 	if orgID == "" || orgID == ds.namespace {
 		return ds.Client, nil
 	}
+
+	// Fast path: read lock.
+	ds.mu.RLock()
+	if c, ok := ds.orgClients[orgID]; ok {
+		ds.mu.RUnlock()
+		return c, nil
+	}
+	ds.mu.RUnlock()
+
+	// Slow path: write lock, double-check, dial.
+	ds.mu.Lock()
+	defer ds.mu.Unlock()
 
 	if c, ok := ds.orgClients[orgID]; ok {
 		return c, nil
@@ -135,10 +150,13 @@ func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
 
 // Close shuts down all client connections.
 func (ds *DurableStore) Close() {
+	ds.mu.Lock()
 	for _, c := range ds.orgClients {
 		c.Close()
 	}
 	ds.orgClients = nil
+	ds.mu.Unlock()
+
 	if ds.Client != nil {
 		ds.Client.Close()
 		ds.connected = false
