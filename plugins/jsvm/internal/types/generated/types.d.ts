@@ -8189,11 +8189,7 @@ namespace core {
    * 
    *  4. Move the extracted dir content to the app "hz_data".
    * 
-<<<<<<< HEAD
    *  5. Restart the app (on successful app bootstap it will also remove the old hz_data).
-=======
-   *  5. Restart the app (on successful app bootstrap it will also remove the old pb_data).
->>>>>>> upstream/master
    * 
    * If a failure occur during the restore process the dir changes are reverted.
    * If for whatever reason the revert is not possible, it panics.
@@ -14595,7 +14591,6 @@ namespace apis {
  }
 }
 
-<<<<<<< HEAD
 namespace base {
  /**
   * Base defines a Base app launcher.
@@ -14689,8 +14684,6 @@ namespace base {
  }
 }
 
-=======
->>>>>>> upstream/master
 /**
  * Package template is a thin wrapper around the standard html/template
  * and text/template packages that implements a convenient registry to
@@ -23770,7 +23763,6 @@ namespace oauth2 {
  }
 }
 
-<<<<<<< HEAD
 namespace multipart {
  /**
   * A Part represents a single part in a multipart body.
@@ -23819,12 +23811,6 @@ namespace url {
   * some protection against cross-site request forgery attacks.
   * 
   * See https://tools.ietf.org/html/draft-ietf-httbaseis-cookie-same-site-00 for details.
-=======
-  * The Userinfo type is an immutable encapsulation of username and
-  * password details for a [URL]. An existing Userinfo value is guaranteed
-  * to have a username set (potentially empty, as allowed by RFC 2396),
-  * and optionally a password.
->>>>>>> upstream/master
   */
  interface Userinfo {
  }
