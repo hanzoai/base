@@ -90,15 +90,6 @@ func realtimeConnect(e *core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-
-			// Send legacy PB_CONNECT for backwards compat with old JS SDK clients.
-			// Client handles whichever event arrives first; remove after one release cycle.
-			legacyMsg := &subscriptions.Message{
-				Name: "PB_CONNECT",
-				Data: me.Message.Data,
-			}
-			_ = legacyMsg.WriteSSE(me.Response, me.Client.Id())
-
 			return me.Flush()
 		})
 		if connectMsgErr != nil {
@@ -300,7 +291,7 @@ func bindRealtimeEvents(app core.App) {
 	})
 
 	// remove the client(s) associated to the deleted auth model
-	// (note: works also with custom model for backward compatibility)
+	// (note: works also with custom model for legacy)
 	app.OnModelAfterDeleteSuccess().Bind(&hook.Handler[*core.ModelEvent]{
 		Func: func(e *core.ModelEvent) error {
 			collection := realtimeResolveRecordCollection(e.App, e.Model)
@@ -512,7 +503,7 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 		(collection.Name + "/*?"):                 collection.ListRule,
 		(collection.Id + "/*?"):                   collection.ListRule,
 
-		// @deprecated: the same as the wildcard topic but kept for backward compatibility
+		// @deprecated: the same as the wildcard topic but kept for legacy
 		(collection.Name + "?"): collection.ListRule,
 		(collection.Id + "?"):   collection.ListRule,
 	}
