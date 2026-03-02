@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/base",
   "version": "0.2.0",
-  "description": "Hanzo Base SDK - Reactive queries, CRDT, realtime, and PocketBase-compatible client",
+  "description": "Hanzo Base SDK - Reactive queries, CRDT, realtime, and Base-compatible client",
   "type": "module",
   "main": "./dist/core/index.js",
   "module": "./dist/core/index.js",
@@ -66,6 +66,6 @@
     "realtime",
     "reactive",
     "crdt",
-    "pocketbase"
+    "hanzo-base"
   ]
 }
