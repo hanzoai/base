@@ -48,6 +48,27 @@
         }
     }
 
+    async function devAutoLogin() {
+        const email = 'admin@hanzo.ai';
+        const pass = 'admin1234567890';
+        identity = '';
+        password = '';
+        // Animate typing email
+        for (const ch of email) {
+            identity += ch;
+            await new Promise(r => setTimeout(r, 30));
+        }
+        await new Promise(r => setTimeout(r, 150));
+        // Animate typing password
+        for (const ch of pass) {
+            password += ch;
+            await new Promise(r => setTimeout(r, 20));
+        }
+        await new Promise(r => setTimeout(r, 200));
+        // Auto submit
+        authWithPassword();
+    }
+
     loadAuthMethods();
 
     async function loadAuthMethods() {
@@ -152,12 +173,24 @@
 
 <FullPage>
     <div class="content txt-center m-b-base">
-        <h4>
-            Superuser login
-            {#if totalSteps > 1}
-                ({currentStep}/{totalSteps})
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+            <h4 style="margin: 0;">
+                Login as Superuser
+                {#if totalSteps > 1}
+                    ({currentStep}/{totalSteps})
+                {/if}
+            </h4>
+            {#if window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
+                <button
+                    type="button"
+                    class="btn btn-sm"
+                    style="border-radius: 999px; padding: 2px 12px; font-size: 11px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15); color: #a1a1aa; cursor: pointer;"
+                    on:click={devAutoLogin}
+                >
+                    dev
+                </button>
             {/if}
-        </h4>
+        </div>
     </div>
 
     {#if isLoading}
@@ -204,15 +237,6 @@
                 <span class="txt">{totalSteps > 1 ? "Next" : "Login"}</span>
             </button>
 
-            {#if window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'}
-                <button
-                    type="button"
-                    class="btn btn-lg btn-block btn-outline m-t-sm"
-                    on:click={() => { identity = 'admin@hanzo.ai'; password = 'admin1234567890'; }}
-                >
-                    <span class="txt">Fill dev credentials</span>
-                </button>
-            {/if}
         </form>
     {:else if authMethods.otp.enabled}
         {#if !otpId}
