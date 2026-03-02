@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"maps"
 	"slices"
 	"sort"
@@ -1003,9 +1002,8 @@ func (m *Record) GetUnsavedFiles(key string) []*filesystem.File {
 	return values
 }
 
-// Deprecated: replaced with GetUnsavedFiles.
+// Deprecated: use GetUnsavedFiles instead.
 func (m *Record) GetUploadedFiles(key string) []*filesystem.File {
-	log.Println("Please replace GetUploadedFiles with GetUnsavedFiles")
 	return m.GetUnsavedFiles(key)
 }
 

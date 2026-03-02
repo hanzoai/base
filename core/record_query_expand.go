@@ -74,17 +74,9 @@ func (app *BaseApp) expandRecords(records []*Record, expandPath string, fetchFun
 	parts := strings.SplitN(expandPath, ".", 2)
 	var matches []string
 
-	// @todo remove the old syntax support
+	// legacy parenthesized syntax: collection(field) -> collection_via_field
 	if strings.Contains(parts[0], "(") {
 		matches = indirectExpandRegexOld.FindStringSubmatch(parts[0])
-		if len(matches) == 3 {
-			log.Printf(
-				"%s expand format is deprecated and will be removed in the future. Consider replacing it with %s_via_%s.\n",
-				matches[0],
-				matches[1],
-				matches[2],
-			)
-		}
 	} else {
 		matches = indirectExpandRegex.FindStringSubmatch(parts[0])
 	}
