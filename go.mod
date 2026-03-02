@@ -13,7 +13,7 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/kms-sdk-go v1.0.0
+	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/luxfi/zap v0.2.0
 	github.com/pocketbase/dbx v1.12.0
@@ -79,5 +79,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/hanzoai/kms-sdk-go v1.0.0 => /Users/z/work/hanzo/kms/sdk/go

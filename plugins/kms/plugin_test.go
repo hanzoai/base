@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	sdk "github.com/hanzoai/kms-sdk-go"
+	sdk "github.com/hanzoai/kms/sdk/go"
 )
 
 func TestConfigValidate(t *testing.T) {
