@@ -73,6 +73,17 @@ type BaseAppConfig struct {
 	// AuxDSN is an optional PostgreSQL DSN for the auxiliary database.
 	// When set, overrides the file-path-based SQLite aux connection.
 	AuxDSN string
+
+	// MultiTenant enables per-org database isolation.
+	// When true, OrgDB(orgID) returns a separate database per org.
+	// Also enabled automatically when MasterKey is set.
+	MultiTenant bool
+
+	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
+	// When set, multi-tenancy is automatically enabled and per-org databases
+	// are encrypted with HKDF-derived keys.
+	// Can be set via MASTER_KEY environment variable (hex-encoded).
+	MasterKey []byte
 }
 
 // ensures that the BaseApp implements the App interface.
@@ -91,6 +102,7 @@ type BaseApp struct {
 	nonconcurrentDB     dbx.Builder
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
+	tenants             *TenantRegistry
 
 	// app event hooks
 	onBootstrap     *hook.Hook[*BootstrapEvent]
@@ -1331,7 +1343,7 @@ func (app *BaseApp) registerBaseHooks() {
 		return nil
 	}
 
-	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("HZ_FILES_DELETE_MAX_WORKERS"))
+	maxFilesDeleteWorkers := cast.ToInt64(os.Getenv("FILES_DELETE_MAX_WORKERS"))
 	if maxFilesDeleteWorkers <= 0 {
 		maxFilesDeleteWorkers = 2000 // the value is arbitrary chosen and may change in the future
 	}

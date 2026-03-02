@@ -80,7 +80,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 		connectMsgEvent.RequestEvent = ce.RequestEvent
 		connectMsgEvent.Client = ce.Client
 		connectMsgEvent.Message = &subscriptions.Message{
-			Name: "HZ_CONNECT",
+			Name: "CONNECT",
 			Data: []byte(`{"clientId":"` + ce.Client.Id() + `"}`),
 		}
 		connectMsgErr := ce.App.OnRealtimeMessageSend().Trigger(connectMsgEvent, func(me *core.RealtimeMessageEvent) error {
@@ -92,7 +92,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 		})
 		if connectMsgErr != nil {
 			ce.App.Logger().Debug(
-				"Realtime connection closed (failed to deliver HZ_CONNECT)",
+				"Realtime connection closed (failed to deliver CONNECT)",
 				slog.String("clientId", ce.Client.Id()),
 				slog.String("error", connectMsgErr.Error()),
 			)

@@ -6,7 +6,7 @@ export default defineConfig({
     server: {
         port: 7777,
     },
-    envPrefix: 'HZ',
+    envPrefix: 'BASE_',
     base: './',
     build: {
         chunkSizeWarningLimit: 1000,
@@ -26,7 +26,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@': __dirname + '/src',
-            'base': 'pocketbase',
+            'base': '../sdk/base-js/src/compat/index.ts',
         }
     },
 })

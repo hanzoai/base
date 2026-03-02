@@ -29,7 +29,7 @@ func TestRealtimeConnect(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`id:`,
-				`event:HZ_CONNECT`,
+				`event:CONNECT`,
 				`data:{"clientId":`,
 			},
 			ExpectedEvents: map[string]int{
@@ -44,7 +44,7 @@ func TestRealtimeConnect(t *testing.T) {
 			},
 		},
 		{
-			Name:           "HZ_CONNECT interrupt",
+			Name:           "CONNECT interrupt",
 			Method:         http.MethodGet,
 			URL:            "/api/realtime",
 			Timeout:        100 * time.Millisecond,
@@ -56,8 +56,8 @@ func TestRealtimeConnect(t *testing.T) {
 			},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnRealtimeMessageSend().BindFunc(func(e *core.RealtimeMessageEvent) error {
-					if e.Message.Name == "HZ_CONNECT" {
-						return errors.New("HZ_CONNECT error")
+					if e.Message.Name == "CONNECT" {
+						return errors.New("CONNECT error")
 					}
 					return e.Next()
 				})

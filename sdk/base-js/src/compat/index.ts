@@ -1,16 +1,15 @@
 /**
- * @hanzoai/base/compat -- upstream-compatible client re-exports.
+ * @hanzo/base/compat -- upstream-compatible client re-exports.
  *
- * Provides a drop-in replacement for the upstream `pocketbase` npm package
- * so that existing code can migrate to `@hanzoai/base` without changes.
+ * Provides a migration shim so existing code can switch to @hanzo/base
+ * without changes. Will be removed in a future major version.
  *
  * Usage:
- *   import Base, { LocalAuthStore, isTokenExpired } from '@hanzoai/base/compat'
+ *   import Base, { LocalAuthStore, isTokenExpired } from '@hanzo/base/compat'
  */
 
 export {
   default,
-  default as PocketBase,
   default as Base,
   LocalAuthStore,
   AsyncAuthStore,

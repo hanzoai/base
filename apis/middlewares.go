@@ -242,22 +242,33 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 			externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool)
 			jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
 
-			if externalOnly && jwksURL != "" {
+			if externalOnly {
 				// External-only mode: IAM (JWKS) is the primary auth mechanism.
 				// Non-superuser collections must authenticate via IAM.
 				// _superusers collection tokens are always accepted as fallback
 				// (admin panel sessions, seeding, CLI tools).
-				record, jwksErr := resolveJWKSToken(e, token, jwksURL)
-				if jwksErr == nil && record != nil {
-					e.Auth = record
-					return e.Next()
+
+				// Try JWKS first if configured.
+				if jwksURL != "" {
+					record, jwksErr := resolveJWKSToken(e, token, jwksURL)
+					if jwksErr == nil && record != nil {
+						e.Auth = record
+						return e.Next()
+					}
+					if jwksErr != nil {
+						e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
+							"error", jwksErr,
+						)
+					}
 				}
 
-				// JWKS failed — no fallback. IAM is the sole auth source.
-				if jwksErr != nil {
-					e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
-						"error", jwksErr,
-					)
+				// JWKS not configured or failed — fall back to local token
+				// for _superusers only. Admin panel sessions and CLI tools
+				// issue local Base tokens that cannot be validated via JWKS.
+				localRecord, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
+				if localErr == nil && localRecord != nil && localRecord.Collection().Name == core.CollectionNameSuperusers {
+					e.Auth = localRecord
+					return e.Next()
 				}
 
 				return e.Next()

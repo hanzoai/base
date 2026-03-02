@@ -19,6 +19,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/zap v0.2.0
+	github.com/mattn/go-sqlite3 v1.14.19
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	go.temporal.io/api v1.62.6

@@ -29,7 +29,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 |--------|------|---------|
 | vault | plugins/vault/ | Per-user encrypted SQLite shards, DEK/KEK, CRDT sync, chain anchor |
 | kms | plugins/kms/ | Client-side KMS integration (talks to K-Chain or cloud HSM) |
-| zap | plugins/zap/ | ZAP transport (8.7µs latency) |
+| zap | plugins/zap/ | ZAP transport (8.7us latency) |
 | platform | plugins/platform/ | Hanzo platform integration |
 | functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
 | jsvm | plugins/jsvm/ | JavaScript plugin VM |
@@ -38,19 +38,19 @@ The server is a relay/index/cache layer, not the owner of truth.
 
 5 primitives, 18 tests:
 
-1. **Identity** — `OpenUser(userID)` → resolve DID, derive DEK, bind device
-2. **Key Access** — DEK/KEK hierarchy: Master KEK → Org KEK → User DEK
-3. **Local DB** — `Put(key, value)`, `Get(key)`, `Delete(key)` → encrypted SQLite
-4. **Sync** — `Sync()`, `Merge(ops)` → CRDT over ZAP (encrypted ops)
-5. **Anchor** — `Anchor()` → merkle root to chain, audit receipt
+1. **Identity** — `OpenUser(userID)` -> resolve DID, derive DEK, bind device
+2. **Key Access** — DEK/KEK hierarchy: Master KEK -> Org KEK -> User DEK
+3. **Local DB** — `Put(key, value)`, `Get(key)`, `Delete(key)` -> encrypted SQLite
+4. **Sync** — `Sync()`, `Merge(ops)` -> CRDT over ZAP (encrypted ops)
+5. **Anchor** — `Anchor()` -> merkle root to chain, audit receipt
 
 Key hierarchy:
 ```
 Cloud HSM / K-Chain ML-KEM
-  └── Master KEK (never on disk)
-        └── Org KEK = HMAC-SHA256(master, "vault:org:" + orgID)
-              └── User DEK = HMAC-SHA256(orgKEK, "vault:user:" + userID)
-                    └── AES-256-GCM per entry (random nonce)
+  +-- Master KEK (never on disk)
+        +-- Org KEK = HMAC-SHA256(master, "vault:org:" + orgID)
+              +-- User DEK = HMAC-SHA256(orgKEK, "vault:user:" + userID)
+                    +-- AES-256-GCM per entry (random nonce)
 ```
 
 ## What Goes On-Chain (Lux)
@@ -113,3 +113,21 @@ Cloud sees ciphertext. Chain sees commitments. FHE is opt-in compute.
 
 > Web5 = local-first apps with blockchain as the trust layer.
 > Put trust on-chain, keep state local, sync privately, make identity portable.
+
+## Ecosystem Alignment (2026-04-10)
+
+See the full alignment guide below. Summary of conflicts:
+
+| Area | Base Current | Ecosystem Standard | Status |
+|------|-------------|-------------------|--------|
+| Timestamp fields | `created`/`updated` | `createdAt`/`updatedAt` | CONFLICT |
+| API prefix | `/api` | `/v1` | CONFLICT |
+| Soft delete | Hard delete only | `Deleted bool` flag | MISSING |
+| Multi-tenancy | None | Per-org SQLite + CEK | MISSING |
+| Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS) | PARTIAL (superuser OIDC done) |
+| SSE event name | `HZ_CONNECT` (server) | `HZ_CONNECT` | SDK still says `PB_CONNECT` |
+| Error format | `{status, message, data}` | `{status, message, data}` | OK |
+| Pagination | `{items, page, perPage, totalItems, totalPages}` | Same | OK |
+
+Migration path: 5 phases, backward-compatible aliases first.
+Full details: research brief produced by scientist agent on 2026-04-10.
