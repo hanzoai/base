@@ -106,6 +106,7 @@ type Workflow struct {
 
 // TaskFilters controls listing and searching.
 type TaskFilters struct {
+	OrgID      string        `json:"org_id,omitempty"`
 	SpaceID    string        `json:"space_id,omitempty"`
 	State      *TaskState    `json:"state,omitempty"`
 	AssignedTo *string       `json:"assigned_to,omitempty"`
