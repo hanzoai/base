@@ -223,7 +223,7 @@ func (s *Session) Sync() error {
 	defer s.mu.Unlock()
 
 	// v1: no-op (single device)
-	// v2: push s.oplog to ZAP peers, pull their ops, merge
+	// push s.oplog to ZAP peers, pull their ops, merge
 	return nil
 }
 
@@ -275,7 +275,7 @@ func (s *Session) Anchor() (*AnchorReceipt, error) {
 		OpCount:    len(s.oplog),
 	}
 
-	// v2: submit receipt.MerkleRoot to I-Chain via chainRPC
+	// submit receipt.MerkleRoot to I-Chain via chainRPC
 
 	return receipt, nil
 }
@@ -288,7 +288,7 @@ func (s *Session) close() {
 	s.oplog = nil
 }
 
-// ─── v2: Shared Vaults ──────────────────────────────────────────────────────
+// ─── Shared Vaults ───────────────────────────────────────────────────────────
 
 // SharedSession is a multi-member vault derived from the org KEK + vaultID.
 // Members list controls who can access. Each member decrypts with the shared DEK.
@@ -356,7 +356,7 @@ func (ss *SharedSession) GetAs(userID, key string) ([]byte, error) {
 	return ss.Session.Get(key)
 }
 
-// ─── v2: Multi-Device Enrollment ─────────────────────────────────────────────
+// ─── Multi-Device Enrollment ─────────────────────────────────────────────────
 
 // DeviceKey is a device-specific wrapping key derived from the user DEK.
 type DeviceKey struct {
@@ -406,7 +406,7 @@ func (v *Vault) RevokeDevice(userID, deviceID string) error {
 	return nil
 }
 
-// ─── v2: Per-Collection Sharing ──────────────────────────────────────────────
+// ─── Per-Collection Sharing ──────────────────────────────────────────────────
 
 // ShareToken carries a re-encrypted DEK scoped to a single collection.
 type ShareToken struct {
@@ -482,7 +482,7 @@ func GetWithToken(token *ShareToken, store map[string][]byte, key string) ([]byt
 	return shard.Decrypt(encrypted)
 }
 
-// ─── v2: Threshold Recovery ──────────────────────────────────────────────────
+// ─── Threshold Recovery ──────────────────────────────────────────────────────
 
 // CreateRecoveryShares splits the user DEK into `total` shares using
 // XOR-based secret sharing. Any `threshold` shares can reconstruct the DEK
@@ -495,7 +495,7 @@ func (s *Session) CreateRecoveryShares(threshold, total int) ([][]byte, error) {
 		return nil, fmt.Errorf("vault: need threshold >= 2 and total >= threshold")
 	}
 	if threshold != total {
-		return nil, fmt.Errorf("vault: v2 only supports threshold == total (XOR split); Shamir in v3")
+		return nil, fmt.Errorf("vault: only supports threshold == total (XOR split); Shamir in future release")
 	}
 
 	dekLen := len(s.dek)
