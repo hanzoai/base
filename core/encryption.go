@@ -31,7 +31,7 @@ func DeriveKey(masterKey []byte, principalType PrincipalType, principalID string
 	}
 
 	info := string(principalType) + ":" + principalID
-	key, err := hkdf.Key(sha256.New, masterKey, nil, info, 32)
+	key, err := hkdf.Key(sha256.New, masterKey, []byte("base.cek.v1.hkdf-sha256-salt..."), info, 32)
 	if err != nil {
 		return nil, fmt.Errorf("core/cek: hkdf: %w", err)
 	}
