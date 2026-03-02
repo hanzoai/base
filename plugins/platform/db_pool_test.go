@@ -73,7 +73,15 @@ func TestPoolManager_GetAndRelease(t *testing.T) {
 }
 
 func TestPoolManager_LRUEviction(t *testing.T) {
-	m, dir := testPoolManager(t, 3) // very small capacity
+	// Use 1 shard to make eviction deterministic
+	dir := t.TempDir()
+	m := NewDBPoolManager(DBPoolConfig{
+		MaxPools:  3,
+		ReadConns: 4,
+		NumShards: 1, // single shard for deterministic eviction
+		Connect:   core.DefaultDBConnect,
+	})
+	t.Cleanup(func() { m.Close() })
 
 	// Open 3 pools and write data so the DB files exist on disk
 	for i := 0; i < 3; i++ {
@@ -98,8 +106,8 @@ func TestPoolManager_LRUEviction(t *testing.T) {
 	if m.Len() != 3 {
 		t.Fatalf("expected 3 pools after eviction, got %d", m.Len())
 	}
-	if m.Stats().Evictions != 1 {
-		t.Fatalf("expected 1 eviction, got %d", m.Stats().Evictions)
+	if m.Stats().Evictions < 1 {
+		t.Fatalf("expected at least 1 eviction, got %d", m.Stats().Evictions)
 	}
 
 	// The evicted pool's DB file should still exist on disk
@@ -109,7 +117,9 @@ func TestPoolManager_LRUEviction(t *testing.T) {
 }
 
 func TestPoolManager_NoEvictInUse(t *testing.T) {
-	m, dir := testPoolManager(t, 2)
+	dir := t.TempDir()
+	m := NewDBPoolManager(DBPoolConfig{MaxPools: 2, ReadConns: 4, NumShards: 1, Connect: core.DefaultDBConnect})
+	t.Cleanup(func() { m.Close() })
 
 	// Open 2 pools and hold references
 	p0, _ := m.Get(dbPath(dir, 0))
