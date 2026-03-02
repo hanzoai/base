@@ -5,10 +5,10 @@ go 1.26
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/domodwyer/mailyak/v3 v3.6.2
-	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
+	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
-	github.com/fatih/color v1.18.0
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fatih/color v1.19.0
+	github.com/fsnotify/fsnotify v1.9.0
 	github.com/gabriel-vasile/mimetype v1.4.13
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
@@ -19,13 +19,14 @@ require (
 	github.com/pocketbase/tygoja v0.0.0-20250812183945-97ffe055281f
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
+	go.temporal.io/api v1.62.5
 	go.temporal.io/sdk v1.41.1
 	golang.org/x/crypto v0.49.0
 	golang.org/x/image v0.37.0
 	golang.org/x/net v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	modernc.org/sqlite v1.46.2
+	modernc.org/sqlite v1.47.0
 )
 
 require (
@@ -39,11 +40,11 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/mock v1.6.0 // indirect
-	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
+	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 // indirect
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -51,25 +52,24 @@ require (
 	github.com/luxfi/mdns v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/miekg/dns v1.1.62 // indirect
+	github.com/miekg/dns v1.1.72 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nexus-rpc/sdk-go v0.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	github.com/stretchr/objx v0.5.2 // indirect
+	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	go.temporal.io/api v1.62.2 // indirect
-	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
-	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240827150818-7e3bb234dfed // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
-	google.golang.org/grpc v1.67.1 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	golang.org/x/time v0.15.0 // indirect
+	golang.org/x/tools v0.43.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260319201613-d00831a3d3e7 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260319201613-d00831a3d3e7 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
