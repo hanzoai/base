@@ -84,6 +84,7 @@ button {
     }
 
     $variationsMap: (
+        "primary": var(--primaryColor),
         "info":    var(--infoColor),
         "success": var(--successColor),
         "danger":  var(--dangerColor),
