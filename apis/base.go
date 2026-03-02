@@ -37,7 +37,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 
 	apiPrefix := os.Getenv("BASE_API_PREFIX")
 	if apiPrefix == "" {
-		apiPrefix = "/v1/base"
+		apiPrefix = "/api"
 	}
 	apiGroup := baseRouter.Group(apiPrefix)
 	bindSettingsApi(app, apiGroup)
@@ -50,6 +50,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindFileApi(app, apiGroup)
 	bindBatchApi(app, apiGroup)
 	bindTasksApi(app, apiGroup)
+	bindHealthApi(app, apiGroup)
 	bindRealtimeApi(app, apiGroup)
 	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
 	bindSuperuserOIDCApi(app, baseRouter)
