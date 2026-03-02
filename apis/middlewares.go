@@ -1,6 +1,7 @@
 package apis
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +17,7 @@ import (
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/tools/security"
 	"github.com/spf13/cast"
 )
 
@@ -168,6 +170,21 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 	}
 }
 
+// Store keys used to configure IAM JWKS-based auth fallback.
+// Set these via app.Store() from the platform plugin or manually.
+const (
+	// StoreKeyIAMJWKSURL is the JWKS endpoint URL (e.g., "https://iam.example.com/.well-known/jwks").
+	// When set, loadAuthToken will fall back to JWKS validation if local token validation fails.
+	StoreKeyIAMJWKSURL = "iamJWKSURL"
+
+	// StoreKeyIAMUsersCollection is the name of the auth collection to find/create
+	// IAM-backed user records in (default: "users").
+	StoreKeyIAMUsersCollection = "iamUsersCollection"
+)
+
+// shared JWKS cache for IAM token validation (10 minute TTL on keys).
+var iamJWKSCache = security.NewJWKSCache(10 * time.Minute)
+
 // loadAuthToken attempts to load the auth context based on the "Authorization: TOKEN" header value.
 //
 // This middleware does nothing in case of:
@@ -175,6 +192,12 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 //   - e.Auth is already loaded by another middleware
 //
 // This middleware is registered by default for all routes.
+//
+// When app.Store() contains a "iamJWKSURL" value, the middleware will attempt
+// JWKS-based JWT validation as a fallback when the token is not a valid local
+// Base auth token. If the JWKS validation succeeds, a corresponding user record
+// is found or auto-created in the "users" auth collection (configurable via
+// "iamUsersCollection" store key).
 //
 // Note: We don't throw an error on invalid or expired token to allow
 // users to extend with their own custom handling in external middleware(s).
@@ -193,16 +216,139 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
+			// Try local Base token validation first.
 			record, err := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
-			if err != nil {
-				e.App.Logger().Debug("loadAuthToken failure", "error", err)
-			} else if record != nil {
+			if err == nil && record != nil {
 				e.Auth = record
+				return e.Next()
+			}
+
+			// Local validation failed — try IAM JWKS fallback if configured.
+			jwksURL, _ := e.App.Store().Get(StoreKeyIAMJWKSURL).(string)
+			if jwksURL == "" {
+				if err != nil {
+					e.App.Logger().Debug("loadAuthToken failure (no JWKS fallback)", "error", err)
+				}
+				return e.Next()
+			}
+
+			iamRecord, iamErr := resolveIAMToken(e, token, jwksURL)
+			if iamErr != nil {
+				e.App.Logger().Debug("loadAuthToken IAM JWKS fallback failure",
+					"localError", err,
+					"iamError", iamErr,
+				)
+			} else if iamRecord != nil {
+				e.Auth = iamRecord
 			}
 
 			return e.Next()
 		},
 	}
+}
+
+// resolveIAMToken validates a JWT against the IAM JWKS endpoint and returns
+// the corresponding Base user record (creating one if it doesn't exist).
+func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record, error) {
+	ctx, cancel := context.WithTimeout(e.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	claims, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, iamJWKSCache)
+	if err != nil {
+		return nil, fmt.Errorf("iam jwks validation: %w", err)
+	}
+
+	// Extract identity claims from the IAM JWT.
+	// IAM uses "sub" for user ID, "owner" for org, "email" for email.
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return nil, errors.New("iam token missing sub claim")
+	}
+
+	owner, _ := claims["owner"].(string)
+	email, _ := claims["email"].(string)
+	name, _ := claims["name"].(string)
+	displayName, _ := claims["displayName"].(string)
+	if name == "" {
+		name = displayName
+	}
+
+	// Store IAM claims on the request for downstream middleware.
+	e.Set("iamSub", sub)
+	e.Set("iamOwner", owner)
+	e.Set("iamEmail", email)
+	e.Set("iamName", name)
+
+	// Determine which collection to use for IAM users.
+	collectionName := "users"
+	if v, _ := e.App.Store().Get(StoreKeyIAMUsersCollection).(string); v != "" {
+		collectionName = v
+	}
+
+	collection, err := e.App.FindCachedCollectionByNameOrId(collectionName)
+	if err != nil {
+		return nil, fmt.Errorf("iam users collection %q not found: %w", collectionName, err)
+	}
+
+	if !collection.IsAuth() {
+		return nil, fmt.Errorf("collection %q is not an auth collection", collectionName)
+	}
+
+	// Try to find existing user by IAM sub (stored as the record ID).
+	record, err := e.App.FindRecordById(collection, sub)
+	if err == nil {
+		return record, nil
+	}
+
+	// Try by email as fallback.
+	if email != "" {
+		record, err = e.App.FindAuthRecordByEmail(collection, email)
+		if err == nil {
+			return record, nil
+		}
+	}
+
+	// Auto-create a new Base user record for this IAM identity.
+	record = core.NewRecord(collection)
+	record.Id = sub
+	record.Set("email", email)
+	if name != "" {
+		record.Set("name", name)
+	}
+
+	// Set org_id if the collection has that field and the claim is present.
+	if owner != "" && collection.Fields.GetByName("org_id") != nil {
+		record.Set("org_id", owner)
+	}
+
+	// Set defaults for common fields if they exist on the collection.
+	if f := collection.Fields.GetByName("role"); f != nil {
+		record.Set("role", "user")
+	}
+	if f := collection.Fields.GetByName("status"); f != nil {
+		record.Set("status", "active")
+	}
+	if f := collection.Fields.GetByName("kyc_status"); f != nil {
+		record.Set("kyc_status", "none")
+	}
+
+	// Set a random password — IAM users authenticate via IAM tokens, not local passwords.
+	record.SetRandomPassword()
+
+	// Mark the email as verified since IAM already verified it.
+	record.SetVerified(true)
+
+	if err := e.App.Save(record); err != nil {
+		return nil, fmt.Errorf("iam auto-create user: %w", err)
+	}
+
+	e.App.Logger().Info("auto-created Base user from IAM token",
+		slog.String("id", sub),
+		slog.String("email", email),
+		slog.String("collection", collectionName),
+	)
+
+	return record, nil
 }
 
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
