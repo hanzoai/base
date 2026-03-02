@@ -225,21 +225,43 @@ type IAMKey struct {
 	State       string `json:"state"`
 }
 
+// Hanzo key prefix standard (always hyphen, never underscore):
+//
+//   pk-  publishable key  (frontend-safe, read-only API access)
+//   sk-  secret key       (backend-only, full API access)
+//   hk-  hanzo key        (IAM user API key, legacy)
+//   hi-  hanzo insights   (analytics event ingestion)
+//   ha-  hanzo analytics  (lightweight web analytics)
+//   hz-  hanzo widget     (restricted chat/embed key)
+//
+// All managed by IAM. One key store. One prefix convention.
+
 // IsPublishableKey returns true if the token has a publishable key prefix.
 func IsPublishableKey(token string) bool {
-	return strings.HasPrefix(token, "pk-") || strings.HasPrefix(token, "pk_")
+	return strings.HasPrefix(token, "pk-")
 }
 
 // IsSecretKey returns true if the token has a secret key prefix.
 func IsSecretKey(token string) bool {
-	return strings.HasPrefix(token, "sk-") || strings.HasPrefix(token, "sk_")
+	return strings.HasPrefix(token, "sk-")
 }
 
 // IsAPIKey returns true if the token is any type of IAM API key.
 func IsAPIKey(token string) bool {
 	return strings.HasPrefix(token, "hk-") ||
-		strings.HasPrefix(token, "pk-") || strings.HasPrefix(token, "pk_") ||
-		strings.HasPrefix(token, "sk-") || strings.HasPrefix(token, "sk_")
+		strings.HasPrefix(token, "pk-") ||
+		strings.HasPrefix(token, "sk-")
+}
+
+// IsAnalyticsKey returns true if the token is an insights or analytics key.
+func IsAnalyticsKey(token string) bool {
+	return strings.HasPrefix(token, "hi-") ||
+		strings.HasPrefix(token, "ha-")
+}
+
+// IsWidgetKey returns true if the token is a widget embed key.
+func IsWidgetKey(token string) bool {
+	return strings.HasPrefix(token, "hz-")
 }
 
 // ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
