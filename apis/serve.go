@@ -78,15 +78,16 @@ func Serve(app core.App, config ServeConfig) error {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
-	// redirect root to the admin dashboard (only if not overridden by app)
-	if os.Getenv("BASE_SKIP_ROOT_REDIRECT") == "" {
+	// Root redirect: disabled by default. Set BASE_ENABLE_ROOT_REDIRECT=1 to redirect / → /_/
+	if os.Getenv("BASE_ENABLE_ROOT_REDIRECT") == "1" {
 		baseRouter.GET("/", func(e *core.RequestEvent) error {
 			return e.Redirect(http.StatusTemporaryRedirect, "/_/")
 		})
 	}
 
-	// Skip admin dashboard entirely when BASE_DISABLE_ADMIN_UI is set.
-	if os.Getenv("BASE_DISABLE_ADMIN_UI") != "" {
+	// Admin UI: disabled by default. Set BASE_ENABLE_ADMIN_UI=1 to serve /_/ dashboard.
+	// Production services are headless APIs — no UI surface exposed.
+	if os.Getenv("BASE_ENABLE_ADMIN_UI") != "1" {
 		baseRouter.GET("/_/{path...}", func(e *core.RequestEvent) error {
 			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
 		})
