@@ -402,7 +402,16 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	record.SetVerified(true)
 
 	if err := e.App.Save(record); err != nil {
-		return nil, fmt.Errorf("auto-create user: %w", err)
+		// Save failed (e.g. collection rules block creation).
+		// In IAM-only mode, the record still serves as a valid auth context
+		// with all claims populated — just not persisted to the local DB.
+		// This is intentional: IAM is the user store, not Base.
+		e.App.Logger().Debug("IAM user not persisted locally (IAM is source of truth)",
+			slog.String("sub", sub),
+			slog.String("email", email),
+			slog.String("error", err.Error()),
+		)
+		return record, nil
 	}
 
 	e.App.Logger().Info("auto-created user from external token",
