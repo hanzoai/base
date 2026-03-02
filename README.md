@@ -7,7 +7,7 @@
 - convenient **Admin dashboard UI**
 - and simple **GraphQL** && **REST-ish API**
 - native **Analytics and LLM observability**
-- deeply with integrated **[Base AI Platform](https://hanzo.ai)** for
+- deeply with integrated **[Hanzo AI Platform](https://hanzo.ai)** for
   hyperscalability day one.
 
 **Use [Hanzo App](https://hanzo.app) to rapidly iterate and build new apps!
