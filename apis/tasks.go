@@ -1,6 +1,7 @@
 package apis
 
 import (
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -130,6 +131,16 @@ func tasksCreate(e *core.RequestEvent) error {
 
 	if err := s.CreateTask(task); err != nil {
 		return e.InternalServerError("Failed to create task.", err)
+	}
+
+	// Submit to durable execution backend if connected.
+	if ds := tasks.GetDurable(e.App); ds != nil && ds.IsConnected() {
+		if err := ds.SubmitTask(e.Request.Context(), task); err != nil {
+			e.App.Logger().Warn("tasks: durable submit failed, SQLite is authoritative",
+				slog.String("task_id", task.ID),
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 
 	return e.JSON(http.StatusCreated, task)
@@ -283,6 +294,16 @@ func tasksCancel(e *core.RequestEvent) error {
 		return mapTaskError(e, err)
 	}
 
+	// Also cancel the durable workflow if connected.
+	if ds := tasks.GetDurable(e.App); ds != nil && ds.IsConnected() {
+		if err := ds.CancelTask(e.Request.Context(), id); err != nil {
+			e.App.Logger().Warn("tasks: durable cancel failed",
+				slog.String("task_id", id),
+				slog.String("error", err.Error()),
+			)
+		}
+	}
+
 	task, _ := s.GetTask(id)
 	return e.JSON(http.StatusOK, task)
 }
@@ -347,10 +368,33 @@ func tasksSignal(e *core.RequestEvent) error {
 		return notConnected(e)
 	}
 
-	// Signal support is a placeholder for future durable execution backends.
-	return e.JSON(http.StatusNotImplemented, map[string]any{
-		"message": "Task signaling requires a durable execution backend (Temporal).",
-	})
+	id := e.Request.PathValue("id")
+
+	var req TaskSignalRequest
+	if err := e.BindBody(&req); err != nil {
+		return e.BadRequestError("Invalid request body.", err)
+	}
+	if req.Name == "" {
+		return e.BadRequestError("Signal name is required.", nil)
+	}
+
+	// Verify task exists.
+	if _, err := s.GetTask(id); err != nil {
+		return e.NotFoundError("Task not found.", err)
+	}
+
+	ds := tasks.GetDurable(e.App)
+	if ds == nil || !ds.IsConnected() {
+		return e.JSON(http.StatusServiceUnavailable, map[string]any{
+			"message": "Task signaling requires durable execution (Temporal). Enable with TASKS_ENABLED=true.",
+		})
+	}
+
+	if err := ds.SignalTask(e.Request.Context(), id, req.Name, req.Data); err != nil {
+		return e.InternalServerError("Failed to signal task.", err)
+	}
+
+	return e.JSON(http.StatusOK, map[string]any{"signaled": true, "task_id": id, "signal": req.Name})
 }
 
 func tasksQuery(e *core.RequestEvent) error {
