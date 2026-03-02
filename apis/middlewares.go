@@ -172,30 +172,36 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 	}
 }
 
-// Store keys used to configure IAM JWKS-based auth fallback.
+// Store keys for OIDC/JWKS-based external auth provider integration.
 // Set these via app.Store() from the platform plugin or manually.
 const (
-	// StoreKeyIAMJWKSURL is the JWKS endpoint URL (e.g., "https://iam.example.com/.well-known/jwks").
-	// When set, loadAuthToken will fall back to JWKS validation if local token validation fails.
-	StoreKeyIAMJWKSURL = "iamJWKSURL"
+	// StoreKeyJWKSURL is the JWKS endpoint URL for the identity provider
+	// (e.g., "https://auth.example.com/.well-known/jwks").
+	// When set, loadAuthToken validates bearer tokens against this endpoint.
+	StoreKeyJWKSURL = "jwksURL"
 
-	// StoreKeyIAMUsersCollection is the name of the auth collection to find/create
-	// IAM-backed user records in (default: "users").
-	StoreKeyIAMUsersCollection = "iamUsersCollection"
+	// StoreKeyAuthUsersCollection is the name of the auth collection to
+	// find/create externally-authenticated user records in (default: "users").
+	StoreKeyAuthUsersCollection = "authUsersCollection"
 
-	// StoreKeyIAMOnly controls whether Hanzo IAM is the exclusive authentication
-	// source. When true:
+	// StoreKeyExternalAuthOnly controls whether the external identity provider
+	// (OIDC/JWKS) is the exclusive authentication source. When true:
 	//   - loadAuthToken tries JWKS first; local tokens are only accepted for
 	//     the _superusers collection (admin panel).
 	//   - Built-in auth endpoints (password, OTP, email-change, password-reset,
 	//     verification) are disabled for non-superuser collections.
 	//
-	// Set automatically by the platform plugin when an IAM endpoint is configured.
-	StoreKeyIAMOnly = "iamOnly"
+	// Set automatically by the platform plugin when an auth endpoint is configured.
+	StoreKeyExternalAuthOnly = "externalAuthOnly"
+
+	// Deprecated: use StoreKeyJWKSURL. Kept for backward compatibility.
+	StoreKeyIAMJWKSURL         = StoreKeyJWKSURL
+	StoreKeyIAMUsersCollection = StoreKeyAuthUsersCollection
+	StoreKeyIAMOnly            = StoreKeyExternalAuthOnly
 )
 
-// shared JWKS cache for IAM token validation (10 minute TTL on keys).
-var iamJWKSCache = security.NewJWKSCache(10 * time.Minute)
+// shared JWKS cache for external token validation (10 minute TTL on keys).
+var jwksCache = security.NewJWKSCache(10 * time.Minute)
 
 // loadAuthToken attempts to load the auth context based on the "Authorization: TOKEN" header value.
 //
@@ -205,16 +211,16 @@ var iamJWKSCache = security.NewJWKSCache(10 * time.Minute)
 //
 // This middleware is registered by default for all routes.
 //
-// When app.Store() contains a "iamJWKSURL" value, the middleware will attempt
-// JWKS-based JWT validation as a fallback when the token is not a valid local
-// Base auth token. If the JWKS validation succeeds, a corresponding user record
-// is found or auto-created in the "users" auth collection (configurable via
-// "iamUsersCollection" store key).
+// When app.Store() contains a "jwksURL" value, the middleware validates bearer
+// tokens against the external identity provider's JWKS endpoint. If the
+// validation succeeds, a corresponding user record is found or auto-created
+// in the auth collection (configurable via "authUsersCollection" store key,
+// default: "users").
 //
-// When StoreKeyIAMOnly is true (set by the platform plugin), IAM JWKS is the
-// primary auth mechanism. Local Base tokens are only accepted for the
+// When StoreKeyExternalAuthOnly is true (set by the platform plugin), JWKS is
+// the primary auth mechanism. Local Base tokens are only accepted for the
 // _superusers collection (admin panel sessions). All other local tokens are
-// rejected — users MUST authenticate via Hanzo IAM.
+// rejected — users must authenticate via the configured identity provider.
 //
 // Note: We don't throw an error on invalid or expired token to allow
 // users to extend with their own custom handling in external middleware(s).
@@ -233,29 +239,29 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			iamOnly, _ := e.App.Store().Get(StoreKeyIAMOnly).(bool)
-			jwksURL, _ := e.App.Store().Get(StoreKeyIAMJWKSURL).(string)
+			externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool)
+			jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
 
-			if iamOnly && jwksURL != "" {
-				// IAM-only mode: JWKS is the primary auth mechanism.
-				iamRecord, iamErr := resolveIAMToken(e, token, jwksURL)
-				if iamErr == nil && iamRecord != nil {
-					e.Auth = iamRecord
-					return e.Next()
-				}
-
-				// JWKS failed — allow local token ONLY for _superusers
-				// (admin panel sessions are issued by Base after IAM OAuth2 login).
-				record, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
-				if localErr == nil && record != nil && record.Collection().Name == core.CollectionNameSuperusers {
+			if externalOnly && jwksURL != "" {
+				// External-only mode: JWKS is the primary auth mechanism.
+				record, jwksErr := resolveJWKSToken(e, token, jwksURL)
+				if jwksErr == nil && record != nil {
 					e.Auth = record
 					return e.Next()
 				}
 
+				// JWKS failed — allow local token ONLY for _superusers
+				// (admin panel sessions issued by Base after OAuth2 login).
+				localRecord, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
+				if localErr == nil && localRecord != nil && localRecord.Collection().Name == core.CollectionNameSuperusers {
+					e.Auth = localRecord
+					return e.Next()
+				}
+
 				// Both failed — log and continue without auth.
-				if iamErr != nil {
-					e.App.Logger().Debug("loadAuthToken IAM-only: JWKS failed",
-						"iamError", iamErr,
+				if jwksErr != nil {
+					e.App.Logger().Debug("loadAuthToken: external JWKS validation failed",
+						"error", jwksErr,
 					)
 				}
 				return e.Next()
@@ -268,22 +274,22 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			// Local validation failed — try IAM JWKS fallback if configured.
+			// Local validation failed — try JWKS if configured.
 			if jwksURL == "" {
 				if err != nil {
-					e.App.Logger().Debug("loadAuthToken failure (no JWKS fallback)", "error", err)
+					e.App.Logger().Debug("loadAuthToken: local token validation failed", "error", err)
 				}
 				return e.Next()
 			}
 
-			iamRecord, iamErr := resolveIAMToken(e, token, jwksURL)
-			if iamErr != nil {
-				e.App.Logger().Warn("loadAuthToken IAM JWKS fallback failure",
+			jwksRecord, jwksErr := resolveJWKSToken(e, token, jwksURL)
+			if jwksErr != nil {
+				e.App.Logger().Warn("loadAuthToken: JWKS validation failed",
 					"localError", err,
-					"iamError", iamErr,
+					"jwksError", jwksErr,
 				)
-			} else if iamRecord != nil {
-				e.Auth = iamRecord
+			} else if jwksRecord != nil {
+				e.Auth = jwksRecord
 			}
 
 			return e.Next()
@@ -291,20 +297,22 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 	}
 }
 
-// resolveIAMToken validates a JWT against the IAM JWKS endpoint and returns
-// the corresponding Base user record (creating one if it doesn't exist).
-func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record, error) {
+// resolveJWKSToken validates a JWT against the configured JWKS endpoint and
+// returns the corresponding Base user record (creating one if it doesn't exist).
+//
+// Standard OIDC claims extracted: sub, email, name, preferred_username, owner.
+func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record, error) {
 	ctx, cancel := context.WithTimeout(e.Request.Context(), 10*time.Second)
 	defer cancel()
 
-	claims, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, iamJWKSCache)
+	claims, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, jwksCache)
 	if err != nil {
-		return nil, fmt.Errorf("iam jwks validation: %w", err)
+		return nil, fmt.Errorf("jwks validation: %w", err)
 	}
 
-	// Extract identity claims from the IAM JWT.
-	// IAM uses "sub" for user ID, "owner" for org, "email" for email.
-	// Casdoor may leave "sub" empty — fall back to preferred_username then name.
+	// Extract standard OIDC claims.
+	// "sub" is the primary identifier (RFC 7519). Fall back to
+	// "preferred_username" then "name" for compatibility.
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
 		sub, _ = claims["preferred_username"].(string)
@@ -313,7 +321,7 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		sub, _ = claims["name"].(string)
 	}
 	if sub == "" {
-		return nil, errors.New("iam token missing sub/preferred_username/name claim")
+		return nil, errors.New("token missing sub/preferred_username/name claim")
 	}
 
 	owner, _ := claims["owner"].(string)
@@ -324,21 +332,21 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		name = displayName
 	}
 
-	// Store IAM claims on the request for downstream middleware.
-	e.Set("iamSub", sub)
-	e.Set("iamOwner", owner)
-	e.Set("iamEmail", email)
-	e.Set("iamName", name)
+	// Store resolved claims on the request for downstream middleware.
+	e.Set("authSub", sub)
+	e.Set("authOwner", owner)
+	e.Set("authEmail", email)
+	e.Set("authName", name)
 
-	// Determine which collection to use for IAM users.
+	// Determine which collection to use.
 	collectionName := "users"
-	if v, _ := e.App.Store().Get(StoreKeyIAMUsersCollection).(string); v != "" {
+	if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 		collectionName = v
 	}
 
 	collection, err := e.App.FindCachedCollectionByNameOrId(collectionName)
 	if err != nil {
-		return nil, fmt.Errorf("iam users collection %q not found: %w", collectionName, err)
+		return nil, fmt.Errorf("auth users collection %q not found: %w", collectionName, err)
 	}
 
 	if !collection.IsAuth() {
@@ -346,10 +354,10 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 	}
 
 	// Base record IDs must be exactly 15 lowercase alphanumeric characters.
-	// IAM subs can be UUIDs (36 chars) or short slugs — normalize to 15 chars.
-	recordID := iamSubToRecordID(sub)
+	// External subs can be UUIDs (36 chars) or short slugs — normalize to 15.
+	recordID := subToRecordID(sub)
 
-	// Try to find existing user by IAM sub (used directly as Base record ID).
+	// Try to find existing user by sub (mapped to Base record ID).
 	record, err := e.App.FindRecordById(collection, recordID)
 	if err == nil {
 		return record, nil
@@ -363,7 +371,7 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		}
 	}
 
-	// Auto-create a new Base user record for this IAM identity.
+	// Auto-create a new Base user record for this external identity.
 	record = core.NewRecord(collection)
 	record.Id = recordID
 	record.Set("email", email)
@@ -387,18 +395,18 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		record.Set("kyc_status", "none")
 	}
 
-	// Set a random password — IAM users authenticate via IAM tokens, not local passwords.
+	// External users authenticate via OIDC tokens, not local passwords.
 	record.SetRandomPassword()
 
-	// Mark the email as verified since IAM already verified it.
+	// Mark email as verified — the identity provider already verified it.
 	record.SetVerified(true)
 
 	if err := e.App.Save(record); err != nil {
-		return nil, fmt.Errorf("iam auto-create user: %w", err)
+		return nil, fmt.Errorf("auto-create user: %w", err)
 	}
 
-	e.App.Logger().Info("auto-created Base user from IAM token",
-		slog.String("id", sub),
+	e.App.Logger().Info("auto-created user from external token",
+		slog.String("sub", sub),
 		slog.String("email", email),
 		slog.String("collection", collectionName),
 	)
@@ -406,13 +414,13 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 	return record, nil
 }
 
-// iamSubToRecordID converts an IAM sub claim (which may be a UUID, slug, or
+// subToRecordID converts an OIDC sub claim (which may be a UUID, slug, or
 // other identifier) into a valid Base record ID (exactly 15 lowercase
 // alphanumeric chars).
 //
 // Short subs (< 15 chars) are padded with underscores (kept for backward compat).
 // Long or non-alphanumeric subs are SHA-256 hashed and truncated to 15 hex chars.
-func iamSubToRecordID(sub string) string {
+func subToRecordID(sub string) string {
 	// Fast path: if already a valid 15-char lowercase alphanumeric ID, use as-is.
 	if len(sub) == 15 && isLowerAlphanumeric(sub) {
 		return sub
