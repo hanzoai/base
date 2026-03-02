@@ -6,7 +6,7 @@ Zero-knowledge encrypted secret management for [Hanzo Base](https://github.com/h
 
 The KMS plugin adds transparent field-level encryption to any Base collection. Configured fields are encrypted before database writes and decrypted after reads, making encryption invisible to the application layer. FHE-encrypted indexes allow equality queries on encrypted data without decryption.
 
-The plugin connects to the [ZK-KMS MPC cluster](https://github.com/hanzoai/kms) — a distributed key management system using Shamir secret sharing, HPKE key wrapping, and AES-256-GCM encryption. No single node ever holds the complete encryption key.
+The plugin connects to the [TFHE-KMS MPC cluster](https://github.com/hanzoai/kms) — a distributed key management system using Shamir secret sharing, HPKE key wrapping, and AES-256-GCM encryption. No single node ever holds the complete encryption key.
 
 ## Quick Start
 
@@ -141,7 +141,7 @@ Enterprise features are configured on the MPC node (`EnterpriseConfig`):
             │ gRPC (TLS + HPKE)
             ▼
 ┌───────────────────────────────────────────────────────────────┐
-│  ZK-KMS MPC Cluster (t-of-n Shamir)                           │
+│  TFHE-KMS MPC Cluster (t-of-n Shamir)                           │
 │                                                               │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                    │
 │  │ MPC Node │  │ MPC Node │  │ MPC Node │  ...               │
