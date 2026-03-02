@@ -124,8 +124,11 @@ func Register(app core.App, config PlatformConfig) error {
 		iam:        NewIAMClient(config.IAMEndpoint),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
-		orgDB:      NewOrgDB(app, config.OrgEncryptionKey),
-		dbPool:     NewDBPoolManager(256, core.DefaultDBConnect),
+		orgDB: NewOrgDB(app, config.OrgEncryptionKey),
+		dbPool: NewDBPoolManager(DBPoolConfig{
+			MaxPools:  256,
+			ReadConns: 4,
+		}),
 	}
 
 	// Bootstrap: ensure system collections exist.
