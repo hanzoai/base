@@ -2,6 +2,7 @@ package apis_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/apis"
@@ -552,4 +553,172 @@ func TestRequireSameCollectionContextAuth(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+func TestExternalAuthGuard(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "blocks users auth-with-password when external auth is on",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/auth-with-password",
+			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "allows _superusers auth-with-password when external auth is on",
+			Method: http.MethodPost,
+			URL:    "/api/collections/_superusers/auth-with-password",
+			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			// The superuser endpoint is allowed through the guard.
+			// It will fail on actual auth (wrong password) — NOT 403 from the guard.
+			ExpectedStatus:     400,
+			NotExpectedContent: []string{`Direct authentication is disabled`},
+		},
+		{
+			Name:   "allows users auth-with-password when external auth is off",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/auth-with-password",
+			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				// external auth is NOT set (default off)
+			},
+			// Should NOT get 403 from the guard. Will fail on auth (wrong password).
+			ExpectedStatus:     400,
+			NotExpectedContent: []string{`Direct authentication is disabled`},
+		},
+		{
+			Name:   "blocks users request-otp when external auth is on",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/request-otp",
+			Body:   strings.NewReader(`{"email":"test@example.com"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "blocks users request-password-reset when external auth is on",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/request-password-reset",
+			Body:   strings.NewReader(`{"email":"test@example.com"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "allows auth-methods when external auth is on",
+			Method: http.MethodGet,
+			URL:    "/api/collections/users/auth-methods",
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"password"`},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestExternalAuthOnlySuperuserFallback(t *testing.T) {
+	t.Parallel()
+
+	// superuser local token accepted in external-only mode
+	t.Run("superuser token accepted", func(t *testing.T) {
+		app, err := tests.NewTestApp()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer app.Cleanup()
+
+		app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+
+		token, err := tests.GetSuperuserAuthToken(app, tests.TestSuperuserID1)
+		if err != nil {
+			t.Fatalf("failed to get superuser token: %v", err)
+		}
+
+		scenario := tests.ApiScenario{
+			Name:   "superuser token in external mode",
+			Method: http.MethodGet,
+			URL:    "/my/test",
+			Headers: map[string]string{
+				"Authorization": token,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				return app
+			},
+			DisableTestAppCleanup: true,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				e.Router.GET("/my/test", func(e *core.RequestEvent) error {
+					if e.Auth == nil {
+						return e.String(401, "no auth")
+					}
+					return e.String(200, "auth:"+e.Auth.Collection().Name+":"+e.Auth.Id)
+				})
+			},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{"auth:_superusers:" + tests.TestSuperuserID1},
+		}
+
+		scenario.Test(t)
+	})
+
+	// regular user token rejected in external-only mode
+	t.Run("regular user token rejected", func(t *testing.T) {
+		app, err := tests.NewTestApp()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer app.Cleanup()
+
+		app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+
+		token, err := tests.GetUserAuthToken(app, "users", tests.TestUserID1)
+		if err != nil {
+			t.Fatalf("failed to get user token: %v", err)
+		}
+
+		scenario := tests.ApiScenario{
+			Name:   "regular user token in external mode",
+			Method: http.MethodGet,
+			URL:    "/my/test",
+			Headers: map[string]string{
+				"Authorization": token,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				return app
+			},
+			DisableTestAppCleanup: true,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				e.Router.GET("/my/test", func(e *core.RequestEvent) error {
+					if e.Auth == nil {
+						return e.String(401, "no auth")
+					}
+					return e.String(200, "auth:"+e.Auth.Collection().Name+":"+e.Auth.Id)
+				})
+			},
+			ExpectedStatus:  401,
+			ExpectedContent: []string{"no auth"},
+		}
+
+		scenario.Test(t)
+	})
 }
