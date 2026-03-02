@@ -3,7 +3,7 @@
  *
  * Two API surfaces:
  *
- * 1. PocketBase-compatible: client.collection('posts').getList(...)
+ * 1. Base-compatible: client.collection('posts').getList(...)
  * 2. Direct (convenience):  client.list('posts', { filter: '...' })
  *
  * Both share the same QueryStore, RealtimeService, and AuthStore.
@@ -105,7 +105,7 @@ export class FileService {
 
   /**
    * Build a full URL to a record file.
-   * Compatible with PocketBase's pb.files.getURL().
+   * Compatible with Base's files.getURL().
    */
   getURL(record: BaseRecord, filename: string, options?: FileOptions): string {
     if (!filename || !record.id) return ''
@@ -200,7 +200,7 @@ export class BaseClient {
     })
   }
 
-  // ---- PocketBase-compatible collection() API -----------------------------
+  // ---- Base-compatible collection() API ------------------------------------
 
   /** Get or create a CollectionService for the given name/id. */
   collection(nameOrId: string): CollectionService {

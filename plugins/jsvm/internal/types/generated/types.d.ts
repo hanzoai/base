@@ -204,7 +204,7 @@ declare function toString(val: any, maxBytes?: number): string;
  * const ex4 = toBytes(null) // []
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare function toBytes(val: any, maxBytes?: number): Array<number>;
 
@@ -257,7 +257,7 @@ declare function arrayOf<T>(model: T): Array<T>;
  * unmarshal({ authAlert: { enabled: true } }, collection)
  * ```
  *
- * @group PocketBase
+ * @group Base
  */
 declare function unmarshal(data: any, dst: any): void;
 
@@ -294,7 +294,7 @@ declare class DynamicModel {
  * nullString creates an empty Go string pointer usually used for
  * describing a **nullable** `DynamicModel` string value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullString(): string;
 
@@ -302,7 +302,7 @@ declare function nullString(): string;
  * nullInt creates an empty Go int64 pointer usually used for
  * describing a **nullable** `DynamicModel` int value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullInt(): number;
 
@@ -310,7 +310,7 @@ declare function nullInt(): number;
  * nullFloat creates an empty Go float64 pointer usually used for
  * describing a **nullable** `DynamicModel` float value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullFloat(): number;
 
@@ -318,7 +318,7 @@ declare function nullFloat(): number;
  * nullBool creates an empty Go bool pointer usually used for
  * describing a **nullable** `DynamicModel` bool value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullBool(): boolean;
 
@@ -326,7 +326,7 @@ declare function nullBool(): boolean;
  * nullArray creates an empty Go types.JSONArray pointer usually used for
  * describing a **nullable** `DynamicModel` JSON array value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullArray(): Array<any>;
 
@@ -334,7 +334,7 @@ declare function nullArray(): Array<any>;
  * nullObject creates an empty Go types.JSONMap pointer usually used for
  * describing a **nullable** `DynamicModel` JSON object value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullObject(): { get(key:string):any; set(key:string,value:any):void };
 
@@ -576,7 +576,7 @@ interface GeoPointField extends core.GeoPointField{} // merge
 /**
  * {@inheritDoc core.GeoPointField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class GeoPointField implements core.GeoPointField {
   constructor(data?: Partial<core.GeoPointField>)
@@ -9494,7 +9494,7 @@ namespace core {
    * ThumbError indicates the a thumb wasn't able to be generated
    * (e.g. because it didn't satisfy the support image formats or it timed out).
    * 
-   * Note that PocketBase fallbacks to the original file in case of a thumb error,
+   * Note that Base falls back to the original file in case of a thumb error,
    * but developers can check the field and provide their own custom thumb generation if necessary.
    */
   thumbError: Error
@@ -14791,10 +14791,10 @@ namespace template {
 
 namespace pocketbase {
  /**
-  * PocketBase defines a PocketBase app launcher.
-  * 
+  * Base defines a Hanzo Base app launcher.
+  *
   * It implements [CoreApp] via embedding and all of the app interface methods
-  * could be accessed directly through the instance (eg. PocketBase.DataDir()).
+  * could be accessed directly through the instance (eg. Base.DataDir()).
   */
  type _spLGfrP = CoreApp
  interface PocketBase extends _spLGfrP {
@@ -14804,7 +14804,7 @@ namespace pocketbase {
   rootCmd?: cobra.Command
  }
  /**
-  * Config is the PocketBase initialization config struct.
+  * Config is the Base initialization config struct.
   */
  interface Config {
   /**
@@ -14829,26 +14829,26 @@ namespace pocketbase {
  }
  interface _new {
   /**
-   * New creates a new PocketBase instance with the default configuration.
+   * New creates a new Base instance with the default configuration.
    * Use [NewWithConfig] if you want to provide a custom configuration.
-   * 
+   *
    * Note that the application will not be initialized/bootstrapped yet,
    * aka. DB connections, migrations, app settings, etc. will not be accessible.
-   * Everything will be initialized when [PocketBase.Start] is executed.
-   * If you want to initialize the application before calling [PocketBase.Start],
-   * then you'll have to manually call [PocketBase.Bootstrap].
+   * Everything will be initialized when [Base.Start] is executed.
+   * If you want to initialize the application before calling [Base.Start],
+   * then you'll have to manually call [Base.Bootstrap].
    */
   (): (PocketBase)
  }
  interface newWithConfig {
   /**
-   * NewWithConfig creates a new PocketBase instance with the provided config.
-   * 
+   * NewWithConfig creates a new Base instance with the provided config.
+   *
    * Note that the application will not be initialized/bootstrapped yet,
    * aka. DB connections, migrations, app settings, etc. will not be accessible.
-   * Everything will be initialized when [PocketBase.Start] is executed.
-   * If you want to initialize the application before calling [PocketBase.Start],
-   * then you'll have to manually call [PocketBase.Bootstrap].
+   * Everything will be initialized when [Base.Start] is executed.
+   * If you want to initialize the application before calling [Base.Start],
+   * then you'll have to manually call [Base.Bootstrap].
    */
   (config: Config): (PocketBase)
  }
