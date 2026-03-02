@@ -20,7 +20,6 @@ import (
 // OldToNewCollectionID maps old collection IDs to current IDs
 var OldToNewCollectionID = map[string]string{
 	"_pb_users_auth_": "_users_auth_",
-	"_hz_users_auth_": "_users_auth_",
 	"pbc_3142635823":  "hbc_3142635823",
 }
 
