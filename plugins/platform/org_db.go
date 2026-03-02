@@ -1,7 +1,7 @@
 package platform
 
 import (
-	"crypto/hmac"
+	"crypto/hkdf"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -78,14 +78,14 @@ func (t *OrgDB) OrgDBPath(orgSlug string) string {
 	return filepath.Join(t.OrgDir(orgSlug), "org.db")
 }
 
-// OrgDEK derives the org-level data encryption key.
+// OrgDEK derives the org-level data encryption key using HKDF (RFC 5869).
+// Go 1.26+ stdlib crypto/hkdf — proper key derivation, not raw HMAC.
 func (t *OrgDB) OrgDEK(orgSlug string) string {
 	if t.masterKey == "" {
 		return ""
 	}
-	mac := hmac.New(sha256.New, []byte(t.masterKey))
-	mac.Write([]byte(orgSlug))
-	return hex.EncodeToString(mac.Sum(nil))
+	key, _ := hkdf.Key(sha256.New, []byte(t.masterKey), []byte(orgSlug), "org-dek", 32)
+	return hex.EncodeToString(key)
 }
 
 // ProvisionOrg creates the org directory and org-level database.
@@ -126,15 +126,14 @@ func (t *OrgDB) UserDBPath(orgSlug, userId string) string {
 	return filepath.Join(t.UserDir(orgSlug, userId), "data.db")
 }
 
-// UserDEK derives the per-user data encryption key.
-// Different from the org DEK — user PII is encrypted with a user-specific key.
+// UserDEK derives the per-user data encryption key using HKDF (RFC 5869).
+// Different from the org DEK — user PII gets a user-specific key.
 func (t *OrgDB) UserDEK(orgSlug, userId string) string {
 	if t.masterKey == "" {
 		return ""
 	}
-	mac := hmac.New(sha256.New, []byte(t.masterKey))
-	mac.Write([]byte(orgSlug + ":" + userId))
-	return hex.EncodeToString(mac.Sum(nil))
+	key, _ := hkdf.Key(sha256.New, []byte(t.masterKey), []byte(orgSlug+":"+userId), "user-dek", 32)
+	return hex.EncodeToString(key)
 }
 
 // ProvisionUser creates the per-user directory and database.

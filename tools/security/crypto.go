@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/sha256"
+	"crypto/sha3"
 	"crypto/sha512"
 	"crypto/subtle"
 	"encoding/base64"
@@ -52,6 +53,21 @@ func HS256(text string, secret string) string {
 // HS512 creates a HMAC hash with sha512 digest algorithm.
 func HS512(text string, secret string) string {
 	h := hmac.New(sha512.New, []byte(secret))
+	h.Write([]byte(text))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// SHA3_256 creates SHA3-256 hash as defined in FIPS 202 from the provided text.
+// Available in Go 1.26+ stdlib (crypto/sha3).
+func SHA3_256(text string) string {
+	h := sha3.New256()
+	h.Write([]byte(text))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+// SHA3_512 creates SHA3-512 hash as defined in FIPS 202 from the provided text.
+func SHA3_512(text string) string {
+	h := sha3.New512()
 	h.Write([]byte(text))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
