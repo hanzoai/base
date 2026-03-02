@@ -70,7 +70,7 @@
 </script>
 
 <svelte:head>
-    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName, "Base"], " - ", false)}</title>
+    <title>{CommonHelper.joinNonEmpty([$pageTitle, $appName || "Base"], " - ", false)}</title>
 
     {#if window.location.protocol == "https:"}
         <link
