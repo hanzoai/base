@@ -24,16 +24,19 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
       - name: Install dependencies
         working-directory: sdk/${{ matrix.package }}
-        run: npm install
+        run: pnpm install
 
       - name: Build
         working-directory: sdk/${{ matrix.package }}
-        run: npx tsup
+        run: pnpm exec tsup
 
       - name: Publish
         working-directory: sdk/${{ matrix.package }}
-        run: npm publish --access public || true
+        run: pnpm publish --access public --no-git-checks || true
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
