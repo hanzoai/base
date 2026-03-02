@@ -1,6 +1,7 @@
 package tasks
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -12,17 +13,31 @@ import (
 const (
 	// StoreKey is the app.Store() key where the task store is registered.
 	StoreKey = "tasks.store"
+	// DurableKey is the app.Store() key where the durable store is registered.
+	DurableKey = "tasks.durable"
 )
 
-// ExecuteFunc is called by the scheduler to execute a claimed task.
+// ExecuteFunc is called by the local scheduler to execute a claimed task.
 // Return output map on success, or error on failure.
 type ExecuteFunc func(task *Task) (map[string]any, error)
 
+// DurableExecuteFunc is called by Temporal activities to execute a task.
+type DurableExecuteFunc func(ctx context.Context, task *Task) (*Task, error)
+
 // Config defines the tasks plugin configuration.
 type Config struct {
-	// OnExecute is called to run a task. If nil, tasks must be completed
-	// externally via the API (work-stealing pattern).
+	// OnExecute is called to run a task locally. If nil, tasks must be
+	// completed externally via the API (work-stealing pattern).
 	OnExecute ExecuteFunc
+
+	// OnDurableExecute is called by Temporal activity workers. If nil,
+	// durable tasks complete with an acknowledgment message.
+	OnDurableExecute DurableExecuteFunc
+
+	// Durable configures Temporal-backed durable execution.
+	// When enabled, task creates are also submitted as Temporal workflows
+	// for crash-safe execution. SQLite remains the authoritative state.
+	Durable DurableConfig
 
 	// PollInterval controls scheduler tick frequency. Default 2s.
 	PollInterval time.Duration
@@ -33,12 +48,23 @@ type Config struct {
 
 // MustRegister registers the tasks plugin and panics on failure.
 //
-// Example:
+// Example — local only (SQLite scheduler):
+//
+//	tasks.MustRegister(app, tasks.Config{})
+//
+// Example — with durable execution (tasks.hanzo.ai):
 //
 //	tasks.MustRegister(app, tasks.Config{
-//		PollInterval:  2 * time.Second,
-//		MaxConcurrent: 10,
+//		Durable: tasks.DurableConfig{
+//			Enabled:   true,
+//			Address:   "tasks.hanzo.ai:7233",
+//			Namespace: "org-acme",  // multi-tenant: org ID
+//		},
 //	})
+//
+// Example — with env vars:
+//
+//	TASKS_ENABLED=true TASKS_NAMESPACE=org-acme ./myapp serve
 func MustRegister(app core.App, config Config) {
 	if err := Register(app, config); err != nil {
 		panic(err)
@@ -56,7 +82,27 @@ func Register(app core.App, config Config) error {
 		p.config.MaxConcurrent = 10
 	}
 
+	// Apply env var overrides for durable config.
+	envCfg := DefaultDurableConfig()
+	if !p.config.Durable.Enabled && envCfg.Enabled {
+		p.config.Durable = envCfg
+	}
+	if p.config.Durable.Address == "" {
+		p.config.Durable.Address = envCfg.Address
+	}
+	if p.config.Durable.Namespace == "" {
+		p.config.Durable.Namespace = envCfg.Namespace
+	}
+	if p.config.Durable.DefaultQueue == "" {
+		p.config.Durable.DefaultQueue = envCfg.DefaultQueue
+	}
+
 	p.sem = make(chan struct{}, p.config.MaxConcurrent)
+
+	// Wire durable activity executor.
+	if p.config.OnDurableExecute != nil {
+		SetTaskExecutor(p.config.OnDurableExecute)
+	}
 
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
 		if err := e.Next(); err != nil {
@@ -81,12 +127,18 @@ func Register(app core.App, config Config) error {
 			return err
 		}
 
+		// Connect to durable execution backend (Temporal).
+		if p.config.Durable.Enabled {
+			p.connectDurable()
+		}
+
 		p.startScheduler()
 		return nil
 	})
 
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		p.stopScheduler()
+		p.disconnectDurable()
 		return e.Next()
 	})
 
@@ -103,15 +155,87 @@ func GetStore(app core.App) *Store {
 	return store
 }
 
+// GetDurable retrieves the registered durable store from the app, or nil.
+func GetDurable(app core.App) *DurableStore {
+	raw := app.Store().Get(DurableKey)
+	if raw == nil {
+		return nil
+	}
+	ds, _ := raw.(*DurableStore)
+	return ds
+}
+
 type plugin struct {
 	app    core.App
 	config Config
 	store  *Store
 	sem    chan struct{}
 
+	durable *DurableStore
+	worker  *Worker
+
 	mu       sync.Mutex
 	stopCh   chan struct{}
 	pollDone chan struct{}
+}
+
+// --- Durable execution lifecycle ---
+
+func (p *plugin) connectDurable() {
+	cfg := p.config.Durable
+
+	p.app.Logger().Info("tasks: connecting to durable execution backend",
+		slog.String("address", cfg.Address),
+		slog.String("namespace", cfg.Namespace),
+	)
+
+	ds, err := NewDurableStore(cfg.Address, cfg.Namespace)
+	if err != nil {
+		p.app.Logger().Warn("tasks: durable connection failed, running SQLite-only",
+			slog.String("error", err.Error()),
+		)
+		return
+	}
+
+	p.durable = ds
+	p.app.Store().Set(DurableKey, ds)
+
+	p.app.Logger().Info("tasks: durable execution connected",
+		slog.String("address", cfg.Address),
+		slog.String("namespace", cfg.Namespace),
+	)
+
+	// Start embedded worker if configured.
+	if cfg.RunWorker {
+		queue := cfg.DefaultQueue
+		if queue == "" {
+			queue = "default"
+		}
+
+		p.worker = NewWorker(ds.Client, queue)
+		if err := p.worker.Start(); err != nil {
+			p.app.Logger().Warn("tasks: worker start failed",
+				slog.String("queue", queue),
+				slog.String("error", err.Error()),
+			)
+			p.worker = nil
+		} else {
+			p.app.Logger().Info("tasks: worker polling",
+				slog.String("queue", queue),
+			)
+		}
+	}
+}
+
+func (p *plugin) disconnectDurable() {
+	if p.worker != nil {
+		p.worker.Stop()
+		p.worker = nil
+	}
+	if p.durable != nil {
+		p.durable.Close()
+		p.durable = nil
+	}
 }
 
 // --- Collection creation ---
@@ -257,7 +381,7 @@ func (p *plugin) tick() {
 		p.app.Logger().Error("tasks: workflow advance failed", slog.String("error", err.Error()))
 	}
 
-	// 3. Auto-execute pending tasks if OnExecute is configured.
+	// 3. Auto-execute pending tasks if OnExecute is configured (local mode).
 	if p.config.OnExecute != nil {
 		p.autoExecute()
 	}
@@ -279,17 +403,13 @@ func (p *plugin) autoExecute() {
 			continue
 		}
 
-		// Claim it.
 		if err := p.store.ClaimTask(task.ID, "_scheduler"); err != nil {
 			continue
 		}
-
-		// Start it.
 		if err := p.store.StartTask(task.ID); err != nil {
 			continue
 		}
 
-		// Acquire semaphore and execute.
 		p.sem <- struct{}{}
 		go func(t *Task) {
 			defer func() { <-p.sem }()
