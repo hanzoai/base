@@ -53,6 +53,13 @@ type PlatformConfig struct {
 	// IAMClientSecret is the OAuth2 client secret for IAM authentication.
 	IAMClientSecret string
 
+	// ComplianceEndpoint is the base URL for Lux Compliance service (optional).
+	// If set, enables KYC/AML screening and payment compliance for tenants.
+	ComplianceEndpoint string
+
+	// ComplianceAPIKey is the API key for the compliance service.
+	ComplianceAPIKey string
+
 	// DefaultTemplates defines collection schemas cloned per tenant on creation.
 	// If nil, no default tenant collections are created.
 	DefaultTemplates []CollectionTemplate
@@ -76,9 +83,10 @@ func Register(app core.App, config PlatformConfig) error {
 	}
 
 	p := &plugin{
-		app:    app,
-		config: config,
-		iam:    NewIAMClient(config.IAMEndpoint),
+		app:        app,
+		config:     config,
+		iam:        NewIAMClient(config.IAMEndpoint),
+		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 	}
 
 	// Bootstrap: ensure system collections exist.
@@ -99,9 +107,10 @@ func Register(app core.App, config PlatformConfig) error {
 }
 
 type plugin struct {
-	app    core.App
-	config PlatformConfig
-	iam    *IAMClient
+	app        core.App
+	config     PlatformConfig
+	iam        *IAMClient
+	compliance *ComplianceClient
 }
 
 // --------------------------------------------------------------------------
@@ -180,6 +189,15 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 
 	// Member management
 	api.POST("/tenants/{id}/members", p.handleInviteMember)
+
+	// Compliance (optional — only registered if endpoint configured)
+	if p.compliance != nil && p.compliance.Enabled() {
+		api.POST("/compliance/application", p.handleCreateComplianceApp)
+		api.POST("/compliance/kyc/{applicationId}", p.handleInitiateKYC)
+		api.GET("/compliance/kyc/{applicationId}", p.handleGetKYCStatus)
+		api.POST("/compliance/screen", p.handleScreenIndividual)
+		api.POST("/compliance/payment/validate", p.handleValidatePayment)
+	}
 }
 
 // --------------------------------------------------------------------------
@@ -553,6 +571,131 @@ func roleHasPermission(role, permission string) bool {
 		return false
 	}
 	return roleLevel >= requiredLevel
+}
+
+// --------------------------------------------------------------------------
+// Compliance handlers
+// --------------------------------------------------------------------------
+
+func (p *plugin) handleCreateComplianceApp(e *core.RequestEvent) error {
+	user, err := p.requireAuth(e)
+	if err != nil {
+		return err
+	}
+
+	var body struct {
+		GivenName  string `json:"given_name"`
+		FamilyName string `json:"family_name"`
+		Country    string `json:"country"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("invalid request body", err)
+	}
+
+	appID, err := p.compliance.CreateApplication(body.GivenName, body.FamilyName, user.Email, body.Country)
+	if err != nil {
+		return e.InternalServerError("compliance: create application failed", err)
+	}
+
+	return e.JSON(http.StatusCreated, map[string]string{
+		"application_id": appID,
+		"user_id":        user.ID,
+	})
+}
+
+func (p *plugin) handleInitiateKYC(e *core.RequestEvent) error {
+	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+
+	applicationID := e.Request.PathValue("applicationId")
+	if applicationID == "" {
+		return e.BadRequestError("missing applicationId", nil)
+	}
+
+	var body struct {
+		Provider string `json:"provider,omitempty"`
+	}
+	e.BindBody(&body)
+
+	verID, redirectURL, err := p.compliance.InitiateKYC(applicationID, body.Provider)
+	if err != nil {
+		return e.InternalServerError("compliance: initiate KYC failed", err)
+	}
+
+	return e.JSON(http.StatusOK, map[string]string{
+		"verification_id": verID,
+		"redirect_url":    redirectURL,
+	})
+}
+
+func (p *plugin) handleGetKYCStatus(e *core.RequestEvent) error {
+	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+
+	applicationID := e.Request.PathValue("applicationId")
+	if applicationID == "" {
+		return e.BadRequestError("missing applicationId", nil)
+	}
+
+	status, err := p.compliance.GetKYCStatus(applicationID)
+	if err != nil {
+		return e.InternalServerError("compliance: get KYC status failed", err)
+	}
+
+	return e.JSON(http.StatusOK, status)
+}
+
+func (p *plugin) handleScreenIndividual(e *core.RequestEvent) error {
+	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+
+	var body struct {
+		GivenName  string `json:"given_name"`
+		FamilyName string `json:"family_name"`
+		Country    string `json:"country"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("invalid request body", err)
+	}
+
+	result, err := p.compliance.ScreenIndividual(body.GivenName, body.FamilyName, body.Country)
+	if err != nil {
+		return e.InternalServerError("compliance: screening failed", err)
+	}
+
+	return e.JSON(http.StatusOK, result)
+}
+
+func (p *plugin) handleValidatePayment(e *core.RequestEvent) error {
+	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+
+	var body struct {
+		FromAccountID string  `json:"from_account_id"`
+		ToAccountID   string  `json:"to_account_id"`
+		Amount        float64 `json:"amount"`
+		Currency      string  `json:"currency"`
+		Jurisdiction  string  `json:"jurisdiction"`
+	}
+	if err := e.BindBody(&body); err != nil {
+		return e.BadRequestError("invalid request body", err)
+	}
+
+	approved, reason, err := p.compliance.ValidatePayment(
+		body.FromAccountID, body.ToAccountID, body.Amount, body.Currency, body.Jurisdiction,
+	)
+	if err != nil {
+		return e.InternalServerError("compliance: payment validation failed", err)
+	}
+
+	return e.JSON(http.StatusOK, map[string]interface{}{
+		"approved": approved,
+		"reason":   reason,
+	})
 }
 
 // --------------------------------------------------------------------------
