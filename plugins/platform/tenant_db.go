@@ -47,10 +47,29 @@ func (t *TenantDB) TenantsDir() string {
 	return filepath.Join(t.app.DataDir(), "tenants")
 }
 
+// validateSlug rejects slugs containing path traversal characters.
+func validateSlug(s string) error {
+	if s == "" {
+		return fmt.Errorf("slug cannot be empty")
+	}
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return fmt.Errorf("slug contains invalid character %q", c)
+		}
+	}
+	if s == "." || s == ".." {
+		return fmt.Errorf("slug cannot be . or ..")
+	}
+	return nil
+}
+
 // --- Org-level database ---
 
-// OrgDir returns the directory for an org.
+// OrgDir returns the directory for an org. Validates slug to prevent path traversal.
 func (t *TenantDB) OrgDir(orgSlug string) string {
+	if err := validateSlug(orgSlug); err != nil {
+		return filepath.Join(t.TenantsDir(), "_invalid")
+	}
 	return filepath.Join(t.TenantsDir(), orgSlug)
 }
 
@@ -71,6 +90,9 @@ func (t *TenantDB) OrgDEK(orgSlug string) string {
 
 // ProvisionOrg creates the org directory and org-level database.
 func (t *TenantDB) ProvisionOrg(orgSlug string) (string, error) {
+	if err := validateSlug(orgSlug); err != nil {
+		return "", fmt.Errorf("invalid org slug: %w", err)
+	}
 	dir := t.OrgDir(orgSlug)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("create org dir %q: %w", dir, err)
@@ -93,6 +115,9 @@ func (t *TenantDB) ProvisionOrg(orgSlug string) (string, error) {
 
 // UserDir returns the directory for a specific user within an org.
 func (t *TenantDB) UserDir(orgSlug, userId string) string {
+	if err := validateSlug(userId); err != nil {
+		return filepath.Join(t.OrgDir(orgSlug), "users", "_invalid")
+	}
 	return filepath.Join(t.OrgDir(orgSlug), "users", userId)
 }
 
@@ -114,6 +139,12 @@ func (t *TenantDB) UserDEK(orgSlug, userId string) string {
 
 // ProvisionUser creates the per-user directory and database.
 func (t *TenantDB) ProvisionUser(orgSlug, userId string) (string, error) {
+	if err := validateSlug(orgSlug); err != nil {
+		return "", fmt.Errorf("invalid org slug: %w", err)
+	}
+	if err := validateSlug(userId); err != nil {
+		return "", fmt.Errorf("invalid user id: %w", err)
+	}
 	dir := t.UserDir(orgSlug, userId)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("create user dir %q: %w", dir, err)
