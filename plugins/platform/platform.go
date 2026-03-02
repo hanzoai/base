@@ -67,22 +67,31 @@ type PlatformConfig struct {
 	// ComplianceAPIKey is the API key for the compliance service.
 	ComplianceAPIKey string
 
-	// OrgIsolation controls how org data is physically separated.
+	// PrincipalIsolation controls how principal (org or user) data is physically separated.
 	//   "prefix"   — (default) t_{slug}_ prefixed collections in shared DB
-	//   "sqlite"   — separate encrypted SQLite file per org in DataDir/orgs/
-	//   "cloudsql" — separate PostgreSQL database per org (requires cloudsql plugin)
+	//   "sqlite"   — separate encrypted Liquid SQL file per principal
+	//   "postgres" — separate PostgreSQL database per principal
 	//
-	// For "sqlite" mode, each org gets its own database file at:
-	//   {DataDir}/orgs/{slug}/data.db
-	// The file can be independently encrypted, backed up, and deleted.
+	// For "sqlite" mode, each principal gets its own database file at:
+	//   {DataDir}/orgs/{slug}/data.db (orgs)
+	//   {DataDir}/users/{userId}/data.db (per-user, when enabled)
+	// For "postgres" mode, each principal gets a dedicated schema or database.
+	// The backend can be configured per-principal via PrincipalBackendFunc.
+	//
 	// PII is physically isolated — zero data commingling.
+	PrincipalIsolation string
+
+	// Deprecated: use PrincipalIsolation. Kept as alias for backward compatibility.
 	OrgIsolation string
 
-	// OrgEncryptionKey is the master key for deriving per-org DEKs.
-	// Used for both SQLite encryption AND S3 SSE-C key derivation.
+	// PrincipalEncryptionKey is the master key for deriving per-principal DEKs.
+	// Used for both Liquid SQL encryption AND S3 SSE-C key derivation.
 	// Each org gets: HMAC-SHA256(masterKey, orgSlug)
 	// Each user gets: HMAC-SHA256(masterKey, orgSlug:userId)
 	// If empty, encryption is disabled (dev mode).
+	PrincipalEncryptionKey string
+
+	// Deprecated: use PrincipalEncryptionKey.
 	OrgEncryptionKey string
 
 	// OrgStorageEndpoint is the S3-compatible storage endpoint for per-org
@@ -289,10 +298,18 @@ func Register(app core.App, config PlatformConfig) error {
 			},
 		})
 
-		// Per-request org/user database resolution.
-		// After identity is established, load the SQLite pool for the org/user.
-		// Services are fully stateless — any instance serves any org/user.
-		if config.OrgIsolation == "sqlite" {
+		// Per-request principal database resolution.
+		// After identity is established, load the Liquid SQL / Postgres pool for the principal.
+		// Services are fully stateless — any instance serves any principal.
+		isolation := config.PrincipalIsolation
+		if isolation == "" {
+			isolation = config.OrgIsolation // backward compat
+		}
+		encKey := config.PrincipalEncryptionKey
+		if encKey == "" {
+			encKey = config.OrgEncryptionKey
+		}
+		if isolation == "sqlite" || isolation == "postgres" {
 			e.Router.Bind(&hook.Handler[*core.RequestEvent]{
 				Id:       "platformOrgDBResolver",
 				Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 4,
