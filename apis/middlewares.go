@@ -182,6 +182,16 @@ const (
 	// StoreKeyIAMUsersCollection is the name of the auth collection to find/create
 	// IAM-backed user records in (default: "users").
 	StoreKeyIAMUsersCollection = "iamUsersCollection"
+
+	// StoreKeyIAMOnly controls whether Hanzo IAM is the exclusive authentication
+	// source. When true:
+	//   - loadAuthToken tries JWKS first; local tokens are only accepted for
+	//     the _superusers collection (admin panel).
+	//   - Built-in auth endpoints (password, OTP, email-change, password-reset,
+	//     verification) are disabled for non-superuser collections.
+	//
+	// Set automatically by the platform plugin when an IAM endpoint is configured.
+	StoreKeyIAMOnly = "iamOnly"
 )
 
 // shared JWKS cache for IAM token validation (10 minute TTL on keys).
@@ -201,6 +211,11 @@ var iamJWKSCache = security.NewJWKSCache(10 * time.Minute)
 // is found or auto-created in the "users" auth collection (configurable via
 // "iamUsersCollection" store key).
 //
+// When StoreKeyIAMOnly is true (set by the platform plugin), IAM JWKS is the
+// primary auth mechanism. Local Base tokens are only accepted for the
+// _superusers collection (admin panel sessions). All other local tokens are
+// rejected — users MUST authenticate via Hanzo IAM.
+//
 // Note: We don't throw an error on invalid or expired token to allow
 // users to extend with their own custom handling in external middleware(s).
 func loadAuthToken() *hook.Handler[*core.RequestEvent] {
@@ -218,7 +233,35 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			// Try local Base token validation first.
+			iamOnly, _ := e.App.Store().Get(StoreKeyIAMOnly).(bool)
+			jwksURL, _ := e.App.Store().Get(StoreKeyIAMJWKSURL).(string)
+
+			if iamOnly && jwksURL != "" {
+				// IAM-only mode: JWKS is the primary auth mechanism.
+				iamRecord, iamErr := resolveIAMToken(e, token, jwksURL)
+				if iamErr == nil && iamRecord != nil {
+					e.Auth = iamRecord
+					return e.Next()
+				}
+
+				// JWKS failed — allow local token ONLY for _superusers
+				// (admin panel sessions are issued by Base after IAM OAuth2 login).
+				record, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
+				if localErr == nil && record != nil && record.Collection().Name == core.CollectionNameSuperusers {
+					e.Auth = record
+					return e.Next()
+				}
+
+				// Both failed — log and continue without auth.
+				if iamErr != nil {
+					e.App.Logger().Debug("loadAuthToken IAM-only: JWKS failed",
+						"iamError", iamErr,
+					)
+				}
+				return e.Next()
+			}
+
+			// Standard mode: try local first, fall back to JWKS.
 			record, err := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
 			if err == nil && record != nil {
 				e.Auth = record
@@ -226,7 +269,6 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 			}
 
 			// Local validation failed — try IAM JWKS fallback if configured.
-			jwksURL, _ := e.App.Store().Get(StoreKeyIAMJWKSURL).(string)
 			if jwksURL == "" {
 				if err != nil {
 					e.App.Logger().Debug("loadAuthToken failure (no JWKS fallback)", "error", err)
