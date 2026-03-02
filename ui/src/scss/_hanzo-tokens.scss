@@ -1,0 +1,45 @@
+// _hanzo-tokens.scss
+//
+// Shared design tokens from @hanzo/ui/admin/tokens.css.
+// Duplicated here for Svelte SCSS build compatibility.
+// Source of truth: @hanzo/ui/src/admin/tokens.css
+
+:root {
+    // Surface
+    --admin-bg: #0a0a0a;
+    --admin-surface: #141419;
+    --admin-surface-hover: #1a1a22;
+    --admin-surface-active: #22222c;
+    --admin-border: rgba(255, 255, 255, 0.06);
+    --admin-border-hover: rgba(255, 255, 255, 0.12);
+
+    // Text
+    --admin-text: #f4f4f5;
+    --admin-text-muted: #a1a1aa;
+    --admin-text-dim: #71717a;
+
+    // Primary
+    --admin-primary: #3b82f6;
+    --admin-primary-hover: #2563eb;
+    --admin-primary-text: #ffffff;
+
+    // Status
+    --admin-success: #10b981;
+    --admin-success-dim: #065f46;
+    --admin-warning: #f59e0b;
+    --admin-warning-dim: #78350f;
+    --admin-error: #ef4444;
+    --admin-error-dim: #7f1d1d;
+
+    // Sizing
+    --admin-radius: 0.5rem;
+    --admin-radius-sm: 0.375rem;
+    --admin-radius-lg: 0.75rem;
+    --admin-sidebar-width: 240px;
+    --admin-sidebar-collapsed-width: 64px;
+    --admin-header-height: 56px;
+
+    // Transitions
+    --admin-transition-fast: 150ms ease;
+    --admin-transition-base: 200ms ease;
+}
