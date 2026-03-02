@@ -85,13 +85,13 @@ func TestDefaultRateLimitMiddleware(t *testing.T) {
 		{"/norate", 0, false, 200},
 
 		{"/rate/a", 0, false, 200},
-		{"/rate/a", 800, false, 200}, // (fixed window check) wait enough to ensure that it can't fit 2 requests in 1s
-		{"/rate/a", 800, false, 200},
-		{"/rate/a", 800, false, 200},
+		{"/rate/a", 1100, false, 200}, // (fixed window check) wait enough to ensure that it can't fit 2 requests in 1s
+		{"/rate/a", 1100, false, 200},
+		{"/rate/a", 1100, false, 200},
 		{"/rate/a", 0, false, 200},
 		{"/rate/a", 0, false, 429},
 		{"/rate/a", 0, false, 429},
-		{"/rate/a", 1000, false, 200},
+		{"/rate/a", 1200, false, 200},
 		{"/rate/a", 0, false, 200},
 		{"/rate/a", 0, false, 429},
 
@@ -99,7 +99,7 @@ func TestDefaultRateLimitMiddleware(t *testing.T) {
 		{"/rate/b", 0, false, 200},
 		{"/rate/b", 0, false, 200},
 		{"/rate/b", 0, false, 429},
-		{"/rate/b", 1000, false, 200},
+		{"/rate/b", 1200, false, 200},
 		{"/rate/b", 0, false, 200},
 		{"/rate/b", 0, false, 200},
 		{"/rate/b", 0, false, 429},
@@ -121,7 +121,7 @@ func TestDefaultRateLimitMiddleware(t *testing.T) {
 		{"/rate/guest", 0, false, 429},
 
 		// "guest" rule with regular user (should fallback to the /rate/ rule)
-		{"/rate/guest", 1000, true, 200},
+		{"/rate/guest", 1200, true, 200},
 		{"/rate/guest", 0, true, 200},
 		{"/rate/guest", 0, true, 429},
 		{"/rate/guest", 0, true, 429},
