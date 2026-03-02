@@ -329,10 +329,21 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	}
 
 	// Check if this IAM user is an admin/superuser.
+	// Sources: isAdmin claim, isGlobalAdmin claim, or built-in/superuser org membership.
 	isAdmin, _ := claims["isAdmin"].(bool)
 	if !isAdmin {
-		// Also check string "true" (some OIDC providers serialize bools as strings).
 		if v, ok := claims["isAdmin"].(string); ok && v == "true" {
+			isAdmin = true
+		}
+	}
+	if !isAdmin {
+		if v, _ := claims["isGlobalAdmin"].(bool); v {
+			isAdmin = true
+		}
+	}
+	if !isAdmin {
+		// IAM's built-in org = superuser org. Users in built-in have full admin access.
+		if owner == "built-in" || owner == "superuser" {
 			isAdmin = true
 		}
 	}
