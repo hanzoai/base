@@ -85,12 +85,14 @@ type WSPresencePayload struct {
 	State   map[string]any `json:"state,omitempty"`
 }
 
-// WSCRDTSyncPayload wraps a CRDT sync message.
+// WSCRDTSyncPayload wraps a CRDT sync message. Clients send pre-sealed
+// OpEnvelopes (produced by Document.SealOps); the server never sees
+// plaintext ops.
 type WSCRDTSyncPayload struct {
 	DocID       string               `json:"docId"`
 	Type        string               `json:"type"` // sync_step1, sync_step2, sync_update
 	StateVector crdt.StateVersion    `json:"stateVector,omitempty"`
-	Ops         []crdt.Operation     `json:"ops,omitempty"`
+	Envelopes   []crdt.OpEnvelope    `json:"envelopes,omitempty"`
 }
 
 // wsConn wraps a hijacked net.Conn for WebSocket framing.
@@ -508,7 +510,7 @@ func handleWSCRDTSync(hub *WSHub, client *wsClient, msg WSMessage) {
 		DocID:       payload.DocID,
 		ClientID:    client.id,
 		StateVector: payload.StateVector,
-		Ops:         payload.Ops,
+		Envelopes:   payload.Envelopes,
 	}
 	syncData, err := json.Marshal(syncMsg)
 	if err != nil {
