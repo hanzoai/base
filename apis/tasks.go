@@ -602,9 +602,9 @@ func extractCreator(e *core.RequestEvent) string {
 	return "anonymous"
 }
 
-// extractOrgID returns the org ID from gateway-injected IAM header.
+// extractOrgID returns the org ID from gateway-injected header.
 func extractOrgID(e *core.RequestEvent) string {
-	if v := e.Request.Header.Get("X-IAM-Org-Id"); v != "" {
+	if v := e.Request.Header.Get("X-Org-Id"); v != "" {
 		return v
 	}
 	return ""
