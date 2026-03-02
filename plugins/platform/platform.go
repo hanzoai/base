@@ -1,6 +1,6 @@
-// Package platform implements a multi-tenant platform plugin for Hanzo Base.
+// Package platform implements a multi-org platform plugin for Hanzo Base.
 //
-// Each tenant (org) gets isolated collections with prefix-based namespacing.
+// Each org gets isolated collections with prefix-based namespacing.
 // Authentication is handled via Hanzo IAM (hanzo.id) OAuth2 and secrets via
 // Hanzo KMS (kms.hanzo.ai) Universal Auth.
 //
@@ -20,17 +20,18 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/router"
 )
 
 const (
 	// System collection names.
-	collectionTenants       = "_tenants"
-	collectionTenantMembers = "_tenant_members"
+	collectionOrgs       = "_orgs"
+	collectionOrgMembers = "_org_members"
 
-	// Header for tenant context scoping.
-	headerTenantID = "X-Tenant-ID"
+	// Header for org context scoping.
 
 	// Member roles.
 	RoleOwner  = "owner"
@@ -60,14 +61,41 @@ type PlatformConfig struct {
 	IAMApp string
 
 	// ComplianceEndpoint is the base URL for Lux Compliance service (optional).
-	// If set, enables KYC/AML screening and payment compliance for tenants.
+	// If set, enables KYC/AML screening and payment compliance for orgs.
 	ComplianceEndpoint string
 
 	// ComplianceAPIKey is the API key for the compliance service.
 	ComplianceAPIKey string
 
-	// DefaultTemplates defines collection schemas cloned per tenant on creation.
-	// If nil, no default tenant collections are created.
+	// OrgIsolation controls how org data is physically separated.
+	//   "prefix"   — (default) t_{slug}_ prefixed collections in shared DB
+	//   "sqlite"   — separate encrypted SQLite file per org in DataDir/orgs/
+	//   "cloudsql" — separate PostgreSQL database per org (requires cloudsql plugin)
+	//
+	// For "sqlite" mode, each org gets its own database file at:
+	//   {DataDir}/orgs/{slug}/data.db
+	// The file can be independently encrypted, backed up, and deleted.
+	// PII is physically isolated — zero data commingling.
+	OrgIsolation string
+
+	// OrgEncryptionKey is the master key for deriving per-org DEKs.
+	// Used for both SQLite encryption AND S3 SSE-C key derivation.
+	// Each org gets: HMAC-SHA256(masterKey, orgSlug)
+	// Each user gets: HMAC-SHA256(masterKey, orgSlug:userId)
+	// If empty, encryption is disabled (dev mode).
+	OrgEncryptionKey string
+
+	// OrgStorageEndpoint is the S3-compatible storage endpoint for per-org
+	// object storage (e.g., "s3.hanzo.space" or "s3.hanzo.ai").
+	// Each org and user gets isolated prefixes with SSE-C encryption.
+	// If empty, no per-org S3 storage is provisioned.
+	OrgStorageEndpoint string
+
+	// OrgStorageBucket is the root S3 bucket name (default: "orgs").
+	OrgStorageBucket string
+
+	// DefaultTemplates defines collection schemas cloned per org on creation.
+	// If nil, no default org collections are created.
 	DefaultTemplates []CollectionTemplate
 }
 
@@ -88,11 +116,14 @@ func Register(app core.App, config PlatformConfig) error {
 		config.KMSEndpoint = "https://kms.hanzo.ai"
 	}
 
+	kmsClient := NewKMSClient(config.KMSEndpoint, "")
+
 	p := &plugin{
 		app:        app,
 		config:     config,
 		iam:        NewIAMClient(config.IAMEndpoint),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
+		org:        &OrgService{app: app, kms: kmsClient, config: config},
 	}
 
 	// Bootstrap: ensure system collections exist.
@@ -103,10 +134,52 @@ func Register(app core.App, config PlatformConfig) error {
 		return p.ensureSystemCollections()
 	})
 
-	// Serve: register API routes and tenant-scoping middleware.
+	// Configure IAM JWKS fallback for Base's loadAuthToken middleware.
+	// This enables all Base routes to accept IAM-issued JWTs transparently.
+	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+	app.Store().Set(apis.StoreKeyIAMJWKSURL, jwksURL)
+
+	app.Logger().Info("platform: IAM JWKS fallback configured",
+		slog.String("jwksURL", jwksURL),
+	)
+
+	// Serve: register API routes, identity header middleware, and org-scoping.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		// Expose OrgService in app store for Goja JS access.
+		app.Store().Set("org", p.org)
+
+		// Global middleware: set identity headers from authenticated user.
+		// Runs after loadAuthToken (which has priority -1020), so e.Auth
+		// is already set if the token was valid (local or IAM JWKS).
+		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+			Id:       "platformIdentityHeaders",
+			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 1,
+			Func: func(re *core.RequestEvent) error {
+				if re.Auth != nil {
+					userId := re.Auth.Id
+					email := re.Auth.GetString("email")
+					orgId := re.Auth.GetString("org_id")
+
+					// If org_id wasn't on the record, check IAM claims stored by loadAuthToken.
+					if orgId == "" {
+						if v, _ := re.Get("iamOwner").(string); v != "" {
+							orgId = v
+						}
+					}
+
+					// Set identity headers for downstream handlers.
+					// Standard X-User-Id / X-Org-Id — one way, no vendor prefix.
+					re.Request.Header.Set("X-User-Id", userId)
+					re.Request.Header.Set("X-Org-Id", orgId)
+					re.Request.Header.Set("X-User-Email", email)
+				}
+				return re.Next()
+			},
+		})
+
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
+		p.registerOrgRoutes(e.Router)
 		return e.Next()
 	})
 
@@ -118,6 +191,7 @@ type plugin struct {
 	config     PlatformConfig
 	iam        *IAMClient
 	compliance *ComplianceClient
+	org        *OrgService
 }
 
 // --------------------------------------------------------------------------
@@ -125,22 +199,28 @@ type plugin struct {
 // --------------------------------------------------------------------------
 
 func (p *plugin) ensureSystemCollections() error {
-	if err := p.ensureTenantsCollection(); err != nil {
-		return fmt.Errorf("platform: ensure _tenants: %w", err)
+	if err := p.ensureOrgsCollection(); err != nil {
+		return fmt.Errorf("platform: ensure _orgs: %w", err)
 	}
 	if err := p.ensureMembersCollection(); err != nil {
-		return fmt.Errorf("platform: ensure _tenant_members: %w", err)
+		return fmt.Errorf("platform: ensure _org_members: %w", err)
+	}
+	if err := p.ensureOrgConfigsCollection(); err != nil {
+		return fmt.Errorf("platform: ensure %s: %w", collectionOrgConfigs, err)
+	}
+	if err := p.ensureOrgCustomersCollection(); err != nil {
+		return fmt.Errorf("platform: ensure %s: %w", collectionOrgCustomers, err)
 	}
 	return nil
 }
 
-func (p *plugin) ensureTenantsCollection() error {
-	_, err := p.app.FindCollectionByNameOrId(collectionTenants)
+func (p *plugin) ensureOrgsCollection() error {
+	_, err := p.app.FindCollectionByNameOrId(collectionOrgs)
 	if err == nil {
 		return nil // already exists
 	}
 
-	c := core.NewBaseCollection(collectionTenants)
+	c := core.NewBaseCollection(collectionOrgs)
 	c.System = true
 	c.Fields.Add(
 		&core.TextField{Name: "name", Required: true, Min: 1, Max: 100},
@@ -152,20 +232,20 @@ func (p *plugin) ensureTenantsCollection() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionTenants))
+	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgs))
 	return p.app.Save(c)
 }
 
 func (p *plugin) ensureMembersCollection() error {
-	_, err := p.app.FindCollectionByNameOrId(collectionTenantMembers)
+	_, err := p.app.FindCollectionByNameOrId(collectionOrgMembers)
 	if err == nil {
 		return nil
 	}
 
-	c := core.NewBaseCollection(collectionTenantMembers)
+	c := core.NewBaseCollection(collectionOrgMembers)
 	c.System = true
 	c.Fields.Add(
-		&core.TextField{Name: "tenantId", Required: true},
+		&core.TextField{Name: "orgId", Required: true},
 		&core.TextField{Name: "userId", Required: true},
 		&core.SelectField{
 			Name:      "role",
@@ -177,7 +257,7 @@ func (p *plugin) ensureMembersCollection() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionTenantMembers))
+	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgMembers))
 	return p.app.Save(c)
 }
 
@@ -188,14 +268,14 @@ func (p *plugin) ensureMembersCollection() error {
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	api := r.Group("/api/platform")
 
-	// Tenant CRUD
-	api.POST("/tenants", p.handleCreateTenant)
-	api.GET("/tenants", p.handleListTenants)
-	api.GET("/tenants/{id}", p.handleGetTenant)
-	api.DELETE("/tenants/{id}", p.handleDeleteTenant)
+	// Org CRUD
+	api.POST("/orgs", p.handleCreateOrg)
+	api.GET("/orgs", p.handleListOrgs)
+	api.GET("/orgs/{id}", p.handleGetOrg)
+	api.DELETE("/orgs/{id}", p.handleDeleteOrg)
 
 	// Member management
-	api.POST("/tenants/{id}/members", p.handleInviteMember)
+	api.POST("/orgs/{id}/members", p.handleInviteMember)
 
 	// Compliance (optional — only registered if endpoint configured)
 	if p.compliance != nil && p.compliance.Enabled() {
@@ -211,7 +291,7 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 // Route handlers
 // --------------------------------------------------------------------------
 
-func (p *plugin) handleCreateTenant(e *core.RequestEvent) error {
+func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
@@ -236,15 +316,15 @@ func (p *plugin) handleCreateTenant(e *core.RequestEvent) error {
 	}
 
 	// Check slug uniqueness.
-	existing, _ := p.app.FindFirstRecordByData(collectionTenants, "slug", body.Slug)
+	existing, _ := p.app.FindFirstRecordByData(collectionOrgs, "slug", body.Slug)
 	if existing != nil {
 		return e.BadRequestError("slug already in use", nil)
 	}
 
-	// Create KMS project for tenant (best-effort).
+	// Create KMS project for org (best-effort).
 	var kmsProjectId string
 	if p.config.IAMClientID != "" && p.config.KMSEndpoint != "" {
-		pid, kmsErr := CreateTenantProject(body.Slug, p.config)
+		pid, kmsErr := CreateOrgProject(body.Slug, p.config)
 		if kmsErr != nil {
 			p.app.Logger().Warn("failed to create KMS project",
 				slog.String("slug", body.Slug),
@@ -255,33 +335,33 @@ func (p *plugin) handleCreateTenant(e *core.RequestEvent) error {
 		}
 	}
 
-	// Create tenant record.
-	col, err := p.app.FindCollectionByNameOrId(collectionTenants)
+	// Create org record.
+	col, err := p.app.FindCollectionByNameOrId(collectionOrgs)
 	if err != nil {
-		return e.InternalServerError("_tenants collection not found", err)
+		return e.InternalServerError("_orgs collection not found", err)
 	}
 
-	tenant := core.NewRecord(col)
-	tenant.Set("name", body.Name)
-	tenant.Set("slug", body.Slug)
-	tenant.Set("ownerId", user.ID)
-	tenant.Set("iamOrgId", "")
-	tenant.Set("kmsProjectId", kmsProjectId)
+	org := core.NewRecord(col)
+	org.Set("name", body.Name)
+	org.Set("slug", body.Slug)
+	org.Set("ownerId", user.ID)
+	org.Set("iamOrgId", "")
+	org.Set("kmsProjectId", kmsProjectId)
 
-	if err := p.app.Save(tenant); err != nil {
-		return e.InternalServerError("failed to create tenant", err)
+	if err := p.app.Save(org); err != nil {
+		return e.InternalServerError("failed to create org", err)
 	}
 
 	// Create owner membership.
-	if err := addMember(p.app, tenant.Id, user.ID, RoleOwner); err != nil {
-		_ = p.app.Delete(tenant)
+	if err := addMember(p.app, org.Id, user.ID, RoleOwner); err != nil {
+		_ = p.app.Delete(org)
 		return e.InternalServerError("failed to create owner membership", err)
 	}
 
-	// Create tenant collections from templates.
+	// Create org collections from templates.
 	if len(p.config.DefaultTemplates) > 0 {
-		if err := CreateTenantCollections(p.app, body.Slug, p.config.DefaultTemplates); err != nil {
-			p.app.Logger().Warn("failed to create tenant collections",
+		if err := CreateOrgCollections(p.app, body.Slug, p.config.DefaultTemplates); err != nil {
+			p.app.Logger().Warn("failed to create org collections",
 				slog.String("slug", body.Slug),
 				slog.String("error", err.Error()),
 			)
@@ -289,14 +369,14 @@ func (p *plugin) handleCreateTenant(e *core.RequestEvent) error {
 	}
 
 	return e.JSON(http.StatusCreated, map[string]any{
-		"id":           tenant.Id,
+		"id":           org.Id,
 		"name":         body.Name,
 		"slug":         body.Slug,
 		"kmsProjectId": kmsProjectId,
 	})
 }
 
-func (p *plugin) handleListTenants(e *core.RequestEvent) error {
+func (p *plugin) handleListOrgs(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
@@ -304,7 +384,7 @@ func (p *plugin) handleListTenants(e *core.RequestEvent) error {
 
 	// Find all memberships for this user.
 	members, err := p.app.FindRecordsByFilter(
-		collectionTenantMembers,
+		collectionOrgMembers,
 		"userId = {:userId}",
 		"",
 		0, 0,
@@ -318,93 +398,93 @@ func (p *plugin) handleListTenants(e *core.RequestEvent) error {
 		return e.JSON(http.StatusOK, []any{})
 	}
 
-	tenantIds := make([]string, 0, len(members))
-	rolesByTenant := make(map[string]string, len(members))
+	orgIds := make([]string, 0, len(members))
+	rolesByOrg := make(map[string]string, len(members))
 	for _, m := range members {
-		tid := m.GetString("tenantId")
-		tenantIds = append(tenantIds, tid)
-		rolesByTenant[tid] = m.GetString("role")
+		oid := m.GetString("orgId")
+		orgIds = append(orgIds, oid)
+		rolesByOrg[oid] = m.GetString("role")
 	}
 
-	tenants, err := p.app.FindRecordsByIds(collectionTenants, tenantIds)
+	orgs, err := p.app.FindRecordsByIds(collectionOrgs, orgIds)
 	if err != nil {
-		return e.InternalServerError("failed to fetch tenants", err)
+		return e.InternalServerError("failed to fetch orgs", err)
 	}
 
-	result := make([]map[string]any, 0, len(tenants))
-	for _, t := range tenants {
+	result := make([]map[string]any, 0, len(orgs))
+	for _, o := range orgs {
 		result = append(result, map[string]any{
-			"id":   t.Id,
-			"name": t.GetString("name"),
-			"slug": t.GetString("slug"),
-			"role": rolesByTenant[t.Id],
+			"id":   o.Id,
+			"name": o.GetString("name"),
+			"slug": o.GetString("slug"),
+			"role": rolesByOrg[o.Id],
 		})
 	}
 
 	return e.JSON(http.StatusOK, result)
 }
 
-func (p *plugin) handleGetTenant(e *core.RequestEvent) error {
+func (p *plugin) handleGetOrg(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
 	}
 
-	tenantId := e.Request.PathValue("id")
-	if tenantId == "" {
-		return e.BadRequestError("missing tenant id", nil)
+	orgId := e.Request.PathValue("id")
+	if orgId == "" {
+		return e.BadRequestError("missing org id", nil)
 	}
 
-	if !checkAccess(p.app, tenantId, user.ID, "read") {
+	if !checkAccess(p.app, orgId, user.ID, "read") {
 		return e.ForbiddenError("access denied", nil)
 	}
 
-	tenant, err := p.app.FindRecordById(collectionTenants, tenantId)
+	org, err := p.app.FindRecordById(collectionOrgs, orgId)
 	if err != nil {
-		return e.NotFoundError("tenant not found", err)
+		return e.NotFoundError("org not found", err)
 	}
 
 	return e.JSON(http.StatusOK, map[string]any{
-		"id":           tenant.Id,
-		"name":         tenant.GetString("name"),
-		"slug":         tenant.GetString("slug"),
-		"ownerId":      tenant.GetString("ownerId"),
-		"iamOrgId":     tenant.GetString("iamOrgId"),
-		"kmsProjectId": tenant.GetString("kmsProjectId"),
+		"id":           org.Id,
+		"name":         org.GetString("name"),
+		"slug":         org.GetString("slug"),
+		"ownerId":      org.GetString("ownerId"),
+		"iamOrgId":     org.GetString("iamOrgId"),
+		"kmsProjectId": org.GetString("kmsProjectId"),
 	})
 }
 
-func (p *plugin) handleDeleteTenant(e *core.RequestEvent) error {
+func (p *plugin) handleDeleteOrg(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
 	}
 
-	tenantId := e.Request.PathValue("id")
-	if tenantId == "" {
-		return e.BadRequestError("missing tenant id", nil)
+	orgId := e.Request.PathValue("id")
+	if orgId == "" {
+		return e.BadRequestError("missing org id", nil)
 	}
 
-	tenant, err := p.app.FindRecordById(collectionTenants, tenantId)
+	org, err := p.app.FindRecordById(collectionOrgs, orgId)
 	if err != nil {
-		return e.NotFoundError("tenant not found", err)
+		return e.NotFoundError("org not found", err)
 	}
 
 	// Owner only.
-	if tenant.GetString("ownerId") != user.ID {
-		return e.ForbiddenError("only the owner can delete a tenant", nil)
+	if org.GetString("ownerId") != user.ID {
+		return e.ForbiddenError("only the owner can delete an org", nil)
 	}
 
-	slug := tenant.GetString("slug")
+	slug := org.GetString("slug")
 
-	// Delete all tenant-prefixed collections.
-	prefix := TenantPrefix(slug)
+	// Delete all org-prefixed collections.
+	prefix := OrgPrefix(slug)
 	allCollections, err := p.app.FindAllCollections()
 	if err == nil {
 		for _, col := range allCollections {
 			if strings.HasPrefix(col.Name, prefix) {
 				if delErr := p.app.Delete(col); delErr != nil {
-					p.app.Logger().Warn("failed to delete tenant collection",
+					p.app.Logger().Warn("failed to delete org collection",
 						slog.String("collection", col.Name),
 						slog.String("error", delErr.Error()),
 					)
@@ -415,18 +495,18 @@ func (p *plugin) handleDeleteTenant(e *core.RequestEvent) error {
 
 	// Delete all memberships.
 	memberships, _ := p.app.FindRecordsByFilter(
-		collectionTenantMembers,
-		"tenantId = {:tenantId}",
+		collectionOrgMembers,
+		"orgId = {:orgId}",
 		"", 0, 0,
-		map[string]any{"tenantId": tenantId},
+		map[string]any{"orgId": orgId},
 	)
 	for _, m := range memberships {
 		_ = p.app.Delete(m)
 	}
 
-	// Delete tenant record.
-	if err := p.app.Delete(tenant); err != nil {
-		return e.InternalServerError("failed to delete tenant", err)
+	// Delete org record.
+	if err := p.app.Delete(org); err != nil {
+		return e.InternalServerError("failed to delete org", err)
 	}
 
 	return e.JSON(http.StatusOK, map[string]bool{"deleted": true})
@@ -438,13 +518,13 @@ func (p *plugin) handleInviteMember(e *core.RequestEvent) error {
 		return err
 	}
 
-	tenantId := e.Request.PathValue("id")
-	if tenantId == "" {
-		return e.BadRequestError("missing tenant id", nil)
+	orgId := e.Request.PathValue("id")
+	if orgId == "" {
+		return e.BadRequestError("missing org id", nil)
 	}
 
 	// Require admin or owner.
-	if !checkAccess(p.app, tenantId, user.ID, "admin") {
+	if !checkAccess(p.app, orgId, user.ID, "admin") {
 		return e.ForbiddenError("only owners and admins can invite members", nil)
 	}
 
@@ -470,19 +550,19 @@ func (p *plugin) handleInviteMember(e *core.RequestEvent) error {
 	}
 
 	// Check if already a member.
-	existing, _ := findMembership(p.app, body.UserID, tenantId)
+	existing, _ := findMembership(p.app, body.UserID, orgId)
 	if existing != nil {
-		return e.BadRequestError("user is already a member of this tenant", nil)
+		return e.BadRequestError("user is already a member of this org", nil)
 	}
 
-	if err := addMember(p.app, tenantId, body.UserID, body.Role); err != nil {
+	if err := addMember(p.app, orgId, body.UserID, body.Role); err != nil {
 		return e.InternalServerError("failed to add member", err)
 	}
 
 	return e.JSON(http.StatusCreated, map[string]any{
-		"tenantId": tenantId,
-		"userId":   body.UserID,
-		"role":     body.Role,
+		"orgId":  orgId,
+		"userId": body.UserID,
+		"role":   body.Role,
 	})
 }
 
@@ -521,13 +601,13 @@ func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 // Membership helpers
 // --------------------------------------------------------------------------
 
-func findMembership(app core.App, userId, tenantId string) (*core.Record, error) {
+func findMembership(app core.App, userId, orgId string) (*core.Record, error) {
 	records, err := app.FindRecordsByFilter(
-		collectionTenantMembers,
-		"userId = {:userId} && tenantId = {:tenantId}",
+		collectionOrgMembers,
+		"userId = {:userId} && orgId = {:orgId}",
 		"",
 		1, 0,
-		map[string]any{"userId": userId, "tenantId": tenantId},
+		map[string]any{"userId": userId, "orgId": orgId},
 	)
 	if err != nil || len(records) == 0 {
 		return nil, fmt.Errorf("membership not found")
@@ -535,14 +615,14 @@ func findMembership(app core.App, userId, tenantId string) (*core.Record, error)
 	return records[0], nil
 }
 
-func addMember(app core.App, tenantId, userId, role string) error {
-	col, err := app.FindCollectionByNameOrId(collectionTenantMembers)
+func addMember(app core.App, orgId, userId, role string) error {
+	col, err := app.FindCollectionByNameOrId(collectionOrgMembers)
 	if err != nil {
-		return fmt.Errorf("_tenant_members collection not found: %w", err)
+		return fmt.Errorf("_org_members collection not found: %w", err)
 	}
 
 	record := core.NewRecord(col)
-	record.Set("tenantId", tenantId)
+	record.Set("orgId", orgId)
 	record.Set("userId", userId)
 	record.Set("role", role)
 
@@ -550,11 +630,11 @@ func addMember(app core.App, tenantId, userId, role string) error {
 }
 
 // checkAccess verifies that userId has at least the required permission level
-// for the given tenant.
+// for the given org.
 //
 // Hierarchy: owner(4) > admin(3) > member(2) > viewer/read(1).
-func checkAccess(app core.App, tenantId, userId, permission string) bool {
-	m, err := findMembership(app, userId, tenantId)
+func checkAccess(app core.App, orgId, userId, permission string) bool {
+	m, err := findMembership(app, userId, orgId)
 	if err != nil {
 		return false
 	}
