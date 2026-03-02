@@ -243,24 +243,17 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 			jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
 
 			if externalOnly && jwksURL != "" {
-				// External-only mode: JWKS is the primary auth mechanism.
+				// External-only mode: IAM (JWKS) is the ONLY auth mechanism.
+				// No local tokens, no superuser fallback. All auth goes through IAM.
 				record, jwksErr := resolveJWKSToken(e, token, jwksURL)
 				if jwksErr == nil && record != nil {
 					e.Auth = record
 					return e.Next()
 				}
 
-				// JWKS failed — allow local token ONLY for _superusers
-				// (admin panel sessions issued by Base after OAuth2 login).
-				localRecord, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
-				if localErr == nil && localRecord != nil && localRecord.Collection().Name == core.CollectionNameSuperusers {
-					e.Auth = localRecord
-					return e.Next()
-				}
-
-				// Both failed — log and continue without auth.
+				// JWKS failed — continue without auth (no fallback).
 				if jwksErr != nil {
-					e.App.Logger().Debug("loadAuthToken: external JWKS validation failed",
+					e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
 						"error", jwksErr,
 					)
 				}
