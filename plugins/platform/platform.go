@@ -240,6 +240,40 @@ func Register(app core.App, config PlatformConfig) error {
 			},
 		})
 
+		// Publishable key enforcement: pk- keys are read-only.
+		// Blocks non-GET methods for publishable keys. Secret keys and
+		// JWTs have no method restrictions.
+		//
+		// Priority +3: runs after identity headers are set, before route handlers.
+		//
+		// Scope rules:
+		//   pk- → GET only (read market data, config, public info)
+		//   sk- → all methods (create orders, manage accounts, admin)
+		//   hk- → all methods (IAM service key, legacy compat)
+		//   JWT → all methods (user session via IAM OIDC)
+		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+			Id:       "platformKeyTypeEnforcement",
+			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 3,
+			Func: func(re *core.RequestEvent) error {
+				keyType, _ := re.Get("authKeyType").(string)
+				if keyType != "publishable" {
+					return re.Next() // JWT, sk-, hk-, or unauthenticated — no restriction
+				}
+
+				method := re.Request.Method
+				if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+					return re.Next() // reads allowed
+				}
+
+				// pk- key trying to write — block it
+				return re.JSON(http.StatusForbidden, map[string]any{
+					"error":   "publishable keys are read-only",
+					"message": "Use a secret key (sk-) or JWT for write operations.",
+					"code":    "key_read_only",
+				})
+			},
+		})
+
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
