@@ -6,45 +6,53 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
-jobs:
-  docker:
-    uses: hanzoai/.github/.github/workflows/docker-build.yml@main
-    with:
-      image: ghcr.io/hanzoai/base
-      platforms: linux/amd64
-    secrets: inherit
+env:
+  IMAGE: ghcr.io/hanzoai/base
 
-  dispatch-to-universe:
-    needs: docker
+jobs:
+  test:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && secrets.UNIVERSE_DISPATCH_TOKEN != ''
     steps:
-      - name: Compute image tag
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+      - run: go test ./...
+
+  docker:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute tags
         id: meta
         run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          SHA="${GITHUB_SHA::8}"
+          TAGS="${IMAGE}:${BRANCH},${IMAGE}:${BRANCH}-${SHA}"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            TAG="${GITHUB_REF#refs/tags/v}"
-          else
-            TAG="main"
+            TAG="${GITHUB_REF#refs/tags/}"
+            TAGS="${IMAGE}:${TAG},${IMAGE}:latest"
           fi
-          echo "image=ghcr.io/hanzoai/base:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
-      - name: Dispatch image update to universe
-        uses: peter-evans/repository-dispatch@v3
+      - uses: docker/build-push-action@v6
         with:
-          token: ${{ secrets.UNIVERSE_DISPATCH_TOKEN }}
-          repository: hanzoai/universe
-          event-type: image-update
-          client-payload: |
-            {
-              "service": "base",
-              "image": "${{ steps.meta.outputs.image }}",
-              "sha": "${{ github.sha }}",
-              "repo": "${{ github.repository }}"
-            }
-
-      - name: Summary
-        run: |
-          echo "### Deploy dispatched to universe" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Image:** ${{ steps.meta.outputs.image }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "- **Flow:** image-receiver -> dev branch -> staging deploy -> E2E -> PR to main -> production" >> "$GITHUB_STEP_SUMMARY"
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
