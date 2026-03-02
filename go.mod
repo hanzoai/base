@@ -17,6 +17,7 @@ require (
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
+	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/zap v0.2.0
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
@@ -34,7 +35,9 @@ require (
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
@@ -45,6 +48,7 @@ require (
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
@@ -53,18 +57,32 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/luxfi/crypto v1.17.45 // indirect
+	github.com/luxfi/ids v1.2.9 // indirect
+	github.com/luxfi/math v1.2.3 // indirect
+	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.1.0 // indirect
+	github.com/luxfi/metric v1.4.10 // indirect
+	github.com/luxfi/mock v0.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
+	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nexus-rpc/sdk-go v0.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
+	github.com/prometheus/client_golang v1.23.2 // indirect
+	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/common v0.67.5 // indirect
+	github.com/prometheus/procfs v0.19.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
+	go.uber.org/mock v0.6.0 // indirect
+	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect

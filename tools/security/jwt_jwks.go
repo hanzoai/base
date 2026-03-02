@@ -11,10 +11,10 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/hanzoai/base/tools/cache"
 )
 
 // JWK represents a JSON Web Key (RSA only, which covers RS256/RS384/RS512).
@@ -50,23 +50,17 @@ func (k *JWK) PublicKey() (*rsa.PublicKey, error) {
 }
 
 // JWKSCache caches fetched JWKS keys with a configurable TTL.
+// Backed by cache.TTL (luxfi/cache LRU + time-based expiration).
 type JWKSCache struct {
-	mu      sync.RWMutex
-	keys    map[string]*jwksCacheEntry // keyed by JWKS URL + kid
-	ttl     time.Duration
-	client  *http.Client
-}
-
-type jwksCacheEntry struct {
-	key     *JWK
-	expires time.Time
+	keys   *cache.TTL[string, *JWK] // keyed by "jwksURL#kid"
+	client *http.Client
 }
 
 // NewJWKSCache creates a new JWKS cache with the given TTL.
+// Up to 256 key entries are cached (ample for multi-provider JWKS).
 func NewJWKSCache(ttl time.Duration) *JWKSCache {
 	return &JWKSCache{
-		keys: make(map[string]*jwksCacheEntry),
-		ttl:  ttl,
+		keys: cache.NewTTL[string, *JWK](256, ttl),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -77,12 +71,8 @@ func NewJWKSCache(ttl time.Duration) *JWKSCache {
 func (c *JWKSCache) FetchKey(ctx context.Context, jwksURL, kid string) (*JWK, error) {
 	cacheKey := jwksURL + "#" + kid
 
-	c.mu.RLock()
-	entry, ok := c.keys[cacheKey]
-	c.mu.RUnlock()
-
-	if ok && time.Now().Before(entry.expires) {
-		return entry.key, nil
+	if key, ok := c.keys.Get(cacheKey); ok {
+		return key, nil
 	}
 
 	// Fetch from remote.
@@ -91,22 +81,7 @@ func (c *JWKSCache) FetchKey(ctx context.Context, jwksURL, kid string) (*JWK, er
 		return nil, err
 	}
 
-	c.mu.Lock()
-	c.keys[cacheKey] = &jwksCacheEntry{
-		key:     key,
-		expires: time.Now().Add(c.ttl),
-	}
-	// Evict expired entries if cache grows.
-	if len(c.keys) > 100 {
-		now := time.Now()
-		for k, v := range c.keys {
-			if now.After(v.expires) {
-				delete(c.keys, k)
-			}
-		}
-	}
-	c.mu.Unlock()
-
+	c.keys.Put(cacheKey, key)
 	return key, nil
 }
 
