@@ -1,8 +1,8 @@
 // Package s3 implements a lightweight client for interacting with the
 // REST APIs of any S3 compatible service.
 //
-// It implements only the minimal functionality required by PocketBase
-// such as objects list, get, copy, delete and upload.
+// It implements only the minimal functionality required by Base:
+// objects list, get, copy, delete and upload.
 //
 // For more details why we don't use the official aws-sdk-go-v2, you could check
 // https://github.com/hanzoai/base/discussions/6562.
@@ -87,7 +87,7 @@ func (s3 *S3) URL(path string) string {
 		path = escapePath(parsed.Path)
 
 		// the rest is usually not expected to be part of the S3 path but it is kept to avoid surprises
-		// (it will be further escaped if necessery by the Go HTTP client)
+		// (it will be further escaped if necessary by the Go HTTP client)
 		if parsed.RawQuery != "" {
 			path += "?" + parsed.RawQuery
 		}

@@ -1,6 +1,9 @@
 package apis
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +19,7 @@ import (
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/routine"
+	"github.com/hanzoai/base/tools/security"
 	"github.com/spf13/cast"
 )
 
@@ -168,6 +172,37 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 	}
 }
 
+// Store keys for OIDC/JWKS-based external auth provider integration.
+// Set these via app.Store() from the platform plugin or manually.
+const (
+	// StoreKeyJWKSURL is the JWKS endpoint URL for the identity provider
+	// (e.g., "https://auth.example.com/.well-known/jwks").
+	// When set, loadAuthToken validates bearer tokens against this endpoint.
+	StoreKeyJWKSURL = "jwksURL"
+
+	// StoreKeyAuthUsersCollection is the name of the auth collection to
+	// find/create externally-authenticated user records in (default: "users").
+	StoreKeyAuthUsersCollection = "authUsersCollection"
+
+	// StoreKeyExternalAuthOnly controls whether the external identity provider
+	// (OIDC/JWKS) is the exclusive authentication source. When true:
+	//   - loadAuthToken tries JWKS first; local tokens are only accepted for
+	//     the _superusers collection (admin panel).
+	//   - Built-in auth endpoints (password, OTP, email-change, password-reset,
+	//     verification) are disabled for non-superuser collections.
+	//
+	// Set automatically by the platform plugin when an auth endpoint is configured.
+	StoreKeyExternalAuthOnly = "externalAuthOnly"
+
+	// Deprecated: use StoreKeyJWKSURL. Kept for backward compatibility.
+	StoreKeyIAMJWKSURL         = StoreKeyJWKSURL
+	StoreKeyIAMUsersCollection = StoreKeyAuthUsersCollection
+	StoreKeyIAMOnly            = StoreKeyExternalAuthOnly
+)
+
+// shared JWKS cache for external token validation (10 minute TTL on keys).
+var jwksCache = security.NewJWKSCache(10 * time.Minute)
+
 // loadAuthToken attempts to load the auth context based on the "Authorization: TOKEN" header value.
 //
 // This middleware does nothing in case of:
@@ -175,6 +210,17 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 //   - e.Auth is already loaded by another middleware
 //
 // This middleware is registered by default for all routes.
+//
+// When app.Store() contains a "jwksURL" value, the middleware validates bearer
+// tokens against the external identity provider's JWKS endpoint. If the
+// validation succeeds, a corresponding user record is found or auto-created
+// in the auth collection (configurable via "authUsersCollection" store key,
+// default: "users").
+//
+// When StoreKeyExternalAuthOnly is true (set by the platform plugin), JWKS is
+// the primary auth mechanism. Local Base tokens are only accepted for the
+// _superusers collection (admin panel sessions). All other local tokens are
+// rejected — users must authenticate via the configured identity provider.
 //
 // Note: We don't throw an error on invalid or expired token to allow
 // users to extend with their own custom handling in external middleware(s).
@@ -193,11 +239,64 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
+			externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool)
+			jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
+
+			if externalOnly {
+				// External-only mode: IAM (JWKS) is the primary auth mechanism.
+				// Non-superuser collections must authenticate via IAM.
+				// _superusers collection tokens are always accepted as fallback
+				// (admin panel sessions, seeding, CLI tools).
+
+				// Try JWKS first if configured.
+				if jwksURL != "" {
+					record, jwksErr := resolveJWKSToken(e, token, jwksURL)
+					if jwksErr == nil && record != nil {
+						e.Auth = record
+						return e.Next()
+					}
+					if jwksErr != nil {
+						e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
+							"error", jwksErr,
+						)
+					}
+				}
+
+				// JWKS not configured or failed — fall back to local token
+				// for _superusers only. Admin panel sessions and CLI tools
+				// issue local Base tokens that cannot be validated via JWKS.
+				localRecord, localErr := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
+				if localErr == nil && localRecord != nil && localRecord.Collection().Name == core.CollectionNameSuperusers {
+					e.Auth = localRecord
+					return e.Next()
+				}
+
+				return e.Next()
+			}
+
+			// Standard mode: try local first, fall back to JWKS.
 			record, err := e.App.FindAuthRecordByToken(token, core.TokenTypeAuth)
-			if err != nil {
-				e.App.Logger().Debug("loadAuthToken failure", "error", err)
-			} else if record != nil {
+			if err == nil && record != nil {
 				e.Auth = record
+				return e.Next()
+			}
+
+			// Local validation failed — try JWKS if configured.
+			if jwksURL == "" {
+				if err != nil {
+					e.App.Logger().Debug("loadAuthToken: local token validation failed", "error", err)
+				}
+				return e.Next()
+			}
+
+			jwksRecord, jwksErr := resolveJWKSToken(e, token, jwksURL)
+			if jwksErr != nil {
+				e.App.Logger().Warn("loadAuthToken: JWKS validation failed",
+					"localError", err,
+					"jwksError", jwksErr,
+				)
+			} else if jwksRecord != nil {
+				e.Auth = jwksRecord
 			}
 
 			return e.Next()
@@ -205,11 +304,151 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 	}
 }
 
+// resolveJWKSToken validates a JWT against the configured JWKS endpoint and
+// returns the corresponding Base user record (creating one if it doesn't exist).
+//
+// Standard OIDC claims extracted: sub, email, name, preferred_username, owner.
+func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record, error) {
+	ctx, cancel := context.WithTimeout(e.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	claims, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, jwksCache)
+	if err != nil {
+		return nil, fmt.Errorf("jwks validation: %w", err)
+	}
+
+	// Extract standard OIDC claims.
+	// "sub" is the primary identifier (RFC 7519). Fall back to
+	// "preferred_username" then "name" for compatibility.
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		sub, _ = claims["preferred_username"].(string)
+	}
+	if sub == "" {
+		sub, _ = claims["name"].(string)
+	}
+	if sub == "" {
+		return nil, errors.New("token missing sub/preferred_username/name claim")
+	}
+
+	owner, _ := claims["owner"].(string)
+	email, _ := claims["email"].(string)
+	name, _ := claims["name"].(string)
+	displayName, _ := claims["displayName"].(string)
+	if name == "" {
+		name = displayName
+	}
+
+	// Check if this IAM user is an admin/superuser.
+	// Sources: isAdmin claim, isGlobalAdmin claim, or built-in/superuser org membership.
+	isAdmin, _ := claims["isAdmin"].(bool)
+	if !isAdmin {
+		if v, ok := claims["isAdmin"].(string); ok && v == "true" {
+			isAdmin = true
+		}
+	}
+	if !isAdmin {
+		if v, _ := claims["isGlobalAdmin"].(bool); v {
+			isAdmin = true
+		}
+	}
+	if !isAdmin {
+		// IAM's built-in org = superuser org. Users in built-in have full admin access.
+		if owner == "built-in" || owner == "superuser" {
+			isAdmin = true
+		}
+	}
+
+	// Store resolved claims on the request for downstream middleware.
+	e.Set("authSub", sub)
+	e.Set("authOwner", owner)
+	e.Set("authEmail", email)
+	e.Set("authName", name)
+
+	// When IAM is active, Base does NOT store user records. IAM is the user store.
+	// We create an ephemeral (unsaved) auth record from JWT claims so Base's
+	// rule engine can evaluate it. No writes to _superusers or users collections.
+
+	collectionName := core.CollectionNameSuperusers
+	if !isAdmin {
+		collectionName = "users"
+		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
+			collectionName = v
+		}
+	}
+
+	collection, err := e.App.FindCachedCollectionByNameOrId(collectionName)
+	if err != nil {
+		return nil, fmt.Errorf("auth collection %q not found: %w", collectionName, err)
+	}
+
+	// Ephemeral record — NOT persisted. IAM is the user store, not Base.
+	// The record exists only for this request so Base's rule engine can evaluate it.
+	record := core.NewRecord(collection)
+	record.Id = subToRecordID(sub)
+	record.Set("email", email)
+	if name != "" {
+		record.Set("name", name)
+	}
+	if owner != "" && collection.Fields.GetByName("org_id") != nil {
+		record.Set("org_id", owner)
+	}
+	record.SetVerified(true)
+
+	return record, nil
+}
+
+// subToRecordID converts an OIDC sub claim (which may be a UUID, slug, or
+// other identifier) into a valid Base record ID (exactly 15 lowercase
+// alphanumeric chars).
+//
+// Short subs (< 15 chars) are padded with underscores (kept for backward compat).
+// Long or non-alphanumeric subs are SHA-256 hashed and truncated to 24 hex chars
+// (96 bits of entropy) to reduce collision risk.
+func subToRecordID(sub string) string {
+	// Fast path: if already a valid 15-char lowercase alphanumeric ID, use as-is.
+	if len(sub) == 15 && isLowerAlphanumeric(sub) {
+		return sub
+	}
+
+	// For short subs that are alphanumeric, pad to 15 (backward compat).
+	if len(sub) < 15 && isLowerAlphanumeric(sub) {
+		for len(sub) < 15 {
+			sub += "_"
+		}
+		return sub
+	}
+
+	// For UUIDs, long strings, or non-alphanumeric subs: deterministic hash.
+	// SHA-256 the original sub and take the first 24 hex chars (96 bits).
+	h := sha256.Sum256([]byte(sub))
+	return hex.EncodeToString(h[:])[:24]
+}
+
+// isLowerAlphanumeric returns true if s contains only [a-z0-9_].
+func isLowerAlphanumeric(s string) bool {
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
+}
+
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
 	token := e.Request.Header.Get("Authorization")
 
-	// the "Bearer" schema prefix is not required by PocketBase and it is
-	// supported only for compatibility with the defaults of some HTTP clients
+	// Fall back to X-Authorization (alias when Authorization is consumed by a proxy/CDN).
+	if token == "" {
+		token = e.Request.Header.Get("X-Authorization")
+	}
+
+	// Fall back to legacy X-Auth-Token header.
+	if token == "" {
+		token = e.Request.Header.Get("X-Auth-Token")
+	}
+
+	// Strip optional "Bearer " prefix for compatibility with standard HTTP clients.
 	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
 		return token[7:]
 	}

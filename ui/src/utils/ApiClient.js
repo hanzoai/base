@@ -8,7 +8,7 @@ import CommonHelper from "@/utils/CommonHelper";
 import { replace } from "svelte-spa-router";
 import { get } from "svelte/store";
 
-const superuserFileTokenKey = "hz_superuser_file_token";
+const superuserFileTokenKey = "superuser_file_token";
 
 /**
  * Clears the authorized state and redirects to the login page.
@@ -103,7 +103,7 @@ class AppAuthStore extends LocalAuthStore {
     /**
      * @inheritdoc
      */
-    constructor(storageKey = "__hz_superuser_auth__") {
+    constructor(storageKey = "__superuser_auth__") {
         super(storageKey);
 
         this.save(this.token, this.record);
@@ -130,10 +130,10 @@ class AppAuthStore extends LocalAuthStore {
     }
 }
 
-const base = new Base(import.meta.env.HZ_BACKEND_URL, new AppAuthStore());
+const base = new Base(import.meta.env.BASE_BACKEND_URL, new AppAuthStore());
 
-if (pb.authStore.isValid) {
-    pb.collection(pb.authStore.record.collectionName || "_superusers")
+if (base.authStore.isValid) {
+    base.collection(base.authStore.record.collectionName || "_superusers")
         .authRefresh()
         .catch((err) => {
             console.warn("Failed to refresh the existing auth token:", err);

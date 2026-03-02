@@ -1,34 +1,42 @@
+// Import shared design tokens from @hanzo/ui
+@import 'hanzo-tokens';
+
 :root {
-    --baseFontFamily: 'Source Sans 3', sans-serif, emoji;
-    --monospaceFontFamily: 'Ubuntu Mono', monospace, emoji;
+    --baseFontFamily: 'Geist', system-ui, -apple-system, sans-serif;
+    --monospaceFontFamily: 'Geist Mono', ui-monospace, monospace;
     --iconFontFamily: 'remixicon';
 
-    --txtPrimaryColor:  #1a1a24;
-    --txtHintColor:     #617079;
-    --txtDisabledColor: #a0a6ac;
+    // Monochrome palette — matches hanzo.ai
+    --txtPrimaryColor:  #ffffff;
+    --txtHintColor:     #a1a1aa;
+    --txtDisabledColor: #52525b;
 
-    --primaryColor: #1a1a24;
+    // Primary — white (monochrome)
+    --primaryColor: #ffffff;
 
-    --bodyColor: #f8f9fa;
+    // Body — pure black
+    --bodyColor: #000000;
 
-    --baseColor:     #ffffff;
-    --baseAlt1Color: #e3e8ed;
-    --baseAlt2Color: #d7dde3;
-    --baseAlt3Color: #c9d0da;
-    --baseAlt4Color: #a5b0c0;
+    // Surfaces — near-black
+    --baseColor:     #0a0a0a;
+    --baseAlt1Color: #111111;
+    --baseAlt2Color: #1a1a1a;
+    --baseAlt3Color: #222222;
+    --baseAlt4Color: #333333;
 
-    --infoColor:       #5499e8;
-    --infoAltColor:    #cee2f8;
-    --successColor:    #32ad84;
-    --successAltColor: #c4eedc;
-    --dangerColor:     #e34562;
-    --dangerAltColor:  #f7cad2;
-    --warningColor:    #ff944d;
-    --warningAltColor: #ffd4b8;
+    // Status — desaturated
+    --infoColor:       #a1a1aa;
+    --infoAltColor:    #1a1a1a;
+    --successColor:    #86efac;
+    --successAltColor: #0a0a0a;
+    --dangerColor:     #fca5a5;
+    --dangerAltColor:  #1a0a0a;
+    --warningColor:    #fcd34d;
+    --warningAltColor: #1a1a0a;
 
-    --overlayColor:   rgba(53, 71, 104, 0.28);
-    --tooltipColor:   rgba(0, 0, 0, 0.85);
-    --shadowColor:    rgba(0, 0, 0, 0.06);
+    --overlayColor:   rgba(0, 0, 0, 0.7);
+    --tooltipColor:   rgba(255, 255, 255, 0.92);
+    --shadowColor:    rgba(0, 0, 0, 0.5);
 
     --baseFontSize: 14.5px;
     --xsFontSize:   12px;
@@ -58,7 +66,7 @@
     --lgWrapperWidth: 1200px;
 
     --appSidebarWidth: 75px;
-    --pageSidebarWidth: 235px;
+    --pageSidebarWidth: var(--dash-sidebar-width);
 
     --baseAnimationSpeed: 150ms;
     --activeAnimationSpeed: 70ms;

@@ -13,7 +13,7 @@ import (
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/tools/list"
-	"github.com/pocketbase/tygoja"
+	"github.com/hanzoai/tygoja"
 )
 
 const heading = `
@@ -220,7 +220,7 @@ declare function toString(val: any, maxBytes?: number): string;
  * const ex4 = toBytes(null) // []
  * ` + "```" + `
  *
- * @group PocketBase
+ * @group Base
  */
 declare function toBytes(val: any, maxBytes?: number): Array<number>;
 
@@ -273,7 +273,7 @@ declare function arrayOf<T>(model: T): Array<T>;
  * unmarshal({ authAlert: { enabled: true } }, collection)
  * ` + "```" + `
  *
- * @group PocketBase
+ * @group Base
  */
 declare function unmarshal(data: any, dst: any): void;
 
@@ -310,7 +310,7 @@ declare class DynamicModel {
  * nullString creates an empty Go string pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` string value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullString(): string;
 
@@ -318,7 +318,7 @@ declare function nullString(): string;
  * nullInt creates an empty Go int64 pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` int value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullInt(): number;
 
@@ -326,7 +326,7 @@ declare function nullInt(): number;
  * nullFloat creates an empty Go float64 pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` float value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullFloat(): number;
 
@@ -334,7 +334,7 @@ declare function nullFloat(): number;
  * nullBool creates an empty Go bool pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` bool value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullBool(): boolean;
 
@@ -342,7 +342,7 @@ declare function nullBool(): boolean;
  * nullArray creates an empty Go types.JSONArray pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` JSON array value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullArray(): Array<any>;
 
@@ -350,7 +350,7 @@ declare function nullArray(): Array<any>;
  * nullObject creates an empty Go types.JSONMap pointer usually used for
  * describing a **nullable** ` + "`DynamicModel`" + ` JSON object value.
  *
- * @group PocketBase
+ * @group Base
  */
 declare function nullObject(): { get(key:string):any; set(key:string,value:any):void };
 
@@ -592,7 +592,7 @@ interface GeoPointField extends core.GeoPointField{} // merge
 /**
  * {@inheritDoc core.GeoPointField}
  *
- * @group PocketBase
+ * @group Base
  */
 declare class GeoPointField implements core.GeoPointField {
   constructor(data?: Partial<core.GeoPointField>)
@@ -1272,7 +1272,7 @@ func main() {
 	gen := tygoja.New(tygoja.Config{
 		Packages: map[string][]string{
 			"github.com/go-ozzo/ozzo-validation/v4":             {"Error"},
-			"github.com/pocketbase/dbx":                         {"*"},
+			"github.com/hanzoai/dbx":                         {"*"},
 			"github.com/hanzoai/base/tools/security":   {"*"},
 			"github.com/hanzoai/base/tools/filesystem": {"*"},
 			"github.com/hanzoai/base/tools/template":   {"*"},

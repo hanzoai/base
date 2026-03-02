@@ -118,6 +118,18 @@ export class RealtimeService {
     }
   }
 
+  /** Remove all subscribers for a topic, or all topics if none specified. */
+  unsubscribe(topic?: string): void {
+    if (topic) {
+      this._subscriptions.delete(topic)
+    } else {
+      this._subscriptions.clear()
+    }
+    if (this._subscriptions.size === 0) {
+      this.disconnect()
+    }
+  }
+
   /** Register a connection-state listener. Returns unsubscribe. */
   onConnectionChange(callback: ConnectionCallback): () => void {
     this._connectionListeners.add(callback)
@@ -148,7 +160,7 @@ export class RealtimeService {
     const url = `${this._baseUrl}/api/realtime`
     this._eventSource = new EventSource(url)
 
-    this._eventSource.addEventListener('PB_CONNECT', (e: MessageEvent) => {
+    this._eventSource.addEventListener('CONNECT', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as { clientId: string }
         this._clientId = data.clientId

@@ -25,6 +25,7 @@ LICENSE.html
 # SDK build artifacts
 node_modules/
 dist/
+!ui/dist/
 
 # typegen binary
 /typegen

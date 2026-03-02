@@ -21,13 +21,13 @@
             title: "JavaScript",
             language: "javascript",
             content: js,
-            url: import.meta.env.HZ_JS_SDK_URL,
+            url: import.meta.env.BASE_JS_SDK_URL,
         },
         {
             title: "Dart",
             language: "dart",
             content: dart,
-            url: import.meta.env.HZ_DART_SDK_URL,
+            url: import.meta.env.BASE_DART_SDK_URL,
         },
     ];
 </script>

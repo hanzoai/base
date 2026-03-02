@@ -1,7 +1,7 @@
 {
-  "name": "@hanzoai/base",
-  "version": "0.1.0",
-  "description": "Hanzo Base SDK - Reactive queries, query deduplication, and optimistic updates",
+  "name": "@hanzo/base",
+  "version": "0.2.0",
+  "description": "Hanzo Base SDK - Reactive queries, CRDT, realtime, and Base-compatible client",
   "type": "module",
   "main": "./dist/core/index.js",
   "module": "./dist/core/index.js",
@@ -10,6 +10,10 @@
     ".": {
       "import": "./dist/core/index.js",
       "types": "./dist/core/index.d.ts"
+    },
+    "./compat": {
+      "import": "./dist/compat/index.js",
+      "types": "./dist/compat/index.d.ts"
     },
     "./react": {
       "import": "./dist/react/index.js",
@@ -28,7 +32,11 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "pocketbase": "^0.26.5"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -54,8 +62,10 @@
     "hanzo",
     "base",
     "sdk",
+    "backend",
     "realtime",
     "reactive",
-    "optimistic-updates"
+    "crdt",
+    "hanzo-base"
   ]
 }

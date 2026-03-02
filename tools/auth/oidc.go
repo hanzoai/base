@@ -19,8 +19,8 @@ import (
 
 // idTokenLeeway is the optional leeway for the id_token timestamp fields validation.
 //
-// It can be changed externally using the PB_ID_TOKEN_LEEWAY env variable
-// (the value must be in seconds, e.g. "PB_ID_TOKEN_LEEWAY=60" for 1 minute).
+// It can be changed externally using the ID_TOKEN_LEEWAY env variable
+// (the value must be in seconds, e.g. "ID_TOKEN_LEEWAY=60" for 1 minute).
 var idTokenLeeway time.Duration = 5 * time.Minute
 
 func init() {
@@ -28,7 +28,7 @@ func init() {
 	Providers[NameOIDC+"2"] = wrapFactory(NewOIDCProvider)
 	Providers[NameOIDC+"3"] = wrapFactory(NewOIDCProvider)
 
-	if leewayStr := os.Getenv("PB_ID_TOKEN_LEEWAY"); leewayStr != "" {
+	if leewayStr := os.Getenv("ID_TOKEN_LEEWAY"); leewayStr != "" {
 		leeway, err := strconv.Atoi(leewayStr)
 		if err == nil {
 			idTokenLeeway = time.Duration(leeway) * time.Second
@@ -48,7 +48,7 @@ const NameOIDC string = "oidc"
 //
 // The provider support the following Extra config options:
 //   - "jwksURL" - url to the keys to validate the id_token signature (optional and used only when reading the user data from the id_token)
-//   - "issuers" - list of valid issuers for the iss id_token claim (optioanl and used only when reading the user data from the id_token)
+//   - "issuers" - list of valid issuers for the iss id_token claim (optional and used only when reading the user data from the id_token)
 type OIDC struct {
 	BaseProvider
 }

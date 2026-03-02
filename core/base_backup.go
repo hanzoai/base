@@ -132,7 +132,7 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 //
 //  3. Move the current app "hz_data" content (excluding the local backups and the special temp dir)
 //     under another temp sub dir that will be deleted on the next app start up
-//     (eg. "hz_data/.hz_temp_to_delete/old_hz_data").
+//     (eg. "hz_data/.hz_temp_to_delete/old_data").
 //     This is because on some environments it may not be allowed
 //     to delete the currently open "hz_data" files.
 //
@@ -140,7 +140,7 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 //
 //  5. Restart the app (on successful app bootstap it will also remove the old hz_data).
 //
-// If a failure occure during the restore process the dir changes are reverted.
+// If a failure occur during the restore process the dir changes are reverted.
 // If for whatever reason the revert is not possible, it panics.
 //
 // Note that if your hz_data has custom network mounts as subdirectories, then
@@ -242,20 +242,20 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 			return fmt.Errorf("data.db file is missing or invalid: %w", err)
 		}
 
-		oldTempDataDir := filepath.Join(localTempDir, "old_pb_data_"+security.PseudorandomString(8))
+		oldTempDataDir := filepath.Join(localTempDir, "old_hz_data_"+security.PseudorandomString(8))
 
 		replaceErr := e.App.RunInTransaction(func(txApp App) error {
 			return txApp.AuxRunInTransaction(func(txApp App) error {
-				// move the current pb_data content to a special temp location
+				// move the current data dir content to a special temp location
 				// that will hold the old data between dirs replace
 				// (the temp dir will be automatically removed on the next app start)
 				if err := osutils.MoveDirContent(txApp.DataDir(), oldTempDataDir, e.Exclude...); err != nil {
-					return fmt.Errorf("failed to move the current pb_data content to a temp location: %w", err)
+					return fmt.Errorf("failed to move the current data dir content to a temp location: %w", err)
 				}
 
-				// move the extracted archive content to the app's pb_data
+				// move the extracted archive content to the app's data dir
 				if err := osutils.MoveDirContent(extractedDataDir, txApp.DataDir(), e.Exclude...); err != nil {
-					return fmt.Errorf("failed to move the extracted archive content to pb_data: %w", err)
+					return fmt.Errorf("failed to move the extracted archive content to data dir: %w", err)
 				}
 
 				return nil
@@ -273,7 +273,7 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 					}
 
 					if err := osutils.MoveDirContent(oldTempDataDir, txApp.DataDir(), e.Exclude...); err != nil {
-						return fmt.Errorf("failed to revert old pb_data dir change: %w", err)
+						return fmt.Errorf("failed to revert old data dir dir change: %w", err)
 					}
 
 					return nil
@@ -306,7 +306,7 @@ func (app *BaseApp) registerAutobackupHooks() {
 		}
 
 		app.Cron().Add(jobId, rawSchedule, func() {
-			const autoPrefix = "@auto_hz_backup_"
+			const autoPrefix = "@auto_backup_"
 
 			name := generateBackupName(app, autoPrefix)
 
