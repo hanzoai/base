@@ -82,7 +82,7 @@ func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (acces
 		"client_secret": {config.IAMClientSecret},
 	}
 
-	resp, err := http.PostForm(endpoint+"/api/login/oauth/access_token", data)
+	resp, err := http.PostForm(endpoint+"/oauth/token", data)
 	if err != nil {
 		return "", "", fmt.Errorf("iam: token exchange request failed: %w", err)
 	}
