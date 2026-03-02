@@ -12,14 +12,26 @@ import (
 	"github.com/hanzoai/base/core"
 )
 
-// TenantDB manages per-tenant SQLite databases.
-// Each tenant gets an isolated, optionally encrypted SQLite file.
+// TenantDB manages per-org AND per-user SQLite databases.
+//
+// Directory layout:
+//
+//	{DataDir}/tenants/{orgSlug}/org.db              ← org-level shared data
+//	{DataDir}/tenants/{orgSlug}/users/{userId}/data.db  ← per-user PII + keys
+//
+// Each file is independently encrypted with a unique DEK:
+//
+//	org DEK  = HMAC-SHA256(masterKey, orgSlug)
+//	user DEK = HMAC-SHA256(masterKey, orgSlug + ":" + userId)
+//
+// Zero data commingling — org data, user PII, and keys are all in separate
+// files with separate encryption keys.
 type TenantDB struct {
 	app       core.App
 	masterKey string
 
-	mu sync.RWMutex
-	dbs map[string]string // slug → db path
+	mu  sync.RWMutex
+	dbs map[string]string // key → db path
 }
 
 func NewTenantDB(app core.App, masterKey string) *TenantDB {
@@ -30,85 +42,161 @@ func NewTenantDB(app core.App, masterKey string) *TenantDB {
 	}
 }
 
-// TenantsDir returns the base directory for per-tenant databases.
+// TenantsDir returns the base directory for all tenant databases.
 func (t *TenantDB) TenantsDir() string {
 	return filepath.Join(t.app.DataDir(), "tenants")
 }
 
-// TenantDir returns the directory for a specific tenant.
-func (t *TenantDB) TenantDir(slug string) string {
-	return filepath.Join(t.TenantsDir(), slug)
+// --- Org-level database ---
+
+// OrgDir returns the directory for an org.
+func (t *TenantDB) OrgDir(orgSlug string) string {
+	return filepath.Join(t.TenantsDir(), orgSlug)
 }
 
-// DBPath returns the SQLite database path for a tenant.
-func (t *TenantDB) DBPath(slug string) string {
-	return filepath.Join(t.TenantDir(slug), "data.db")
+// OrgDBPath returns the org-level SQLite database path.
+func (t *TenantDB) OrgDBPath(orgSlug string) string {
+	return filepath.Join(t.OrgDir(orgSlug), "org.db")
 }
 
-// DEK derives a per-tenant data encryption key from the master key + slug.
-// Returns empty string if no master key is configured (dev mode, unencrypted).
-func (t *TenantDB) DEK(slug string) string {
+// OrgDEK derives the org-level data encryption key.
+func (t *TenantDB) OrgDEK(orgSlug string) string {
 	if t.masterKey == "" {
 		return ""
 	}
 	mac := hmac.New(sha256.New, []byte(t.masterKey))
-	mac.Write([]byte(slug))
+	mac.Write([]byte(orgSlug))
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// Provision creates the directory and SQLite database for a tenant.
-// If a master encryption key is set, the DB file path includes the DEK
-// hint for SQLCipher / encrypted SQLite drivers.
-func (t *TenantDB) Provision(slug string) (string, error) {
-	dir := t.TenantDir(slug)
+// ProvisionOrg creates the org directory and org-level database.
+func (t *TenantDB) ProvisionOrg(orgSlug string) (string, error) {
+	dir := t.OrgDir(orgSlug)
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return "", fmt.Errorf("create tenant dir %q: %w", dir, err)
+		return "", fmt.Errorf("create org dir %q: %w", dir, err)
+	}
+	// Create users subdirectory
+	if err := os.MkdirAll(filepath.Join(dir, "users"), 0700); err != nil {
+		return "", fmt.Errorf("create org users dir: %w", err)
 	}
 
-	dbPath := t.DBPath(slug)
+	dbPath := t.OrgDBPath(orgSlug)
 
 	t.mu.Lock()
-	t.dbs[slug] = dbPath
+	t.dbs["org:"+orgSlug] = dbPath
 	t.mu.Unlock()
 
 	return dbPath, nil
 }
 
-// GetDBPath returns the database path for an existing tenant.
-func (t *TenantDB) GetDBPath(slug string) (string, bool) {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
+// --- Per-user database ---
 
-	if p, ok := t.dbs[slug]; ok {
+// UserDir returns the directory for a specific user within an org.
+func (t *TenantDB) UserDir(orgSlug, userId string) string {
+	return filepath.Join(t.OrgDir(orgSlug), "users", userId)
+}
+
+// UserDBPath returns the per-user SQLite database path.
+func (t *TenantDB) UserDBPath(orgSlug, userId string) string {
+	return filepath.Join(t.UserDir(orgSlug, userId), "data.db")
+}
+
+// UserDEK derives the per-user data encryption key.
+// Different from the org DEK — user PII is encrypted with a user-specific key.
+func (t *TenantDB) UserDEK(orgSlug, userId string) string {
+	if t.masterKey == "" {
+		return ""
+	}
+	mac := hmac.New(sha256.New, []byte(t.masterKey))
+	mac.Write([]byte(orgSlug + ":" + userId))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// ProvisionUser creates the per-user directory and database.
+func (t *TenantDB) ProvisionUser(orgSlug, userId string) (string, error) {
+	dir := t.UserDir(orgSlug, userId)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return "", fmt.Errorf("create user dir %q: %w", dir, err)
+	}
+
+	dbPath := t.UserDBPath(orgSlug, userId)
+
+	t.mu.Lock()
+	t.dbs["user:"+orgSlug+":"+userId] = dbPath
+	t.mu.Unlock()
+
+	return dbPath, nil
+}
+
+// --- Lookup ---
+
+// GetOrgDBPath returns the database path for an existing org.
+func (t *TenantDB) GetOrgDBPath(orgSlug string) (string, bool) {
+	t.mu.RLock()
+	if p, ok := t.dbs["org:"+orgSlug]; ok {
+		t.mu.RUnlock()
 		return p, true
 	}
+	t.mu.RUnlock()
 
-	// Check filesystem
-	dbPath := t.DBPath(slug)
+	dbPath := t.OrgDBPath(orgSlug)
 	if _, err := os.Stat(dbPath); err == nil {
-		t.mu.RUnlock()
 		t.mu.Lock()
-		t.dbs[slug] = dbPath
+		t.dbs["org:"+orgSlug] = dbPath
 		t.mu.Unlock()
-		t.mu.RLock()
 		return dbPath, true
 	}
-
 	return "", false
 }
 
-// Delete removes a tenant's database directory entirely.
-func (t *TenantDB) Delete(slug string) error {
-	t.mu.Lock()
-	delete(t.dbs, slug)
-	t.mu.Unlock()
+// GetUserDBPath returns the database path for an existing user.
+func (t *TenantDB) GetUserDBPath(orgSlug, userId string) (string, bool) {
+	key := "user:" + orgSlug + ":" + userId
+	t.mu.RLock()
+	if p, ok := t.dbs[key]; ok {
+		t.mu.RUnlock()
+		return p, true
+	}
+	t.mu.RUnlock()
 
-	dir := t.TenantDir(slug)
-	return os.RemoveAll(dir)
+	dbPath := t.UserDBPath(orgSlug, userId)
+	if _, err := os.Stat(dbPath); err == nil {
+		t.mu.Lock()
+		t.dbs[key] = dbPath
+		t.mu.Unlock()
+		return dbPath, true
+	}
+	return "", false
 }
 
-// List returns all provisioned tenant slugs by scanning the tenants directory.
-func (t *TenantDB) List() ([]string, error) {
+// --- Lifecycle ---
+
+// DeleteUser removes a user's database directory.
+func (t *TenantDB) DeleteUser(orgSlug, userId string) error {
+	t.mu.Lock()
+	delete(t.dbs, "user:"+orgSlug+":"+userId)
+	t.mu.Unlock()
+	return os.RemoveAll(t.UserDir(orgSlug, userId))
+}
+
+// DeleteOrg removes an org's entire directory (including all user databases).
+func (t *TenantDB) DeleteOrg(orgSlug string) error {
+	t.mu.Lock()
+	// Remove all cached paths for this org
+	for k := range t.dbs {
+		if len(k) > 4 && k[:4] == "org:" && k[4:] == orgSlug {
+			delete(t.dbs, k)
+		}
+		if len(k) > 5+len(orgSlug) && k[:5+len(orgSlug)] == "user:"+orgSlug+":" {
+			delete(t.dbs, k)
+		}
+	}
+	t.mu.Unlock()
+	return os.RemoveAll(t.OrgDir(orgSlug))
+}
+
+// ListOrgs returns all provisioned org slugs.
+func (t *TenantDB) ListOrgs() ([]string, error) {
 	entries, err := os.ReadDir(t.TenantsDir())
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -116,15 +204,34 @@ func (t *TenantDB) List() ([]string, error) {
 		}
 		return nil, err
 	}
-
 	var slugs []string
 	for _, e := range entries {
 		if e.IsDir() {
-			dbPath := filepath.Join(t.TenantsDir(), e.Name(), "data.db")
-			if _, err := os.Stat(dbPath); err == nil {
+			if _, err := os.Stat(t.OrgDBPath(e.Name())); err == nil {
 				slugs = append(slugs, e.Name())
 			}
 		}
 	}
 	return slugs, nil
+}
+
+// ListUsers returns all provisioned user IDs within an org.
+func (t *TenantDB) ListUsers(orgSlug string) ([]string, error) {
+	usersDir := filepath.Join(t.OrgDir(orgSlug), "users")
+	entries, err := os.ReadDir(usersDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var ids []string
+	for _, e := range entries {
+		if e.IsDir() {
+			if _, err := os.Stat(t.UserDBPath(orgSlug, e.Name())); err == nil {
+				ids = append(ids, e.Name())
+			}
+		}
+	}
+	return ids, nil
 }
