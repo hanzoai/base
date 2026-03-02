@@ -208,8 +208,8 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
 	token := e.Request.Header.Get("Authorization")
 
-	// the "Bearer" schema prefix is not required by PocketBase and it is
-	// supported only for compatibility with the defaults of some HTTP clients
+	// the "Bearer" prefix is not required but is supported for compatibility
+	// with the defaults of standard HTTP clients
 	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
 		return token[7:]
 	}

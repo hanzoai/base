@@ -86,7 +86,7 @@ func (b *bufferWithFile) Write(p []byte) (int, error) {
 	if int64(b.buf.Len()+len(p)) > b.memoryLimit {
 		if b.file == nil {
 			var err error
-			b.file, err = os.CreateTemp("", "pb_buffer_file_*")
+			b.file, err = os.CreateTemp("", "hz_buffer_*")
 			if err != nil {
 				return 0, err
 			}
