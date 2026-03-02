@@ -343,117 +343,35 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	e.Set("authEmail", email)
 	e.Set("authName", name)
 
-	// IAM admins map to Base superusers — they bypass all collection rules.
-	if isAdmin {
-		suCollection, suErr := e.App.FindCachedCollectionByNameOrId(core.CollectionNameSuperusers)
-		if suErr == nil {
-			// Find or create superuser record for this IAM admin.
-			recordID := subToRecordID(sub)
-			record, err := e.App.FindRecordById(suCollection, recordID)
-			if err == nil {
-				return record, nil
-			}
-			if email != "" {
-				record, err = e.App.FindAuthRecordByEmail(suCollection, email)
-				if err == nil {
-					return record, nil
-				}
-			}
-			// Auto-create superuser record.
-			record = core.NewRecord(suCollection)
-			record.Id = recordID
-			record.Set("email", email)
-			record.SetRandomPassword()
-			record.SetVerified(true)
-			if saveErr := e.App.Save(record); saveErr != nil {
-				e.App.Logger().Debug("IAM admin → superuser auto-create failed (using unsaved record)",
-					slog.String("email", email), slog.String("error", saveErr.Error()))
-			}
-			return record, nil
-		}
-	}
+	// When IAM is active, Base does NOT store user records. IAM is the user store.
+	// We create an ephemeral (unsaved) auth record from JWT claims so Base's
+	// rule engine can evaluate it. No writes to _superusers or users collections.
 
-	// Determine which collection to use for regular users.
-	collectionName := "users"
-	if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
-		collectionName = v
+	collectionName := core.CollectionNameSuperusers
+	if !isAdmin {
+		collectionName = "users"
+		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
+			collectionName = v
+		}
 	}
 
 	collection, err := e.App.FindCachedCollectionByNameOrId(collectionName)
 	if err != nil {
-		return nil, fmt.Errorf("auth users collection %q not found: %w", collectionName, err)
+		return nil, fmt.Errorf("auth collection %q not found: %w", collectionName, err)
 	}
 
-	if !collection.IsAuth() {
-		return nil, fmt.Errorf("collection %q is not an auth collection", collectionName)
-	}
-
-	// Base record IDs must be exactly 15 lowercase alphanumeric characters.
-	// External subs can be UUIDs (36 chars) or short slugs — normalize to 15.
-	recordID := subToRecordID(sub)
-
-	// Try to find existing user by sub (mapped to Base record ID).
-	record, err := e.App.FindRecordById(collection, recordID)
-	if err == nil {
-		return record, nil
-	}
-
-	// Try by email as fallback.
-	if email != "" {
-		record, err = e.App.FindAuthRecordByEmail(collection, email)
-		if err == nil {
-			return record, nil
-		}
-	}
-
-	// Auto-create a new Base user record for this external identity.
-	record = core.NewRecord(collection)
-	record.Id = recordID
+	// Ephemeral record — NOT persisted. IAM is the user store, not Base.
+	// The record exists only for this request so Base's rule engine can evaluate it.
+	record := core.NewRecord(collection)
+	record.Id = subToRecordID(sub)
 	record.Set("email", email)
 	if name != "" {
 		record.Set("name", name)
 	}
-
-	// Set org_id if the collection has that field and the claim is present.
 	if owner != "" && collection.Fields.GetByName("org_id") != nil {
 		record.Set("org_id", owner)
 	}
-
-	// Set defaults for common fields if they exist on the collection.
-	if f := collection.Fields.GetByName("role"); f != nil {
-		record.Set("role", "user")
-	}
-	if f := collection.Fields.GetByName("status"); f != nil {
-		record.Set("status", "active")
-	}
-	if f := collection.Fields.GetByName("kyc_status"); f != nil {
-		record.Set("kyc_status", "none")
-	}
-
-	// External users authenticate via OIDC tokens, not local passwords.
-	record.SetRandomPassword()
-
-	// Mark email as verified — the identity provider already verified it.
 	record.SetVerified(true)
-
-	if err := e.App.Save(record); err != nil {
-		// Save failed (e.g. collection rules block creation).
-		// In IAM-only mode, the record still serves as a valid auth context
-		// with all claims populated — just not persisted to the local DB.
-		// This is intentional: IAM is the user store, not Base.
-		e.App.Logger().Debug("IAM user not persisted locally (IAM is source of truth)",
-			slog.String("sub", sub),
-			slog.String("email", email),
-			slog.String("error", err.Error()),
-		)
-		return record, nil
-	}
-
-	e.App.Logger().Info("auto-created user from external token",
-		slog.String("sub", sub),
-		slog.String("email", email),
-		slog.String("collection", collectionName),
-	)
 
 	return record, nil
 }
