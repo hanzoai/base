@@ -109,8 +109,11 @@ func MustRegister(app core.App, config PlatformConfig) {
 
 // Register registers the platform plugin to the provided app instance.
 func Register(app core.App, config PlatformConfig) error {
-	if config.IAMEndpoint == "" {
-		config.IAMEndpoint = "https://hanzo.id"
+	if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
+		// When IAM is explicitly disabled, skip external auth entirely.
+		// PocketBase superuser tokens will still work for _superusers collection.
+		// All other collections fall back to PocketBase's native auth rules.
+		config.IAMEndpoint = ""
 	}
 	if config.KMSEndpoint == "" {
 		config.KMSEndpoint = "https://kms.hanzo.ai"
@@ -143,14 +146,18 @@ func Register(app core.App, config PlatformConfig) error {
 	// All Base routes accept OIDC/JWKS tokens; built-in auth endpoints
 	// (password, OTP, email-change, etc.) are disabled for non-superuser
 	// collections.
-	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
-	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
-	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+	if config.IAMEndpoint != "" {
+		jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+		app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+		app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 
-	app.Logger().Info("platform: external auth enabled — built-in auth disabled for non-superuser collections",
-		slog.String("jwksURL", jwksURL),
-		slog.String("authEndpoint", config.IAMEndpoint),
-	)
+		app.Logger().Info("platform: external auth enabled — built-in auth disabled for non-superuser collections",
+			slog.String("jwksURL", jwksURL),
+			slog.String("authEndpoint", config.IAMEndpoint),
+		)
+	} else {
+		app.Logger().Warn("platform: IAM disabled — PB superuser tokens accepted for all collections")
+	}
 
 	// Serve: register API routes, identity header middleware, and org-scoping.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
