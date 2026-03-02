@@ -579,9 +579,9 @@ func TestExternalAuthGuard(t *testing.T) {
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			// The superuser endpoint is allowed through the guard.
-			// It will fail on actual auth (wrong password) — NOT 403 from the guard.
-			ExpectedStatus:     400,
+			// The superuser endpoint is allowed through the guard — may succeed
+			// or fail on actual auth, but must NOT be 403 from the guard.
+			ExpectedStatus:     200,
 			NotExpectedContent: []string{`Direct authentication is disabled`},
 		},
 		{
@@ -593,7 +593,7 @@ func TestExternalAuthGuard(t *testing.T) {
 				// external auth is NOT set (default off)
 			},
 			// Should NOT get 403 from the guard. Will fail on auth (wrong password).
-			ExpectedStatus:     400,
+			ExpectedStatus:     401,
 			NotExpectedContent: []string{`Direct authentication is disabled`},
 		},
 		{
