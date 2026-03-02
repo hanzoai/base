@@ -124,10 +124,27 @@ See the full alignment guide below. Summary of conflicts:
 | API prefix | `/api` | `/v1` | CONFLICT |
 | Soft delete | Hard delete only | `Deleted bool` flag | MISSING |
 | Multi-tenancy | None | Per-org SQLite + CEK | MISSING |
-| Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS) | PARTIAL (superuser OIDC done) |
+| Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS) | DONE (EXTERNAL_AUTH_ONLY env var) |
 | SSE event name | `CONNECT` | `CONNECT` | OK (server + SDK aligned) |
 | Error format | `{status, message, data}` | `{status, message, data}` | OK |
 | Pagination | `{items, page, perPage, totalItems, totalPages}` | Same | OK |
 
 Migration path: 5 phases, backward-compatible aliases first.
 Full details: research brief produced by scientist agent on 2026-04-10.
+
+## External Auth Mode (2026-04-10)
+
+Set `EXTERNAL_AUTH_ONLY=true` to defer all auth to an external OIDC provider.
+Optional env vars: `JWKS_URL` (token validation endpoint), `AUTH_USERS_COLLECTION` (default: "users").
+
+Behavior when active:
+- Built-in auth endpoints blocked for non-superuser collections (password, OTP, OAuth2, email change, password reset, verification)
+- `auth-methods`, `auth-refresh`, `impersonate` still work
+- `_superusers` collection is exempt (admin panel login)
+- `loadAuthToken` validates bearer tokens via JWKS, creates ephemeral user records from JWT claims
+- Superuser local tokens always accepted as fallback (admin sessions, CLI tools)
+- Regular user local tokens rejected
+
+The platform plugin (`plugins/platform/`) sets these same store keys automatically when `IAMEndpoint` is configured. The env vars provide the same behavior for standalone Base deployments without the platform plugin.
+
+Store keys: `StoreKeyExternalAuthOnly`, `StoreKeyJWKSURL`, `StoreKeyAuthUsersCollection`.
