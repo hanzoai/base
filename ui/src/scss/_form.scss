@@ -94,7 +94,7 @@ button {
     // primary styles
     @each $name, $color in $variationsMap {
         &.btn-#{$name} {
-            color: #000000;
+            color: #000000 !important;
             &:before {
                 background: $color;
             }
