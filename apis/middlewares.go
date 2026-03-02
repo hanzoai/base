@@ -2,6 +2,8 @@ package apis
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -234,7 +236,7 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 
 			iamRecord, iamErr := resolveIAMToken(e, token, jwksURL)
 			if iamErr != nil {
-				e.App.Logger().Debug("loadAuthToken IAM JWKS fallback failure",
+				e.App.Logger().Warn("loadAuthToken IAM JWKS fallback failure",
 					"localError", err,
 					"iamError", iamErr,
 				)
@@ -301,11 +303,9 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 		return nil, fmt.Errorf("collection %q is not an auth collection", collectionName)
 	}
 
-	// Base requires record IDs >= 15 chars. Pad short IAM subs with underscores.
-	recordID := sub
-	for len(recordID) < 15 {
-		recordID += "_"
-	}
+	// Base record IDs must be exactly 15 lowercase alphanumeric characters.
+	// IAM subs can be UUIDs (36 chars) or short slugs — normalize to 15 chars.
+	recordID := iamSubToRecordID(sub)
 
 	// Try to find existing user by IAM sub (used directly as Base record ID).
 	record, err := e.App.FindRecordById(collection, recordID)
@@ -362,6 +362,42 @@ func resolveIAMToken(e *core.RequestEvent, token, jwksURL string) (*core.Record,
 	)
 
 	return record, nil
+}
+
+// iamSubToRecordID converts an IAM sub claim (which may be a UUID, slug, or
+// other identifier) into a valid Base record ID (exactly 15 lowercase
+// alphanumeric chars).
+//
+// Short subs (< 15 chars) are padded with underscores (kept for backward compat).
+// Long or non-alphanumeric subs are SHA-256 hashed and truncated to 15 hex chars.
+func iamSubToRecordID(sub string) string {
+	// Fast path: if already a valid 15-char lowercase alphanumeric ID, use as-is.
+	if len(sub) == 15 && isLowerAlphanumeric(sub) {
+		return sub
+	}
+
+	// For short subs that are alphanumeric, pad to 15 (backward compat).
+	if len(sub) < 15 && isLowerAlphanumeric(sub) {
+		for len(sub) < 15 {
+			sub += "_"
+		}
+		return sub
+	}
+
+	// For UUIDs, long strings, or non-alphanumeric subs: deterministic hash.
+	// SHA-256 the original sub and take the first 15 hex chars.
+	h := sha256.Sum256([]byte(sub))
+	return hex.EncodeToString(h[:])[:15]
+}
+
+// isLowerAlphanumeric returns true if s contains only [a-z0-9_].
+func isLowerAlphanumeric(s string) bool {
+	for _, c := range s {
+		if !((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
+			return false
+		}
+	}
+	return true
 }
 
 func getAuthTokenFromRequest(e *core.RequestEvent) string {
