@@ -15,6 +15,7 @@ import (
 	"github.com/hanzoai/base/plugins/cloudsql"
 	"github.com/hanzoai/base/plugins/functions"
 	"github.com/hanzoai/base/plugins/platform"
+	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
 )
@@ -102,6 +103,9 @@ func main() {
 		Automigrate:  automigrate,
 		Dir:          migrationsDir,
 	})
+
+	// ZAP binary protocol transport (port 9652)
+	zap.MustRegister(app)
 
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
