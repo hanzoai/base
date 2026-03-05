@@ -12,6 +12,8 @@ import (
 	"github.com/hanzoai/base/plugins/ghupdate"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
+	"github.com/hanzoai/base/plugins/cloudsql"
+	"github.com/hanzoai/base/plugins/platform"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
 )
@@ -102,6 +104,22 @@ func main() {
 
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
+
+	// Multi-tenant platform (IAM + KMS integration)
+	platform.MustRegister(app, platform.PlatformConfig{
+		IAMEndpoint:     os.Getenv("IAM_ENDPOINT"),
+		KMSEndpoint:     os.Getenv("KMS_ENDPOINT"),
+		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
+		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
+	})
+
+	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
+	cloudsql.MustRegister(app, cloudsql.Config{
+		MetaURL:       os.Getenv("CLOUD_SQL_META_URL"),
+		ComputeHost:   os.Getenv("CLOUD_SQL_COMPUTE_HOST"),
+		DefaultPGUser: os.Getenv("CLOUD_SQL_PG_USER"),
+		DefaultPGPass: os.Getenv("CLOUD_SQL_PG_PASS"),
+	})
 
 	// static route to serves files from the provided public dir
 	// (if publicDir exists and the route path is not already defined)
