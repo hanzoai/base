@@ -13,6 +13,7 @@ import (
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/cloudsql"
+	"github.com/hanzoai/base/plugins/functions"
 	"github.com/hanzoai/base/plugins/platform"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
@@ -119,6 +120,13 @@ func main() {
 		ComputeHost:   os.Getenv("CLOUD_SQL_COMPUTE_HOST"),
 		DefaultPGUser: os.Getenv("CLOUD_SQL_PG_USER"),
 		DefaultPGPass: os.Getenv("CLOUD_SQL_PG_PASS"),
+	})
+
+	// OpenFaaS serverless functions
+	functions.MustRegister(app, functions.Config{
+		GatewayURL:        os.Getenv("OPENFAAS_GATEWAY_URL"),
+		FunctionNamespace: os.Getenv("OPENFAAS_FN_NAMESPACE"),
+		RegistryURL:       os.Getenv("OPENFAAS_REGISTRY_URL"),
 	})
 
 	// static route to serves files from the provided public dir
