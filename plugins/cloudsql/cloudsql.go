@@ -225,8 +225,13 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	api.POST("/databases/{id}/branches", p.handleCreateBranch)
 	api.GET("/databases/{id}/branches", p.handleListBranches)
 
+	// Register specific methods to avoid conflict with the static catch-all GET /{path...}
 	meta := r.Group("/api/meta")
-	meta.Any("/{path...}", p.handleMetaProxy)
+	meta.GET("/{path...}", p.handleMetaProxy)
+	meta.POST("/{path...}", p.handleMetaProxy)
+	meta.PUT("/{path...}", p.handleMetaProxy)
+	meta.PATCH("/{path...}", p.handleMetaProxy)
+	meta.DELETE("/{path...}", p.handleMetaProxy)
 }
 
 // --------------------------------------------------------------------------
