@@ -53,7 +53,7 @@
     }
 
     function download() {
-        CommonHelper.downloadJson(Object.values(bulkSelected), "hz_schema");
+        CommonHelper.downloadJson(Object.values(bulkSelected), "schema");
     }
 
     function copy() {
