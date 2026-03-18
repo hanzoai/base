@@ -1,30 +1,37 @@
+// Import shared design tokens from @hanzo/ui
+@import 'hanzo-tokens';
+
 :root {
     --baseFontFamily: 'Source Sans 3', sans-serif, emoji;
     --monospaceFontFamily: 'Ubuntu Mono', monospace, emoji;
     --iconFontFamily: 'remixicon';
 
-    --txtPrimaryColor:  #f4f4f5;
-    --txtHintColor:     #a1a1aa;
+    // Text colors - sourced from shared admin tokens
+    --txtPrimaryColor:  var(--admin-text);
+    --txtHintColor:     var(--admin-text-muted);
     --txtDisabledColor: #52525b;
 
-    --primaryColor: #3b82f6;
+    // Primary - sourced from shared admin tokens
+    --primaryColor: var(--admin-primary);
 
-    --bodyColor: #0a0a0a;
+    // Body/surface - sourced from shared admin tokens
+    --bodyColor: var(--admin-bg);
 
-    --baseColor:     #141419;
+    --baseColor:     var(--admin-surface);
     --baseAlt1Color: #1e1e26;
     --baseAlt2Color: #27272f;
     --baseAlt3Color: #333340;
     --baseAlt4Color: #4a4a5a;
 
-    --infoColor:       #3b82f6;
+    // Status colors - sourced from shared admin tokens
+    --infoColor:       var(--admin-primary);
     --infoAltColor:    #1e3a5f;
     --successColor:    #22c55e;
     --successAltColor: #14532d;
-    --dangerColor:     #ef4444;
-    --dangerAltColor:  #7f1d1d;
-    --warningColor:    #f59e0b;
-    --warningAltColor: #78350f;
+    --dangerColor:     var(--admin-error);
+    --dangerAltColor:  var(--admin-error-dim);
+    --warningColor:    var(--admin-warning);
+    --warningAltColor: var(--admin-warning-dim);
 
     --overlayColor:   rgba(0, 0, 0, 0.5);
     --tooltipColor:   rgba(240, 240, 240, 0.92);
@@ -58,7 +65,7 @@
     --lgWrapperWidth: 1200px;
 
     --appSidebarWidth: 75px;
-    --pageSidebarWidth: 235px;
+    --pageSidebarWidth: var(--admin-sidebar-width);
 
     --baseAnimationSpeed: 150ms;
     --activeAnimationSpeed: 70ms;
