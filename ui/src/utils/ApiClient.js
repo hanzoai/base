@@ -8,7 +8,7 @@ import CommonHelper from "@/utils/CommonHelper";
 import { replace } from "svelte-spa-router";
 import { get } from "svelte/store";
 
-const superuserFileTokenKey = "hz_superuser_file_token";
+const superuserFileTokenKey = "superuser_file_token";
 
 /**
  * Clears the authorized state and redirects to the login page.
@@ -103,7 +103,7 @@ class AppAuthStore extends LocalAuthStore {
     /**
      * @inheritdoc
      */
-    constructor(storageKey = "__hz_superuser_auth__") {
+    constructor(storageKey = "__superuser_auth__") {
         super(storageKey);
 
         this.save(this.token, this.record);

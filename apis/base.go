@@ -98,7 +98,7 @@ func MustSubFS(fsys fs.FS, dir string) fs.FS {
 //
 // Example:
 //
-//	fsys := os.DirFS("./hz_public")
+//	fsys := os.DirFS("./public")
 //	router.GET("/files/{path...}", apis.Static(fsys, false))
 func Static(fsys fs.FS, indexFallback bool) func(*core.RequestEvent) error {
 	if fsys == nil {
