@@ -18,10 +18,10 @@ RUN apk add --no-cache ca-certificates tzdata curl \
 WORKDIR /app
 COPY --from=builder /build/base /app/base
 COPY --from=builder /build/ui/dist /app/hz_public
-RUN mkdir -p /pb_data /pb_migrations /pb_hooks && chown -R hanzo:hanzo /app /pb_data /pb_migrations /pb_hooks
+RUN mkdir -p /data /migrations /hooks && chown -R hanzo:hanzo /app /data /migrations /hooks
 USER hanzo
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 ENTRYPOINT ["/app/base"]
-CMD ["serve", "--http=0.0.0.0:8080", "--dir=/pb_data", "--migrationsDir=/pb_migrations", "--hooksDir=/pb_hooks"]
+CMD ["serve", "--http=0.0.0.0:8080", "--dir=/data", "--migrationsDir=/migrations", "--hooksDir=/hooks"]

@@ -1241,7 +1241,7 @@ select {
     display: flex;
     flex-direction: column;
     width: 100%;
-    overflow: visible; // https://github.com/pocketbase/pocketbase/issues/7223
+    overflow: visible; // https://github.com/hanzoai/base/issues/7223
     .cm-editor {
         flex-grow: 1;
         min-height: 0;
