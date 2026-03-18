@@ -7,31 +7,31 @@
     --iconFontFamily: 'remixicon';
 
     // Text colors - sourced from shared admin tokens
-    --txtPrimaryColor:  var(--admin-text);
-    --txtHintColor:     var(--admin-text-muted);
+    --txtPrimaryColor:  var(--dash-text);
+    --txtHintColor:     var(--dash-text-muted);
     --txtDisabledColor: #52525b;
 
     // Primary - sourced from shared admin tokens
-    --primaryColor: var(--admin-primary);
+    --primaryColor: var(--dash-primary);
 
     // Body/surface - sourced from shared admin tokens
-    --bodyColor: var(--admin-bg);
+    --bodyColor: var(--dash-bg);
 
-    --baseColor:     var(--admin-surface);
+    --baseColor:     var(--dash-surface);
     --baseAlt1Color: #1e1e26;
     --baseAlt2Color: #27272f;
     --baseAlt3Color: #333340;
     --baseAlt4Color: #4a4a5a;
 
     // Status colors - sourced from shared admin tokens
-    --infoColor:       var(--admin-primary);
+    --infoColor:       var(--dash-primary);
     --infoAltColor:    #1e3a5f;
     --successColor:    #22c55e;
     --successAltColor: #14532d;
-    --dangerColor:     var(--admin-error);
-    --dangerAltColor:  var(--admin-error-dim);
-    --warningColor:    var(--admin-warning);
-    --warningAltColor: var(--admin-warning-dim);
+    --dangerColor:     var(--dash-error);
+    --dangerAltColor:  var(--dash-error-dim);
+    --warningColor:    var(--dash-warning);
+    --warningAltColor: var(--dash-warning-dim);
 
     --overlayColor:   rgba(0, 0, 0, 0.5);
     --tooltipColor:   rgba(240, 240, 240, 0.92);
@@ -65,7 +65,7 @@
     --lgWrapperWidth: 1200px;
 
     --appSidebarWidth: 75px;
-    --pageSidebarWidth: var(--admin-sidebar-width);
+    --pageSidebarWidth: var(--dash-sidebar-width);
 
     --baseAnimationSpeed: 150ms;
     --activeAnimationSpeed: 70ms;
