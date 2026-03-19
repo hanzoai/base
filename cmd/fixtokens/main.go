@@ -50,8 +50,8 @@ func main() {
 	userTokenKey := userRecord.TokenKey()
 	userFileKey := userTokenKey + userCol.FileToken.Secret
 
-	validUserFileToken := createFileToken("4q1xlclmfloku33", "_hz_users_auth_", userFileKey, 86400*365*100*time.Second)
-	expiredUserFileToken := createFileToken("4q1xlclmfloku33", "_hz_users_auth_", userFileKey, -1*time.Hour)
+	validUserFileToken := createFileToken("4q1xlclmfloku33", "_users_auth_", userFileKey, 86400*365*100*time.Second)
+	expiredUserFileToken := createFileToken("4q1xlclmfloku33", "_users_auth_", userFileKey, -1*time.Hour)
 
 	fmt.Printf("Valid user file token: %s\n", validUserFileToken)
 	fmt.Printf("Expired user file token: %s\n", expiredUserFileToken)
@@ -62,7 +62,7 @@ func main() {
 	fmt.Printf("Expired superuser auth token: %s\n", expiredSuAuthToken)
 
 	userAuthKey := userTokenKey + userCol.AuthToken.Secret
-	expiredUserAuthToken := createAuthToken("4q1xlclmfloku33", "_hz_users_auth_", userAuthKey, -1*time.Hour)
+	expiredUserAuthToken := createAuthToken("4q1xlclmfloku33", "_users_auth_", userAuthKey, -1*time.Hour)
 	fmt.Printf("Expired user auth token: %s\n", expiredUserAuthToken)
 
 	// Define replacements

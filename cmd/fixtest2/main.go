@@ -40,7 +40,7 @@ func main() {
 	// Valid token (far future expiry)
 	validEmailChangeToken := createToken(
 		"4q1xlclmfloku33",
-		"_hz_users_auth_",
+		"_users_auth_",
 		"emailChange",
 		"test@example.com",
 		"change@example.com",
@@ -52,7 +52,7 @@ func main() {
 	// Expired token
 	expiredEmailChangeToken := createToken(
 		"4q1xlclmfloku33",
-		"_hz_users_auth_",
+		"_users_auth_",
 		"emailChange",
 		"test@example.com",
 		"change@example.com",
@@ -68,7 +68,7 @@ func main() {
 	resetKey := tokenKey + col.PasswordResetToken.Secret
 	validPasswordResetToken := createToken(
 		"4q1xlclmfloku33",
-		"_hz_users_auth_",
+		"_users_auth_",
 		"passwordReset",
 		"test@example.com",
 		"",
@@ -84,7 +84,7 @@ func main() {
 
 	validPasswordResetToken2 := createToken(
 		"oap640cot4yru2s",
-		"_hz_users_auth_",
+		"_users_auth_",
 		"passwordReset",
 		"test2@example.com",
 		"",
@@ -100,7 +100,7 @@ func main() {
 
 	validPasswordResetToken3 := createToken(
 		"bgs820n361vj1qd",
-		"_hz_users_auth_",
+		"_users_auth_",
 		"passwordReset",
 		"test3@example.com",
 		"",
@@ -130,7 +130,7 @@ func main() {
 	userFileKey := tokenKey + col.FileToken.Secret
 	userFileToken := createFileToken(
 		"4q1xlclmfloku33",
-		"_hz_users_auth_",
+		"_users_auth_",
 		userFileKey,
 		86400*365*100*time.Second, // 100 years
 	)
@@ -141,7 +141,7 @@ func main() {
 	authKey := tokenKey + col.AuthToken.Secret
 	expiredAuthToken := createAuthToken(
 		"4q1xlclmfloku33",
-		"_hz_users_auth_",
+		"_users_auth_",
 		authKey,
 		-1*time.Hour, // expired
 	)
