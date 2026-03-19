@@ -11,11 +11,11 @@
                 <figure class="logo">
                     <img
                         src="{import.meta.env.BASE_URL}images/logo.svg"
-                        alt="Base logo"
+                        alt="Hanzo"
                         width="40"
                         height="40"
                     />
-                    <span class="txt">Base <strong>Base</strong></span>
+                    <span class="txt"><strong>Base</strong></span>
                 </figure>
             </div>
             <div class="clearfix" />
