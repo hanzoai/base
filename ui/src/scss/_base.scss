@@ -1,5 +1,14 @@
 @include scrollbar();
 
+/* Remixicon base styles */
+[class^="ri-"]:before,
+[class*=" ri-"]:before {
+    font-family: var(--iconFontFamily) !important;
+    font-style: normal;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 :focus-visible {
     outline-color: var(--primaryColor);
     outline-style: solid;
