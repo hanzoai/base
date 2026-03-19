@@ -69,11 +69,7 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 			return fmt.Errorf("failed to create a temp dir: %w", err)
 		}
 
-<<<<<<< HEAD
 		// archive hz_data in a temp directory, exluding the "backups" and the temp dirs
-=======
-		// archive pb_data in a temp directory, excluding the "backups" and the temp dirs
->>>>>>> upstream/master
 		//
 		// run in transaction to temporary block other writes (transactions uses the NonconcurrentDB connection)
 		// ---
@@ -142,11 +138,7 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 //
 //  4. Move the extracted dir content to the app "hz_data".
 //
-<<<<<<< HEAD
 //  5. Restart the app (on successful app bootstap it will also remove the old hz_data).
-=======
-//  5. Restart the app (on successful app bootstrap it will also remove the old pb_data).
->>>>>>> upstream/master
 //
 // If a failure occur during the restore process the dir changes are reverted.
 // If for whatever reason the revert is not possible, it panics.

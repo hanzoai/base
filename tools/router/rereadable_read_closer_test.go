@@ -8,11 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-<<<<<<< HEAD
 
 	"github.com/hanzoai/base/tools/router"
-=======
->>>>>>> upstream/master
 )
 
 func TestRereadableReadCloser(t *testing.T) {
