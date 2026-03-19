@@ -48,7 +48,7 @@ func main() {
 	userTokenKey := userRecord.TokenKey()
 	userAuthKey := userTokenKey + userCol.AuthToken.Secret
 
-	expiredUserAuthToken := createAuthToken("4q1xlclmfloku33", "_hz_users_auth_", userAuthKey, -24*time.Hour)
+	expiredUserAuthToken := createAuthToken("4q1xlclmfloku33", "_users_auth_", userAuthKey, -24*time.Hour)
 	fmt.Printf("Expired user auth token: %s\n", expiredUserAuthToken)
 
 	// Define replacements - replace VALID tokens (exp far future) with EXPIRED tokens
