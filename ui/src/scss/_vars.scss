@@ -2,8 +2,8 @@
 @import 'hanzo-tokens';
 
 :root {
-    --baseFontFamily: 'Source Sans 3', sans-serif, emoji;
-    --monospaceFontFamily: 'Ubuntu Mono', monospace, emoji;
+    --baseFontFamily: 'Geist', system-ui, -apple-system, sans-serif;
+    --monospaceFontFamily: 'Geist Mono', ui-monospace, monospace;
     --iconFontFamily: 'remixicon';
 
     // Monochrome palette — matches hanzo.ai
