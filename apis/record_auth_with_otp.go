@@ -53,13 +53,8 @@ func recordAuthWithOTP(e *core.RequestEvent) error {
 		return e.BadRequestError("Invalid or expired OTP", fmt.Errorf("missing auth record: %w", err))
 	}
 
-<<<<<<< HEAD
 	// since otps are usually simple digit numbers, enforce an extra rate limit rule as basic enumaration protection
 	err = checkRateLimit(e, "@hz_otp_"+event.Record.Id, core.RateLimitRule{MaxRequests: 5, Duration: 180})
-=======
-	// since otps are usually simple digit numbers, enforce an extra rate limit rule as basic enumeration protection
-	err = checkRateLimit(e, "@pb_otp_"+event.Record.Id, core.RateLimitRule{MaxRequests: 5, Duration: 180})
->>>>>>> upstream/master
 	if err != nil {
 		return e.TooManyRequestsError("Too many attempts, please try again later with a new OTP.", nil)
 	}
