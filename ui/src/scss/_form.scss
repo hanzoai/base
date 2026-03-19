@@ -94,18 +94,19 @@ button {
     // primary styles
     @each $name, $color in $variationsMap {
         &.btn-#{$name} {
+            color: #000000;
             &:before {
                 background: $color;
             }
             &:hover,
             &:focus-visible {
                 &:before {
-                    opacity: 0.8;
+                    opacity: 0.9;
                 }
             }
             &:active {
                 &:before {
-                    opacity: 0.7;
+                    opacity: 0.8;
                 }
             }
         }
@@ -114,7 +115,7 @@ button {
     // secondary/bordered styles
     &.btn-outline {
         border: 2px solid currentColor;
-        background: #fff;
+        background: transparent;
     }
 
     @mixin btnOpacity($base: 1, $hover: 1, $active: 1) {

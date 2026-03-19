@@ -6,36 +6,37 @@
     --monospaceFontFamily: 'Ubuntu Mono', monospace, emoji;
     --iconFontFamily: 'remixicon';
 
-    // Text colors - sourced from shared admin tokens
-    --txtPrimaryColor:  var(--dash-text);
-    --txtHintColor:     var(--dash-text-muted);
+    // Monochrome palette — matches hanzo.ai
+    --txtPrimaryColor:  #ffffff;
+    --txtHintColor:     #a1a1aa;
     --txtDisabledColor: #52525b;
 
-    // Primary - sourced from shared admin tokens
-    --primaryColor: var(--dash-primary);
+    // Primary — white (monochrome)
+    --primaryColor: #ffffff;
 
-    // Body/surface - sourced from shared admin tokens
-    --bodyColor: var(--dash-bg);
+    // Body — pure black
+    --bodyColor: #000000;
 
-    --baseColor:     var(--dash-surface);
-    --baseAlt1Color: #1e1e26;
-    --baseAlt2Color: #27272f;
-    --baseAlt3Color: #333340;
-    --baseAlt4Color: #4a4a5a;
+    // Surfaces — near-black
+    --baseColor:     #0a0a0a;
+    --baseAlt1Color: #111111;
+    --baseAlt2Color: #1a1a1a;
+    --baseAlt3Color: #222222;
+    --baseAlt4Color: #333333;
 
-    // Status colors - sourced from shared admin tokens
-    --infoColor:       var(--dash-primary);
-    --infoAltColor:    #1e3a5f;
-    --successColor:    #22c55e;
-    --successAltColor: #14532d;
-    --dangerColor:     var(--dash-error);
-    --dangerAltColor:  var(--dash-error-dim);
-    --warningColor:    var(--dash-warning);
-    --warningAltColor: var(--dash-warning-dim);
+    // Status — desaturated
+    --infoColor:       #a1a1aa;
+    --infoAltColor:    #1a1a1a;
+    --successColor:    #86efac;
+    --successAltColor: #0a0a0a;
+    --dangerColor:     #fca5a5;
+    --dangerAltColor:  #1a0a0a;
+    --warningColor:    #fcd34d;
+    --warningAltColor: #1a1a0a;
 
-    --overlayColor:   rgba(0, 0, 0, 0.5);
-    --tooltipColor:   rgba(240, 240, 240, 0.92);
-    --shadowColor:    rgba(0, 0, 0, 0.3);
+    --overlayColor:   rgba(0, 0, 0, 0.7);
+    --tooltipColor:   rgba(255, 255, 255, 0.92);
+    --shadowColor:    rgba(0, 0, 0, 0.5);
 
     --baseFontSize: 14.5px;
     --xsFontSize:   12px;
