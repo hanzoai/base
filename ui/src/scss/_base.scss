@@ -1156,18 +1156,33 @@ a.thumb:not(.thumb-active) {
     }
 }
 
-/* Force primary button: white bg, black text */
-.btn.btn-primary {
-    background: #ffffff !important;
+/* Force all filled buttons: proper contrast */
+.btn.btn-primary,
+.btn.btn-info,
+.btn.btn-success,
+.btn.btn-warning,
+.btn.btn-danger,
+.btn.btn-hint,
+.btn.btn-secondary,
+.btn.btn-expanded,
+.btn.btn-expanded-sm,
+.btn.btn-expanded-lg {
     color: #000000 !important;
-    border-radius: 8px !important;
+    border-radius: 8px;
     &:before {
-        display: none !important;
+        border-radius: 8px;
     }
-    &:hover {
-        background: #e5e5e5 !important;
-    }
-    .txt, span, i {
+    .txt, span {
         color: #000000 !important;
     }
+    i {
+        color: #000000 !important;
+    }
+}
+/* Primary/info specifically get white bg */
+.btn.btn-primary,
+.btn.btn-info {
+    background: #ffffff !important;
+    &:before { display: none !important; }
+    &:hover { background: #e5e5e5 !important; }
 }
