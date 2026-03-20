@@ -900,6 +900,12 @@ func TestFindAuthRecordByToken(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
+	// Generate a fresh verification token to avoid hardcoded expiry issues
+	verificationToken, err := tests.GetUserVerificationToken(app, "nologin", "dc49k6jgejn40h3")
+	if err != nil {
+		t.Fatalf("Failed to generate verification token: %v", err)
+	}
+
 	scenarios := []struct {
 		name       string
 		token      string
@@ -932,7 +938,7 @@ func TestFindAuthRecordByToken(t *testing.T) {
 		},
 		{
 			"valid verification token",
-			"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJlbWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJleHAiOjE3Njk0MjExMTgsImlkIjoiZGM0OWs2amdlam40MGgzIiwidHlwZSI6InZlcmlmaWNhdGlvbiJ9.4rWr4xE3le0FrCmoEwBHngm1cD0JNUJ9iNrMHoRqNJU",
+			verificationToken,
 			nil,
 			"dc49k6jgejn40h3",
 		},
