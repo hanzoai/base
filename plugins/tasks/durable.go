@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"go.temporal.io/api/workflowservice/v1"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 )
@@ -203,6 +204,90 @@ func (ds *DurableStore) CancelTask(ctx context.Context, taskID string) error {
 // SignalTask sends a signal to a running workflow.
 func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName string, data interface{}) error {
 	return ds.Client.SignalWorkflow(ctx, taskID, "", signalName, data)
+}
+
+// ListTasks returns tasks in a space by querying workflow visibility.
+func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string) ([]*Task, error) {
+	query := fmt.Sprintf(`TaskQueue = "%s"`, spaceID)
+	resp, err := ds.Client.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
+		Query: query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tasks: list failed: %w", err)
+	}
+
+	var result []*Task
+	for _, exec := range resp.GetExecutions() {
+		task := &Task{
+			ID:      exec.Execution.GetWorkflowId(),
+			SpaceID: spaceID,
+		}
+		switch exec.GetStatus().String() {
+		case "Running":
+			task.State = TaskRunning
+		case "Completed":
+			task.State = TaskCompleted
+		case "Failed":
+			task.State = TaskFailed
+		case "Canceled", "Cancelled":
+			task.State = TaskCancelled
+		default:
+			task.State = TaskPending
+		}
+		if exec.GetStartTime() != nil {
+			t := exec.GetStartTime().AsTime()
+			task.StartedAt = &t
+		}
+		result = append(result, task)
+	}
+	return result, nil
+}
+
+// GetNextTask finds the next pending task in a space and claims it for the agent.
+func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string) (*Task, error) {
+	tasks, err := ds.ListTasks(ctx, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	for _, t := range tasks {
+		if t.State == TaskRunning || t.State == TaskPending {
+			_ = ds.SignalTask(ctx, t.ID, "claim", map[string]string{"agent_id": agentID})
+			return t, nil
+		}
+	}
+	return nil, nil
+}
+
+// ListWorkflows returns workflows in a space by querying visibility.
+func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string) ([]*Workflow, error) {
+	query := fmt.Sprintf(`TaskQueue = "%s" AND WorkflowType IN ("PipelineWorkflow", "FanOutWorkflow")`, spaceID)
+	resp, err := ds.Client.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
+		Query: query,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("tasks: list workflows failed: %w", err)
+	}
+
+	var result []*Workflow
+	for _, exec := range resp.GetExecutions() {
+		wf := &Workflow{
+			ID:      exec.Execution.GetWorkflowId(),
+			SpaceID: spaceID,
+			Name:    exec.GetType().GetName(),
+		}
+		switch exec.GetStatus().String() {
+		case "Running":
+			wf.State = TaskRunning
+		case "Completed":
+			wf.State = TaskCompleted
+		case "Failed":
+			wf.State = TaskFailed
+		default:
+			wf.State = TaskPending
+		}
+		result = append(result, wf)
+	}
+	return result, nil
 }
 
 // logDurableError logs a durable store error without failing the operation.
