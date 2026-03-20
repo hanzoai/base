@@ -1136,11 +1136,11 @@ func TestCollectionUpdate(t *testing.T) {
 			Body: strings.NewReader(`{
 				"name":"new",
 				"fields":[
-					{"type":"text","name":"id","id":"_hzf_text_id_","system":true,"min":15,"max":15,"pattern":"^[a-z0-9]+$","autogeneratePattern":"[a-z0-9]{15}","required":true,"primaryKey":true},
+					{"type":"text","name":"id","id":"_pbf_text_id_","system":true,"min":15,"max":15,"pattern":"^[a-z0-9]+$","autogeneratePattern":"[a-z0-9]{15}","required":true,"primaryKey":true},
 					{"type":"text","name":"text","id":"u7spsiph"},
 					{"type":"bool","name":"bool","id":"puk534el"},
-					{"type":"autodate","name":"created","id":"_hzf_autodate_created_","onCreate":true,"onUpdate":false},
-					{"type":"autodate","name":"updated","id":"_hzf_autodate_updated_","onCreate":true,"onUpdate":true},
+					{"type":"autodate","name":"created","id":"_pbf_autodate_created_","onCreate":true,"onUpdate":false},
+					{"type":"autodate","name":"updated","id":"_pbf_autodate_updated_","onCreate":true,"onUpdate":true},
 					{"type":"text","name":"expand"},
 					{"type":"text","name":"collectionId"},
 					{"type":"text","name":"collectionName"}
