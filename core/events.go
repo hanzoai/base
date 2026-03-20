@@ -388,8 +388,8 @@ type FileDownloadRequestEvent struct {
 	// ThumbError indicates the a thumb wasn't able to be generated
 	// (e.g. because it didn't satisfy the support image formats or it timed out).
 	//
-	// Note that PocketBase fallbacks to the original file in case of a thumb error,
-	// but developers can check the field and provide their own custom thumb generation if necessary.
+	// Note: the server falls back to the original file on thumb error,
+	// but developers can check the field and provide custom thumb generation if necessary.
 	ThumbError error
 }
 

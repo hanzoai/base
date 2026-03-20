@@ -63,7 +63,7 @@ var TokenFunctions = map[string]func(
 	//
 	// It is similar to the builtin SQLite strftime function (https://sqlite.org/lang_datefunc.html)
 	// with the main difference that NULL results will be normalized for
-	// consistency with the non-nullable PocketBase "text" and "date" fields.
+	// consistency with non-nullable "text" and "date" fields.
 	//
 	// The function accepts 1, 2 or 3+ arguments.
 	//
