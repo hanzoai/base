@@ -62,6 +62,7 @@ const (
 // Task is a durable work item.
 type Task struct {
 	ID           string            `json:"id"`
+	OrgID        string            `json:"org_id,omitempty"`  // IAM org — maps to Temporal namespace
 	SpaceID      string            `json:"space_id"`
 	Title        string            `json:"title"`
 	Description  string            `json:"description,omitempty"`
@@ -90,6 +91,7 @@ type Task struct {
 // Workflow chains tasks into a DAG.
 type Workflow struct {
 	ID          string            `json:"id"`
+	OrgID       string            `json:"org_id,omitempty"` // IAM org — maps to Temporal namespace
 	SpaceID     string            `json:"space_id"`
 	Name        string            `json:"name"`
 	Description string            `json:"description,omitempty"`
