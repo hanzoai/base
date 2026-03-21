@@ -250,6 +250,7 @@ func (p *plugin) ensureTasksCollection() error {
 	col.System = true
 
 	col.Fields.Add(
+		&core.TextField{Name: "orgId"},
 		&core.TextField{Name: "spaceId", Required: true},
 		&core.TextField{Name: "title", Required: true},
 		&core.TextField{Name: "description"},
@@ -297,6 +298,7 @@ func (p *plugin) ensureWorkflowsCollection() error {
 	col.System = true
 
 	col.Fields.Add(
+		&core.TextField{Name: "orgId"},
 		&core.TextField{Name: "spaceId", Required: true},
 		&core.TextField{Name: "name", Required: true},
 		&core.TextField{Name: "description"},

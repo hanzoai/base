@@ -346,3 +346,147 @@ func TestWorkflowAdvancement(t *testing.T) {
 		t.Fatal("expected completedAt set")
 	}
 }
+
+func TestOrgIsolation(t *testing.T) {
+	app := newTestApp(t)
+	s := GetStore(app)
+
+	// Create tasks in two different orgs.
+	taskA := &Task{OrgID: "org-alpha", SpaceID: "s1", Title: "Alpha task"}
+	taskB := &Task{OrgID: "org-beta", SpaceID: "s1", Title: "Beta task"}
+	if err := s.CreateTask(taskA); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateTask(taskB); err != nil {
+		t.Fatal(err)
+	}
+
+	// ListTasks scoped to org-alpha should only return alpha task.
+	items, err := s.ListTasks(TaskFilters{OrgID: "org-alpha"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Title != "Alpha task" {
+		t.Fatalf("expected 1 alpha task, got %d", len(items))
+	}
+
+	// GetTask with wrong org should fail.
+	_, err = s.GetTask(taskA.ID, "org-beta")
+	if err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for cross-org GetTask, got %v", err)
+	}
+
+	// GetTask with correct org should succeed.
+	got, err := s.GetTask(taskA.ID, "org-alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OrgID != "org-alpha" {
+		t.Fatalf("expected org-alpha, got %q", got.OrgID)
+	}
+
+	// ClaimTask with wrong org should fail silently (0 rows affected).
+	err = s.ClaimTask(taskA.ID, "agent-1", "org-beta")
+	if err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for cross-org ClaimTask, got %v", err)
+	}
+
+	// ClaimTask with correct org should succeed.
+	if err := s.ClaimTask(taskA.ID, "agent-1", "org-alpha"); err != nil {
+		t.Fatalf("expected claim to succeed for correct org, got %v", err)
+	}
+
+	// StartTask with wrong org should fail.
+	err = s.StartTask(taskA.ID, "org-beta")
+	if err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for cross-org StartTask, got %v", err)
+	}
+
+	// StartTask with correct org should succeed.
+	if err := s.StartTask(taskA.ID, "org-alpha"); err != nil {
+		t.Fatal(err)
+	}
+
+	// CompleteTask with wrong org should fail.
+	err = s.CompleteTask(taskA.ID, nil, "org-beta")
+	if err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for cross-org CompleteTask, got %v", err)
+	}
+
+	// CompleteTask with correct org should succeed.
+	if err := s.CompleteTask(taskA.ID, nil, "org-alpha"); err != nil {
+		t.Fatal(err)
+	}
+
+	// CancelTask with wrong org should fail.
+	err = s.CancelTask(taskB.ID, "org-alpha")
+	if err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for cross-org CancelTask, got %v", err)
+	}
+
+	// CancelTask with correct org should succeed.
+	if err := s.CancelTask(taskB.ID, "org-beta"); err != nil {
+		t.Fatal(err)
+	}
+
+	// GetNextPendingTask scoped to org returns only that org's tasks.
+	taskC := &Task{OrgID: "org-gamma", SpaceID: "s1", Title: "Gamma task"}
+	taskD := &Task{OrgID: "org-delta", SpaceID: "s1", Title: "Delta task"}
+	_ = s.CreateTask(taskC)
+	_ = s.CreateTask(taskD)
+
+	next, err := s.GetNextPendingTask("s1", "agent-2", "org-gamma")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next == nil || next.OrgID != "org-gamma" {
+		t.Fatalf("expected org-gamma task, got %v", next)
+	}
+}
+
+func TestWorkflowOrgIsolation(t *testing.T) {
+	app := newTestApp(t)
+	s := GetStore(app)
+
+	wfA := &Workflow{OrgID: "org-alpha", SpaceID: "s1", Name: "Alpha WF"}
+	wfB := &Workflow{OrgID: "org-beta", SpaceID: "s1", Name: "Beta WF"}
+	if err := s.CreateWorkflow(wfA); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CreateWorkflow(wfB); err != nil {
+		t.Fatal(err)
+	}
+
+	// GetWorkflow with wrong org should fail.
+	_, err := s.GetWorkflow(wfA.ID, "org-beta")
+	if err != ErrWorkflowNotFound {
+		t.Fatalf("expected ErrWorkflowNotFound for cross-org GetWorkflow, got %v", err)
+	}
+
+	// GetWorkflow with correct org should succeed.
+	got, err := s.GetWorkflow(wfA.ID, "org-alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.OrgID != "org-alpha" {
+		t.Fatalf("expected org-alpha, got %q", got.OrgID)
+	}
+
+	// ListWorkflows scoped to org-alpha should only return alpha workflow.
+	items, err := s.ListWorkflows("s1", "org-alpha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].Name != "Alpha WF" {
+		t.Fatalf("expected 1 alpha workflow, got %d", len(items))
+	}
+
+	// ListWorkflows without org should return both.
+	all, err := s.ListWorkflows("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 workflows, got %d", len(all))
+	}
+}

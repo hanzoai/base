@@ -113,6 +113,7 @@ func tasksCreate(e *core.RequestEvent) error {
 	}
 
 	task := &tasks.Task{
+		OrgID:        extractOrgID(e),
 		SpaceID:      spaceID,
 		Title:        title,
 		Description:  req.Description,
@@ -153,7 +154,8 @@ func tasksGet(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	task, err := s.GetTask(id)
+	orgID := extractOrgID(e)
+	task, err := s.GetTask(id, orgID)
 	if err != nil {
 		return e.NotFoundError("Task not found.", err)
 	}
@@ -168,7 +170,8 @@ func tasksUpdate(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	task, err := s.GetTask(id)
+	orgID := extractOrgID(e)
+	task, err := s.GetTask(id, orgID)
 	if err != nil {
 		return e.NotFoundError("Task not found.", err)
 	}
@@ -208,6 +211,7 @@ func tasksClaim(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
+	orgID := extractOrgID(e)
 
 	var req TaskClaimRequest
 	if err := e.BindBody(&req); err != nil {
@@ -217,11 +221,11 @@ func tasksClaim(e *core.RequestEvent) error {
 		req.AgentID = extractCreator(e)
 	}
 
-	if err := s.ClaimTask(id, req.AgentID); err != nil {
+	if err := s.ClaimTask(id, req.AgentID, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -232,11 +236,12 @@ func tasksStart(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	if err := s.StartTask(id); err != nil {
+	orgID := extractOrgID(e)
+	if err := s.StartTask(id, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -247,15 +252,16 @@ func tasksComplete(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
+	orgID := extractOrgID(e)
 
 	var req TaskCompleteRequest
 	_ = e.BindBody(&req) // allow empty body
 
-	if err := s.CompleteTask(id, req.Output); err != nil {
+	if err := s.CompleteTask(id, req.Output, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -266,6 +272,7 @@ func tasksFail(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
+	orgID := extractOrgID(e)
 
 	var req TaskFailRequest
 	if err := e.BindBody(&req); err != nil {
@@ -275,11 +282,11 @@ func tasksFail(e *core.RequestEvent) error {
 		return e.BadRequestError("Error message is required.", nil)
 	}
 
-	if err := s.FailTask(id, req.Error); err != nil {
+	if err := s.FailTask(id, req.Error, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -290,13 +297,14 @@ func tasksCancel(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	if err := s.CancelTask(id); err != nil {
+	orgID := extractOrgID(e)
+	if err := s.CancelTask(id, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
 	// Also cancel the durable workflow if connected.
 	if ds := tasks.GetDurable(e.App); ds != nil && ds.IsConnected() {
-		if err := ds.CancelTask(e.Request.Context(), id); err != nil {
+		if err := ds.CancelTask(e.Request.Context(), id, orgID); err != nil {
 			e.App.Logger().Warn("tasks: durable cancel failed",
 				slog.String("task_id", id),
 				slog.String("error", err.Error()),
@@ -304,7 +312,7 @@ func tasksCancel(e *core.RequestEvent) error {
 		}
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -315,17 +323,18 @@ func tasksProgress(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
+	orgID := extractOrgID(e)
 
 	var req TaskProgressRequest
 	if err := e.BindBody(&req); err != nil {
 		return e.BadRequestError("Invalid request body.", err)
 	}
 
-	if err := s.UpdateProgress(id, req.Progress); err != nil {
+	if err := s.UpdateProgress(id, req.Progress, orgID); err != nil {
 		return mapTaskError(e, err)
 	}
 
-	task, _ := s.GetTask(id)
+	task, _ := s.GetTask(id, orgID)
 	return e.JSON(http.StatusOK, task)
 }
 
@@ -351,7 +360,8 @@ func tasksNext(e *core.RequestEvent) error {
 		req.AgentID = extractCreator(e)
 	}
 
-	task, err := s.GetNextPendingTask(spaceID, req.AgentID)
+	orgID := extractOrgID(e)
+	task, err := s.GetNextPendingTask(spaceID, req.AgentID, orgID)
 	if err != nil {
 		return e.InternalServerError("Failed to get next task.", err)
 	}
@@ -369,6 +379,7 @@ func tasksSignal(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
+	orgID := extractOrgID(e)
 
 	var req TaskSignalRequest
 	if err := e.BindBody(&req); err != nil {
@@ -378,8 +389,16 @@ func tasksSignal(e *core.RequestEvent) error {
 		return e.BadRequestError("Signal name is required.", nil)
 	}
 
-	// Verify task exists.
-	if _, err := s.GetTask(id); err != nil {
+	allowedSignals := map[string]bool{
+		"claim": true, "complete": true, "fail": true,
+		"progress": true, "update": true, "cancel": true,
+	}
+	if !allowedSignals[req.Name] {
+		return e.BadRequestError("Invalid signal name. Allowed: claim, complete, fail, progress, update, cancel.", nil)
+	}
+
+	// Verify task exists and belongs to the org.
+	if _, err := s.GetTask(id, orgID); err != nil {
 		return e.NotFoundError("Task not found.", err)
 	}
 
@@ -390,7 +409,7 @@ func tasksSignal(e *core.RequestEvent) error {
 		})
 	}
 
-	if err := ds.SignalTask(e.Request.Context(), id, req.Name, req.Data); err != nil {
+	if err := ds.SignalTask(e.Request.Context(), id, req.Name, req.Data, orgID); err != nil {
 		return e.InternalServerError("Failed to signal task.", err)
 	}
 
@@ -404,7 +423,8 @@ func tasksQuery(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	task, err := s.GetTask(id)
+	orgID := extractOrgID(e)
+	task, err := s.GetTask(id, orgID)
 	if err != nil {
 		return e.NotFoundError("Task not found.", err)
 	}
@@ -429,8 +449,9 @@ func workflowsList(e *core.RequestEvent) error {
 	if spaceID == "" {
 		spaceID = e.Request.URL.Query().Get("queue")
 	}
+	orgID := extractOrgID(e)
 
-	items, err := s.ListWorkflows(spaceID)
+	items, err := s.ListWorkflows(spaceID, orgID)
 	if err != nil {
 		return e.InternalServerError("Failed to list workflows.", err)
 	}
@@ -472,9 +493,11 @@ func workflowsCreate(e *core.RequestEvent) error {
 	}
 
 	createdBy := extractCreator(e)
+	orgID := extractOrgID(e)
 
 	// Create the workflow first to get its ID.
 	wf := &tasks.Workflow{
+		OrgID:       orgID,
 		SpaceID:     spaceID,
 		Name:        req.Name,
 		Description: req.Description,
@@ -494,6 +517,7 @@ func workflowsCreate(e *core.RequestEvent) error {
 		}
 
 		task := &tasks.Task{
+			OrgID:       orgID,
 			SpaceID:     spaceID,
 			Title:       title,
 			Description: td.Description,
@@ -549,7 +573,8 @@ func workflowsGet(e *core.RequestEvent) error {
 	}
 
 	id := e.Request.PathValue("id")
-	wf, err := s.GetWorkflow(id)
+	orgID := extractOrgID(e)
+	wf, err := s.GetWorkflow(id, orgID)
 	if err != nil {
 		return e.NotFoundError("Workflow not found.", err)
 	}
@@ -557,7 +582,7 @@ func workflowsGet(e *core.RequestEvent) error {
 	// Attach task details.
 	taskList := make([]*tasks.Task, 0, len(wf.Tasks))
 	for _, tid := range wf.Tasks {
-		if t, err := s.GetTask(tid); err == nil {
+		if t, err := s.GetTask(tid, orgID); err == nil {
 			taskList = append(taskList, t)
 		}
 	}
@@ -571,21 +596,29 @@ func workflowsGet(e *core.RequestEvent) error {
 // --- Helpers ---
 
 func extractCreator(e *core.RequestEvent) string {
-	if v := e.Request.Header.Get("X-Agent-ID"); v != "" {
-		return v
-	}
-	if v := e.Request.Header.Get("X-User-ID"); v != "" {
-		return v
-	}
 	if e.Auth != nil {
 		return e.Auth.Id
 	}
 	return "anonymous"
 }
 
+// extractOrgID returns the org ID from the authenticated user context.
+// Falls back to the X-Org-ID header if no auth record is available (superuser API key).
+func extractOrgID(e *core.RequestEvent) string {
+	if v := e.Request.URL.Query().Get("org_id"); v != "" {
+		return v
+	}
+	if v := e.Request.Header.Get("X-Org-ID"); v != "" {
+		return v
+	}
+	return ""
+}
+
 func parseFilters(e *core.RequestEvent) tasks.TaskFilters {
 	q := e.Request.URL.Query()
 	var f tasks.TaskFilters
+
+	f.OrgID = extractOrgID(e)
 
 	f.SpaceID = q.Get("space_id")
 	if f.SpaceID == "" {

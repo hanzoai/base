@@ -77,6 +77,11 @@ func Serve(app core.App, config ServeConfig) error {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
+	// redirect root to the admin dashboard
+	baseRouter.GET("/", func(e *core.RequestEvent) error {
+		return e.Redirect(http.StatusTemporaryRedirect, "/_/")
+	})
+
 	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
