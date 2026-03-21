@@ -25,8 +25,7 @@ RUN apk add --no-cache ca-certificates tzdata curl \
     && addgroup -S hanzo && adduser -S hanzo -G hanzo
 WORKDIR /app
 COPY --from=builder /build/base /app/base
-COPY --from=builder /build/ui/dist /app/public
-RUN mkdir -p /data /migrations /hooks && chown -R hanzo:hanzo /app /data /migrations /hooks
+RUN mkdir -p /data /migrations /hooks /app/public && chown -R hanzo:hanzo /app /data /migrations /hooks
 USER hanzo
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
