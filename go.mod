@@ -1,6 +1,6 @@
 module github.com/hanzoai/base
 
-go 1.26
+go 1.26.1
 
 require (
 	github.com/disintegration/imaging v1.6.2
