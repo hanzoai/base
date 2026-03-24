@@ -66,6 +66,23 @@ type PlatformConfig struct {
 	// ComplianceAPIKey is the API key for the compliance service.
 	ComplianceAPIKey string
 
+	// TenantIsolation controls how tenant data is physically separated.
+	//   "prefix"   — (default) t_{slug}_ prefixed collections in shared DB
+	//   "sqlite"   — separate encrypted SQLite file per tenant in DataDir/tenants/
+	//   "cloudsql" — separate PostgreSQL database per tenant (requires cloudsql plugin)
+	//
+	// For "sqlite" mode, each tenant gets its own database file at:
+	//   {DataDir}/tenants/{slug}/data.db
+	// The file can be independently encrypted, backed up, and deleted.
+	// PII is physically isolated — zero data commingling.
+	TenantIsolation string
+
+	// TenantEncryptionKey is the master key for deriving per-tenant DEKs.
+	// When set with TenantIsolation="sqlite", each tenant's SQLite is
+	// encrypted with HMAC-SHA256(masterKey, tenantSlug) as the DEK.
+	// If empty, SQLite files are unencrypted (dev mode).
+	TenantEncryptionKey string
+
 	// DefaultTemplates defines collection schemas cloned per tenant on creation.
 	// If nil, no default tenant collections are created.
 	DefaultTemplates []CollectionTemplate
