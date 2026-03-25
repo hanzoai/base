@@ -602,13 +602,9 @@ func extractCreator(e *core.RequestEvent) string {
 	return "anonymous"
 }
 
-// extractOrgID returns the org ID from the authenticated user context.
-// Falls back to the X-Org-ID header if no auth record is available (superuser API key).
+// extractOrgID returns the org ID from gateway-injected IAM header.
 func extractOrgID(e *core.RequestEvent) string {
-	if v := e.Request.URL.Query().Get("org_id"); v != "" {
-		return v
-	}
-	if v := e.Request.Header.Get("X-Org-ID"); v != "" {
+	if v := e.Request.Header.Get("X-IAM-Org-Id"); v != "" {
 		return v
 	}
 	return ""
