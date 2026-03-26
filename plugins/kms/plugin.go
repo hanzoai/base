@@ -8,7 +8,7 @@ import (
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
-	sdk "github.com/hanzoai/kms-sdk-go"
+	sdk "github.com/hanzoai/kms/sdk/go"
 )
 
 // MustRegister registers the KMS plugin with a Base app and panics on error.

@@ -10,7 +10,7 @@ import (
 	"fmt"
 
 	"github.com/hanzoai/base/core"
-	sdk "github.com/hanzoai/kms-sdk-go"
+	sdk "github.com/hanzoai/kms/sdk/go"
 )
 
 // FHE index prefix for stored index values.
