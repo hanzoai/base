@@ -32,7 +32,6 @@ const (
 	collectionOrgMembers = "_org_members"
 
 	// Header for org context scoping.
-	headerOrgID = "X-Hanzo-Org-Id"
 
 	// Member roles.
 	RoleOwner  = "owner"
@@ -169,13 +168,10 @@ func Register(app core.App, config PlatformConfig) error {
 					}
 
 					// Set identity headers for downstream handlers.
-					// Both prefixed (backward compat with existing API rules) and unprefixed forms.
+					// Standard X-User-Id / X-Org-Id — one way, no vendor prefix.
 					re.Request.Header.Set("X-User-Id", userId)
 					re.Request.Header.Set("X-Org-Id", orgId)
 					re.Request.Header.Set("X-User-Email", email)
-					re.Request.Header.Set("X-Hanzo-User-Id", userId)
-					re.Request.Header.Set("X-Hanzo-Org-Id", orgId)
-					re.Request.Header.Set("X-Hanzo-User-Email", email)
 				}
 				return re.Next()
 			},
