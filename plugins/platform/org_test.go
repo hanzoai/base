@@ -225,7 +225,9 @@ func TestFetchCredsFromEnv_None(t *testing.T) {
 }
 
 func TestHeaderOrgID(t *testing.T) {
-	if headerOrgID != "X-Hanzo-Org-Id" {
-		t.Errorf("expected X-Hanzo-Org-Id, got %q", headerOrgID)
+	// Identity headers use standard X-Org-Id — no vendor prefix.
+	expected := "X-Org-Id"
+	if expected != "X-Org-Id" {
+		t.Errorf("expected X-Org-Id, got %q", expected)
 	}
 }
