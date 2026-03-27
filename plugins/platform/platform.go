@@ -20,7 +20,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/router"
 )
 
@@ -133,10 +135,51 @@ func Register(app core.App, config PlatformConfig) error {
 		return p.ensureSystemCollections()
 	})
 
-	// Serve: register API routes and org-scoping middleware.
+	// Configure IAM JWKS fallback for Base's loadAuthToken middleware.
+	// This enables all Base routes to accept IAM-issued JWTs transparently.
+	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+	app.Store().Set(apis.StoreKeyIAMJWKSURL, jwksURL)
+
+	app.Logger().Info("platform: IAM JWKS fallback configured",
+		slog.String("jwksURL", jwksURL),
+	)
+
+	// Serve: register API routes, identity header middleware, and org-scoping.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 		// Expose OrgService in app store for Goja JS access.
 		app.Store().Set("org", p.org)
+
+		// Global middleware: set identity headers from authenticated user.
+		// Runs after loadAuthToken (which has priority -1020), so e.Auth
+		// is already set if the token was valid (local or IAM JWKS).
+		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+			Id:       "platformIdentityHeaders",
+			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 1,
+			Func: func(re *core.RequestEvent) error {
+				if re.Auth != nil {
+					userId := re.Auth.Id
+					email := re.Auth.GetString("email")
+					orgId := re.Auth.GetString("org_id")
+
+					// If org_id wasn't on the record, check IAM claims stored by loadAuthToken.
+					if orgId == "" {
+						if v, _ := re.Get("iamOwner").(string); v != "" {
+							orgId = v
+						}
+					}
+
+					// Set identity headers for downstream handlers.
+					// Both prefixed (backward compat with existing API rules) and unprefixed forms.
+					re.Request.Header.Set("X-User-Id", userId)
+					re.Request.Header.Set("X-Org-Id", orgId)
+					re.Request.Header.Set("X-User-Email", email)
+					re.Request.Header.Set("X-Hanzo-User-Id", userId)
+					re.Request.Header.Set("X-Hanzo-Org-Id", orgId)
+					re.Request.Header.Set("X-Hanzo-User-Email", email)
+				}
+				return re.Next()
+			},
+		})
 
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
