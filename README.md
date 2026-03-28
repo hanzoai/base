@@ -1,14 +1,4 @@
-<p align="center">
-    <a href="https://hanzo.ai" target="_blank" rel="noopener">
-        <img src="https://i.imgur.com/5qimnm5.png" alt="Hanzo Base - Open Source backend for any app" />
-    </a>
-</p>
-
-<p align="center">
-    <a href="https://github.com/hanzoai/base/actions/workflows/release.yaml" target="_blank" rel="noopener"><img src="https://github.com/hanzoai/base/actions/workflows/release.yaml/badge.svg" alt="build" /></a>
-    <a href="https://github.com/hanzoai/base/releases" target="_blank" rel="noopener"><img src="https://img.shields.io/github/release/hanzoai/base.svg" alt="Latest releases" /></a>
-    <a href="https://pkg.go.dev/github.com/hanzoai/base" target="_blank" rel="noopener"><img src="https://godoc.org/github.com/hanzoai/base?status.svg" alt="Go package documentation" /></a>
-</p>
+# base
 
 [Base](https://hanzo.ai/base) is an open source Go backend that includes:
 
