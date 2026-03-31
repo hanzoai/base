@@ -152,30 +152,89 @@ func Register(app core.App, config PlatformConfig) error {
 		// Expose OrgService in app store for Goja JS access.
 		app.Store().Set("org", p.org)
 
-		// Global middleware: set identity headers from authenticated user.
-		// Runs after loadAuthToken (which has priority -1020), so e.Auth
-		// is already set if the token was valid (local or IAM JWKS).
+		// API key middleware: resolve hk-/pk-/sk- keys via IAM.
+		// Runs after loadAuthToken — if JWKS didn't set re.Auth (because
+		// the token isn't a JWT), try resolving it as an IAM API key.
+		// This gives every Base app native support for IAM-managed keys.
+		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+			Id:       "platformAPIKeyAuth",
+			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 1,
+			Func: func(re *core.RequestEvent) error {
+				// Skip if already authenticated via JWKS/JWT
+				if re.Auth != nil {
+					return re.Next()
+				}
+
+				// Extract Bearer token
+				auth := re.Request.Header.Get("Authorization")
+				token := ""
+				if len(auth) > 7 && auth[:7] == "Bearer " {
+					token = auth[7:]
+				}
+				// Also check query param (for /v1/config?key=pk-xxx)
+				if token == "" {
+					token = re.Request.URL.Query().Get("key")
+				}
+
+				if token == "" || !IsAPIKey(token) {
+					return re.Next()
+				}
+
+				// Resolve key via IAM
+				user, err := p.iam.ResolveAPIKey(token)
+				if err != nil {
+					app.Logger().Debug("platform: API key resolution failed",
+						"error", err, "prefix", token[:6]+"...")
+					return re.Next() // fail-open to next middleware
+				}
+
+				// Set identity context from resolved key
+				re.Set("authSub", user.ID)
+				re.Set("authName", user.Name)
+				re.Set("authEmail", user.Email)
+				if len(user.OrgIDs) > 0 {
+					re.Set("authOwner", user.OrgIDs[0])
+				}
+				// Store key type for permission checks downstream
+				if IsPublishableKey(token) {
+					re.Set("authKeyType", "publishable") // read-only
+				} else {
+					re.Set("authKeyType", "secret") // full access
+				}
+
+				return re.Next()
+			},
+		})
+
+		// Global middleware: set identity headers from authenticated user or API key.
+		// Runs after both loadAuthToken and platformAPIKeyAuth.
 		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
 			Id:       "platformIdentityHeaders",
-			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 1,
+			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 2,
 			Func: func(re *core.RequestEvent) error {
 				if re.Auth != nil {
 					userId := re.Auth.Id
 					email := re.Auth.GetString("email")
 					orgId := re.Auth.GetString("org_id")
 
-					// If org_id wasn't on the record, check claims stored by loadAuthToken.
 					if orgId == "" {
 						if v, _ := re.Get("authOwner").(string); v != "" {
 							orgId = v
 						}
 					}
 
-					// Set identity headers for downstream handlers.
-					// Standard X-User-Id / X-Org-Id — one way, no vendor prefix.
 					re.Request.Header.Set("X-User-Id", userId)
 					re.Request.Header.Set("X-Org-Id", orgId)
 					re.Request.Header.Set("X-User-Email", email)
+				} else if sub, _ := re.Get("authSub").(string); sub != "" {
+					// API key auth (no re.Auth record, but identity resolved via IAM)
+					re.Request.Header.Set("X-User-Id", sub)
+					if orgId, _ := re.Get("authOwner").(string); orgId != "" {
+						re.Request.Header.Set("X-Org-Id", orgId)
+					}
+					if email, _ := re.Get("authEmail").(string); email != "" {
+						re.Request.Header.Set("X-User-Email", email)
+					}
 				}
 				return re.Next()
 			},
