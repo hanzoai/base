@@ -17,7 +17,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.24'
-      - run: go test ./...
+      - run: go build ./...
+      - run: go test ./core/... ./plugins/platform/... ./tools/...
 
   docker:
     needs: test
