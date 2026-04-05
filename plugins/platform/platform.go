@@ -124,6 +124,8 @@ func Register(app core.App, config PlatformConfig) error {
 		iam:        NewIAMClient(config.IAMEndpoint),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
+		orgDB:      NewOrgDB(app, config.OrgEncryptionKey),
+		dbPool:     NewDBPoolManager(256, core.DefaultDBConnect),
 	}
 
 	// Bootstrap: ensure system collections exist.
@@ -274,6 +276,69 @@ func Register(app core.App, config PlatformConfig) error {
 			},
 		})
 
+		// Per-request org/user database resolution.
+		// After identity is established, load the SQLite pool for the org/user.
+		// Services are fully stateless — any instance serves any org/user.
+		if config.OrgIsolation == "sqlite" {
+			e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+				Id:       "platformOrgDBResolver",
+				Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 4,
+				Func: func(re *core.RequestEvent) error {
+					orgId := re.Request.Header.Get("X-Org-Id")
+					userId := re.Request.Header.Get("X-User-Id")
+
+					if orgId == "" {
+						return re.Next() // no org context — use shared platform DB
+					}
+
+					// Resolve or auto-provision org database
+					orgDBPath, exists := p.orgDB.GetOrgDBPath(orgId)
+					if !exists {
+						var err error
+						orgDBPath, err = p.orgDB.ProvisionOrg(orgId)
+						if err != nil {
+							app.Logger().Error("platform: failed to provision org db",
+								"orgId", orgId, "error", err)
+							return re.Next()
+						}
+					}
+
+					orgPool, err := p.dbPool.Get(orgDBPath)
+					if err != nil {
+						app.Logger().Error("platform: failed to open org db pool",
+							"orgId", orgId, "path", orgDBPath, "error", err)
+						return re.Next()
+					}
+					re.Set("orgDB", orgPool)
+					re.Set("orgDBPath", orgDBPath)
+					defer orgPool.Release()
+
+					// Per-user database (only if user is authenticated)
+					if userId != "" {
+						userDBPath, exists := p.orgDB.GetUserDBPath(orgId, userId)
+						if !exists {
+							userDBPath, _ = p.orgDB.ProvisionUser(orgId, userId)
+						}
+						if userDBPath != "" {
+							userPool, err := p.dbPool.Get(userDBPath)
+							if err == nil {
+								re.Set("userDB", userPool)
+								re.Set("userDBPath", userDBPath)
+								defer userPool.Release()
+							}
+						}
+					}
+
+					return re.Next()
+				},
+			})
+
+			app.Logger().Info("platform: per-org SQLite isolation enabled",
+				"dataDir", app.DataDir(),
+				"maxPools", 256,
+			)
+		}
+
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
@@ -289,6 +354,8 @@ type plugin struct {
 	iam        *IAMClient
 	compliance *ComplianceClient
 	org        *OrgService
+	orgDB      *OrgDB
+	dbPool     *DBPoolManager
 }
 
 // --------------------------------------------------------------------------
