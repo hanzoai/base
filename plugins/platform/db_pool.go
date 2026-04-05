@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 
@@ -12,12 +13,16 @@ import (
 )
 
 // DBPool holds a dual-pool connection pair for one SQLite database.
-// Reads use the concurrent pool (many open conns), writes use the
-// nonconcurrent pool (single conn) to avoid SQLITE_BUSY.
+//
+// Reads use the concurrent pool (configurable MaxOpenConns), writes use
+// the nonconcurrent pool (1 conn) to avoid SQLITE_BUSY under WAL mode.
+//
+// Callers must bracket usage with Acquire/Release so the LRU manager
+// knows when a pool is safe to evict.
 type DBPool struct {
 	Path          string
-	Concurrent    *dbx.DB // reads — MaxOpenConns=20
-	Nonconcurrent *dbx.DB // writes — MaxOpenConns=1
+	Concurrent    *dbx.DB // reads
+	Nonconcurrent *dbx.DB // writes (serialized)
 	refCount      int64
 }
 
@@ -26,32 +31,88 @@ func (p *DBPool) Release() { atomic.AddInt64(&p.refCount, -1) }
 func (p *DBPool) InUse() bool { return atomic.LoadInt64(&p.refCount) > 0 }
 
 func (p *DBPool) Close() error {
-	var errs []error
+	var firstErr error
 	if p.Concurrent != nil {
-		if err := p.Concurrent.Close(); err != nil {
-			errs = append(errs, err)
+		if err := p.Concurrent.Close(); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
 	if p.Nonconcurrent != nil {
-		if err := p.Nonconcurrent.Close(); err != nil {
-			errs = append(errs, err)
+		if err := p.Nonconcurrent.Close(); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("close pool %s: %v", p.Path, errs)
+	return firstErr
+}
+
+// DBPoolConfig tunes the pool manager for a given workload.
+type DBPoolConfig struct {
+	// MaxPools is the maximum number of open database file pools.
+	// Each pool holds 2 connections (read + write). Default: 256.
+	//
+	// Sizing guide (per service instance):
+	//   4 CPU / 8 GB  → 128-256 pools (~50 MB overhead)
+	//   8 CPU / 16 GB → 256-512 pools (~100 MB overhead)
+	//  16 CPU / 32 GB → 512-1024 pools (~200 MB overhead)
+	//
+	// Each idle pool costs ~200 KB (two sqlite3 connections with
+	// 32 MB page cache split across read + write, but idle conns
+	// release most pages). Active pools under load use more.
+	MaxPools int
+
+	// ReadConns is the max open connections in the read pool per DB.
+	// Higher values improve read throughput but use more memory.
+	// Default: 4. Max recommended: min(NumCPU, 16).
+	ReadConns int
+
+	// ReadIdleConns is the idle connection count for the read pool.
+	// Default: 2.
+	ReadIdleConns int
+
+	// Connect is the SQLite connection function.
+	// Default: core.DefaultDBConnect (WAL mode, busy_timeout=10s).
+	Connect core.DBConnectFunc
+}
+
+func (c *DBPoolConfig) defaults() {
+	if c.MaxPools <= 0 {
+		c.MaxPools = 256
 	}
-	return nil
+	if c.ReadConns <= 0 {
+		c.ReadConns = 4
+	}
+	if c.ReadIdleConns <= 0 {
+		c.ReadIdleConns = 2
+	}
+	if c.Connect == nil {
+		c.Connect = core.DefaultDBConnect
+	}
 }
 
 // DBPoolManager manages an LRU cache of SQLite connection pools.
-// Any service instance can serve any org/user by loading the right
-// SQLite file — services are fully stateless.
+//
+// Design:
+//   - Services are stateless: any pod serves any org/user by loading
+//     the correct SQLite file from shared storage.
+//   - Pools are opened lazily on first access and evicted LRU when
+//     capacity is reached.
+//   - Eviction never closes a pool that has active references (InUse).
+//   - The manager is safe for concurrent use from multiple goroutines.
 type DBPoolManager struct {
-	mu       sync.Mutex
-	pools    map[string]*list.Element // key → LRU element
-	lru      *list.List
-	maxPools int
-	connect  core.DBConnectFunc
+	mu     sync.Mutex
+	pools  map[string]*list.Element
+	lru    *list.List
+	config DBPoolConfig
+	stats  PoolStats
+}
+
+// PoolStats tracks pool manager metrics for monitoring.
+type PoolStats struct {
+	Hits      int64 // cache hits (pool already open)
+	Misses    int64 // cache misses (new pool opened)
+	Evictions int64 // pools evicted from LRU
+	Opens     int64 // total pools opened
+	Errors    int64 // connection open failures
 }
 
 type lruEntry struct {
@@ -59,45 +120,46 @@ type lruEntry struct {
 	pool *DBPool
 }
 
-// NewDBPoolManager creates a pool manager with the given capacity.
-// connect is the SQLite connection function (typically core.DefaultDBConnect).
-func NewDBPoolManager(maxPools int, connect core.DBConnectFunc) *DBPoolManager {
-	if maxPools <= 0 {
-		maxPools = 256
-	}
+// NewDBPoolManager creates a pool manager with the given config.
+func NewDBPoolManager(config DBPoolConfig) *DBPoolManager {
+	config.defaults()
 	return &DBPoolManager{
-		pools:    make(map[string]*list.Element),
-		lru:      list.New(),
-		maxPools: maxPools,
-		connect:  connect,
+		pools:  make(map[string]*list.Element, config.MaxPools),
+		lru:    list.New(),
+		config: config,
 	}
 }
 
 // Get returns a connection pool for the given database path.
-// If no pool exists, one is created. The caller must call pool.Release()
-// when done to allow eviction.
+// The pool is created if it doesn't exist.
+// The caller MUST call pool.Release() when done.
 func (m *DBPoolManager) Get(dbPath string) (*DBPool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Hit: move to front of LRU
+	// Cache hit
 	if elem, ok := m.pools[dbPath]; ok {
 		m.lru.MoveToFront(elem)
 		pool := elem.Value.(*lruEntry).pool
 		pool.Acquire()
+		atomic.AddInt64(&m.stats.Hits, 1)
 		return pool, nil
 	}
 
-	// Miss: open new pool
+	// Cache miss — open new pool
+	atomic.AddInt64(&m.stats.Misses, 1)
+
 	pool, err := m.openPool(dbPath)
 	if err != nil {
+		atomic.AddInt64(&m.stats.Errors, 1)
 		return nil, err
 	}
+	atomic.AddInt64(&m.stats.Opens, 1)
 
 	// Evict if at capacity
-	for m.lru.Len() >= m.maxPools {
+	for m.lru.Len() >= m.config.MaxPools {
 		if !m.evictOne() {
-			break // all pools in use, allow over-capacity temporarily
+			break // all in use, allow temporary over-capacity
 		}
 	}
 
@@ -110,22 +172,22 @@ func (m *DBPoolManager) Get(dbPath string) (*DBPool, error) {
 }
 
 func (m *DBPoolManager) openPool(dbPath string) (*DBPool, error) {
-	// Ensure directory exists
-	if err := os.MkdirAll(dbPath[:len(dbPath)-len("/"+dbPath[1+findLastSlash(dbPath):])], 0700); err != nil {
-		// fallback: try opening anyway
+	// Ensure parent directory exists
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
+		return nil, fmt.Errorf("create dir for %s: %w", dbPath, err)
 	}
 
-	concurrent, err := m.connect(dbPath)
+	concurrent, err := m.config.Connect(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("open concurrent db %s: %w", dbPath, err)
+		return nil, fmt.Errorf("open read pool %s: %w", dbPath, err)
 	}
-	concurrent.DB().SetMaxOpenConns(20)
-	concurrent.DB().SetMaxIdleConns(5)
+	concurrent.DB().SetMaxOpenConns(m.config.ReadConns)
+	concurrent.DB().SetMaxIdleConns(m.config.ReadIdleConns)
 
-	nonconcurrent, err := m.connect(dbPath)
+	nonconcurrent, err := m.config.Connect(dbPath)
 	if err != nil {
 		concurrent.Close()
-		return nil, fmt.Errorf("open nonconcurrent db %s: %w", dbPath, err)
+		return nil, fmt.Errorf("open write pool %s: %w", dbPath, err)
 	}
 	nonconcurrent.DB().SetMaxOpenConns(1)
 	nonconcurrent.DB().SetMaxIdleConns(1)
@@ -137,15 +199,6 @@ func (m *DBPoolManager) openPool(dbPath string) (*DBPool, error) {
 	}, nil
 }
 
-func findLastSlash(s string) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == '/' {
-			return i
-		}
-	}
-	return -1
-}
-
 func (m *DBPoolManager) evictOne() bool {
 	for elem := m.lru.Back(); elem != nil; elem = elem.Prev() {
 		entry := elem.Value.(*lruEntry)
@@ -153,20 +206,32 @@ func (m *DBPoolManager) evictOne() bool {
 			m.lru.Remove(elem)
 			delete(m.pools, entry.key)
 			entry.pool.Close()
+			atomic.AddInt64(&m.stats.Evictions, 1)
 			return true
 		}
 	}
 	return false
 }
 
-// Stats returns the number of open pools.
-func (m *DBPoolManager) Stats() (open, capacity int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.lru.Len(), m.maxPools
+// Stats returns a snapshot of pool manager metrics.
+func (m *DBPoolManager) Stats() PoolStats {
+	return PoolStats{
+		Hits:      atomic.LoadInt64(&m.stats.Hits),
+		Misses:    atomic.LoadInt64(&m.stats.Misses),
+		Evictions: atomic.LoadInt64(&m.stats.Evictions),
+		Opens:     atomic.LoadInt64(&m.stats.Opens),
+		Errors:    atomic.LoadInt64(&m.stats.Errors),
+	}
 }
 
-// Close closes all open pools.
+// Len returns the number of currently open pools.
+func (m *DBPoolManager) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lru.Len()
+}
+
+// Close closes all open pools. Call on shutdown.
 func (m *DBPoolManager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
