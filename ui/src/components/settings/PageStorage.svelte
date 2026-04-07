@@ -90,7 +90,7 @@
     <div class="wrapper">
         <form class="panel" autocomplete="off" on:submit|preventDefault={() => save()}>
             <div class="content txt-xl m-b-base">
-                <p>By default Hanzo Base uses the local file system to store uploaded files.</p>
+                <p>By default the application uses the local file system to store uploaded files.</p>
                 <p>
                     If you have limited disk space, you could optionally connect to an S3 compatible storage.
                 </p>
