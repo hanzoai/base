@@ -111,8 +111,8 @@ func MustRegister(app core.App, config PlatformConfig) {
 func Register(app core.App, config PlatformConfig) error {
 	if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
 		// When IAM is explicitly disabled, skip external auth entirely.
-		// PocketBase superuser tokens will still work for _superusers collection.
-		// All other collections fall back to PocketBase's native auth rules.
+		// Base superuser tokens will still work for _superusers collection.
+		// All other collections fall back to Base's native auth rules.
 		config.IAMEndpoint = ""
 	}
 	if config.KMSEndpoint == "" {
@@ -156,7 +156,7 @@ func Register(app core.App, config PlatformConfig) error {
 			slog.String("authEndpoint", config.IAMEndpoint),
 		)
 	} else {
-		app.Logger().Warn("platform: IAM disabled — PB superuser tokens accepted for all collections")
+		app.Logger().Warn("platform: IAM disabled — Base superuser tokens accepted for all collections")
 	}
 
 	// Serve: register API routes, identity header middleware, and org-scoping.

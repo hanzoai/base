@@ -1,7 +1,7 @@
 /**
- * @hanzoai/base/compat -- PocketBase-compatible client re-exports.
+ * @hanzoai/base/compat -- upstream-compatible client re-exports.
  *
- * Provides a drop-in replacement for the `pocketbase` npm package
+ * Provides a drop-in replacement for the upstream `pocketbase` npm package
  * so that existing code can migrate to `@hanzoai/base` without changes.
  *
  * Usage:
