@@ -32,6 +32,22 @@ require (
 )
 
 require (
+	github.com/hablullah/go-hijri v1.0.2 // indirect
+	github.com/hablullah/go-juliandays v1.0.0 // indirect
+	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
+	github.com/lmittmann/tint v1.1.3 // indirect
+	github.com/luxfi/age v1.4.0 // indirect
+	github.com/magefile/mage v1.14.0 // indirect
+	github.com/markusmobius/go-dateparser v1.2.4 // indirect
+	github.com/pierrec/lz4/v4 v4.1.22 // indirect
+	github.com/psanford/sqlite3vfs v0.0.0-20251127171934-4e34e03a991a // indirect
+	github.com/superfly/ltx v0.5.1 // indirect
+	github.com/tetratelabs/wazero v1.2.1 // indirect
+	github.com/wasilibs/go-re2 v1.3.0 // indirect
+)
+
+require (
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
@@ -52,6 +68,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.3 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0 // indirect
+	github.com/hanzoai/replicate v0.4.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -97,3 +114,5 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+replace github.com/hanzoai/replicate => /Users/z/work/hanzo/replicate
