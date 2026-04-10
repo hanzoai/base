@@ -366,7 +366,7 @@ func oauth2Submit(e *core.RecordAuthWithOAuth2RequestEvent, optExternalAuth *cor
 func sendOAuth2RecordCreateRequest(txApp core.App, e *core.RecordAuthWithOAuth2RequestEvent, payload map[string]any) (*core.Record, error) {
 	ir := &core.InternalRequest{
 		Method: http.MethodPost,
-		URL:    "/api/collections/" + e.Collection.Name + "/records",
+		URL:    "/v1/base/collections/" + e.Collection.Name + "/records",
 		Body:   payload,
 	}
 
