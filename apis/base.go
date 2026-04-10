@@ -51,8 +51,6 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindBatchApi(app, apiGroup)
 	bindTasksApi(app, apiGroup)
 	bindRealtimeApi(app, apiGroup)
-	bindHealthApi(app, apiGroup)
-
 	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
 	bindSuperuserOIDCApi(app, baseRouter)
 
