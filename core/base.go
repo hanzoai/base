@@ -247,6 +247,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 
 	app.initHooks()
 	app.registerBaseHooks()
+	registerNATSHooks(app)
 
 	return app
 }
