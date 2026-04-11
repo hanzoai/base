@@ -162,7 +162,7 @@ func (r *TenantRegistry) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
 
 // MasterKey returns the configured master key (may be nil).
 func (r *TenantRegistry) MasterKey() []byte {
-	return r.masterKey
+	out := make([]byte, len(r.masterKey)); copy(out, r.masterKey); return out
 }
 
 // HasOrg checks if a database for the given org exists on disk.
