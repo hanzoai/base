@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -430,6 +431,8 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
+		app.initTenants()
+
 		if err := app.initLogger(); err != nil {
 			return err
 		}
@@ -489,6 +492,14 @@ func (app *BaseApp) ResetBootstrapState() error {
 			}
 		}
 		*db = nil
+	}
+
+	// Close tenant databases
+	if app.tenants != nil {
+		if err := app.tenants.Close(); err != nil {
+			errs = append(errs, err)
+		}
+		app.tenants = nil
 	}
 
 	if len(errs) > 0 {
@@ -594,6 +605,29 @@ func (app *BaseApp) AuxConcurrentDB() dbx.Builder {
 // In a transaction the AuxConcurrentDB() and AuxNonconcurrentDB() refer to the same *dbx.TX instance.
 func (app *BaseApp) AuxNonconcurrentDB() dbx.Builder {
 	return app.auxNonconcurrentDB
+}
+
+// OrgDB returns the data.db builder for a specific org.
+// Returns nil, nil if multi-tenancy is not enabled.
+func (app *BaseApp) OrgDB(orgID string) (dbx.Builder, error) {
+	if app.tenants == nil {
+		return nil, nil
+	}
+	return app.tenants.OrgDB(orgID)
+}
+
+// OrgNonconcurrentDB returns the write-only builder for a specific org.
+// Returns nil, nil if multi-tenancy is not enabled.
+func (app *BaseApp) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
+	if app.tenants == nil {
+		return nil, nil
+	}
+	return app.tenants.OrgNonconcurrentDB(orgID)
+}
+
+// Tenants returns the TenantRegistry, or nil if multi-tenancy is not enabled.
+func (app *BaseApp) Tenants() *TenantRegistry {
+	return app.tenants
 }
 
 // DataDir returns the app data directory path.
@@ -1190,6 +1224,42 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // -------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------
+
+// initTenants initializes the TenantRegistry if multi-tenancy is enabled.
+// Multi-tenancy activates when config.MultiTenant is true OR config.MasterKey is set,
+// OR the MULTI_TENANT env var is "true", OR the MASTER_KEY env var is set.
+func (app *BaseApp) initTenants() {
+	multiTenant := app.config.MultiTenant
+	masterKey := app.config.MasterKey
+
+	// Check env vars as fallback
+	if !multiTenant && os.Getenv("MULTI_TENANT") == "true" {
+		multiTenant = true
+	}
+	if len(masterKey) == 0 {
+		if envKey := os.Getenv("MASTER_KEY"); envKey != "" {
+			decoded, err := hex.DecodeString(envKey)
+			if err == nil && len(decoded) == 32 {
+				masterKey = decoded
+			}
+		}
+	}
+
+	// Master key implies multi-tenancy
+	if len(masterKey) == 32 {
+		multiTenant = true
+	}
+
+	if !multiTenant {
+		return
+	}
+
+	app.tenants = NewTenantRegistry(&TenantConfig{
+		DataDir:   app.config.DataDir,
+		MasterKey: masterKey,
+		DBConnect: app.config.DBConnect,
+	})
+}
 
 func (app *BaseApp) initDataDB() error {
 	var connectFunc func() (*dbx.DB, error)
