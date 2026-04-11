@@ -403,7 +403,8 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 // alphanumeric chars).
 //
 // Short subs (< 15 chars) are padded with underscores (kept for backward compat).
-// Long or non-alphanumeric subs are SHA-256 hashed and truncated to 15 hex chars.
+// Long or non-alphanumeric subs are SHA-256 hashed and truncated to 24 hex chars
+// (96 bits of entropy) to reduce collision risk.
 func subToRecordID(sub string) string {
 	// Fast path: if already a valid 15-char lowercase alphanumeric ID, use as-is.
 	if len(sub) == 15 && isLowerAlphanumeric(sub) {
@@ -419,9 +420,9 @@ func subToRecordID(sub string) string {
 	}
 
 	// For UUIDs, long strings, or non-alphanumeric subs: deterministic hash.
-	// SHA-256 the original sub and take the first 15 hex chars.
+	// SHA-256 the original sub and take the first 24 hex chars (96 bits).
 	h := sha256.Sum256([]byte(sub))
-	return hex.EncodeToString(h[:])[:15]
+	return hex.EncodeToString(h[:])[:24]
 }
 
 // isLowerAlphanumeric returns true if s contains only [a-z0-9_].

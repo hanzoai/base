@@ -45,6 +45,8 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 		jwksURL := os.Getenv("JWKS_URL")
 		if jwksURL != "" {
 			app.Store().Set(StoreKeyJWKSURL, jwksURL)
+		} else {
+			app.Logger().Warn("EXTERNAL_AUTH_ONLY is set but JWKS_URL is empty — token validation will fail")
 		}
 		app.Store().Set(StoreKeyExternalAuthOnly, true)
 
