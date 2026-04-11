@@ -369,8 +369,8 @@ type baseCollection struct {
 	Type    string                  `db:"type" json:"type" form:"type"`
 	Fields  FieldsList              `db:"fields" json:"fields" form:"fields"`
 	Indexes types.JSONArray[string] `db:"indexes" json:"indexes" form:"indexes"`
-	Created types.DateTime          `db:"created" json:"created"`
-	Updated types.DateTime          `db:"updated" json:"updated"`
+	Created types.DateTime          `db:"created" json:"createdAt"`
+	Updated types.DateTime          `db:"updated" json:"updatedAt"`
 
 	// System prevents the collection rename, deletion and rules change.
 	// It is used primarily for internal purposes for collections like "_superusers", "_externalAuths", etc.

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -34,6 +35,28 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	baseRouter.Bind(loadAuthToken())
 	baseRouter.Bind(securityHeaders())
 	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
+
+	// External auth mode: allow JWKS-based auth without the platform plugin.
+	// EXTERNAL_AUTH_ONLY=true disables all built-in auth endpoints for
+	// non-superuser collections and requires JWKS_URL for token validation.
+	// The platform plugin sets these store keys directly; env vars provide
+	// the same behavior for standalone Base deployments.
+	if os.Getenv("EXTERNAL_AUTH_ONLY") == "true" {
+		jwksURL := os.Getenv("JWKS_URL")
+		if jwksURL != "" {
+			app.Store().Set(StoreKeyJWKSURL, jwksURL)
+		}
+		app.Store().Set(StoreKeyExternalAuthOnly, true)
+
+		usersCollection := os.Getenv("AUTH_USERS_COLLECTION")
+		if usersCollection != "" {
+			app.Store().Set(StoreKeyAuthUsersCollection, usersCollection)
+		}
+
+		app.Logger().Info("external auth enabled via env — built-in auth disabled for non-superuser collections",
+			slog.String("jwksURL", jwksURL),
+		)
+	}
 
 	apiPrefix := os.Getenv("BASE_API_PREFIX")
 	if apiPrefix == "" {

@@ -160,7 +160,7 @@ export class RealtimeService {
     const url = `${this._baseUrl}/api/realtime`
     this._eventSource = new EventSource(url)
 
-    this._eventSource.addEventListener('PB_CONNECT', (e: MessageEvent) => {
+    this._eventSource.addEventListener('CONNECT', (e: MessageEvent) => {
       try {
         const data = JSON.parse(e.data) as { clientId: string }
         this._clientId = data.clientId
