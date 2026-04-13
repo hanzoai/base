@@ -122,6 +122,20 @@ func (group *RouterGroup[T]) Route(method string, path string, action func(e T) 
 		Action: action,
 	}
 
+	// Idempotent: if a route with the same Method+Path already exists in this
+	// group, replace it (last-write-wins). Without this, calling Route() twice
+	// — which happens when an init function (e.g. BindHealthzRoute) is invoked
+	// more than once during plugin/service composition — produces two children,
+	// causing http.ServeMux to panic in BuildMux with
+	//   "pattern X conflicts with pattern X".
+	for i, child := range group.children {
+		if existing, ok := child.(*Route[T]); ok &&
+			existing.Method == method && existing.Path == path {
+			group.children[i] = route
+			return route
+		}
+	}
+
 	group.children = append(group.children, route)
 
 	return route
