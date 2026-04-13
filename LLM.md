@@ -96,7 +96,44 @@ Cloud HSM / K-Chain ML-KEM
 go build ./...
 go test ./...
 go test ./plugins/vault/  # 18 tests
+go test ./cmd/cli/        # 39 tests (network flags, cluster, operator, config, etc.)
+go test ./cmd/            # integration tests (collection, record, login, superuser)
 ```
+
+## CLI Surface (2026-04-13)
+
+Every Base-derived daemon (ats, bd, ta) uses `cmd.AddCLISubcommands(root)` to get:
+
+| Command | Purpose | Lux CLI Equivalent |
+|---------|---------|-------------------|
+| `cluster init/start/stop/status/leader/replicate/failover` | Manage base-ha HA groups | `lux network start/stop/status` |
+| `operator apply/status/describe/upgrade/logs` | Manage Liquidity K8s operator CRDs | `lux chain deploy` |
+| `config show/set-env/set-org/init` | CLI config (~/.config/base/config.json) | `lux config` |
+| `status` | Daemon health + cluster state | `lux status` |
+| `self version/doctor` | Binary management | `lux self` |
+| `rpc get/post/patch/delete` | Direct API passthrough | `lux rpc` |
+
+### Network Flags
+
+All commands accept `--mainnet/-m`, `--testnet/-t`, `--devnet/-d`, `--dev`. Exactly one may be set.
+Fallback: `$LIQUIDITY_ENV` -> `$BASE_ENV` -> default `local`.
+
+### Config File
+
+`~/.config/base/config.json` (respects `$XDG_CONFIG_HOME`). Contains default env, per-env URLs, default org.
+
+### Cluster (HA)
+
+Local mode (`--dev`): spawns N `base-ha` processes with auto-filled `BASE_PEERS`.
+K8s mode (`--mainnet/--testnet/--devnet`): `kubectl scale` against the correct GKE context.
+Consensus: `--consensus lux` (default) or `--consensus pubsub`.
+
+### Operator (K8s CRDs)
+
+Wraps kubectl against `liquid.network/v1alpha1` CRDs. Context map:
+- devnet: `gke_liquidity-devnet_us-central1_dev`
+- testnet: `gke_liquidity-testnet_us-central1_test`
+- mainnet: `gke_liquidity-mainnet_us-central1_main`
 
 ## FHE Position
 
