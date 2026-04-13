@@ -12,6 +12,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/hanzoai/base/cmd"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/osutils"
@@ -158,15 +159,21 @@ func NewWithConfig(config Config) *Base {
 		},
 	})
 
+	// Register ZAP transport plugin natively. ZAP is the binary,
+	// zero-copy wire protocol shared with Lux/Hanzo HFT services.
+	// Set ZAP_DISABLED=true to skip; set ZAP_PORT to override port.
+	zap.MustRegister(base)
+
 	return base
 }
 
 // Start starts the application, aka. registers the default system
-// commands (serve, superuser, version) and executes base.RootCmd.
+// commands (serve, superuser, cli, version) and executes base.RootCmd.
 func (base *Base) Start() error {
 	// register system commands
 	base.RootCmd.AddCommand(cmd.NewSuperuserCommand(base))
 	base.RootCmd.AddCommand(cmd.NewServeCommand(base, !base.hideStartBanner))
+	base.RootCmd.AddCommand(cmd.NewCLICommand())
 
 	return base.Execute()
 }
