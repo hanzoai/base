@@ -158,3 +158,160 @@ Base has a [roadmap](https://github.com/orgs/base/projects/2) and I try to work 
 
 Don't get upset if I close your PR, even if it is well executed and tested. This doesn't mean that it will never be merged.
 Later we can always refer to it and/or take pieces of your implementation when the time comes to work on the issue (don't worry you'll be credited in the release notes).
+
+## CLI
+
+The `base cli` subcommand provides a complete HTTP client for operating any running Base-backed daemon from the command line. It works against `base`, `atsd`, `brokerd`, `tad`, `bdd`, or any binary that embeds Base.
+
+### Targeting a server
+
+```bash
+# Defaults to http://127.0.0.1:8090 if nothing is set
+base cli --url http://localhost:8090 collection list
+
+# Or use environment variables
+export BASE_URL=http://localhost:8090
+export BASE_TOKEN=eyJhbGciOi...
+base cli collection list
+```
+
+Global flags (apply to all subcommands):
+
+| Flag | Env var | Default | Description |
+|------|---------|---------|-------------|
+| `--url` | `BASE_URL` | `http://127.0.0.1:8090` | Server URL |
+| `--token` | `BASE_TOKEN` | `~/.config/base/token` | Auth token |
+| `--tenant` | - | - | Sets `X-Org-Id` header |
+| `--format` | - | `table` on TTY, `json` otherwise | `table`, `json`, or `yaml` |
+
+### Authentication
+
+```bash
+# Login as a regular user
+base cli login --email user@example.com --password secret123
+
+# Login as superuser
+base cli login --email admin@example.com --password secret123 --superuser
+
+# Check who you are
+base cli whoami
+```
+
+Token is stored at `~/.config/base/token` (or `$XDG_CONFIG_HOME/base/token`) with mode `0600`.
+
+### Collections
+
+```bash
+# List all collections
+base cli collection list
+
+# Show a specific collection's schema
+base cli collection get users
+
+# Export schema as JSON (always JSON, ignores --format)
+base cli collection schema users > schema.json
+```
+
+### Records
+
+```bash
+# List records with filtering and sorting
+base cli record list posts --filter "title~'hello'" --limit 10 --sort "-created"
+
+# Get a single record
+base cli record get posts abc123
+
+# Create a record
+base cli record create posts '{"title":"Hello","body":"World"}'
+
+# Update a record
+base cli record update posts abc123 '{"title":"Updated"}'
+
+# Delete a record
+base cli record delete posts abc123
+```
+
+### Crons
+
+```bash
+# List registered cron schedules
+base cli crons list
+```
+
+### Using from a downstream daemon
+
+Any Base-backed daemon can expose these subcommands without duplicating code.
+For example, in `~/work/liquidity/ats/main.go`:
+
+```go
+package main
+
+import (
+    "log"
+
+    "github.com/hanzoai/base"
+    "github.com/hanzoai/base/cmd"
+    "github.com/hanzoai/base/core"
+)
+
+func main() {
+    app := base.New()
+
+    // ... register ATS-specific hooks and routes ...
+
+    // Register system commands manually for flattened CLI:
+    // `ats collection list` instead of `ats cli collection list`
+    app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app))
+    app.RootCmd.AddCommand(cmd.NewServeCommand(app, true))
+    cmd.AddCLISubcommands(app.RootCmd)
+
+    if err := app.Execute(); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+Then operate the running ATS:
+
+```bash
+ats collection list
+ats record list trades --filter "status='settled'" --limit 20
+ats crons list
+ats daemon status
+```
+
+### CLI Registration Patterns
+
+**Flattened** (recommended for domain daemons): commands at root level.
+
+```go
+app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app))
+app.RootCmd.AddCommand(cmd.NewServeCommand(app, true))
+cmd.AddCLISubcommands(app.RootCmd)  // collection, record, login, whoami, crons, daemon
+app.Execute()
+```
+
+**Nested** (default via `app.Start()`): commands under `cli` parent.
+
+```go
+app.Start()  // registers serve, superuser, cli (with all subcommands)
+// Access via: myapp cli collection list
+```
+
+### Daemon Lifecycle
+
+The `daemon` subcommand manages the process lifecycle:
+
+```bash
+myapp daemon start              # local: nohup spawn
+myapp daemon stop               # local: kill
+myapp daemon status             # local: pgrep
+myapp daemon logs --follow      # local: tail -f
+myapp daemon restart            # local: stop + start
+
+myapp daemon status --env dev   # K8s: kubectl get pods
+myapp daemon restart --env test --yes  # K8s: rollout restart
+```
+
+K8s actions require `--env` (dev, test, main) and are dry-run by default.
+Pass `--yes` to execute.
