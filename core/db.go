@@ -27,7 +27,8 @@ const (
 )
 
 // DefaultIdRegex specifies the default regex pattern for an id value.
-var DefaultIdRegex = regexp.MustCompile(`^\w+$`)
+// Accepts alphanumeric, underscores, and hyphens (for UUID-format IAM IDs).
+var DefaultIdRegex = regexp.MustCompile(`^[\w-]+$`)
 
 // DBExporter defines an interface for custom DB data export.
 // Usually used as part of [App.Save].
