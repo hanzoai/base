@@ -1,21 +1,17 @@
-// Package ha registers leader/follower HA for a Base app.
+// Package ha registers writer/replica HA for a Base app.
 //
-// Import it for side-effect-free registration:
-//
-//	import _ "github.com/hanzoai/base/plugins/ha"
-//
-// Then call [Register] from your main:
+// Quasar consensus is leaderless — all nodes are equal validators.
+// SQLite's single-writer constraint is satisfied by deterministic
+// writer-pinning: the lowest-sorted alive NodeID holds the write lock.
+// All others are replicas that 307 mutating requests to the writer.
 //
 //	app := base.New()
 //	ha.Register(app)
 //	app.Start()
 //
-// Config lives under the BASE_* env namespace. See the base-ha README
-// for the full variable reference.
+// Config lives under the BASE_* env namespace. See the base-ha README.
 //
-// HA is a no-op unless at least one of BASE_LOCAL_TARGET, BASE_STATIC_LEADER,
-// or BASE_PEERS is set. That way you can import this plugin unconditionally
-// and enable clustering per-deployment.
+// HA is a no-op unless BASE_LOCAL_TARGET or BASE_STATIC_WRITER is set.
 package ha
 
 import (
@@ -29,49 +25,49 @@ import (
 // Register wires HA into the given app.
 //
 // Behavior depends on env:
-//   - BASE_STATIC_LEADER=http://... → all writes forward to that URL.
-//   - BASE_LOCAL_TARGET=http://... + BASE_PEERS=a,b → lightweight lux
-//     heartbeat-lease election; local node redirects to elected leader.
+//   - BASE_STATIC_WRITER=http://... → all writes forward to that URL.
+//   - BASE_LOCAL_TARGET=http://... + BASE_PEERS=a,b → Quasar heartbeat
+//     writer-pin; lowest-sorted alive NodeID is the writer.
 //   - Neither set → plugin is inactive (standalone Base).
 //
 // The full go-ha CDC pipeline (change-set capture over NATS-compatible
 // JetStream) is provisioned by the base-ha binary at the SQL driver level.
-// This plugin only handles the HTTP surface: leader-forwarding middleware
-// and the /_ha/heartbeat endpoint.
+// This plugin handles the HTTP surface: write-forwarding middleware and
+// the /_ha/heartbeat endpoint.
 func Register(app core.App) {
 	target := os.Getenv("BASE_LOCAL_TARGET")
 	peers := splitCSV(os.Getenv("BASE_PEERS"))
-	static := os.Getenv("BASE_STATIC_LEADER")
+	static := os.Getenv("BASE_STATIC_WRITER")
 
 	if target == "" && static == "" {
 		return // standalone mode
 	}
 
-	var provider LeaderProvider
+	var provider WriterProvider
 	switch {
 	case static != "":
-		provider = &StaticLeader{Target: static}
+		provider = &StaticWriter{Target: static}
 	default:
-		p, err := NewLuxLeader(LuxConfig{
+		w, err := NewQuasarWriter(QuasarConfig{
 			NodeID:      nodeID(),
 			LocalTarget: target,
 			Peers:       peers,
 		})
 		if err != nil {
-			app.Logger().Error("ha: lux leader init", "error", err)
+			app.Logger().Error("ha: quasar writer init", "error", err)
 			return
 		}
-		provider = p
+		provider = w
 	}
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		// Forward write methods to the leader when we're a follower.
-		se.Router.BindFunc(forwardToLeader(provider))
+		// Forward mutating methods to the writer when we're a replica.
+		se.Router.BindFunc(forwardToWriter(provider))
 
-		// Mount the heartbeat endpoint when dynamic.
-		if lux, ok := provider.(*LuxLeader); ok {
+		// Mount the heartbeat endpoint for Quasar writer-pin.
+		if q, ok := provider.(*QuasarWriter); ok {
 			se.Router.POST("/_ha/heartbeat", func(e *core.RequestEvent) error {
-				lux.HandleHeartbeat(e.Response, e.Request)
+				q.HandleHeartbeat(e.Response, e.Request)
 				return nil
 			})
 		}
@@ -79,23 +75,15 @@ func Register(app core.App) {
 	})
 }
 
-// LeaderProvider abstracts election strategies.
-type LeaderProvider interface {
-	IsLeader() bool
-	RedirectTarget() string
-}
-
-// forwardToLeader is a RequestEvent middleware that reverse-proxies
-// mutating HTTP methods to the current leader when we're a follower.
-func forwardToLeader(p LeaderProvider) func(*core.RequestEvent) error {
+// forwardToWriter is middleware that 307s mutating HTTP to the pinned writer.
+func forwardToWriter(p WriterProvider) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if isMutating(e.Request.Method) && !p.IsLeader() {
+		if isMutating(e.Request.Method) && !p.IsWriter() {
 			target := p.RedirectTarget()
 			if target == "" {
-				http.Error(e.Response, "no leader available", http.StatusServiceUnavailable)
+				http.Error(e.Response, "no writer available", http.StatusServiceUnavailable)
 				return nil
 			}
-			// 307 preserves the method and body; clients will resend.
 			http.Redirect(e.Response, e.Request, target+e.Request.URL.RequestURI(), http.StatusTemporaryRedirect)
 			return nil
 		}
