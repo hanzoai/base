@@ -35,7 +35,7 @@ import (
 
 const typesFileName = "types.d.ts"
 
-var defaultScriptPath = "pb.js"
+var defaultScriptPath = "base.js"
 
 func init() {
 	// For backward compatibility and consistency with the Go exposed
