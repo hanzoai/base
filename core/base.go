@@ -223,7 +223,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 		settings:            newDefaultSettings(),
 		store:               store.New[string, any](nil),
 		cron:                cron.New(),
-		tasks:               tasks.New(os.Getenv("TASKS_URL"), nil),
+		tasks:               tasks.New(os.Getenv("TASKS_URL"), os.Getenv("TASKS_ZAP"), nil),
 		subscriptionsBroker: subscriptions.NewBroker(),
 		config:              &config,
 	}
