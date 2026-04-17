@@ -42,6 +42,12 @@ func loadInstaller(
 	baseURL string,
 	installerFunc func(app core.App, systemSuperuser *core.Record, baseURL string) error,
 ) error {
+	// In IAM auth mode, skip the installer entirely — IAM handles first login.
+	// No _superusers collection needed; all admin access goes through OIDC.
+	if os.Getenv("BASE_AUTH_MODE") == "iam" || (os.Getenv("BASE_AUTH_MODE") == "" && os.Getenv("BASE_OIDC_ISSUER") != "") {
+		return nil
+	}
+
 	if installerFunc == nil || !needInstallerSuperuser(app) {
 		return nil
 	}
