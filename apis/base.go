@@ -78,8 +78,29 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindHealthApi(app, apiGroup)
 	bindRealtimeApi(app, apiGroup)
 	bindPrivateApi(app, apiGroup)
-	// OIDC superuser auth (/_/auth/oidc/* and /_/api/oidc/config)
-	bindSuperuserOIDCApi(app, baseRouter)
+	// Auth mode: "iam" or "builtin" (default).
+	// Only ONE can be active. When "iam", _superusers collection is not used
+	// and all auth goes through OIDC/IAM. When "builtin", normal superuser
+	// password auth works and OIDC is not bound.
+	authMode := os.Getenv("BASE_AUTH_MODE")
+	if authMode == "" {
+		// Auto-detect: if OIDC is configured, default to iam mode
+		if os.Getenv("BASE_OIDC_ISSUER") != "" {
+			authMode = "iam"
+		} else {
+			authMode = "builtin"
+		}
+	}
+
+	switch authMode {
+	case "iam":
+		// OIDC only — IAM is the single auth source
+		bindSuperuserOIDCApi(app, baseRouter)
+		app.Logger().Info("Auth mode: iam (OIDC only, _superusers bypassed)")
+	default:
+		// Built-in only — normal _superusers, no OIDC
+		app.Logger().Info("Auth mode: builtin (_superusers collection)")
+	}
 
 	// Platform-standard health check at root level.
 	BindHealthzRoute(baseRouter)
