@@ -57,8 +57,8 @@ func TestNetworkFlagsResolveMultipleError(t *testing.T) {
 }
 
 func TestNetworkFlagsResolveEnvVar(t *testing.T) {
-	// LIQUIDITY_ENV takes precedence over BASE_ENV.
-	t.Setenv("LIQUIDITY_ENV", "testnet")
+	// APP_ENV takes precedence over BASE_ENV.
+	t.Setenv("APP_ENV", "testnet")
 	t.Setenv("BASE_ENV", "mainnet")
 
 	nf := NetworkFlags{}
@@ -67,12 +67,12 @@ func TestNetworkFlagsResolveEnvVar(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got != EnvTestnet {
-		t.Fatalf("expected testnet from LIQUIDITY_ENV, got %s", got)
+		t.Fatalf("expected testnet from APP_ENV, got %s", got)
 	}
 }
 
 func TestNetworkFlagsResolveBASEEnv(t *testing.T) {
-	t.Setenv("LIQUIDITY_ENV", "")
+	t.Setenv("APP_ENV", "")
 	t.Setenv("BASE_ENV", "main")
 
 	nf := NetworkFlags{}
@@ -86,7 +86,7 @@ func TestNetworkFlagsResolveBASEEnv(t *testing.T) {
 }
 
 func TestNetworkFlagsResolveDefault(t *testing.T) {
-	t.Setenv("LIQUIDITY_ENV", "")
+	t.Setenv("APP_ENV", "")
 	t.Setenv("BASE_ENV", "")
 
 	nf := NetworkFlags{}
@@ -100,7 +100,7 @@ func TestNetworkFlagsResolveDefault(t *testing.T) {
 }
 
 func TestNetworkFlagsResolveFlagOverridesEnv(t *testing.T) {
-	t.Setenv("LIQUIDITY_ENV", "mainnet")
+	t.Setenv("APP_ENV", "mainnet")
 
 	nf := NetworkFlags{Devnet: true}
 	got, err := nf.Resolve()
@@ -136,9 +136,9 @@ func TestEnvK8sContext(t *testing.T) {
 		env  Env
 		want string
 	}{
-		{EnvMainnet, "gke_liquidity-mainnet_us-central1_main"},
-		{EnvTestnet, "gke_liquidity-testnet_us-central1_test"},
-		{EnvDevnet, "gke_liquidity-devnet_us-central1_dev"},
+		{EnvMainnet, "gke_mainnet"},
+		{EnvTestnet, "gke_testnet"},
+		{EnvDevnet, "gke_devnet"},
 		{EnvLocal, ""},
 	}
 
@@ -208,17 +208,17 @@ func TestEnvURLs(t *testing.T) {
 	}
 
 	got = EnvURLs(EnvMainnet, "ats", 8090)
-	if got != "https://ats.satschel.com" {
+	if got != "https://ats.example.com" {
 		t.Fatalf("expected mainnet URL, got %s", got)
 	}
 
 	got = EnvURLs(EnvTestnet, "ats", 8090)
-	if got != "https://ats.test.satschel.com" {
+	if got != "https://ats.test.example.com" {
 		t.Fatalf("expected testnet URL, got %s", got)
 	}
 
 	got = EnvURLs(EnvDevnet, "bd", 8091)
-	if got != "https://bd.dev.satschel.com" {
+	if got != "https://bd.dev.example.com" {
 		t.Fatalf("expected devnet URL, got %s", got)
 	}
 }
