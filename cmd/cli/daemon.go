@@ -213,13 +213,21 @@ func k8sContext(env string) string {
 	}
 }
 
+func k8sNamespace(env string) string {
+	e, err := parseEnv(env)
+	if err != nil {
+		return "default"
+	}
+	return e.K8sNamespace()
+}
+
 func k8sRolloutRestart(name, env string, execute bool) error {
 	ctx := k8sContext(env)
 	if ctx == "" {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", k8sNamespace(), "rollout", "restart", "deployment/" + name}
+	args := []string{"--context", ctx, "-n", k8sNamespace(env), "rollout", "restart", "deployment/" + name}
 
 	if !execute {
 		fmt.Fprintf(os.Stdout, "[dry-run] kubectl %s\n", strings.Join(args, " "))
@@ -238,7 +246,7 @@ func k8sScale(name, env string, replicas int, execute bool) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", k8sNamespace(), "scale", "deployment/" + name, fmt.Sprintf("--replicas=%d", replicas)}
+	args := []string{"--context", ctx, "-n", k8sNamespace(env), "scale", "deployment/" + name, fmt.Sprintf("--replicas=%d", replicas)}
 
 	if !execute {
 		fmt.Fprintf(os.Stdout, "[dry-run] kubectl %s\n", strings.Join(args, " "))
@@ -257,7 +265,7 @@ func k8sStatus(name, env string) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	c := exec.Command("kubectl", "--context", ctx, "-n", k8sNamespace(), "get", "pods", "-l", "app="+name)
+	c := exec.Command("kubectl", "--context", ctx, "-n", k8sNamespace(env), "get", "pods", "-l", "app="+name)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
@@ -269,7 +277,7 @@ func k8sLogs(name, env string, follow bool) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", k8sNamespace(), "logs", "deployment/" + name}
+	args := []string{"--context", ctx, "-n", k8sNamespace(env), "logs", "deployment/" + name}
 	if follow {
 		args = append(args, "-f")
 	}
