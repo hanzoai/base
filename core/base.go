@@ -18,6 +18,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
+	"github.com/hanzoai/tasks/pkg/tasks"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/logger"
@@ -96,6 +97,7 @@ type BaseApp struct {
 	txInfo              *TxAppInfo
 	store               *store.Store[string, any]
 	cron                *cron.Cron
+	tasks               *tasks.Client
 	settings            *Settings
 	subscriptionsBroker *subscriptions.Broker
 	logger              *slog.Logger
@@ -221,6 +223,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 		settings:            newDefaultSettings(),
 		store:               store.New[string, any](nil),
 		cron:                cron.New(),
+		tasks:               tasks.New(os.Getenv("TASKS_URL"), nil),
 		subscriptionsBroker: subscriptions.NewBroker(),
 		config:              &config,
 	}
@@ -662,6 +665,15 @@ func (app *BaseApp) Store() *store.Store[string, any] {
 // Cron returns the app cron instance.
 func (app *BaseApp) Cron() *cron.Cron {
 	return app.cron
+}
+
+// Tasks returns the durable task client (Hanzo Tasks).
+// Use Add() for recurring schedules, Now() for one-shot tasks.
+//
+//	app.Tasks().Add("settlement", "30s", fn)
+//	app.Tasks().Now("webhook.deliver", payload)
+func (app *BaseApp) Tasks() *tasks.Client {
+	return app.tasks
 }
 
 // SubscriptionsBroker returns the app realtime subscriptions broker instance.

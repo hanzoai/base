@@ -16,12 +16,13 @@ require (
 	github.com/hanzoai/dbx v1.15.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/pubsub-go v1.0.0
+	github.com/hanzoai/tasks v1.2.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.4.0
 	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/fhe v1.7.9
-	github.com/luxfi/zap v0.2.0
+	github.com/luxfi/zap v0.2.1
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	go.temporal.io/api v1.62.6
