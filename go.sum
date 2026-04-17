@@ -185,8 +185,6 @@ github.com/hanzoai/pubsub-go v1.0.0 h1:nUZ4jK+MFlFQ5qTMri/Yffnqs/R5avI99SfZ9e3t6
 github.com/hanzoai/pubsub-go v1.0.0/go.mod h1:ZHWDgSLsYHK4TiitzNwGc7Cn+oApKyMp0uK8cU7jwpg=
 github.com/hanzoai/replicate v0.4.0 h1:mpH6NvW2cWfoqSgtd+IX/PunqYFOavMy00pNnH5gJCE=
 github.com/hanzoai/replicate v0.4.0/go.mod h1:PBvHNQ7cXBJejTWDWxXWvtUwjT5O66pTC7npxLWu8H0=
-github.com/hanzoai/tasks v1.2.0 h1:gKVq/w6UKd1mAAo3YQwhzE8NsxNlbkCSyO30MY3fbqs=
-github.com/hanzoai/tasks v1.2.0/go.mod h1:oWvj5e5ZePcrV81K76tDhtUXCQTbZQZ6QVzHdaK3eSw=
 github.com/hanzoai/tygoja v0.0.2 h1:0wb1nm+k8LYfLDWdiiqQtKyVGEAXkuSlBpH3g/lUsIE=
 github.com/hanzoai/tygoja v0.0.2/go.mod h1:o+poSPLJ5S3SMtdz7gJHaL/6P6tjGBZcfQMl0SUIBr4=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=
