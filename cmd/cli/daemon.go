@@ -203,11 +203,11 @@ func localLogs(name string, follow bool) error {
 func k8sContext(env string) string {
 	switch env {
 	case "dev":
-		return "gke_liquidity-devnet_us-central1_dev"
+		return "gke_devnet"
 	case "test":
-		return "gke_liquidity-testnet_us-central1_test"
+		return "gke_testnet"
 	case "main":
-		return "gke_liquidity-mainnet_us-central1_main"
+		return "gke_mainnet"
 	default:
 		return ""
 	}
@@ -219,7 +219,7 @@ func k8sRolloutRestart(name, env string, execute bool) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", "liquidity", "rollout", "restart", "deployment/" + name}
+	args := []string{"--context", ctx, "-n", k8sNamespace(), "rollout", "restart", "deployment/" + name}
 
 	if !execute {
 		fmt.Fprintf(os.Stdout, "[dry-run] kubectl %s\n", strings.Join(args, " "))
@@ -238,7 +238,7 @@ func k8sScale(name, env string, replicas int, execute bool) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", "liquidity", "scale", "deployment/" + name, fmt.Sprintf("--replicas=%d", replicas)}
+	args := []string{"--context", ctx, "-n", k8sNamespace(), "scale", "deployment/" + name, fmt.Sprintf("--replicas=%d", replicas)}
 
 	if !execute {
 		fmt.Fprintf(os.Stdout, "[dry-run] kubectl %s\n", strings.Join(args, " "))
@@ -257,7 +257,7 @@ func k8sStatus(name, env string) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	c := exec.Command("kubectl", "--context", ctx, "-n", "liquidity", "get", "pods", "-l", "app="+name)
+	c := exec.Command("kubectl", "--context", ctx, "-n", k8sNamespace(), "get", "pods", "-l", "app="+name)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
@@ -269,7 +269,7 @@ func k8sLogs(name, env string, follow bool) error {
 		return fmt.Errorf("unknown environment: %s", env)
 	}
 
-	args := []string{"--context", ctx, "-n", "liquidity", "logs", "deployment/" + name}
+	args := []string{"--context", ctx, "-n", k8sNamespace(), "logs", "deployment/" + name}
 	if follow {
 		args = append(args, "-f")
 	}

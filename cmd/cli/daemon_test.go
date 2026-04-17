@@ -41,9 +41,9 @@ func TestK8sContext(t *testing.T) {
 		env  string
 		want string
 	}{
-		{"dev", "gke_liquidity-devnet_us-central1_dev"},
-		{"test", "gke_liquidity-testnet_us-central1_test"},
-		{"main", "gke_liquidity-mainnet_us-central1_main"},
+		{"dev", "gke_devnet"},
+		{"test", "gke_testnet"},
+		{"main", "gke_mainnet"},
 		{"unknown", ""},
 	}
 
