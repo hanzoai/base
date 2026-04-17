@@ -16,7 +16,6 @@ require (
 	github.com/hanzoai/dbx v1.15.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.2.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.4.0
@@ -36,7 +35,13 @@ require (
 )
 
 require (
+	cloud.google.com/go/iam v1.4.2 // indirect
+	cloud.google.com/go/monitoring v1.24.1 // indirect
+	cloud.google.com/go/storage v1.51.0 // indirect
+	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/ALTree/bigfloat v0.2.0 // indirect
+	github.com/Masterminds/semver/v3 v3.3.0 // indirect
+	github.com/go-sql-driver/mysql v1.9.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
@@ -54,6 +59,8 @@ require (
 	github.com/superfly/ltx v0.5.1 // indirect
 	github.com/tetratelabs/wazero v1.2.1 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
+	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
+	google.golang.org/api v0.224.0 // indirect
 )
 
 require (
