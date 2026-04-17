@@ -47,7 +47,7 @@ func AddNetworkFlags(cmd *cobra.Command, nf *NetworkFlags) {
 
 // Resolve returns the canonical Env. Rules:
 //  1. Exactly one flag set -> that env.
-//  2. No flags -> $LIQUIDITY_ENV, then $BASE_ENV, then default "local".
+//  2. No flags -> $APP_ENV, then $BASE_ENV, then default "local".
 //  3. More than one flag -> error.
 func (nf *NetworkFlags) Resolve() (Env, error) {
 	set := 0
@@ -78,7 +78,7 @@ func (nf *NetworkFlags) Resolve() (Env, error) {
 	}
 
 	// Fallback: env vars.
-	if v := os.Getenv("LIQUIDITY_ENV"); v != "" {
+	if v := os.Getenv("APP_ENV"); v != "" {
 		return parseEnv(v)
 	}
 	if v := os.Getenv("BASE_ENV"); v != "" {
@@ -96,11 +96,11 @@ func (e Env) IsRemote() bool {
 func (e Env) K8sContext() string {
 	switch e {
 	case EnvMainnet:
-		return "gke_liquidity-mainnet_us-central1_main"
+		return "gke_mainnet"
 	case EnvTestnet:
-		return "gke_liquidity-testnet_us-central1_test"
+		return "gke_testnet"
 	case EnvDevnet:
-		return "gke_liquidity-devnet_us-central1_dev"
+		return "gke_devnet"
 	default:
 		return ""
 	}
@@ -124,11 +124,11 @@ func (e Env) K8sNamespace() string {
 func (e Env) DomainSuffix() string {
 	switch e {
 	case EnvMainnet:
-		return "satschel.com"
+		return "example.com"
 	case EnvTestnet:
-		return "test.satschel.com"
+		return "test.example.com"
 	case EnvDevnet:
-		return "dev.satschel.com"
+		return "dev.example.com"
 	default:
 		return ""
 	}

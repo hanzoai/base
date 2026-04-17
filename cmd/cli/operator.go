@@ -11,28 +11,28 @@ import (
 )
 
 // DefaultOperatorNetworkDir is the path to the operator network YAMLs.
-// Resolved relative to the user's checkout of ~/work/liquidity/operator.
+// Resolved relative to the user's checkout of ~/work/operator.
 const DefaultOperatorNetworkDir = "k8s/networks"
 
 // NewOperatorCommand returns the `operator` subcommand tree for managing
-// Liquidity K8s operator CRDs (liquid.network/v1alpha1).
+// Base K8s operator CRDs (liquid.network/v1alpha1).
 func NewOperatorCommand(nf *NetworkFlags) *cobra.Command {
 	var operatorDir string
 
 	cmd := &cobra.Command{
 		Use:   "operator",
-		Short: "Manage Liquidity K8s operator CRDs",
-		Long: `Manage the Liquidity Kubernetes operator (liquid.network/v1alpha1).
+		Short: "Manage Base K8s operator CRDs",
+		Long: `Manage the Base Kubernetes operator (liquid.network/v1alpha1).
 
 Wraps kubectl to apply, inspect, and upgrade CRDs managed by the
-Liquidity operator. Respects --mainnet/--testnet/--devnet flags for
+Base operator. Respects --mainnet/--testnet/--devnet flags for
 kubectl context selection.`,
 	}
 
 	home, _ := os.UserHomeDir()
-	defaultDir := filepath.Join(home, "work", "liquidity", "operator")
+	defaultDir := filepath.Join(home, "work", "operator")
 	cmd.PersistentFlags().StringVar(&operatorDir, "operator-dir", defaultDir,
-		"path to the liquidity/operator checkout")
+		"path to the operator checkout")
 
 	daemonName := filepath.Base(os.Args[0])
 
