@@ -11,6 +11,7 @@ import (
 	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
 	"github.com/hanzoai/base/tools/filesystem"
+	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/mailer"
 	"github.com/hanzoai/base/tools/store"
@@ -81,6 +82,10 @@ type App interface {
 
 	// Cron returns the app cron instance.
 	Cron() *cron.Cron
+
+	// Tasks returns the app durable tasks client.
+	// Accepts duration strings ("30s") and cron expressions ("0 3 * * *").
+	Tasks() *tasks.Client
 
 	// SubscriptionsBroker returns the app realtime subscriptions broker instance.
 	SubscriptionsBroker() *subscriptions.Broker
