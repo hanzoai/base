@@ -1,12 +1,19 @@
-// Package taskqueue provides a durable task client for Hanzo Tasks.
+// Package tasks provides a durable task client for Hanzo Tasks.
 //
 // Drop-in replacement for Base's Cron():
 //
 //	// Before (cron):
 //	e.App.Cron().Add("settlement", "*/30 * * * * *", func() { ... })
 //
-//	// After (tasks):
-//	tasks.Add("settlement", "30s", func() { ... })
+//	// After (tasks — duration):
+//	app.Tasks().Add("settlement", "30s", fn)
+//
+//	// After (tasks — cron expression):
+//	app.Tasks().Add("daily-cleanup", "0 3 * * *", fn)
+//
+// Accepts both Go duration strings ("30s", "5m", "1h") and cron expressions
+// ("0 3 * * *", "0 0 * * 1", "0 0 5 1,4,7,10 *"). Detection is automatic:
+// if time.ParseDuration succeeds, it's a duration; otherwise it's cron.
 //
 // If TASKS_URL is set, schedules run as durable Temporal workflows
 // (retries, dead letter, audit trail). If not, runs locally via goroutine
@@ -23,6 +30,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -80,31 +89,39 @@ func New(tasksURL, zapAddr string, handler Handler) *Client {
 	}
 }
 
-// Add registers a recurring task. interval is a duration string ("30s", "5m", "1h").
-// The fn runs every interval. If TASKS_URL is set, creates a durable Temporal schedule.
-// Otherwise runs a local ticker (same as cron but cleaner).
+// Add registers a recurring task. schedule is either a Go duration string
+// ("30s", "5m", "1h") or a cron expression ("0 3 * * *", "0 0 * * 1").
+// Detection is automatic via time.ParseDuration.
 //
-//	tasks.Add("settlement.process", "30s", func() { processSettlements() })
-//	tasks.Add("oracle.update", "5m", func() { updateOracle() })
-func (c *Client) Add(name, interval string, fn func()) error {
-	dur, err := time.ParseDuration(interval)
-	if err != nil {
-		return fmt.Errorf("taskqueue: invalid interval %q: %w", interval, err)
+//	app.Tasks().Add("settlement", "30s", fn)            // every 30 seconds
+//	app.Tasks().Add("daily-cleanup", "0 3 * * *", fn)   // daily at 3am UTC
+//	app.Tasks().Add("weekly-report", "0 0 * * 1", fn)   // mondays at midnight
+func (c *Client) Add(name, schedule string, fn func()) error {
+	dur, durErr := time.ParseDuration(schedule)
+	isCron := durErr != nil
+
+	if isCron {
+		dur = approximateCron(schedule)
 	}
 
 	if c.zapAddr != "" || c.tasksURL != "" {
-		// Try ZAP first, then HTTP, then local fallback.
 		scheduled := false
 		if c.zapAddr != "" {
 			if err := c.scheduleZAP(name, dur); err == nil {
 				scheduled = true
 			} else {
-				c.logger.Warn("taskqueue: ZAP schedule failed", "name", name, "error", err)
+				c.logger.Warn("tasks: ZAP schedule failed", "name", name, "error", err)
 			}
 		}
 		if !scheduled && c.tasksURL != "" {
-			if err := c.createSchedule(name, dur); err != nil {
-				c.logger.Warn("taskqueue: HTTP schedule failed, falling back to local",
+			var err error
+			if isCron {
+				err = c.createCronSchedule(name, schedule)
+			} else {
+				err = c.createSchedule(name, dur)
+			}
+			if err != nil {
+				c.logger.Warn("tasks: HTTP schedule failed, falling back to local",
 					"name", name, "error", err)
 				c.addLocal(name, dur, fn)
 			}
@@ -257,6 +274,97 @@ func (c *Client) scheduleZAP(name string, interval time.Duration) error {
 
 	c.logger.Info("taskqueue: ZAP schedule created", "name", name, "interval", interval)
 	return nil
+}
+
+// createCronSchedule creates a durable cron-based schedule on Hanzo Tasks.
+func (c *Client) createCronSchedule(name, cronExpr string) error {
+	schedule := map[string]any{
+		"schedule_id": name,
+		"schedule": map[string]any{
+			"spec": map[string]any{
+				"cron_string": []string{cronExpr},
+			},
+			"action": map[string]any{
+				"start_workflow": map[string]any{
+					"workflow_type": name,
+					"task_queue":    "ats",
+				},
+			},
+		},
+	}
+
+	body, err := json.Marshal(schedule)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+
+	url := c.tasksURL + "/api/v1/namespaces/default/schedules/" + name
+	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		c.logger.Info("tasks: durable cron schedule created", "name", name, "cron", cronExpr)
+		return nil
+	}
+
+	return fmt.Errorf("status %d", resp.StatusCode)
+}
+
+// approximateCron converts a cron expression to a rough duration for local dev fallback.
+// Production uses Temporal's real cron scheduler; this is only for dev mode tickers.
+func approximateCron(expr string) time.Duration {
+	fields := strings.Fields(expr)
+	switch len(fields) {
+	case 6: // second-precision: "*/30 * * * * *"
+		if strings.HasPrefix(fields[0], "*/") {
+			if n, err := strconv.Atoi(fields[0][2:]); err == nil {
+				return time.Duration(n) * time.Second
+			}
+		}
+		return time.Minute
+	case 5: // standard cron
+		// "*/N * * * *" → every N minutes
+		if strings.HasPrefix(fields[0], "*/") {
+			if n, err := strconv.Atoi(fields[0][2:]); err == nil {
+				return time.Duration(n) * time.Minute
+			}
+		}
+		// "0 */N * * *" → every N hours
+		if fields[0] == "0" && strings.HasPrefix(fields[1], "*/") {
+			if n, err := strconv.Atoi(fields[1][2:]); err == nil {
+				return time.Duration(n) * time.Hour
+			}
+		}
+		// Every minute
+		if fields[0] == "*" {
+			return time.Minute
+		}
+		// Specific month-day → monthly
+		if fields[2] != "*" {
+			return 720 * time.Hour
+		}
+		// Specific day-of-week → weekly
+		if fields[4] != "*" {
+			return 168 * time.Hour
+		}
+		// Specific hour → daily
+		if fields[1] != "*" {
+			return 24 * time.Hour
+		}
+		// Hourly
+		return time.Hour
+	default:
+		return time.Hour
+	}
 }
 
 // addLocal runs fn on a ticker (dev fallback, no persistence).
