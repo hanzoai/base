@@ -439,7 +439,10 @@ func (p *plugin) handleListBranches(e *core.RequestEvent) error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) handleMetaProxy(e *core.RequestEvent) error {
-	tenantID := e.Request.Header.Get("X-Tenant-ID")
+	// Canonical 3 identity contract: per-tenant routing uses X-Org-Id (the
+	// JWT "owner" claim), injected by the gateway after JWKS validation.
+	// The legacy X-Tenant-ID header is no longer read here.
+	tenantID := e.Request.Header.Get("X-Org-Id")
 
 	var connStr string
 	if tenantID != "" {
