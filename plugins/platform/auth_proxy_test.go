@@ -57,7 +57,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 				json.NewEncoder(w).Encode(map[string]string{"error": "missing fields"})
 				return
 			}
-			w.Header().Set("X-IAM-Test", "verify-phone")
+			w.Header().Set("X-Test-Endpoint", "verify-phone")
 			json.NewEncoder(w).Encode(map[string]string{"status": "sent"})
 
 		case "/api/login":
@@ -65,7 +65,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
 			}
-			w.Header().Set("X-IAM-Test", "login")
+			w.Header().Set("X-Test-Endpoint", "login")
 			json.NewEncoder(w).Encode(map[string]any{
 				"access_token": "test-token-123",
 				"user_id":      "user-abc",
@@ -76,7 +76,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
 			}
-			w.Header().Set("X-IAM-Test", "signup")
+			w.Header().Set("X-Test-Endpoint", "signup")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{"user_id": "new-user-456"})
 
@@ -90,7 +90,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
 			}
-			w.Header().Set("X-IAM-Test", "userinfo")
+			w.Header().Set("X-Test-Endpoint", "userinfo")
 			json.NewEncoder(w).Encode(map[string]any{
 				"id":    "user-abc",
 				"email": "user@test.com",
@@ -137,8 +137,8 @@ func TestProxyToIAM(t *testing.T) {
 		t.Errorf("expected status 200, got %d", rec.Code)
 	}
 
-	if got := rec.Header().Get("X-IAM-Test"); got != "login" {
-		t.Errorf("expected X-IAM-Test=login, got %q", got)
+	if got := rec.Header().Get("X-Test-Endpoint"); got != "login" {
+		t.Errorf("expected X-Test-Endpoint=login, got %q", got)
 	}
 
 	var result map[string]any
@@ -300,8 +300,8 @@ func TestHandleUserinfo(t *testing.T) {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
-	if got := rec.Header().Get("X-IAM-Test"); got != "userinfo" {
-		t.Errorf("expected X-IAM-Test=userinfo, got %q", got)
+	if got := rec.Header().Get("X-Test-Endpoint"); got != "userinfo" {
+		t.Errorf("expected X-Test-Endpoint=userinfo, got %q", got)
 	}
 
 	var result map[string]any
