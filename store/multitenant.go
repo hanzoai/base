@@ -13,6 +13,17 @@
 // No handler ever opens SQLite directly. No handler ever reads object
 // storage directly. No handler ever knows whether its SQLite file is in
 // memory or in a bucket.
+//
+// # Consistency model (v1)
+//
+// A single tenant is served by exactly one pod at a time via
+// gateway-side sticky-session affinity (consistent hash on X-Org-Id). The
+// store does NOT perform object-storage CAS (ETag If-Match) on upload —
+// see [CAS]. During an HPA rebalance a (short) single-writer window may
+// overlap across pods; ops MUST drain before scaling. This is the
+// "at-most-once delivery under rebalance" model. The ARCHITECTURE.md §5.5
+// document describes this contract verbatim; consumers that require
+// generation-checked writes must wait for the CAS follow-up slice.
 package store
 
 import (
@@ -57,6 +68,36 @@ const (
 	ScopeOrg
 )
 
+// CAS reports whether this package performs object-storage compare-and-swap
+// on upload (ETag If-Match). In v1 CAS is false — single-writer is provided
+// by gateway sticky-session affinity on X-Org-Id. Consumers that require
+// generation-checked writes must feature-gate on this constant and refuse
+// to boot until it flips true.
+const CAS = false
+
+// sqliteMagic is the 16-byte SQLite 3 file header. Every valid SQLite file
+// begins with exactly these bytes; empty files are accepted as the "fresh
+// tenant" state. Anything else is rejected on hydrate.
+var sqliteMagic = []byte("SQLite format 3\x00")
+
+// Sentinel errors surfaced to callers. They are errors.Is-comparable and
+// MUST NOT be wrapped out of recognition.
+var (
+	// ErrCorruptDB is returned from hydrate when the downloaded object is
+	// non-empty and does not begin with the SQLite magic header. Callers
+	// must NOT retry blindly — the bucket contents are hostile or
+	// corrupted; an operator has to triage.
+	ErrCorruptDB = errors.New("store: downloaded object is not a SQLite database (header mismatch)")
+
+	// ErrUploadFailed wraps any object-storage upload failure surfaced
+	// from Evict / Close / Checkpoint. The handle is retained in the
+	// cache so the next reap cycle can retry.
+	ErrUploadFailed = errors.New("store: upload failed")
+
+	// ErrClosed is returned when Get is called after Close.
+	ErrClosed = errors.New("store: closed")
+)
+
 // String implements fmt.Stringer for log lines and metric labels.
 func (k Key) String() string {
 	if k.Scope == ScopeOrg {
@@ -99,16 +140,45 @@ func (k Key) Valid() error {
 	return nil
 }
 
-// validateSlug enforces `[a-z0-9_-]+`, rejecting path traversal, mixed case,
-// and whitespace. Both slugs (org, user) live under this contract in IAM.
+// MaxSlugLen caps org / user slug length. 128 bytes is generous: IAM ULIDs
+// are 26 chars, UUIDs 36. A slug longer than this is either a mistake or an
+// attempt to blow up filesystem error messages with attacker-controlled
+// bytes — reject before any FS call.
+const MaxSlugLen = 128
+
+// validateSlug enforces `[a-z0-9_-]+` and length ≤ MaxSlugLen, rejecting
+// path traversal, mixed case, whitespace, and oversized inputs. Both slugs
+// (org, user) live under this contract in IAM.
 func validateSlug(s string) error {
 	if s == "" {
 		return errors.New("empty")
+	}
+	if len(s) > MaxSlugLen {
+		return fmt.Errorf("too long (%d > %d)", len(s), MaxSlugLen)
 	}
 	for _, c := range s {
 		ok := (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-' || c == '_'
 		if !ok {
 			return fmt.Errorf("invalid character %q", c)
+		}
+	}
+	return nil
+}
+
+// validateSQLiteMagic checks the first 16 bytes of a downloaded blob.
+// Empty blobs are allowed (represents a fresh tenant slot). A non-empty
+// blob that doesn't start with the SQLite 3 magic header is rejected as
+// ErrCorruptDB — no handle is opened, no further byte is read.
+func validateSQLiteMagic(header []byte) error {
+	if len(header) == 0 {
+		return nil
+	}
+	if len(header) < len(sqliteMagic) {
+		return ErrCorruptDB
+	}
+	for i, b := range sqliteMagic {
+		if header[i] != b {
+			return ErrCorruptDB
 		}
 	}
 	return nil
@@ -152,6 +222,13 @@ type Options struct {
 
 	// Now returns the current time. Swap in tests to drive IdleTTL.
 	Now func() time.Time
+
+	// OnReapFailure is an optional observer for reap-cycle upload errors.
+	// Services wire this to a structured logger + Prometheus counter. Nil
+	// means silent — the error is still returned from Evict, but the
+	// reaper runs asynchronously and there is nowhere to surface it
+	// except through a hook.
+	OnReapFailure func(Key, error)
 }
 
 // MultiTenantStore owns the per-(org, user) SQLite universe for one pod.
@@ -284,7 +361,7 @@ func (s *MultiTenantStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
 		return nil, fmt.Errorf("store: invalid key %s: %w", k, err)
 	}
 	if s.closed.Load() {
-		return nil, errors.New("store: closed")
+		return nil, ErrClosed
 	}
 
 	// Fast path: already cached.
@@ -331,7 +408,14 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 		if victim == (Key{}) {
 			break
 		}
-		s.flushAndCloseLocked(victim)
+		if err := s.flushAndCloseLocked(victim); err != nil {
+			// Upload failed for this victim — report it through the
+			// reap-failure hook (ops needs to see it) and bail. We do
+			// NOT fall back to a different victim: that would make
+			// LRU-cap eviction silently drop a retry we owe the data.
+			s.logReapFailure(victim, err)
+			return nil, err
+		}
 	}
 
 	localPath := k.LocalPath(s.opts.CacheRoot)
@@ -348,6 +432,14 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 	if exists {
 		etag, err = s.downloadTo(ctx, objKey, localPath)
 		if err != nil {
+			return nil, err
+		}
+		// Defense in depth: reject non-SQLite blobs BEFORE handing bytes
+		// to modernc.org/sqlite. A poisoned bucket entry (SSRF, stolen
+		// creds, malicious CI) otherwise reaches the SQLite VM unchecked
+		// and any hostile sqlite_master row fires on first query.
+		if err := verifySQLiteFile(localPath); err != nil {
+			_ = os.Remove(localPath)
 			return nil, err
 		}
 	} else {
@@ -399,13 +491,17 @@ func (s *MultiTenantStore) MarkDirty(k Key, n int) {
 	}
 }
 
-// Checkpoint flushes the WAL, uploads to object storage with If-Match on the
-// known ETag, and advances the cached ETag. Safe to call while the handle is
-// in use; writers will block only for the upload window.
+// Checkpoint flushes the WAL and uploads the DB to object storage.
 //
-// On CAS failure (another pod has advanced the generation), returns an error
-// wrapping ErrConflict so the caller can choose to invalidate the local
-// handle and hydrate fresh.
+// In v1 there is NO generation check (CAS=false). Sticky-session gateway
+// affinity provides the single-writer guarantee; during an HPA rebalance a
+// brief dual-writer window may produce a lost-write. Ops MUST drain before
+// scaling out. Callers that need generation-checked writes must refuse to
+// boot until [CAS] flips true.
+//
+// The returned error wraps ErrUploadFailed on object-storage failure; the
+// handle is retained in the cache so the next Checkpoint / reap tick can
+// retry without losing local writes that are still durable in the WAL.
 func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
 	s.mu.Lock()
 	h, ok := s.handles.Get(k)
@@ -427,13 +523,9 @@ func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
 		return fmt.Errorf("store: read local %s: %w", h.localPath, err)
 	}
 	if err := s.opts.ObjectStore.Upload(content, k.ObjectKey()); err != nil {
-		return fmt.Errorf("store: upload %s: %w", k, err)
+		return fmt.Errorf("%w: %s: %v", ErrUploadFailed, k, err)
 	}
 
-	// We don't read ETag here — filesystem.System doesn't surface it
-	// uniformly across fileblob/s3blob, and for the v1 spec we rely on a
-	// pod-affinity router (consistent hash on org) to prevent concurrent
-	// writers. The §5.5 ETag CAS path is the follow-up slice.
 	h.dirtyCount = 0
 	h.lastFlush = s.opts.Now()
 	return nil
@@ -441,36 +533,70 @@ func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
 
 // Evict flushes (if dirty) and closes the handle. Subsequent Gets for the
 // same key will re-hydrate from object storage.
+//
+// On upload failure: returns ErrUploadFailed and RETAINS the handle in the
+// cache so that (a) the next reap cycle retries, (b) the caller can
+// surface the failure instead of losing the WAL-durable write.
 func (s *MultiTenantStore) Evict(ctx context.Context, k Key) error {
 	s.mu.Lock()
-	s.flushAndCloseLocked(k)
-	s.mu.Unlock()
-	return nil
+	defer s.mu.Unlock()
+	return s.flushAndCloseLocked(k)
 }
 
 // flushAndCloseLocked runs the "evict this handle" sequence. Caller MUST
-// hold s.mu. The handle is removed from the LRU, the WAL is checkpointed,
-// the DB is closed, and the local file is uploaded to object storage.
+// hold s.mu.
 //
-// Ordering: Close first so modernc.org/sqlite flushes the WAL into the main
-// file and drops its file locks. Only then is the file byte-equal to the
-// committed state — reading before Close risks uploading a partial page.
-func (s *MultiTenantStore) flushAndCloseLocked(k Key) {
+// Success path: WAL checkpoint → Close the handle → upload local bytes to
+// the bucket → drop from cache + shadow. Ordering matters: Close first so
+// modernc.org/sqlite flushes the WAL into the main file and drops its file
+// locks. Only then is the file byte-equal to the committed state — reading
+// before Close risks uploading a partial page.
+//
+// Failure path: on upload error we re-open the handle and KEEP it resident
+// (do NOT remove from cache / shadow). The handle is now marked "still
+// dirty" so the next reap or Checkpoint can retry. This makes eviction
+// idempotent and prevents silent data loss — the exact bug P7-H1 fixed.
+func (s *MultiTenantStore) flushAndCloseLocked(k Key) error {
 	h, ok := s.handles.Get(k)
 	if !ok {
 		delete(s.shadow, k)
-		return
+		return nil
 	}
 	h.mu.Lock()
+	defer h.mu.Unlock()
+
 	_, _ = h.db.NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
 	_ = h.db.Close()
-	if content, err := os.ReadFile(h.localPath); err == nil && len(content) > 0 {
-		_ = s.opts.ObjectStore.Upload(content, k.ObjectKey())
+
+	content, readErr := os.ReadFile(h.localPath)
+	if readErr != nil {
+		// Local file gone — nothing durable to upload. Drop the handle
+		// because re-opening it won't recover data that isn't there.
+		s.handles.Delete(k)
+		delete(s.shadow, k)
+		return fmt.Errorf("store: read local %s: %w", h.localPath, readErr)
 	}
-	h.mu.Unlock()
+	if len(content) > 0 {
+		if err := s.opts.ObjectStore.Upload(content, k.ObjectKey()); err != nil {
+			// Re-open the handle so subsequent Gets don't hit a closed
+			// DB, and the retry path has something to Checkpoint.
+			db, openErr := s.opts.Connect(h.localPath)
+			if openErr == nil {
+				h.db = db
+				h.dirtyCount++ // force the next Checkpoint to actually run
+			} else {
+				// Re-open failed too — drop from LRU so Get will
+				// re-hydrate, but keep shadow so the caller knows
+				// data is in-flight for this tenant.
+				s.handles.Delete(k)
+			}
+			return fmt.Errorf("%w: %s: %v", ErrUploadFailed, k, err)
+		}
+	}
 
 	s.handles.Delete(k)
 	delete(s.shadow, k)
+	return nil
 }
 
 // reaperLoop runs in the background, evicting handles that have been idle
@@ -491,6 +617,12 @@ func (s *MultiTenantStore) reaperLoop() {
 
 // reapOnce evicts any handles idle longer than IdleTTL, flushing them to
 // object storage on the way out.
+//
+// Lock discipline (P7-H2): the reaper takes s.mu only to SNAPSHOT the list
+// of idle keys. Each per-handle flush (WAL checkpoint + Close + upload)
+// runs under a fresh s.mu acquisition — i.e. the lock is released between
+// handles. This bounds the maximum blocking window per Get/ForCtx to a
+// single handle's flush latency instead of the full reap cycle.
 func (s *MultiTenantStore) reapOnce() {
 	cutoff := s.opts.Now().Add(-s.opts.IdleTTL)
 
@@ -508,14 +640,27 @@ func (s *MultiTenantStore) reapOnce() {
 		}
 		h.mu.Unlock()
 	}
-	for _, k := range idle {
-		s.flushAndCloseLocked(k)
-	}
 	s.mu.Unlock()
+
+	for _, k := range idle {
+		// Each Evict re-acquires s.mu briefly; Get calls interleaved
+		// with the reaper block for one handle's upload, not all of
+		// them. On upload failure we log and leave the handle resident
+		// so the next reap tick retries — data is NOT lost silently.
+		if err := s.Evict(context.Background(), k); err != nil {
+			s.logReapFailure(k, err)
+		}
+	}
 }
 
 // Close flushes every resident handle to object storage and then closes the
 // store. Safe to call multiple times.
+//
+// Lock discipline (P7-H2): snapshot keys under s.mu, release, then flush
+// each key with a fresh per-key lock. This bounds the shutdown window to
+// sum-of-per-handle-latencies instead of holding s.mu for the entire
+// drain. Upload failures are AGGREGATED into the returned error so ops
+// can see exactly which tenants did not make it to durable storage.
 func (s *MultiTenantStore) Close(ctx context.Context) error {
 	if !s.closed.CompareAndSwap(false, true) {
 		return nil
@@ -525,17 +670,36 @@ func (s *MultiTenantStore) Close(ctx context.Context) error {
 		s.reaperWg.Wait()
 	}
 
-	// Flush every resident handle through the explicit path.
 	s.mu.Lock()
 	keys := make([]Key, 0, len(s.shadow))
 	for k := range s.shadow {
 		keys = append(keys, k)
 	}
-	for _, k := range keys {
-		s.flushAndCloseLocked(k)
-	}
 	s.mu.Unlock()
+
+	var errs []error
+	for _, k := range keys {
+		s.mu.Lock()
+		err := s.flushAndCloseLocked(k)
+		s.mu.Unlock()
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("store: close flushed %d/%d, %d upload failures: %w",
+			len(keys)-len(errs), len(keys), len(errs), errors.Join(errs...))
+	}
 	return nil
+}
+
+// logReapFailure is a hookable point for structured reap-failure logging.
+// Default: no-op (the Prometheus counter in a follow-up slice will record
+// this). Exposed as a method so tests can inject an observer.
+func (s *MultiTenantStore) logReapFailure(k Key, err error) {
+	if s.opts.OnReapFailure != nil {
+		s.opts.OnReapFailure(k, err)
+	}
 }
 
 // downloadTo fetches obj into localPath atomically (write-then-rename).
@@ -574,4 +738,30 @@ func (s *MultiTenantStore) downloadTo(ctx context.Context, objKey, localPath str
 func defaultConnect(path string) (*dbx.DB, error) {
 	const pragmas = "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=journal_size_limit(200000000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-32000)"
 	return dbx.Open("sqlite", path+pragmas)
+}
+
+// verifySQLiteFile reads the first 16 bytes of path and passes them to
+// validateSQLiteMagic. Empty files are accepted (fresh-tenant path).
+func verifySQLiteFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("store: open for header check %s: %w", path, err)
+	}
+	defer f.Close()
+	var buf [16]byte
+	n, err := io.ReadFull(f, buf[:])
+	switch {
+	case err == io.EOF:
+		// Zero bytes — fresh tenant slot.
+		return nil
+	case err == io.ErrUnexpectedEOF:
+		// Short but non-empty: not a valid SQLite file.
+		return ErrCorruptDB
+	case err != nil:
+		return fmt.Errorf("store: header read %s: %w", path, err)
+	}
+	if n < len(buf) {
+		return ErrCorruptDB
+	}
+	return validateSQLiteMagic(buf[:])
 }
