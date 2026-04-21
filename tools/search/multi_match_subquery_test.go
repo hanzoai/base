@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/search"
 )
 
@@ -16,7 +16,7 @@ func TestMultiMatchSubqueryBuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db := dbx.NewFromDB(sqlDB, "sqlite")
+	db := query.NewFromDB(sqlDB, "sqlite")
 
 	mm := search.MultiMatchSubquery{
 		TargetTableAlias: "test_TargetTableAlias",
@@ -25,12 +25,12 @@ func TestMultiMatchSubqueryBuild(t *testing.T) {
 		ValueIdentifier:  "({:mm},{:external})",
 		Joins: []*search.Join{
 			{TableName: "join_table1", TableAlias: "join_alias1"},
-			{TableName: "join_table2", TableAlias: "join_alias2", On: dbx.NewExp("123={:join}", dbx.Params{"join": "test_join"})},
+			{TableName: "join_table2", TableAlias: "join_alias2", On: query.NewExp("123={:join}", query.Params{"join": "test_join"})},
 		},
-		Params: dbx.Params{"mm": "test_mm"},
+		Params: query.Params{"mm": "test_mm"},
 	}
 
-	params := dbx.Params{"external": "test_external"}
+	params := query.Params{"external": "test_external"}
 
 	result := mm.Build(db, params)
 

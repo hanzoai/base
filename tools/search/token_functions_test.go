@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/security"
 )
 
@@ -581,11 +581,11 @@ func testCompareResults(t *testing.T, a, b *ResolverResult) {
 
 	var aAfterBuild string
 	if a.AfterBuild != nil {
-		aAfterBuild = a.AfterBuild(dbx.NewExp("test")).Build(testDB.DB, a.Params)
+		aAfterBuild = a.AfterBuild(query.NewExp("test")).Build(testDB.DB, a.Params)
 	}
 	var bAfterBuild string
 	if b.AfterBuild != nil {
-		bAfterBuild = b.AfterBuild(dbx.NewExp("test")).Build(testDB.DB, a.Params)
+		bAfterBuild = b.AfterBuild(query.NewExp("test")).Build(testDB.DB, a.Params)
 	}
 	if aAfterBuild != bAfterBuild {
 		t.Fatalf("Expected bAfterBuild and bAfterBuild to be the same, got\n%s\nvs\n%s", aAfterBuild, bAfterBuild)
