@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 )
 
-var _ dbx.Expression = (*MultiMatchSubquery)(nil)
+var _ query.Expression = (*MultiMatchSubquery)(nil)
 
 // Join defines common fields required for a single SQL JOIN clause.
 type Join struct {
 	TableName  string
 	TableAlias string
-	On         dbx.Expression
+	On         query.Expression
 }
 
 // MultiMatchSubquery defines a multi-match record subquery expression.
@@ -23,13 +23,13 @@ type MultiMatchSubquery struct {
 	FromTableAlias   string
 	ValueIdentifier  string
 	Joins            []*Join
-	Params           dbx.Params
+	Params           query.Params
 }
 
 // Build converts the expression into a SQL fragment.
 //
-// Implements [dbx.Expression] interface.
-func (m *MultiMatchSubquery) Build(db *dbx.DB, params dbx.Params) string {
+// Implements [query.Expression] interface.
+func (m *MultiMatchSubquery) Build(db *query.DB, params query.Params) string {
 	if m.TargetTableAlias == "" || m.FromTableName == "" || m.FromTableAlias == "" {
 		return "0=1"
 	}

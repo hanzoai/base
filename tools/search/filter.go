@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/store"
 	"github.com/spf13/cast"
@@ -23,7 +23,7 @@ import (
 //
 //	var filter FilterData = "id = null || (name = 'test' && status = true) || (total >= {:min} && total <= {:max})"
 //	resolver := search.NewSimpleFieldResolver("id", "name", "status")
-//	expr, err := filter.BuildExpr(resolver, dbx.Params{"min": 100, "max": 200})
+//	expr, err := filter.BuildExpr(resolver, query.Params{"min": 100, "max": 200})
 type FilterData string
 
 // parsedFilterData holds a cache with previously parsed filter data expressions
@@ -39,8 +39,8 @@ var parsedFilterData = store.New(make(map[string][]fexpr.ExprGroup, 50))
 // Use [FilterData.BuildExprWithLimit] if you want to set a custom limit.
 func (f FilterData) BuildExpr(
 	fieldResolver FieldResolver,
-	placeholderReplacements ...dbx.Params,
-) (dbx.Expression, error) {
+	placeholderReplacements ...query.Params,
+) (query.Expression, error) {
 	return f.BuildExprWithLimit(fieldResolver, DefaultFilterExprLimit, placeholderReplacements...)
 }
 
@@ -51,8 +51,8 @@ func (f FilterData) BuildExpr(
 func (f FilterData) BuildExprWithLimit(
 	fieldResolver FieldResolver,
 	maxExpressions int,
-	placeholderReplacements ...dbx.Params,
-) (dbx.Expression, error) {
+	placeholderReplacements ...query.Params,
+) (query.Expression, error) {
 	raw := string(f)
 
 	// replace the placeholder params in the raw string filter
@@ -91,7 +91,7 @@ func (f FilterData) BuildExprWithLimit(
 		// (aka. expressions consisting only of whitespaces or comments)
 		// but for now disallow them as it seems unnecessary
 		// if errors.Is(err, fexpr.ErrEmpty) {
-		// return dbx.NewExp("1=1"), nil
+		// return query.NewExp("1=1"), nil
 		// }
 
 		return nil, err
@@ -104,7 +104,7 @@ func (f FilterData) BuildExprWithLimit(
 	return buildParsedFilterExpr(data, fieldResolver, &maxExpressions)
 }
 
-func buildParsedFilterExpr(data []fexpr.ExprGroup, fieldResolver FieldResolver, maxExpressions *int) (dbx.Expression, error) {
+func buildParsedFilterExpr(data []fexpr.ExprGroup, fieldResolver FieldResolver, maxExpressions *int) (query.Expression, error) {
 	if len(data) == 0 {
 		return nil, fexpr.ErrEmpty
 	}
@@ -112,7 +112,7 @@ func buildParsedFilterExpr(data []fexpr.ExprGroup, fieldResolver FieldResolver, 
 	result := &concatExpr{separator: " "}
 
 	for _, group := range data {
-		var expr dbx.Expression
+		var expr query.Expression
 		var exprErr error
 
 		switch item := group.Item.(type) {
@@ -152,7 +152,7 @@ func buildParsedFilterExpr(data []fexpr.ExprGroup, fieldResolver FieldResolver, 
 	return result, nil
 }
 
-func resolveTokenizedExpr(expr fexpr.Expr, fieldResolver FieldResolver) (dbx.Expression, error) {
+func resolveTokenizedExpr(expr fexpr.Expr, fieldResolver FieldResolver) (query.Expression, error) {
 	lResult, lErr := resolveToken(expr.Left, fieldResolver)
 	if lErr != nil || lResult.Identifier == "" {
 		return nil, fmt.Errorf("invalid left operand %q - %v", expr.Left.Literal, lErr)
@@ -170,8 +170,8 @@ func buildResolversExpr(
 	left *ResolverResult,
 	op fexpr.SignOp,
 	right *ResolverResult,
-) (dbx.Expression, error) {
-	var expr dbx.Expression
+) (query.Expression, error) {
+	var expr query.Expression
 
 	switch op {
 	case fexpr.SignEq, fexpr.SignAnyEq:
@@ -181,25 +181,25 @@ func buildResolversExpr(
 	case fexpr.SignLike, fexpr.SignAnyLike:
 		// the right side is a column and therefor wrap it with "%" for contains like behavior
 		if len(right.Params) == 0 {
-			expr = dbx.NewExp(fmt.Sprintf("%s LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
+			expr = query.NewExp(fmt.Sprintf("%s LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
 		} else {
-			expr = dbx.NewExp(fmt.Sprintf("%s LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
+			expr = query.NewExp(fmt.Sprintf("%s LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
 		}
 	case fexpr.SignNlike, fexpr.SignAnyNlike:
 		// the right side is a column and therefor wrap it with "%" for not-contains like behavior
 		if len(right.Params) == 0 {
-			expr = dbx.NewExp(fmt.Sprintf("%s NOT LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
+			expr = query.NewExp(fmt.Sprintf("%s NOT LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
 		} else {
-			expr = dbx.NewExp(fmt.Sprintf("%s NOT LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
+			expr = query.NewExp(fmt.Sprintf("%s NOT LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
 		}
 	case fexpr.SignLt, fexpr.SignAnyLt:
-		expr = dbx.NewExp(fmt.Sprintf("%s < %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
+		expr = query.NewExp(fmt.Sprintf("%s < %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
 	case fexpr.SignLte, fexpr.SignAnyLte:
-		expr = dbx.NewExp(fmt.Sprintf("%s <= %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
+		expr = query.NewExp(fmt.Sprintf("%s <= %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
 	case fexpr.SignGt, fexpr.SignAnyGt:
-		expr = dbx.NewExp(fmt.Sprintf("%s > %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
+		expr = query.NewExp(fmt.Sprintf("%s > %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
 	case fexpr.SignGte, fexpr.SignAnyGte:
-		expr = dbx.NewExp(fmt.Sprintf("%s >= %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
+		expr = query.NewExp(fmt.Sprintf("%s >= %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
 	}
 
 	if expr == nil {
@@ -215,7 +215,7 @@ func buildResolversExpr(
 				op:    op,
 			}
 
-			expr = dbx.Enclose(dbx.And(expr, mm))
+			expr = query.Enclose(query.And(expr, mm))
 		} else if left.MultiMatchSubQuery != nil {
 			mm := &manyVsOneExpr{
 				nullFallback: left.NullFallback,
@@ -224,7 +224,7 @@ func buildResolversExpr(
 				otherOperand: right,
 			}
 
-			expr = dbx.Enclose(dbx.And(expr, mm))
+			expr = query.Enclose(query.And(expr, mm))
 		} else if right.MultiMatchSubQuery != nil {
 			mm := &manyVsOneExpr{
 				nullFallback: right.NullFallback,
@@ -234,7 +234,7 @@ func buildResolversExpr(
 				inverse:      true,
 			}
 
-			expr = dbx.Enclose(dbx.And(expr, mm))
+			expr = query.Enclose(query.And(expr, mm))
 		}
 	}
 
@@ -273,7 +273,7 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 
 			return &ResolverResult{
 				Identifier: "{:" + placeholder + "}",
-				Params:     dbx.Params{placeholder: macroValue},
+				Params:     query.Params{placeholder: macroValue},
 			}, nil
 		}
 
@@ -295,14 +295,14 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 
 		return &ResolverResult{
 			Identifier: "{:" + placeholder + "}",
-			Params:     dbx.Params{placeholder: token.Literal},
+			Params:     query.Params{placeholder: token.Literal},
 		}, nil
 	case fexpr.TokenNumber:
 		placeholder := "t" + security.PseudorandomString(8)
 
 		return &ResolverResult{
 			Identifier: "{:" + placeholder + "}",
-			Params:     dbx.Params{placeholder: cast.ToFloat64(token.Literal)},
+			Params:     query.Params{placeholder: cast.ToFloat64(token.Literal)},
 		}, nil
 	case fexpr.TokenFunction:
 		fn, ok := TokenFunctions[token.Literal]
@@ -325,7 +325,7 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 // The expression `a = "" OR a is null` tends to perform better than
 // `COALESCE(a, "") = ""` since the direct match can be accomplished
 // with a seek while the COALESCE will induce a table scan.
-func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
+func resolveEqualExpr(equal bool, left, right *ResolverResult) query.Expression {
 	equalOp := "="
 	nullEqualOp := "IS"
 	concatOp := "OR"
@@ -345,7 +345,7 @@ func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
 	// a IS NOT b
 	if left.NullFallback == NullFallbackDisabled ||
 		right.NullFallback == NullFallbackDisabled {
-		return dbx.NewExp(
+		return query.NewExp(
 			fmt.Sprintf("%s %s %s", left.Identifier, nullEqualOp, right.Identifier),
 			mergeParams(left.Params, right.Params),
 		)
@@ -359,7 +359,7 @@ func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
 
 	// both operands are empty
 	if isLeftEmpty && isRightEmpty {
-		return dbx.NewExp(fmt.Sprintf("'' %s ''", equalOp), mergeParams(left.Params, right.Params))
+		return query.NewExp(fmt.Sprintf("'' %s ''", equalOp), mergeParams(left.Params, right.Params))
 	}
 
 	// direct compare since at least one of the operands is known to be non-empty
@@ -373,7 +373,7 @@ func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
 		if isRightEmpty {
 			rightIdentifier = "''"
 		}
-		return dbx.NewExp(
+		return query.NewExp(
 			fmt.Sprintf("%s %s %s", leftIdentifier, equalOp, rightIdentifier),
 			mergeParams(left.Params, right.Params),
 		)
@@ -382,7 +382,7 @@ func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
 	// "" = b OR b IS NULL
 	// "" IS NOT b AND b IS NOT NULL
 	if isLeftEmpty {
-		return dbx.NewExp(
+		return query.NewExp(
 			fmt.Sprintf("('' %s %s %s %s %s)", equalOp, right.Identifier, concatOp, right.Identifier, nullExpr),
 			mergeParams(left.Params, right.Params),
 		)
@@ -391,14 +391,14 @@ func resolveEqualExpr(equal bool, left, right *ResolverResult) dbx.Expression {
 	// a = "" OR a IS NULL
 	// a IS NOT "" AND a IS NOT NULL
 	if isRightEmpty {
-		return dbx.NewExp(
+		return query.NewExp(
 			fmt.Sprintf("(%s %s '' %s %s %s)", left.Identifier, equalOp, concatOp, left.Identifier, nullExpr),
 			mergeParams(left.Params, right.Params),
 		)
 	}
 
 	// fallback to a COALESCE comparison
-	return dbx.NewExp(
+	return query.NewExp(
 		fmt.Sprintf(
 			"COALESCE(%s, '') %s COALESCE(%s, '')",
 			left.Identifier,
@@ -463,10 +463,10 @@ func isAnyMatchOp(op fexpr.SignOp) bool {
 	return false
 }
 
-// mergeParams returns new dbx.Params where each provided params item
+// mergeParams returns new query.Params where each provided params item
 // is merged in the order they are specified.
-func mergeParams(params ...dbx.Params) dbx.Params {
-	result := dbx.Params{}
+func mergeParams(params ...query.Params) query.Params {
+	result := query.Params{}
 
 	for _, p := range params {
 		for k, v := range p {
@@ -481,8 +481,8 @@ func mergeParams(params ...dbx.Params) dbx.Params {
 //
 // wrapLikeParams wraps each provided param value string with `%`
 // if the param doesn't contain an explicit wildcard (`%`) character already.
-func wrapLikeParams(params dbx.Params) dbx.Params {
-	result := dbx.Params{}
+func wrapLikeParams(params query.Params) query.Params {
+	result := query.Params{}
 
 	for k, v := range params {
 		vStr := cast.ToString(v)
@@ -556,7 +556,7 @@ func containsUnescapedChar(str string, ch rune) bool {
 
 // -------------------------------------------------------------------
 
-var _ dbx.Expression = (*opExpr)(nil)
+var _ query.Expression = (*opExpr)(nil)
 
 // opExpr defines an expression that contains a raw sql operator string.
 type opExpr struct {
@@ -565,26 +565,26 @@ type opExpr struct {
 
 // Build converts the expression into a SQL fragment.
 //
-// Implements [dbx.Expression] interface.
-func (e *opExpr) Build(db *dbx.DB, params dbx.Params) string {
+// Implements [query.Expression] interface.
+func (e *opExpr) Build(db *query.DB, params query.Params) string {
 	return e.op
 }
 
 // -------------------------------------------------------------------
 
-var _ dbx.Expression = (*concatExpr)(nil)
+var _ query.Expression = (*concatExpr)(nil)
 
 // concatExpr defines an expression that concatenates multiple
 // other expressions with a specified separator.
 type concatExpr struct {
 	separator string
-	parts     []dbx.Expression
+	parts     []query.Expression
 }
 
 // Build converts the expression into a SQL fragment.
 //
-// Implements [dbx.Expression] interface.
-func (e *concatExpr) Build(db *dbx.DB, params dbx.Params) string {
+// Implements [query.Expression] interface.
+func (e *concatExpr) Build(db *query.DB, params query.Params) string {
 	if len(e.parts) == 0 {
 		return ""
 	}
@@ -614,7 +614,7 @@ func (e *concatExpr) Build(db *dbx.DB, params dbx.Params) string {
 
 // -------------------------------------------------------------------
 
-var _ dbx.Expression = (*manyVsManyExpr)(nil)
+var _ query.Expression = (*manyVsManyExpr)(nil)
 
 // manyVsManyExpr constructs a multi-match many<->many db where expression.
 //
@@ -628,8 +628,8 @@ type manyVsManyExpr struct {
 
 // Build converts the expression into a SQL fragment.
 //
-// Implements [dbx.Expression] interface.
-func (e *manyVsManyExpr) Build(db *dbx.DB, params dbx.Params) string {
+// Implements [query.Expression] interface.
+func (e *manyVsManyExpr) Build(db *query.DB, params query.Params) string {
 	if e.left.MultiMatchSubQuery == nil || e.right.MultiMatchSubQuery == nil {
 		return "0=1"
 	}
@@ -648,7 +648,7 @@ func (e *manyVsManyExpr) Build(db *dbx.DB, params dbx.Params) string {
 			Identifier:   "[[" + rAlias + ".multiMatchValue]]",
 			// note: the AfterBuild needs to be handled only once and it
 			// doesn't matter whether it is applied on the left or right subquery operand
-			AfterBuild: dbx.Not, // inverse for the not-exist expression
+			AfterBuild: query.Not, // inverse for the not-exist expression
 		},
 	)
 
@@ -668,7 +668,7 @@ func (e *manyVsManyExpr) Build(db *dbx.DB, params dbx.Params) string {
 
 // -------------------------------------------------------------------
 
-var _ dbx.Expression = (*manyVsOneExpr)(nil)
+var _ query.Expression = (*manyVsOneExpr)(nil)
 
 // manyVsOneExpr constructs a multi-match many<->one db where expression.
 //
@@ -677,7 +677,7 @@ var _ dbx.Expression = (*manyVsOneExpr)(nil)
 // You can set inverse=false to reverse the condition sides (aka. one<->many).
 type manyVsOneExpr struct {
 	otherOperand *ResolverResult
-	subQuery     dbx.Expression
+	subQuery     query.Expression
 	op           fexpr.SignOp
 	inverse      bool
 	nullFallback NullFallbackPreference
@@ -685,8 +685,8 @@ type manyVsOneExpr struct {
 
 // Build converts the expression into a SQL fragment.
 //
-// Implements [dbx.Expression] interface.
-func (e *manyVsOneExpr) Build(db *dbx.DB, params dbx.Params) string {
+// Implements [query.Expression] interface.
+func (e *manyVsOneExpr) Build(db *query.DB, params query.Params) string {
 	if e.subQuery == nil {
 		return "0=1"
 	}
@@ -696,7 +696,7 @@ func (e *manyVsOneExpr) Build(db *dbx.DB, params dbx.Params) string {
 	r1 := &ResolverResult{
 		NullFallback: e.nullFallback,
 		Identifier:   "[[" + alias + ".multiMatchValue]]",
-		AfterBuild:   dbx.Not, // inverse for the not-exist expression
+		AfterBuild:   query.Not, // inverse for the not-exist expression
 	}
 
 	r2 := &ResolverResult{
@@ -704,7 +704,7 @@ func (e *manyVsOneExpr) Build(db *dbx.DB, params dbx.Params) string {
 		Params:     e.otherOperand.Params,
 	}
 
-	var whereExpr dbx.Expression
+	var whereExpr query.Expression
 	var buildErr error
 
 	if e.inverse {
