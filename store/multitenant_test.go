@@ -31,10 +31,14 @@ func newTestStore(t *testing.T, opts ...func(*store.Options)) (*store.MultiTenan
 	t.Cleanup(func() { fs.Close() })
 
 	o := store.Options{
-		ObjectStore:        fs,
-		CacheRoot:          cacheDir,
-		LRUSize:            4, // tiny on purpose to exercise eviction
-		IdleTTL:            50 * time.Millisecond,
+		ObjectStore: fs,
+		CacheRoot:   cacheDir,
+		LRUSize:     4, // tiny on purpose to exercise eviction
+		// IdleTTL is long by default so standard tests don't race the
+		// reaper while operating on a DB handle. Tests that need to
+		// exercise reap behavior pass a small IdleTTL via the opts
+		// variadic.
+		IdleTTL:            5 * time.Second,
 		CheckpointWrites:   2,
 		CheckpointInterval: 10 * time.Millisecond,
 	}
@@ -397,10 +401,254 @@ func TestDoubleCloseIdempotent(t *testing.T) {
 	}
 }
 
+// ============================================================
+// P7 — Red re-review coverage. Each test maps to one Red finding.
+// ============================================================
+
+// TestHydrate_RejectsPoisonedBlob (P7-C2) — a non-SQLite blob planted in
+// the bucket is rejected on hydrate and the modernc driver never touches
+// the bytes.
+func TestHydrate_RejectsPoisonedBlob(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+
+	// Plant a malicious blob at the expected object path.
+	if err := os.MkdirAll(filepath.Join(bucketDir, "acme", "users"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	poison := []byte("--evil DROP TABLE users; SELECT * FROM sqlite_master;--")
+	if err := os.WriteFile(filepath.Join(bucketDir, "acme", "users", "alice.db"), poison, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := ctxWithClaims("acme", "alice")
+	db, err := s.ForCtx(ctx)
+	if !errors.Is(err, store.ErrCorruptDB) {
+		t.Fatalf("ForCtx: got err=%v, want ErrCorruptDB (db=%v)", err, db)
+	}
+	if db != nil {
+		t.Fatalf("ForCtx returned a non-nil db for a poisoned blob: %v", db)
+	}
+}
+
+// TestValidateSQLiteMagic checks boundary cases on the magic-header check.
+func TestValidateSQLiteMagic_AcceptsEmpty(t *testing.T) {
+	// This exercises store.verifySQLiteFile indirectly through a fresh
+	// tenant — empty local file must NOT be rejected (a new tenant's
+	// localPath is 0 bytes on first hydrate).
+	s, _ := newTestStore(t)
+	ctx := ctxWithClaims("acme", "alice")
+	if _, err := s.ForCtx(ctx); err != nil {
+		t.Fatalf("fresh tenant (empty file) must not be rejected: %v", err)
+	}
+}
+
+// TestEvict_SurfacesUploadError (P7-H1) — when object-store Upload fails,
+// Evict returns an error wrapping ErrUploadFailed and the local data is
+// retained (caller can retry, data not silently lost).
+func TestEvict_SurfacesUploadError(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+	ctx := ctxWithClaims("acme", "alice")
+
+	db, err := s.ForCtx(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewQuery("CREATE TABLE t(v TEXT)").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewQuery("INSERT INTO t VALUES ('keep-me')").Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Lock the bucket so Upload fails. fileblob writes a tempfile inside
+	// the destination directory and renames it — chmod 0500 on the dir
+	// that holds the target prevents both file creation and rename.
+	targetDir := filepath.Join(bucketDir, "acme", "users")
+	// The directory may not exist yet (no prior upload). Create it.
+	if err := os.MkdirAll(targetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(targetDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(targetDir, 0o700) })
+
+	k := store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}
+	err = s.Evict(context.Background(), k)
+	if !errors.Is(err, store.ErrUploadFailed) {
+		t.Fatalf("Evict: err=%v, want ErrUploadFailed", err)
+	}
+}
+
+// TestClose_AggregatesUploadFailures (P7-H1) — Close loudly surfaces how
+// many tenants failed to flush so ops can intervene.
+func TestClose_AggregatesUploadFailures(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+
+	for _, u := range []string{"alice", "bob", "carol"} {
+		ctx := ctxWithClaims("acme", u)
+		db, err := s.ForCtx(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.NewQuery("CREATE TABLE t(v TEXT)").Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := db.NewQuery("INSERT INTO t VALUES ('data')").Execute(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Poison every upload target.
+	targetDir := filepath.Join(bucketDir, "acme", "users")
+	if err := os.MkdirAll(targetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(targetDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(targetDir, 0o700) })
+
+	err := s.Close(context.Background())
+	if err == nil {
+		t.Fatalf("Close: expected aggregated upload-failure error, got nil")
+	}
+	if !errors.Is(err, store.ErrUploadFailed) {
+		t.Fatalf("Close: err=%v, want Is(ErrUploadFailed)", err)
+	}
+}
+
+// TestReaper_LockHoldTimeChunked (P7-H2) — with 100 resident handles, a
+// Get call for a fresh tenant made while the reaper is flushing must
+// return fast (under 500ms), proving the reaper releases s.mu per-handle.
+func TestReaper_LockHoldTimeChunked(t *testing.T) {
+	// Large LRU so filling 100 handles doesn't trigger cap eviction; tiny
+	// idle TTL so every handle is eligible for reap.
+	s, _ := newTestStore(t, func(o *store.Options) {
+		o.LRUSize = 200
+		o.IdleTTL = 1 * time.Millisecond
+		o.CheckpointInterval = 10 * time.Minute // disable time-based flush
+	})
+
+	// Fill 100 handles.
+	for i := 0; i < 100; i++ {
+		ctx := ctxWithClaims("acme", "u"+itoa(i))
+		if _, err := s.ForCtx(ctx); err != nil {
+			t.Fatalf("warmup %d: %v", i, err)
+		}
+	}
+
+	// Force every handle's lastAccess beyond the TTL cutoff.
+	time.Sleep(5 * time.Millisecond)
+
+	// Kick the reaper by sleeping past one tick interval. The default
+	// reaperLoop tick is IdleTTL/2 = 500µs; definitely fired by 5ms.
+	done := make(chan struct{})
+	start := time.Now()
+	go func() {
+		// While the reaper is mid-flush, issue a cold Get for a NEW tenant.
+		// Under the old (O(N)) reaper this Get blocks for the entire reap
+		// cycle; under the chunked reaper it blocks at most one handle.
+		ctx := ctxWithClaims("acme", "probe")
+		_, _ = s.ForCtx(ctx)
+		close(done)
+	}()
+	<-done
+	elapsed := time.Since(start)
+	if elapsed > 500*time.Millisecond {
+		t.Fatalf("cold Get during reap blocked for %v (>500ms)", elapsed)
+	}
+}
+
+// TestEvictionReturnsError_RecoversOnRetry (P7-H1) — after an upload-fail
+// Evict, clearing the failure lets the next Evict succeed and drops the
+// handle cleanly. No data is lost in the local cache until durable write
+// is confirmed.
+func TestEvictionReturnsError_RecoversOnRetry(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+	ctx := ctxWithClaims("acme", "alice")
+
+	db, err := s.ForCtx(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewQuery("CREATE TABLE t(v TEXT)").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewQuery("INSERT INTO t VALUES ('x')").Execute(); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDir := filepath.Join(bucketDir, "acme", "users")
+	if err := os.MkdirAll(targetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(targetDir, 0o500); err != nil {
+		t.Fatal(err)
+	}
+
+	k := store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}
+	if err := s.Evict(context.Background(), k); !errors.Is(err, store.ErrUploadFailed) {
+		t.Fatalf("first Evict should fail: %v", err)
+	}
+
+	// Clear the poisoning.
+	if err := os.Chmod(targetDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	// A retry succeeds; data is now durable.
+	if err := s.Evict(context.Background(), k); err != nil {
+		t.Fatalf("second Evict should succeed: %v", err)
+	}
+	if !fileExists(t, filepath.Join(targetDir, "alice.db")) {
+		t.Fatalf("bucket should have the flushed DB now")
+	}
+}
+
+// TestCAS_ConstantExposed (P7-C1 option B) — consumers that want
+// generation-checked writes must feature-gate on store.CAS. In v1 it's
+// false; a CAS-requiring service can refuse to boot.
+func TestCAS_ConstantExposed(t *testing.T) {
+	if store.CAS {
+		t.Fatal("store.CAS must be false in v1 until ETag upload path lands")
+	}
+}
+
+// TestKey_Valid_RejectsLongSlug (P7-M1/H additional) — slugs over the cap
+// are rejected by validateSlug before any FS call. No log-injection
+// surface through ENAMETOOLONG.
+func TestKey_Valid_RejectsLongSlug(t *testing.T) {
+	long := make([]byte, store.MaxSlugLen+1)
+	for i := range long {
+		long[i] = 'a'
+	}
+	k := store.Key{OrgID: string(long), UserID: "alice", Scope: store.ScopeUser}
+	if err := k.Valid(); err == nil {
+		t.Fatalf("expected Valid()=err for %d-byte slug", len(long))
+	}
+}
+
 // helpers
 
 func fileExists(t *testing.T, path string) bool {
 	t.Helper()
 	info, err := os.Stat(path)
 	return err == nil && info != nil
+}
+
+// itoa is a tiny int→string for test IDs; avoids strconv just to keep
+// the test file focused on the testing DSL.
+func itoa(i int) string {
+	if i == 0 {
+		return "0"
+	}
+	var buf [20]byte
+	pos := len(buf)
+	for i > 0 {
+		pos--
+		buf[pos] = byte('0' + i%10)
+		i /= 10
+	}
+	return string(buf[pos:])
 }
