@@ -100,6 +100,20 @@ func RequireGateway(next http.Handler) http.Handler {
 	})
 }
 
+// Chain is the canonical tenant-route middleware chain: Strip → Inject →
+// RequireGateway → next. This is the ONLY approved way to mount a
+// tenant-scoped handler. Services MUST NOT compose Strip, Inject, and
+// RequireGateway by hand — the PHILOSOPHY.md "one and only one way"
+// principle applies, and a misordered hand-wired chain silently defeats
+// the forged-header defense (verified by Red probe P7-H3).
+//
+// Public routes (/healthz, /readyz, /metrics) MUST be mounted on a
+// separate mux that does not pass through Chain; the chain would 503
+// every probe when gateway headers are absent.
+func Chain(next http.Handler) http.Handler {
+	return Strip(Inject(RequireGateway(next)))
+}
+
 // RequireRole returns a middleware that enforces the caller holds at least one
 // of the requested roles. On failure, the response is a 404 — not 403 — so
 // probing for authorized endpoints does not leak their existence. If you want
