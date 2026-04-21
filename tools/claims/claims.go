@@ -29,6 +29,13 @@ const (
 	HeaderRoles  = "X-Roles"
 )
 
+// MaxIdentityValueLen caps every header value consumed by this package.
+// Chosen at 256 bytes: generous for ULIDs/UUIDs, IAM usernames, and the
+// longest realistic comma-joined role list (~20 role names @ 12 chars).
+// A value longer than this is either a bug or an exhaustion attempt and
+// is discarded — the caller observes "no identity" and RequireGateway 503s.
+const MaxIdentityValueLen = 256
+
 // Claims is the verified identity of the current request as asserted by the
 // upstream gateway's JWT validation. All three fields may be empty strings /
 // empty slices when the request is unauthenticated (public endpoints).
@@ -42,27 +49,83 @@ type Claims struct {
 // three canonical headers; any legacy variant set by a client is ignored by
 // design (and should have been stripped upstream).
 //
-// Roles are decoded from a comma-separated list; empty roles are dropped.
+// Header values are sanitized: any value that contains a control character
+// (byte < 0x20 or byte == 0x7f) or exceeds [MaxIdentityValueLen] bytes is
+// discarded and the corresponding field becomes empty. This makes log /
+// path / response-splitting injection unreachable through this parser, and
+// makes [RequireGateway] fail closed (503) on a poisoned identity instead
+// of forwarding hostile bytes into handlers.
+//
+// Roles are decoded from a comma-separated list; empty roles, roles that
+// exceed the length cap individually, and roles that contain control
+// characters are each dropped.
 func FromHeaders(r *http.Request) Claims {
 	return Claims{
-		UserID: r.Header.Get(HeaderUserID),
-		OrgID:  r.Header.Get(HeaderOrgID),
+		UserID: sanitizeIdentity(r.Header.Get(HeaderUserID)),
+		OrgID:  sanitizeIdentity(r.Header.Get(HeaderOrgID)),
 		Roles:  parseRoles(r.Header.Get(HeaderRoles)),
 	}
 }
 
+// sanitizeIdentity returns s unchanged when it meets the identity-value
+// contract: non-empty, ≤ MaxIdentityValueLen bytes, no control characters.
+// Any violation returns "" — i.e. the header is treated as absent. We
+// deliberately do NOT fall back to a "best-effort" trimmed value because
+// the identity contract is binary: either the gateway produced a clean
+// header or the request is hostile.
+func sanitizeIdentity(s string) string {
+	if s == "" {
+		return ""
+	}
+	if len(s) > MaxIdentityValueLen {
+		return ""
+	}
+	if hasControlByte(s) {
+		return ""
+	}
+	return s
+}
+
+// hasControlByte reports whether s contains any byte below 0x20 (all C0
+// controls including NUL, TAB, CR, LF) or the DEL byte 0x7f. These bytes
+// are never part of a legitimate IAM slug, email, or role name and are
+// the universal primitives for header / log / path injection.
+func hasControlByte(s string) bool {
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if b < 0x20 || b == 0x7f {
+			return true
+		}
+	}
+	return false
+}
+
 // parseRoles splits a comma-joined roles header into a slice, trimming
-// whitespace and dropping empty entries.
+// whitespace and dropping empty entries. Any role value that contains a
+// control byte or exceeds the length cap is silently dropped — the parser
+// refuses to propagate bytes that could smuggle CRLF or NUL into
+// downstream audit / log / response code.
 func parseRoles(raw string) []string {
 	if raw == "" {
+		return nil
+	}
+	if len(raw) > MaxIdentityValueLen {
 		return nil
 	}
 	parts := strings.Split(raw, ",")
 	out := make([]string, 0, len(parts))
 	for _, p := range parts {
-		if v := strings.TrimSpace(p); v != "" {
-			out = append(out, v)
+		v := strings.TrimSpace(p)
+		if v == "" {
+			continue
 		}
+		if hasControlByte(v) {
+			continue
+		}
+		if len(v) > MaxIdentityValueLen {
+			continue
+		}
+		out = append(out, v)
 	}
 	if len(out) == 0 {
 		return nil
