@@ -1,41 +1,39 @@
 package cron
 
-import "encoding/json"
+import (
+	"encoding/json"
 
-// Job defines a single registered cron job.
+	"github.com/hanzoai/base/tools/tasks"
+)
+
+// Job is a read-only view of a registered schedule, returned by Cron.Jobs().
 type Job struct {
-	fn       func()
-	schedule *Schedule
-	id       string
+	id         string
+	expression string
+	client     *tasks.Client
 }
 
-// Id returns the cron job id.
-func (j *Job) Id() string {
-	return j.id
-}
+// Id returns the job id.
+func (j *Job) Id() string { return j.id }
 
-// Expression returns the plain cron job schedule expression.
-func (j *Job) Expression() string {
-	return j.schedule.rawExpr
-}
+// Expression returns the cron expression or duration string the job was
+// registered with.
+func (j *Job) Expression() string { return j.expression }
 
-// Run runs the cron job function.
+// Run invokes the job's registered callback immediately, outside the normal
+// schedule. No-op if the callback runs server-side (durable tasks) and is
+// therefore not available in-process.
 func (j *Job) Run() {
-	if j.fn != nil {
-		j.fn()
+	if j.client == nil {
+		return
 	}
+	j.client.Run(j.id)
 }
 
-// MarshalJSON implements [json.Marshaler] and export the current
-// jobs data into valid JSON.
+// MarshalJSON implements json.Marshaler for the admin list endpoint.
 func (j Job) MarshalJSON() ([]byte, error) {
-	plain := struct {
+	return json.Marshal(struct {
 		Id         string `json:"id"`
 		Expression string `json:"expression"`
-	}{
-		Id:         j.Id(),
-		Expression: j.Expression(),
-	}
-
-	return json.Marshal(plain)
+	}{Id: j.id, Expression: j.expression})
 }
