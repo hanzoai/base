@@ -20,6 +20,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.4.0
 	github.com/luxfi/cache v1.2.1
+	github.com/luxfi/consensus v1.22.85
 	github.com/luxfi/fhe v1.7.9
 	github.com/luxfi/zap v0.2.1
 	github.com/spf13/cast v1.10.0
@@ -41,6 +42,9 @@ require (
 	filippo.io/edwards25519 v1.1.1 // indirect
 	github.com/ALTree/bigfloat v0.2.0 // indirect
 	github.com/Masterminds/semver/v3 v3.3.0 // indirect
+	github.com/bits-and-blooms/bitset v1.24.4 // indirect
+	github.com/cloudflare/circl v1.6.3 // indirect
+	github.com/consensys/gnark-crypto v0.20.1 // indirect
 	github.com/go-sql-driver/mysql v1.9.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
@@ -48,21 +52,26 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.4 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
 	github.com/luxfi/constants v1.5.0 // indirect
-	github.com/luxfi/container v0.0.2 // indirect
+	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
+	github.com/luxfi/ringtail v0.2.0 // indirect
 	github.com/luxfi/sampler v1.0.0 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
+	github.com/montanaflynn/stats v0.8.2 // indirect
 	github.com/nats-io/nkeys v0.4.12 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/psanford/sqlite3vfs v0.0.0-20251127171934-4e34e03a991a // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/superfly/ltx v0.5.1 // indirect
+	github.com/supranational/blst v0.3.16 // indirect
 	github.com/tetratelabs/wazero v1.2.1 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
+	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.40.0 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.224.0 // indirect
@@ -109,17 +118,17 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nexus-rpc/sdk-go v0.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
-	github.com/prometheus/client_model v0.6.2 // indirect
+	github.com/prometheus/client_golang v1.23.2
+	github.com/prometheus/client_model v0.6.2
 	github.com/prometheus/common v0.67.5 // indirect
-	github.com/prometheus/procfs v0.19.2 // indirect
+	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	go.uber.org/mock v0.6.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect

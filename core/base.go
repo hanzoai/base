@@ -106,6 +106,7 @@ type BaseApp struct {
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
 	tenants             *TenantRegistry
+	network             baseNetwork
 
 	// app event hooks
 	onBootstrap     *hook.Hook[*BootstrapEvent]
@@ -435,6 +436,10 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
+		if err := app.attachNetwork(context.Background()); err != nil {
+			return err
+		}
+
 		app.initTenants()
 
 		if err := app.initLogger(); err != nil {
@@ -504,6 +509,13 @@ func (app *BaseApp) ResetBootstrapState() error {
 			errs = append(errs, err)
 		}
 		app.tenants = nil
+	}
+
+	if app.network != nil {
+		if err := app.network.Stop(context.Background()); err != nil {
+			errs = append(errs, err)
+		}
+		app.network = nil
 	}
 
 	if len(errs) > 0 {
