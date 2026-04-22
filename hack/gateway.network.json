@@ -1,0 +1,77 @@
+{
+  "$schema": "https://gateway.hanzo.ai/schema/v3.json",
+  "version": 3,
+  "name": "Base Network dev gateway",
+  "port": 8080,
+  "timeout": "30s",
+  "output_encoding": "no-op",
+  "extra_config": {
+    "router": {
+      "return_error_msg": true
+    },
+    "telemetry/logging": {
+      "level": "INFO",
+      "prefix": "[GATEWAY]",
+      "stdout": true
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "/api/{path}",
+      "method": "GET",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/api/{path}",
+          "host": ["http://base-a:8090"],
+          "encoding": "no-op",
+          "extra_config": {
+            "github.com/hanzoai/gateway/base-network": {
+              "shard_key": "user_id",
+              "shard_key_source": "header:X-User-Id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/{path}",
+      "method": "POST",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/api/{path}",
+          "host": ["http://base-a:8090"],
+          "encoding": "no-op",
+          "extra_config": {
+            "github.com/hanzoai/gateway/base-network": {
+              "shard_key": "user_id",
+              "shard_key_source": "header:X-User-Id"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "endpoint": "/api/{path}",
+      "method": "DELETE",
+      "input_headers": ["*"],
+      "output_encoding": "no-op",
+      "backend": [
+        {
+          "url_pattern": "/api/{path}",
+          "host": ["http://base-a:8090"],
+          "encoding": "no-op",
+          "extra_config": {
+            "github.com/hanzoai/gateway/base-network": {
+              "shard_key": "user_id",
+              "shard_key_source": "header:X-User-Id"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
