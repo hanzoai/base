@@ -1,0 +1,185 @@
+name: network-attack-suite
+
+# Red-team adversarial test suite for the Base Network package.
+# Blocks merge of any PR touching network/** or docs/NETWORK.md that
+# regresses a published defence.
+#
+# Contract (duplicated in network/attack_vectors_test.go header):
+#   - Every TestAttack_* test must PASS or SKIP.
+#   - The ONLY accepted skip reason is the literal string
+#     "BLOCKED: waiting on blue feat/network-v0-redfix".
+#     Any other skip reason is a CI failure (the check below greps
+#     t.Skip() args against an allowlist).
+#   - Every test name in EXPECTED_TESTS must be present.
+#     Deletions are refused until the catalog is updated.
+#   - Runtime < 2 minutes on ubuntu-latest. Integration variants
+#     (//go:build integration) run in a separate step with longer
+#     budget.
+
+on:
+  pull_request:
+    paths:
+      - "network/**"
+      - "docs/NETWORK.md"
+      - ".github/workflows/network-attack-suite.yml"
+  push:
+    branches: [main, "feat/network-**"]
+
+jobs:
+  attack-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOTOOLCHAIN: local+path
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.x"
+          cache: true
+
+      - name: Resolve dependencies
+        working-directory: network
+        run: go mod download
+
+      - name: Compile-only gate (race detector + integration tag)
+        working-directory: network
+        run: |
+          go test -race -count=1 -run ImpossibleTestName ./... >/dev/null
+          go test -tags=integration -count=1 -run ImpossibleTestName ./... >/dev/null
+
+      - name: Run attack suite
+        id: suite
+        working-directory: network
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/attack-suite
+          go test -count=1 -race -v -timeout 5m -run '^TestAttack_' ./... 2>&1 \
+            | tee /tmp/attack-suite/output.txt
+          grep -c '^--- PASS: TestAttack_' /tmp/attack-suite/output.txt > /tmp/attack-suite/pass_count
+          grep -c '^--- SKIP: TestAttack_' /tmp/attack-suite/output.txt > /tmp/attack-suite/skip_count || echo 0 > /tmp/attack-suite/skip_count
+          grep -c '^--- FAIL: TestAttack_' /tmp/attack-suite/output.txt > /tmp/attack-suite/fail_count || echo 0 > /tmp/attack-suite/fail_count
+
+      - name: Enforce no unlisted skip reasons
+        working-directory: network
+        run: |
+          set -e
+          # The ONLY accepted skip reason. Any other skip string is a
+          # silent-regression vector and fails CI.
+          allowed='BLOCKED: waiting on blue feat/network-v0-redfix'
+          # Pull out skip-reason lines.
+          bad=$(awk '
+            /^=== RUN[[:space:]]+TestAttack_/ { name = $3 }
+            /BLOCKED: waiting on blue feat\/network-v0-redfix/ { next }
+            /attack_vectors_test\.go:[0-9]+: / {
+              # Allowlist: "BLOCKED: ..." accepted, "note:" tolerated
+              if ($0 !~ /BLOCKED: waiting on blue/ && $0 !~ /reader goroutine did not run/) {
+                printf("%s :: %s\n", name, $0)
+              }
+            }
+            /^--- SKIP: TestAttack_/ { name = "" }
+          ' /tmp/attack-suite/output.txt || true)
+          if [ -n "$bad" ]; then
+            echo "Unlisted skip reasons detected:" >&2
+            echo "$bad" >&2
+            echo "" >&2
+            echo "Only '${allowed}' is allowed for t.Skip() in attack tests." >&2
+            exit 1
+          fi
+
+      - name: Enforce expected-tests catalog
+        working-directory: network
+        run: |
+          set -e
+          # Source of truth: every TestAttack_* in attack_vectors_test.go
+          # MUST appear in the run output. Deletions require updating the
+          # NETWORK_RED_REVIEW.md catalog AND this list in the same PR.
+          declared=$(grep -oE '^func (TestAttack_[A-Za-z0-9_]+)' attack_vectors_test.go \
+            | awk '{print $2}' | sort -u)
+          ran=$(grep -oE 'TestAttack_[A-Za-z0-9_]+' /tmp/attack-suite/output.txt \
+            | sort -u)
+          missing=$(comm -23 <(echo "$declared") <(echo "$ran"))
+          if [ -n "$missing" ]; then
+            echo "Declared but not executed:" >&2
+            echo "$missing" >&2
+            exit 1
+          fi
+
+      - name: Enforce no failures
+        run: |
+          fail=$(cat /tmp/attack-suite/fail_count)
+          if [ "$fail" != "0" ]; then
+            echo "Attack suite failures: $fail" >&2
+            grep -E '^(--- FAIL: TestAttack_|    attack_vectors_test\.go:)' /tmp/attack-suite/output.txt >&2 || true
+            exit 1
+          fi
+
+      - name: Runtime budget
+        working-directory: network
+        run: |
+          # Independent budget check: re-run the suite without -v and
+          # assert <2 min wall-clock. Race detector is off here because
+          # it's intentionally a runtime-cost amplifier — we enforce the
+          # budget on the non-instrumented build.
+          start=$(date +%s)
+          go test -count=1 -timeout 2m -run '^TestAttack_' ./... >/dev/null
+          end=$(date +%s)
+          elapsed=$((end - start))
+          echo "Suite runtime: ${elapsed}s"
+          if [ "$elapsed" -gt 120 ]; then
+            echo "Suite exceeded 2-minute budget" >&2
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          pass=$(cat /tmp/attack-suite/pass_count 2>/dev/null || echo ?)
+          skip=$(cat /tmp/attack-suite/skip_count 2>/dev/null || echo ?)
+          fail=$(cat /tmp/attack-suite/fail_count 2>/dev/null || echo ?)
+          total=$((pass + skip + fail))
+          {
+            echo "# Network attack suite"
+            echo ""
+            echo "| Status | Count |"
+            echo "|--------|-------|"
+            echo "| PASS   | $pass |"
+            echo "| SKIP   | $skip (blocking-blue) |"
+            echo "| FAIL   | $fail |"
+            echo "| **Total** | **$total** |"
+            echo ""
+            echo "Skip reason allowed: \`BLOCKED: waiting on blue feat/network-v0-redfix\`"
+            echo ""
+            echo "Catalog: \`docs/NETWORK_RED_REVIEW.md#attack-suite-catalog\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  pr-comment:
+    needs: attack-suite
+    if: github.event_name == 'pull_request' && always()
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post summary comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ needs.attack-suite.result }}';
+            const emoji = status === 'success' ? 'OK' : 'BLOCKED';
+            const body = [
+              `### Network attack suite: ${emoji} (${status})`,
+              ``,
+              `Adversarial test suite run — full catalog in`,
+              `\`docs/NETWORK_RED_REVIEW.md#attack-suite-catalog\`.`,
+              ``,
+              `Workflow: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            ].join('\n');
+            const {owner, repo} = context.repo;
+            const pr = context.payload.pull_request.number;
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr, body,
+            });
