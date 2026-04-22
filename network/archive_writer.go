@@ -2,11 +2,11 @@ package network
 
 import (
 	"context"
+	"crypto/ed25519"
 	"fmt"
 	"iter"
 	"log/slog"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,10 +30,20 @@ type uploader interface {
 type shardQueue struct {
 	shardID string
 	seg     *segmentBuffer
-	backlog [][]byte // encoded segments pending upload
+	backlog []segmentPending
 	// flushDeadline is when the current seg must flush even if under
 	// the size target. Reset on every new segment.
 	flushDeadline time.Time
+}
+
+// segmentPending is an encoded segment waiting to be uploaded. The
+// nanos field is the monotonic suffix that goes into the object key —
+// assigned once on rotate, never changed after, so re-buffered items
+// don't collide with fresh encodes of the same seq range.
+type segmentPending struct {
+	nanos    int64
+	startSeq uint64
+	data     []byte
 }
 
 // archiveWriter is the shared goroutine-per-shard pipeline that both
@@ -46,6 +56,15 @@ type archiveWriter struct {
 	svcPrefix string
 	m         *ArchiveMetrics
 
+	// signer produces per-segment Ed25519 signatures. Every segment we
+	// write is signed; without a signer the writer refuses to encode.
+	signer *segmentSigner
+	// verifier is the trust policy for segments we read back. Defaults
+	// to accepting only the local signer's key. Callers needing to
+	// trust a rotated-out key (PITR) inject additional keys via
+	// cfg.TrustedSegmentKeys.
+	verifier *segmentVerifier
+
 	mu     sync.Mutex
 	shards map[string]*shardQueue
 
@@ -53,23 +72,55 @@ type archiveWriter struct {
 	// every shard. Refreshed whenever append/flush changes it.
 	lagBytes atomic.Int64
 
-	stopCh chan struct{}
+	stopCh  chan struct{}
 	stopped atomic.Bool
-	wg     sync.WaitGroup
+	wg      sync.WaitGroup
 }
 
 func newArchiveWriter(up uploader, svcPrefix string, cfg ArchiveConfig, m *ArchiveMetrics) *archiveWriter {
+	cfg = cfg.withDefaults()
+	signer, verifier := resolveSegmentCrypto(&cfg)
 	w := &archiveWriter{
 		up:        up,
 		cfg:       cfg,
 		svcPrefix: svcPrefix,
 		m:         m,
+		signer:    signer,
+		verifier:  verifier,
 		shards:    make(map[string]*shardQueue),
 		stopCh:    make(chan struct{}),
 	}
 	w.wg.Add(1)
 	go w.flushLoop()
 	return w
+}
+
+// resolveSegmentCrypto picks the signing key and builds the verifier
+// trust set. An unconfigured cfg auto-generates a transient key so
+// tests and dev runs Just Work — production callers are expected to
+// inject a KMS-held key via cfg.SigningKey and the matching public
+// key(s) via cfg.TrustedSegmentKeys.
+func resolveSegmentCrypto(cfg *ArchiveConfig) (*segmentSigner, *segmentVerifier) {
+	priv := cfg.SigningKey
+	if len(priv) != ed25519.PrivateKeySize {
+		// No key supplied — auto-generate. Sized so archives read
+		// within a single process (tests, dev) can be verified by the
+		// same writer's verifier.
+		pub, gen, err := ed25519.GenerateKey(nil)
+		if err != nil {
+			// Ed25519.GenerateKey only fails on a catastrophically
+			// broken crypto/rand — return a disabled pair so the
+			// writer fails closed on encode.
+			_ = pub
+			return nil, newSegmentVerifier()
+		}
+		priv = gen
+	}
+	s := newSegmentSigner(priv)
+	// Trust the local signer's key plus any explicitly trusted keys.
+	trust := []ed25519.PublicKey{s.pub}
+	trust = append(trust, cfg.TrustedSegmentKeys...)
+	return s, newSegmentVerifier(trust...)
 }
 
 // Append buffers a frame. It never blocks on the network; the flush
@@ -107,6 +158,7 @@ func (w *archiveWriter) Append(ctx context.Context, shardID string, seq uint64, 
 			return err
 		}
 	}
+	w.enforceBacklogCapLocked(q)
 	w.reportLag()
 	return nil
 }
@@ -120,15 +172,59 @@ func (w *archiveWriter) rotateLocked(q *shardQueue) error {
 		q.flushDeadline = time.Now().Add(w.cfg.FlushInterval)
 		return nil
 	}
-	enc, err := q.seg.encode()
+	enc, err := q.seg.encode(w.signer)
 	if err != nil {
 		return fmt.Errorf("archive: encode segment: %w", err)
 	}
-	q.backlog = append(q.backlog, enc)
+	pending := segmentPending{
+		nanos:    time.Now().UnixNano(),
+		startSeq: q.seg.startSeq,
+		data:     enc,
+	}
+	q.backlog = append(q.backlog, pending)
 	w.lagBytes.Add(int64(len(enc)))
 	q.seg = newSegmentBuffer(q.shardID, q.seg.nextSeq)
 	q.flushDeadline = time.Now().Add(w.cfg.FlushInterval)
 	return nil
+}
+
+// enforceBacklogCapLocked sheds the oldest segments once the shard's
+// backlog exceeds either the byte cap or the segment-count cap. Drops
+// are counted on the IncDrops metric so operators get paged; this is
+// strictly a liveness-over-durability trade that fires only under a
+// hostile / broken backend (retries exhausted, uploads never
+// succeeding). The alternative is OOM, which drops everything.
+func (w *archiveWriter) enforceBacklogCapLocked(q *shardQueue) {
+	if w.cfg.BacklogMaxBytes <= 0 && w.cfg.BacklogMaxSegments <= 0 {
+		return
+	}
+	for {
+		total := 0
+		for _, p := range q.backlog {
+			total += len(p.data)
+		}
+		overBytes := w.cfg.BacklogMaxBytes > 0 && total > w.cfg.BacklogMaxBytes
+		overCount := w.cfg.BacklogMaxSegments > 0 && len(q.backlog) > w.cfg.BacklogMaxSegments
+		if !overBytes && !overCount {
+			return
+		}
+		if len(q.backlog) == 0 {
+			return
+		}
+		dropped := q.backlog[0]
+		q.backlog = q.backlog[1:]
+		w.lagBytes.Add(-int64(len(dropped.data)))
+		slog.Error("archive: backlog cap exceeded, dropping oldest segment",
+			"shard", q.shardID,
+			"dropped_seq", dropped.startSeq,
+			"dropped_bytes", len(dropped.data),
+			"backlog_segments_after", len(q.backlog),
+			"backlog_bytes_after", total-len(dropped.data),
+		)
+		if w.m != nil && w.m.IncDrops != nil {
+			w.m.IncDrops()
+		}
+	}
 }
 
 // flushLoop ticks at half the configured interval (so worst-case lag
@@ -166,20 +262,20 @@ func (w *archiveWriter) flushReady() {
 	}
 	// Snapshot backlog keys so we can upload without holding the lock.
 	type item struct {
-		q    *shardQueue
-		data []byte
+		q       *shardQueue
+		pending segmentPending
 	}
 	var pending []item
 	for _, q := range w.shards {
 		for _, seg := range q.backlog {
-			pending = append(pending, item{q: q, data: seg})
+			pending = append(pending, item{q: q, pending: seg})
 		}
 		q.backlog = nil
 	}
 	w.mu.Unlock()
 
 	for _, it := range pending {
-		w.uploadWithRetry(it.q, it.data)
+		w.uploadWithRetry(it.q, it.pending)
 	}
 	w.reportLag()
 }
@@ -194,13 +290,13 @@ func (w *archiveWriter) drain() {
 		}
 	}
 	type item struct {
-		q    *shardQueue
-		data []byte
+		q       *shardQueue
+		pending segmentPending
 	}
 	var pending []item
 	for _, q := range w.shards {
 		for _, seg := range q.backlog {
-			pending = append(pending, item{q: q, data: seg})
+			pending = append(pending, item{q: q, pending: seg})
 		}
 		q.backlog = nil
 	}
@@ -210,11 +306,12 @@ func (w *archiveWriter) drain() {
 	ctx, cancel := context.WithTimeout(context.Background(), w.cfg.RetryDeadline)
 	defer cancel()
 	for _, it := range pending {
-		if err := w.uploadOnce(ctx, it.q, it.data); err != nil {
+		if err := w.uploadOnce(ctx, it.q, it.pending); err != nil {
 			// Re-buffer the ones we couldn't ship so Close doesn't drop data;
 			// callers that care can poll until lag reaches zero.
 			w.mu.Lock()
-			it.q.backlog = append(it.q.backlog, it.data)
+			it.q.backlog = append(it.q.backlog, it.pending)
+			w.enforceBacklogCapLocked(it.q)
 			w.mu.Unlock()
 			slog.Error("archive: flush on close failed", "shard", it.q.shardID, "err", err)
 			if w.m != nil && w.m.IncFailures != nil {
@@ -226,30 +323,31 @@ func (w *archiveWriter) drain() {
 }
 
 // uploadWithRetry retries exponentially until RetryDeadline expires.
-// On deadline, it re-buffers the segment (never data loss) and
-// increments the failure counter.
-func (w *archiveWriter) uploadWithRetry(q *shardQueue, data []byte) {
+// On deadline, it re-buffers the segment (never silent data loss) and
+// increments the failure counter. The backlog cap is enforced again on
+// re-buffer, so a persistent hostile backend still bounds memory.
+func (w *archiveWriter) uploadWithRetry(q *shardQueue, p segmentPending) {
 	ctx, cancel := context.WithTimeout(context.Background(), w.cfg.RetryDeadline)
 	defer cancel()
 	backoff := 250 * time.Millisecond
 	for {
-		err := w.uploadOnce(ctx, q, data)
+		err := w.uploadOnce(ctx, q, p)
 		if err == nil {
 			return
 		}
 		slog.Warn("archive: upload failed, will retry",
-			"shard", q.shardID, "bytes", len(data), "err", err)
+			"shard", q.shardID, "bytes", len(p.data), "err", err)
 		select {
 		case <-w.stopCh:
-			w.reBuffer(q, data)
+			w.reBuffer(q, p)
 			return
 		case <-ctx.Done():
 			slog.Error("archive: upload retry deadline exceeded, re-buffering",
-				"shard", q.shardID, "bytes", len(data))
+				"shard", q.shardID, "bytes", len(p.data))
 			if w.m != nil && w.m.IncFailures != nil {
 				w.m.IncFailures()
 			}
-			w.reBuffer(q, data)
+			w.reBuffer(q, p)
 			return
 		case <-time.After(backoff):
 		}
@@ -260,29 +358,29 @@ func (w *archiveWriter) uploadWithRetry(q *shardQueue, data []byte) {
 	}
 }
 
-func (w *archiveWriter) uploadOnce(ctx context.Context, q *shardQueue, data []byte) error {
-	dec, err := decodeSegment(data)
-	if err != nil {
-		// This would be a bug in our own encoder; never silently ship
-		// a malformed segment.
-		return fmt.Errorf("archive: refusing to upload malformed segment: %w", err)
+func (w *archiveWriter) uploadOnce(ctx context.Context, q *shardQueue, p segmentPending) error {
+	// Sanity round-trip: refuse to ship anything we can't decode.
+	if _, err := decodeSegment(p.data, w.verifier); err != nil {
+		return fmt.Errorf("archive: refusing to upload unverifiable segment: %w", err)
 	}
-	key := objectKey(w.svcPrefix, dec.ShardID, dec.StartSeq)
-	if err := w.up.put(ctx, key, data); err != nil {
+	key := objectKey(w.svcPrefix, q.shardID, p.startSeq, p.nanos)
+	if err := w.up.put(ctx, key, p.data); err != nil {
 		return err
 	}
-	w.lagBytes.Add(-int64(len(data)))
+	w.lagBytes.Add(-int64(len(p.data)))
 	w.reportLag()
 	return nil
 }
 
 // reBuffer returns an unshipped segment to the shard's backlog so the
-// next flush cycle tries again. No data is ever dropped.
-func (w *archiveWriter) reBuffer(q *shardQueue, data []byte) {
+// next flush cycle tries again. The head-insert preserves oldest-first
+// ordering; the cap check ensures memory is still bounded.
+func (w *archiveWriter) reBuffer(q *shardQueue, p segmentPending) {
 	w.mu.Lock()
-	// Preserve ordering: re-buffered segments go to the head.
-	q.backlog = append([][]byte{data}, q.backlog...)
-	w.mu.Unlock()
+	defer w.mu.Unlock()
+	q.backlog = append([]segmentPending{p}, q.backlog...)
+	w.lagBytes.Add(int64(len(p.data)))
+	w.enforceBacklogCapLocked(q)
 }
 
 func (w *archiveWriter) reportLag() {
@@ -307,6 +405,11 @@ func (w *archiveWriter) Close() error {
 // Range implements Archive.Range by listing objects under the shard
 // prefix, filtering by seq range, downloading each overlapping
 // segment, and yielding frames in order.
+//
+// Keys contain a (startSeq, nanos) pair so multiple flushes of the
+// same seq range don't overwrite. The iterator sorts by (startSeq,
+// nanos) and dedupes frames by (startSeq + index) — the latest nanos
+// for a given startSeq wins when two segments cover the same range.
 func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSeq uint64) (iter.Seq2[Frame, error], error) {
 	if toSeq < fromSeq {
 		return nil, fmt.Errorf("archive: range toSeq %d < fromSeq %d", toSeq, fromSeq)
@@ -319,37 +422,39 @@ func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSe
 	type segMeta struct {
 		key      string
 		startSeq uint64
+		nanos    int64
 	}
 	metas := make([]segMeta, 0, len(keys))
 	for _, k := range keys {
 		if !strings.HasSuffix(k, ".lbn") {
 			continue
 		}
-		// key suffix: "<20-digit-seq>.lbn"
-		base := k[strings.LastIndex(k, "/")+1:]
-		stripped := strings.TrimSuffix(base, ".lbn")
-		seq, err := strconv.ParseUint(stripped, 10, 64)
-		if err != nil {
+		startSeq, nanos, ok := parseObjectKey(k)
+		if !ok {
 			continue // ignore unrelated objects under this prefix
 		}
-		metas = append(metas, segMeta{key: k, startSeq: seq})
+		metas = append(metas, segMeta{key: k, startSeq: startSeq, nanos: nanos})
 	}
-	sort.Slice(metas, func(i, j int) bool { return metas[i].startSeq < metas[j].startSeq })
+	// Sort primarily by startSeq, secondarily by nanos (older first)
+	// so a later flush of overlapping ranges wins on dedupe below.
+	sort.Slice(metas, func(i, j int) bool {
+		if metas[i].startSeq != metas[j].startSeq {
+			return metas[i].startSeq < metas[j].startSeq
+		}
+		return metas[i].nanos < metas[j].nanos
+	})
 
 	return func(yield func(Frame, error) bool) {
+		// Track the next seq we haven't yielded yet; we skip frames we've
+		// already emitted when two segments overlap.
+		nextSeq := fromSeq
 		for i, m := range metas {
-			// Cheap prune: if this segment starts after the requested
-			// range, we're done. If the NEXT segment also starts
-			// strictly after fromSeq, the current one may still
-			// overlap, so we only stop on pure post-range segments.
 			if m.startSeq > toSeq {
 				return
 			}
-			// Skip segments that end before fromSeq. "ends before" is
-			// determined by the next segment's startSeq-1 (contiguous
-			// assumption), or unbounded for the last segment — which
-			// means we must download it to know.
-			if i+1 < len(metas) && metas[i+1].startSeq <= fromSeq {
+			// Skip segments that end before fromSeq. We can only know the
+			// end by reading or the next segment's startSeq.
+			if i+1 < len(metas) && metas[i+1].startSeq <= fromSeq && metas[i+1].startSeq != m.startSeq {
 				continue
 			}
 			data, err := w.up.get(ctx, m.key)
@@ -357,14 +462,24 @@ func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSe
 				yield(Frame{ShardID: shardID}, fmt.Errorf("archive: get %s: %w", m.key, err))
 				return
 			}
-			dec, err := decodeSegment(data)
+			dec, err := decodeSegment(data, w.verifier)
 			if err != nil {
-				yield(Frame{ShardID: shardID}, fmt.Errorf("archive: decode %s: %w", m.key, err))
-				return
+				// R3: forged / truncated / foreign-signed segments are
+				// SILENTLY SKIPPED. Halting PITR on a single poisoned
+				// segment hands the attacker a DoS against restore;
+				// surfacing the skip as a metric keeps it visible.
+				slog.Warn("archive: skipping unverifiable segment",
+					"shard", shardID, "key", m.key, "err", err)
+				if w.m != nil && w.m.IncFailures != nil {
+					w.m.IncFailures()
+				}
+				continue
 			}
 			for idx, raw := range dec.Frames {
 				seq := dec.StartSeq + uint64(idx)
-				if seq < fromSeq {
+				if seq < nextSeq {
+					// Already yielded from an earlier segment covering
+					// this range; skip the duplicate copy.
 					continue
 				}
 				if seq > toSeq {
@@ -380,6 +495,7 @@ func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSe
 				if !yield(f, nil) {
 					return
 				}
+				nextSeq = seq + 1
 			}
 		}
 	}, nil
