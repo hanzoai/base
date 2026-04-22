@@ -220,11 +220,12 @@ type BaseApp struct {
 //
 // To initialize the app, you need to call `app.Bootstrap()`.
 func NewBaseApp(config BaseAppConfig) *BaseApp {
+	tc := tasks.New(os.Getenv("TASKS_URL"), os.Getenv("TASKS_ZAP"), nil)
 	app := &BaseApp{
 		settings:            newDefaultSettings(),
 		store:               store.New[string, any](nil),
-		cron:                cron.New(),
-		tasks:               tasks.New(os.Getenv("TASKS_URL"), os.Getenv("TASKS_ZAP"), nil),
+		tasks:               tc,
+		cron:                cron.NewFromTasks(tc),
 		subscriptionsBroker: subscriptions.NewBroker(),
 		config:              &config,
 	}

@@ -6,66 +6,54 @@ import (
 )
 
 func TestJobId(t *testing.T) {
-	expected := "test"
-
-	j := Job{id: expected}
-
-	if j.Id() != expected {
-		t.Fatalf("Expected job with id %q, got %q", expected, j.Id())
+	j := Job{id: "test"}
+	if j.Id() != "test" {
+		t.Fatalf("expected id=test, got %q", j.Id())
 	}
 }
 
-func TestJobExpr(t *testing.T) {
-	expected := "1 2 3 4 5"
-
-	s, err := NewSchedule(expected)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	j := Job{schedule: s}
-
-	if j.Expression() != expected {
-		t.Fatalf("Expected job with cron expression %q, got %q", expected, j.Expression())
+func TestJobExpression(t *testing.T) {
+	j := Job{expression: "1 2 3 4 5"}
+	if j.Expression() != "1 2 3 4 5" {
+		t.Fatalf("expected expression=1 2 3 4 5, got %q", j.Expression())
 	}
 }
 
-func TestJobRun(t *testing.T) {
+func TestJobRunNoClient(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Errorf("Shouldn't panic: %v", r)
+			t.Errorf("Run on zero-value Job must not panic: %v", r)
 		}
 	}()
+	(&Job{}).Run()
+}
 
-	calls := ""
+func TestJobRunThroughClient(t *testing.T) {
+	c := New()
+	defer c.Stop()
 
-	j1 := Job{}
-	j2 := Job{fn: func() { calls += "2" }}
-
-	j1.Run()
-	j2.Run()
-
-	expected := "2"
-	if calls != expected {
-		t.Fatalf("Expected calls %q, got %q", expected, calls)
+	calls := 0
+	if err := c.Add("probe", "24h", func() { calls++ }); err != nil {
+		t.Fatal(err)
+	}
+	jobs := c.Jobs()
+	if len(jobs) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(jobs))
+	}
+	jobs[0].Run()
+	if calls != 1 {
+		t.Fatalf("expected Run to invoke callback once, got %d", calls)
 	}
 }
 
 func TestJobMarshalJSON(t *testing.T) {
-	s, err := NewSchedule("1 2 3 4 5")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	j := Job{id: "test_id", schedule: s}
-
+	j := Job{id: "test_id", expression: "1 2 3 4 5"}
 	raw, err := json.Marshal(j)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	expected := `{"id":"test_id","expression":"1 2 3 4 5"}`
-	if str := string(raw); str != expected {
-		t.Fatalf("Expected\n%s\ngot\n%s", expected, str)
+	want := `{"id":"test_id","expression":"1 2 3 4 5"}`
+	if string(raw) != want {
+		t.Fatalf("expected %s, got %s", want, string(raw))
 	}
 }
