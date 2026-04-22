@@ -4,139 +4,92 @@ import (
 	"encoding/json"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/hanzoai/base/tools/tasks"
 )
 
 func TestCronNew(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
-	expectedInterval := 1 * time.Minute
-	if c.interval != expectedInterval {
-		t.Fatalf("Expected default interval %v, got %v", expectedInterval, c.interval)
+	if c.Total() != 0 {
+		t.Fatalf("expected no jobs on fresh cron, got %d", c.Total())
 	}
-
-	expectedTimezone := time.UTC
-	if c.timezone.String() != expectedTimezone.String() {
-		t.Fatalf("Expected default timezone %v, got %v", expectedTimezone, c.timezone)
-	}
-
-	if len(c.jobs) != 0 {
-		t.Fatalf("Expected no jobs by default, got \n%v", c.jobs)
-	}
-
-	if c.ticker != nil {
-		t.Fatal("Expected the ticker NOT to be initialized")
+	if c.HasStarted() {
+		t.Fatal("expected HasStarted=false before any Add")
 	}
 }
 
+// TestCronSetInterval verifies SetInterval is a safe no-op (superseded by
+// per-schedule durations on tasks.Client).
 func TestCronSetInterval(t *testing.T) {
 	t.Parallel()
 
 	c := New()
-
-	interval := 2 * time.Minute
-
-	c.SetInterval(interval)
-
-	if c.interval != interval {
-		t.Fatalf("Expected interval %v, got %v", interval, c.interval)
-	}
+	defer c.Stop()
+	c.SetInterval(2 * time.Minute) // must not panic
 }
 
+// TestCronSetTimezone verifies SetTimezone accepts a zone without erroring.
 func TestCronSetTimezone(t *testing.T) {
 	t.Parallel()
 
 	c := New()
-
-	timezone, _ := time.LoadLocation("Asia/Tokyo")
-
-	c.SetTimezone(timezone)
-
-	if c.timezone.String() != timezone.String() {
-		t.Fatalf("Expected timezone %v, got %v", timezone, c.timezone)
+	defer c.Stop()
+	tz, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		t.Fatal(err)
 	}
+	c.SetTimezone(tz)   // must not panic
+	c.SetTimezone(nil)  // must not panic
 }
 
 func TestCronAddAndRemove(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
 	if err := c.Add("test0", "* * * * *", nil); err == nil {
-		t.Fatal("Expected nil function error")
+		t.Fatal("expected nil-fn error")
 	}
-
 	if err := c.Add("test1", "invalid", func() {}); err == nil {
-		t.Fatal("Expected invalid cron expression error")
+		t.Fatal("expected invalid cron expression error")
 	}
 
-	if err := c.Add("test2", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
+	for _, id := range []string{"test2", "test3", "test4"} {
+		if err := c.Add(id, "* * * * *", func() {}); err != nil {
+			t.Fatal(err)
+		}
 	}
 
-	if err := c.Add("test3", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := c.Add("test4", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
-	// overwrite test2
+	// Overwrite test2 — should not duplicate.
 	if err := c.Add("test2", "1 2 3 4 5", func() {}); err != nil {
 		t.Fatal(err)
 	}
-
 	if err := c.Add("test5", "1 2 3 4 5", func() {}); err != nil {
 		t.Fatal(err)
 	}
 
-	// mock job deletion
 	c.Remove("test4")
+	c.Remove("missing") // no-op
 
-	// try to remove non-existing (should be no-op)
-	c.Remove("missing")
-
-	indexedJobs := make(map[string]*Job, len(c.jobs))
-	for _, j := range c.jobs {
-		indexedJobs[j.Id()] = j
+	expectedIds := []string{"test2", "test3", "test5"}
+	if c.Total() != len(expectedIds) {
+		t.Fatalf("expected %d jobs, got %d", len(expectedIds), c.Total())
 	}
-
-	// check job keys
-	{
-		expectedKeys := []string{"test3", "test2", "test5"}
-
-		if v := len(c.jobs); v != len(expectedKeys) {
-			t.Fatalf("Expected %d jobs, got %d", len(expectedKeys), v)
-		}
-
-		for _, k := range expectedKeys {
-			if indexedJobs[k] == nil {
-				t.Fatalf("Expected job with key %s, got nil", k)
-			}
+	for _, id := range expectedIds {
+		if !c.HasJob(id) {
+			t.Fatalf("expected HasJob(%q)=true", id)
 		}
 	}
-
-	// check the jobs schedule
-	{
-		expectedSchedules := map[string]string{
-			"test2": `{"minutes":{"1":{}},"hours":{"2":{}},"days":{"3":{}},"months":{"4":{}},"daysOfWeek":{"5":{}}}`,
-			"test3": `{"minutes":{"0":{},"1":{},"10":{},"11":{},"12":{},"13":{},"14":{},"15":{},"16":{},"17":{},"18":{},"19":{},"2":{},"20":{},"21":{},"22":{},"23":{},"24":{},"25":{},"26":{},"27":{},"28":{},"29":{},"3":{},"30":{},"31":{},"32":{},"33":{},"34":{},"35":{},"36":{},"37":{},"38":{},"39":{},"4":{},"40":{},"41":{},"42":{},"43":{},"44":{},"45":{},"46":{},"47":{},"48":{},"49":{},"5":{},"50":{},"51":{},"52":{},"53":{},"54":{},"55":{},"56":{},"57":{},"58":{},"59":{},"6":{},"7":{},"8":{},"9":{}},"hours":{"0":{},"1":{},"10":{},"11":{},"12":{},"13":{},"14":{},"15":{},"16":{},"17":{},"18":{},"19":{},"2":{},"20":{},"21":{},"22":{},"23":{},"3":{},"4":{},"5":{},"6":{},"7":{},"8":{},"9":{}},"days":{"1":{},"10":{},"11":{},"12":{},"13":{},"14":{},"15":{},"16":{},"17":{},"18":{},"19":{},"2":{},"20":{},"21":{},"22":{},"23":{},"24":{},"25":{},"26":{},"27":{},"28":{},"29":{},"3":{},"30":{},"31":{},"4":{},"5":{},"6":{},"7":{},"8":{},"9":{}},"months":{"1":{},"10":{},"11":{},"12":{},"2":{},"3":{},"4":{},"5":{},"6":{},"7":{},"8":{},"9":{}},"daysOfWeek":{"0":{},"1":{},"2":{},"3":{},"4":{},"5":{},"6":{}}}`,
-			"test5": `{"minutes":{"1":{}},"hours":{"2":{}},"days":{"3":{}},"months":{"4":{}},"daysOfWeek":{"5":{}}}`,
-		}
-		for k, v := range expectedSchedules {
-			raw, err := json.Marshal(indexedJobs[k].schedule)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if string(raw) != v {
-				t.Fatalf("Expected %q schedule \n%s, \ngot \n%s", k, v, raw)
-			}
-		}
+	if c.HasJob("test4") {
+		t.Fatal("expected HasJob(test4)=false after Remove")
 	}
 }
 
@@ -144,47 +97,38 @@ func TestCronMustAdd(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
 	defer func() {
 		if r := recover(); r == nil {
-			t.Errorf("test1 didn't panic")
+			t.Errorf("MustAdd didn't panic on nil fn")
 		}
 	}()
 
-	c.MustAdd("test1", "* * * * *", nil)
-
-	c.MustAdd("test2", "* * * * *", func() {})
-
-	if !slices.ContainsFunc(c.jobs, func(j *Job) bool { return j.Id() == "test2" }) {
-		t.Fatal("Couldn't find job test2")
+	c.MustAdd("withfn", "* * * * *", func() {})
+	if !c.HasJob("withfn") {
+		t.Fatal("MustAdd did not register job")
 	}
+	c.MustAdd("nilfn", "* * * * *", nil) // must panic
 }
 
 func TestCronRemoveAll(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
-	if err := c.Add("test1", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
+	for _, id := range []string{"t1", "t2", "t3"} {
+		if err := c.Add(id, "* * * * *", func() {}); err != nil {
+			t.Fatal(err)
+		}
 	}
-
-	if err := c.Add("test2", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
+	if c.Total() != 3 {
+		t.Fatalf("expected 3 jobs, got %d", c.Total())
 	}
-
-	if err := c.Add("test3", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
-	if v := len(c.jobs); v != 3 {
-		t.Fatalf("Expected %d jobs, got %d", 3, v)
-	}
-
 	c.RemoveAll()
-
-	if v := len(c.jobs); v != 0 {
-		t.Fatalf("Expected %d jobs, got %d", 0, v)
+	if c.Total() != 0 {
+		t.Fatalf("expected 0 jobs after RemoveAll, got %d", c.Total())
 	}
 }
 
@@ -192,26 +136,16 @@ func TestCronTotal(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
 	if v := c.Total(); v != 0 {
-		t.Fatalf("Expected 0 jobs, got %v", v)
+		t.Fatalf("expected 0, got %d", v)
 	}
-
-	if err := c.Add("test1", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := c.Add("test2", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
-	// overwrite
-	if err := c.Add("test1", "* * * * *", func() {}); err != nil {
-		t.Fatal(err)
-	}
-
+	_ = c.Add("a", "* * * * *", func() {})
+	_ = c.Add("b", "* * * * *", func() {})
+	_ = c.Add("a", "* * * * *", func() {}) // overwrite
 	if v := c.Total(); v != 2 {
-		t.Fatalf("Expected 2 jobs, got %v", v)
+		t.Fatalf("expected 2, got %d", v)
 	}
 }
 
@@ -219,98 +153,196 @@ func TestCronJobs(t *testing.T) {
 	t.Parallel()
 
 	c := New()
+	defer c.Stop()
 
+	var mu sync.Mutex
 	calls := ""
 
-	if err := c.Add("a", "1 * * * *", func() { calls += "a" }); err != nil {
+	if err := c.Add("a", "1 * * * *", func() { mu.Lock(); calls += "a"; mu.Unlock() }); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := c.Add("b", "2 * * * *", func() { calls += "b" }); err != nil {
+	if err := c.Add("b", "2 * * * *", func() { mu.Lock(); calls += "b"; mu.Unlock() }); err != nil {
 		t.Fatal(err)
 	}
-
-	// overwrite
-	if err := c.Add("b", "3 * * * *", func() { calls += "b" }); err != nil {
+	// Overwrite b — its callback is replaced; original callback must not fire.
+	if err := c.Add("b", "3 * * * *", func() { mu.Lock(); calls += "b"; mu.Unlock() }); err != nil {
 		t.Fatal(err)
 	}
 
 	jobs := c.Jobs()
-
 	if len(jobs) != 2 {
-		t.Fatalf("Expected 2 jobs, got %v", len(jobs))
+		t.Fatalf("expected 2 jobs, got %d", len(jobs))
+	}
+
+	// MarshalJSON — admin endpoint contract.
+	slices.SortFunc(jobs, func(x, y *Job) int {
+		if x.Id() < y.Id() {
+			return -1
+		}
+		if x.Id() > y.Id() {
+			return 1
+		}
+		return 0
+	})
+	out, err := json.Marshal(jobs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `[{"id":"a","expression":"1 * * * *"},{"id":"b","expression":"3 * * * *"}]`
+	if string(out) != want {
+		t.Fatalf("unexpected json\n got: %s\nwant: %s", out, want)
 	}
 
 	for _, j := range jobs {
 		j.Run()
 	}
 
-	expectedCalls := "ab"
-	if calls != expectedCalls {
-		t.Fatalf("Expected %q calls, got %q", expectedCalls, calls)
+	mu.Lock()
+	defer mu.Unlock()
+	if calls != "ab" {
+		t.Fatalf("expected calls=ab, got %q", calls)
 	}
 }
 
-func TestCronStartStop(t *testing.T) {
+// TestCronDelegatesToTasks verifies that cron.Add ends up invoking the
+// callback the tasks.Client registered — i.e. the shim is not just
+// bookkeeping, the ticker actually fires.
+func TestCronDelegatesToTasks(t *testing.T) {
 	t.Parallel()
 
-	var mu sync.Mutex
-
-	test1 := 0
-	test2 := 0
-
 	c := New()
+	defer c.Stop()
 
-	c.SetInterval(250 * time.Millisecond)
+	var hits atomic.Int64
+	if err := c.Add("delegates", "20ms", func() { hits.Add(1) }); err != nil {
+		t.Fatal(err)
+	}
 
-	c.Add("test1", "* * * * *", func() {
-		mu.Lock()
-		defer mu.Unlock()
-		test1++
-	})
+	// Should tick >=3 times over 100ms on a 20ms schedule.
+	deadline := time.Now().Add(250 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if hits.Load() >= 3 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
 
-	c.Add("test2", "* * * * *", func() {
-		mu.Lock()
-		defer mu.Unlock()
-		test2++
-	})
+	if got := hits.Load(); got < 3 {
+		t.Fatalf("expected >=3 ticks, got %d", got)
+	}
 
-	// call twice Start to check if the previous ticker will be reseted
-	c.Start()
-	c.Start()
+	c.Remove("delegates")
+	before := hits.Load()
+	time.Sleep(60 * time.Millisecond)
+	after := hits.Load()
+	if after > before+1 {
+		// Allow one in-flight tick but no further ticking.
+		t.Fatalf("ticker continued after Remove: %d -> %d", before, after)
+	}
+}
 
-	time.Sleep(505 * time.Millisecond) // slightly larger to minimize flakiness
+// TestCronNewFromTasksShared verifies NewFromTasks wraps an existing client
+// and that Stop() pauses without dropping registry entries — matching the
+// legacy cron.Cron semantics.
+func TestCronNewFromTasksShared(t *testing.T) {
+	t.Parallel()
 
-	// call twice Stop to ensure that the second stop is no-op
+	tc := tasks.New("", "", nil)
+	defer tc.Stop()
+
+	c := NewFromTasks(tc)
+
+	if err := c.Add("shared", "* * * * *", func() {}); err != nil {
+		t.Fatal(err)
+	}
+	if !tc.HasJob("shared") {
+		t.Fatal("expected tasks client to hold the registered schedule")
+	}
+
 	c.Stop()
-	c.Stop()
-
-	expectedCalls := 2
-
-	mu.Lock()
-	if test1 != expectedCalls {
-		t.Fatalf("Expected %d test1, got %d", expectedCalls, test1)
+	if !tc.HasJob("shared") {
+		t.Fatal("Stop must pause tickers without removing registry entries")
 	}
-	if test2 != expectedCalls {
-		t.Fatalf("Expected %d test2, got %d", expectedCalls, test2)
+	if c.HasStarted() {
+		t.Fatal("expected HasStarted=false after Stop")
 	}
-	mu.Unlock()
 
-	// resume for 1 seconds
 	c.Start()
-
-	time.Sleep(1005 * time.Millisecond) // slightly larger to minimize flakiness
-
-	c.Stop()
-
-	expectedCalls += 4
-
-	mu.Lock()
-	if test1 != expectedCalls {
-		t.Fatalf("Expected %d test1, got %d", expectedCalls, test1)
+	if !c.HasStarted() {
+		t.Fatal("expected HasStarted=true after Start")
 	}
-	if test2 != expectedCalls {
-		t.Fatalf("Expected %d test2, got %d", expectedCalls, test2)
+
+	// Shared client still usable.
+	if err := tc.Add("after", "* * * * *", func() {}); err != nil {
+		t.Fatal(err)
 	}
-	mu.Unlock()
+	if !tc.HasJob("after") {
+		t.Fatal("expected shared client to remain usable")
+	}
+}
+
+// TestCronStartStop is retained as a documentation test: Start/Stop are
+// pause/resume in the shim. The legacy interval-based tick behaviour
+// from the old ticker implementation is superseded by per-schedule durations
+// at the tasks.Client layer (see TestCronDelegatesToTasks).
+func TestCronStartStop(t *testing.T) {
+	t.Parallel()
+	t.Skip("superseded by TestCronDelegatesToTasks — legacy 1-min-tick semantics no longer apply")
+}
+
+// TestCronAppFacadeLocal exercises the app-shaped call site with TASKS_URL
+// unset — the pure-local path that every dev/test environment uses today.
+func TestCronAppFacadeLocal(t *testing.T) {
+	t.Parallel()
+
+	tc := tasks.New("", "", nil) // local only
+	defer tc.Stop()
+
+	c := NewFromTasks(tc)
+	defer c.Stop()
+
+	if err := c.Add("settlement", "*/5 * * * *", func() {}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !c.HasJob("settlement") {
+		t.Fatal("expected settlement schedule to be registered")
+	}
+	if c.Total() != 1 {
+		t.Fatalf("expected Total=1, got %d", c.Total())
+	}
+}
+
+// TestCronAppFacadeRemoteFallback exercises the TASKS_URL-set path with an
+// unreachable server — it must fall through to the local goroutine ticker,
+// record the schedule, and still tick.
+func TestCronAppFacadeRemoteFallback(t *testing.T) {
+	t.Parallel()
+
+	// Point at a definitely-closed port so HTTP scheduling fails fast.
+	tc := tasks.New("http://127.0.0.1:1", "", nil)
+	defer tc.Stop()
+
+	c := NewFromTasks(tc)
+	defer c.Stop()
+
+	var hits atomic.Int64
+	if err := c.Add("remote-fallback", "20ms", func() { hits.Add(1) }); err != nil {
+		t.Fatal(err)
+	}
+
+	if !c.HasJob("remote-fallback") {
+		t.Fatal("expected schedule to be registered after remote failure")
+	}
+
+	deadline := time.Now().Add(250 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if hits.Load() >= 2 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if hits.Load() < 2 {
+		t.Fatalf("expected local fallback to keep ticking, got %d hits", hits.Load())
+	}
 }
