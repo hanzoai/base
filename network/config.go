@@ -45,6 +45,13 @@ type Config struct {
 
 	// ListenP2P is the Quasar peer-to-peer port.
 	ListenP2P string
+
+	// TLS is the mTLS config for the Quasar p2p transport (R5). When
+	// unset the transport runs without authentication — only acceptable
+	// in single-node dev and tests. Production callers inject certs via
+	// the KMS plugin (base/plugins/kms) or the operator-emitted dev CA.
+	// See transport_tls.go for the pinning rules.
+	TLS *TLSConfig
 }
 
 // NodeRole distinguishes voters from witnesses.
@@ -56,7 +63,10 @@ const (
 )
 
 // ConfigFromEnv reads BASE_NETWORK, BASE_SHARD_KEY, BASE_REPLICATION,
-// BASE_PEERS, BASE_NODE_ROLE, BASE_ARCHIVE, BASE_LISTEN_HTTP, BASE_LISTEN_P2P.
+// BASE_PEERS, BASE_NODE_ROLE, BASE_ARCHIVE, BASE_LISTEN_HTTP, BASE_LISTEN_P2P,
+// and BASE_SHARD_BACKLOG_MAX / BASE_SHARD_BACKLOG_SEGMENTS (R6 per-shard
+// backlog caps — the archive config is built separately from these by
+// base/core's startup path).
 // Standalone defaults are safe: no error, Enabled==false.
 func ConfigFromEnv() (Config, error) {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv("BASE_NETWORK")))
