@@ -57,6 +57,22 @@ const (
 // Handler processes a one-shot task (webhook delivery, settlement, etc.)
 type Handler func(taskType string, payload map[string]any)
 
+// Schedule is a read-only view of a registered schedule.
+// Returned by Client.Schedules() for the admin UI and introspection.
+type Schedule struct {
+	Name       string `json:"id"`
+	Expression string `json:"expression"`
+}
+
+// scheduleEntry is the internal state tracked per Add().
+type scheduleEntry struct {
+	expression string             // original "30s" or "*/5 * * * *"
+	interval   time.Duration      // resolved tick interval (local mode)
+	fn         func()             // user-supplied callback (may be nil for remote-only)
+	cancel     context.CancelFunc // local ticker canceller (nil when not ticking)
+	remote     bool               // true when ticking happens server-side
+}
+
 // Client manages both one-shot tasks and recurring schedules.
 type Client struct {
 	tasksURL   string
@@ -65,7 +81,7 @@ type Client struct {
 	handler    Handler
 	logger     *slog.Logger
 	mu         sync.RWMutex
-	schedules  map[string]context.CancelFunc // local schedule cancellers
+	schedules  map[string]*scheduleEntry
 
 	zapOnce sync.Once
 	zapNode *zap.Node
@@ -85,7 +101,7 @@ func New(tasksURL, zapAddr string, handler Handler) *Client {
 		},
 		handler:   handler,
 		logger:    slog.Default(),
-		schedules: make(map[string]context.CancelFunc),
+		schedules: make(map[string]*scheduleEntry),
 	}
 }
 
@@ -96,6 +112,8 @@ func New(tasksURL, zapAddr string, handler Handler) *Client {
 //	app.Tasks().Add("settlement", "30s", fn)            // every 30 seconds
 //	app.Tasks().Add("daily-cleanup", "0 3 * * *", fn)   // daily at 3am UTC
 //	app.Tasks().Add("weekly-report", "0 0 * * 1", fn)   // mondays at midnight
+//
+// Re-adding with the same name replaces the previous schedule.
 func (c *Client) Add(name, schedule string, fn func()) error {
 	dur, durErr := time.ParseDuration(schedule)
 	isCron := durErr != nil
@@ -103,6 +121,14 @@ func (c *Client) Add(name, schedule string, fn func()) error {
 	if isCron {
 		dur = approximateCron(schedule)
 	}
+
+	// Cancel any previous ticker for this name before registering the new one.
+	c.mu.Lock()
+	if prev, ok := c.schedules[name]; ok && prev.cancel != nil {
+		prev.cancel()
+		prev.cancel = nil
+	}
+	c.mu.Unlock()
 
 	if c.zapAddr != "" || c.tasksURL != "" {
 		scheduled := false
@@ -123,16 +149,165 @@ func (c *Client) Add(name, schedule string, fn func()) error {
 			if err != nil {
 				c.logger.Warn("tasks: HTTP schedule failed, falling back to local",
 					"name", name, "error", err)
-				c.addLocal(name, dur, fn)
+				c.addLocal(name, schedule, dur, fn)
+				return nil
 			}
+			// Remote schedule succeeded: record metadata without local ticker.
+			c.recordRemote(name, schedule, fn)
+			return nil
 		} else if !scheduled {
-			c.addLocal(name, dur, fn)
+			c.addLocal(name, schedule, dur, fn)
+			return nil
 		}
+		// ZAP schedule succeeded: record metadata without local ticker.
+		c.recordRemote(name, schedule, fn)
 		return nil
 	}
 
-	c.addLocal(name, dur, fn)
+	c.addLocal(name, schedule, dur, fn)
 	return nil
+}
+
+// Remove cancels a named schedule. No-op if the schedule is not registered.
+// For remote schedules, also sends a DELETE to the tasks server.
+func (c *Client) Remove(name string) {
+	c.mu.Lock()
+	entry, ok := c.schedules[name]
+	if ok {
+		if entry.cancel != nil {
+			entry.cancel()
+		}
+		delete(c.schedules, name)
+	}
+	c.mu.Unlock()
+
+	if ok && entry.remote {
+		c.deleteRemoteSchedule(name)
+	}
+}
+
+// RemoveAll cancels every registered schedule and clears the registry.
+// For remote schedules, issues best-effort DELETE to the tasks server.
+func (c *Client) RemoveAll() {
+	c.mu.Lock()
+	remoteNames := make([]string, 0, len(c.schedules))
+	for name, entry := range c.schedules {
+		if entry.cancel != nil {
+			entry.cancel()
+		}
+		if entry.remote {
+			remoteNames = append(remoteNames, name)
+		}
+	}
+	c.schedules = make(map[string]*scheduleEntry)
+	c.mu.Unlock()
+
+	for _, name := range remoteNames {
+		c.deleteRemoteSchedule(name)
+	}
+}
+
+// HasJob reports whether a schedule with the given name is registered.
+func (c *Client) HasJob(name string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	_, ok := c.schedules[name]
+	return ok
+}
+
+// Total returns the number of registered schedules.
+func (c *Client) Total() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.schedules)
+}
+
+// ActiveTickerCount returns the number of schedules currently ticking
+// locally. Remote (server-side) schedules are counted as active when
+// registered. Used by the legacy cron.HasStarted() accessor.
+func (c *Client) ActiveTickerCount() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	n := 0
+	for _, entry := range c.schedules {
+		if entry.remote || entry.cancel != nil {
+			n++
+		}
+	}
+	return n
+}
+
+// Schedules returns a snapshot of all registered schedules.
+// The returned slice is safe for the caller to mutate.
+func (c *Client) Schedules() []Schedule {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make([]Schedule, 0, len(c.schedules))
+	for name, entry := range c.schedules {
+		out = append(out, Schedule{Name: name, Expression: entry.expression})
+	}
+	return out
+}
+
+// Run invokes the locally registered callback for a schedule, if any.
+// Returns true if a callback was found and executed, false otherwise.
+// Used by the admin "run now" endpoint.
+func (c *Client) Run(name string) bool {
+	c.mu.RLock()
+	entry, ok := c.schedules[name]
+	var fn func()
+	if ok {
+		fn = entry.fn
+	}
+	c.mu.RUnlock()
+	if !ok || fn == nil {
+		return false
+	}
+	fn()
+	return true
+}
+
+// recordRemote stores metadata for a schedule whose ticking is server-side.
+func (c *Client) recordRemote(name, expression string, fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.schedules[name] = &scheduleEntry{expression: expression, fn: fn, remote: true}
+}
+
+// PauseAll cancels every local tick goroutine but leaves registry entries
+// intact. Use ResumeAll to restart them. Remote (server-side) schedules are
+// untouched — they keep firing unless explicitly Removed.
+//
+// This is the backing for the legacy cron.Cron.Stop() semantics (stop
+// ticking without losing jobs).
+func (c *Client) PauseAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, entry := range c.schedules {
+		if entry.cancel != nil {
+			entry.cancel()
+			entry.cancel = nil
+		}
+	}
+}
+
+// ResumeAll restarts tick goroutines for every local entry that has an
+// associated callback but no active ticker. Remote entries are untouched.
+//
+// This is the backing for the legacy cron.Cron.Start() semantics.
+func (c *Client) ResumeAll() {
+	c.mu.Lock()
+	entries := make(map[string]*scheduleEntry, len(c.schedules))
+	for name, entry := range c.schedules {
+		if !entry.remote && entry.fn != nil && entry.cancel == nil {
+			entries[name] = entry
+		}
+	}
+	c.mu.Unlock()
+
+	for name, entry := range entries {
+		c.startEntryTicker(name, entry)
+	}
 }
 
 // Enqueue submits a one-shot task for durable execution.
@@ -157,14 +332,18 @@ func (c *Client) Now(taskType string, payload map[string]any) error {
 	return c.execDirect(taskType, payload)
 }
 
-// Stop cancels all local schedules and closes ZAP connection. Call on shutdown.
+// Stop cancels every local ticker, clears the schedule registry, and closes
+// the ZAP connection. Call on graceful shutdown. After Stop(), the Client
+// must not be reused.
 func (c *Client) Stop() {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	for name, cancel := range c.schedules {
-		cancel()
+	for name, entry := range c.schedules {
+		if entry.cancel != nil {
+			entry.cancel()
+		}
 		delete(c.schedules, name)
 	}
+	c.mu.Unlock()
 	if c.zapNode != nil {
 		c.zapNode.Stop()
 	}
@@ -368,19 +547,40 @@ func approximateCron(expr string) time.Duration {
 }
 
 // addLocal runs fn on a ticker (dev fallback, no persistence).
-func (c *Client) addLocal(name string, interval time.Duration, fn func()) {
+// expression is the raw "30s" / "*/5 * * * *" string as passed to Add().
+// interval is the resolved tick duration.
+func (c *Client) addLocal(name, expression string, interval time.Duration, fn func()) {
+	c.mu.Lock()
+	entry := &scheduleEntry{
+		expression: expression,
+		interval:   interval,
+		fn:         fn,
+	}
+	c.schedules[name] = entry
+	c.mu.Unlock()
+
+	c.startEntryTicker(name, entry)
+}
+
+// startEntryTicker spins up the goroutine that fires entry.fn on its interval.
+// Must be called with the entry already stored in c.schedules.
+func (c *Client) startEntryTicker(name string, entry *scheduleEntry) {
+	if entry.fn == nil {
+		return // nothing to tick
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	c.mu.Lock()
-	if old, ok := c.schedules[name]; ok {
-		old() // cancel previous
+	if entry.cancel != nil {
+		entry.cancel()
 	}
-	c.schedules[name] = cancel
+	entry.cancel = cancel
 	c.mu.Unlock()
 
-	c.logger.Info("taskqueue: local schedule started", "name", name, "interval", interval)
+	c.logger.Info("taskqueue: local schedule started", "name", name, "interval", entry.interval)
 
-	go func() {
+	go func(fn func(), interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
@@ -398,7 +598,24 @@ func (c *Client) addLocal(name string, interval time.Duration, fn func()) {
 				}()
 			}
 		}
-	}()
+	}(entry.fn, entry.interval)
+}
+
+// deleteRemoteSchedule issues a best-effort DELETE to the tasks server.
+// Errors are logged but not returned — local state is already cleared.
+func (c *Client) deleteRemoteSchedule(name string) {
+	url := c.tasksURL + "/api/v1/namespaces/default/schedules/" + name
+	req, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		c.logger.Warn("tasks: remote delete request build failed", "name", name, "error", err)
+		return
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.logger.Warn("tasks: remote delete failed", "name", name, "error", err)
+		return
+	}
+	resp.Body.Close()
 }
 
 // createSchedule creates a durable schedule on Hanzo Tasks.
