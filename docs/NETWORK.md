@@ -176,16 +176,53 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 
 ### Env surface (one shape, every Base app)
 
-| var                  | values                                      | notes |
-|----------------------|---------------------------------------------|-------|
-| `BASE_NETWORK`       | `quasar` \| `standalone` (default)          | standalone = today's behaviour, no network. |
-| `BASE_SHARD_KEY`     | `user_id` \| `org_id` \| `<header name>`    | required when `BASE_NETWORK=quasar`. |
-| `BASE_REPLICATION`   | `1` \| `2` \| `3` \| …                      | ≤ `BASE_PEERS` count. |
-| `BASE_PEERS`         | CSV of `host:port` DNS                      | operator-emitted in k8s; explicit in compose. |
-| `BASE_NODE_ROLE`     | `validator` (default) \| `archive`          |  |
-| `BASE_ARCHIVE`       | `gs://…` \| `s3://…` \| `off` (default)     |  |
-| `BASE_LISTEN_HTTP`   | `:8090` default                             | Base HTTP. |
-| `BASE_LISTEN_P2P`    | `:9651` default                             | quasar p2p port. |
+| var                         | values                                      | notes |
+|-----------------------------|---------------------------------------------|-------|
+| `BASE_NETWORK`              | `quasar` \| `standalone` (default)          | standalone = today's behaviour, no network. |
+| `BASE_SHARD_KEY`            | `user_id` \| `org_id` \| `<header name>`    | required when `BASE_NETWORK=quasar`. |
+| `BASE_REPLICATION`          | `1` \| `2` \| `3` \| …                      | ≤ `BASE_PEERS` count. |
+| `BASE_PEERS`                | CSV of `host:port` DNS                      | operator-emitted in k8s; explicit in compose. |
+| `BASE_NODE_ROLE`            | `validator` (default) \| `archive`          |  |
+| `BASE_ARCHIVE`              | `gs://…` \| `s3://…` \| `off` (default)     |  |
+| `BASE_LISTEN_HTTP`          | `:8090` default                             | Base HTTP. |
+| `BASE_LISTEN_P2P`           | `:9651` default                             | quasar p2p port. |
+| `BASE_SHARD_BACKLOG_MAX`    | bytes (64 MiB default)                      | R6 per-shard archive backlog cap; drop-oldest beyond. |
+| `BASE_SHARD_BACKLOG_SEGMENTS` | integer (100 000 default)                 | R6 segment-count cap; first-to-hit with MAX drops. |
+| `BASE_TLS_CA`               | path to PEM bundle                          | R5 mTLS CA for peer verification. Unset ⇒ no TLS. |
+| `BASE_TLS_SERVER_CERT`      | path to PEM                                 | R5 server cert presented to inbound peers. |
+| `BASE_TLS_SERVER_KEY`       | path to PEM                                 | R5 server key. |
+| `BASE_TLS_ALLOWED_SANS`     | CSV of DNS SANs                             | R5 SAN allowlist. Typically = `BASE_PEERS` stripped of `:9651`. |
+
+### R1–R8 fix notes
+
+- **R1 (frame/envelope shardID binding)**: inbound envelopes whose inner
+  `Frame.ShardID` disagrees with `Envelope.ShardID` are rejected at the
+  transport boundary; the apply loop re-checks as defence-in-depth.
+- **R2 (localSeq monotonic)**: `Shard.localSeq` advances strictly by
+  +1 per finalised frame. Out-of-order frames buffer (cap 1024). An
+  attacker-forged high-Seq frame stays in the buffer forever because
+  its predecessors never arrive, so the gateway's `txseq` check cannot
+  be fooled into reporting "caught up".
+- **R3 (archive authorship)**: segments are `LBN2` — Ed25519 signature
+  over body || CRC32 || pubkey. Writers refuse to encode without a
+  signer; readers refuse to decode without a verifier; `LBN1` hard-
+  rejected as a downgrade vector.
+- **R4 (StatefulSet by default)**: when `network.enabled: true`, the
+  operator emits a StatefulSet (`spec.network.workload: StatefulSet`
+  default) so `BASE_PEERS` pod-ordinal DNS resolves. Deployment is
+  permitted only at `replicas == 1`.
+- **R5 (mTLS on p2p)**: `TLSConfig` wires Ed25519/EC mTLS with SAN
+  pinning against the BASE_PEERS list. Transport wire-format (QUIC/
+  gRPC) is Phase-2; `TLSConfig.ServerConfig() / ClientConfig()` land
+  the crypto surface.
+- **R6 (backlog caps)**: per-shard cap 64 MiB / 100 k segments,
+  drop-oldest with `base_shard_backlog_drops_total` metric.
+- **R7 (HPA workload kind)**: operator threads workload kind into the
+  HPA / KEDA `scaleTargetRef.kind` so a StatefulSet-backed service
+  autoscales correctly.
+- **R8 (nanos-suffixed object keys)**: `objectKey(…, startSeq, nanos)`
+  produces unique keys per flush; `Range` dedupes by
+  `(startSeq + frameIndex)` when multiple segments overlap.
 
 ## Layout
 
