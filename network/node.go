@@ -159,7 +159,18 @@ func (n *node) shard(shardID string) (*Shard, error) {
 
 // onPeerFrame is the transport callback: a remote member submitted a frame,
 // we cross-feed it into our local engine so consensus converges.
+//
+// R1 fix: the Envelope's ShardID is the trust boundary — we route by it, so
+// the inner Frame MUST declare the same shardID (its checksum binds to that
+// value, and Quasar's ChainID = SHA256(shardID) must match the engine we're
+// about to submit into). If the two disagree the envelope is malformed or
+// hostile; drop it, bump the rejection metric, and return. This closes the
+// cross-shard state-injection probe.
 func (n *node) onPeerFrame(env Envelope) {
+	if env.Frame.ShardID != env.ShardID {
+		n.metrics.FramesRejectedShardMismatch.Inc()
+		return
+	}
 	s, err := n.shard(env.ShardID)
 	if err != nil {
 		n.metrics.ApplyErrors.Inc()
