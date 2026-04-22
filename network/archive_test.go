@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"iter"
@@ -18,14 +19,28 @@ func makeFrame(t *testing.T, shard string, seq uint64, payload string) Frame {
 	return newFrame(shard, seq, seq-1, []byte(payload))
 }
 
+// testSignerPair builds a signer + matching verifier for tests that
+// need to encode and decode segments without standing up real KMS.
+func testSignerPair(t *testing.T) (*segmentSigner, *segmentVerifier) {
+	t.Helper()
+	pub, priv, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		t.Fatalf("ed25519.GenerateKey: %v", err)
+	}
+	s := newSegmentSigner(priv)
+	v := newSegmentVerifier(pub)
+	return s, v
+}
+
 // TestSegmentHexDump prints the first 32 bytes of a minimal segment
 // so a grep of test output proves the on-wire format matches the doc:
 //
-//	"LBN1" | shardIDLen uint16 | shardID | startSeq uint64 | frameCount uint32 | ...
+//	"LBN2" | shardIDLen uint16 | shardID | startSeq uint64 | frameCount uint32 | ...
 func TestSegmentHexDump(t *testing.T) {
+	signer, _ := testSignerPair(t)
 	sb := newSegmentBuffer("svc-shard-01", 42)
 	_ = sb.append(42, []byte{0xAA, 0xBB, 0xCC, 0xDD})
-	enc, err := sb.encode()
+	enc, err := sb.encode(signer)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
@@ -33,20 +48,14 @@ func TestSegmentHexDump(t *testing.T) {
 	if len(head) > 32 {
 		head = head[:32]
 	}
-	// Expected layout for shardID="svc-shard-01" (12 bytes):
-	//   4c424e31          "LBN1"
-	//   000c              uint16 len=12
-	//   73 76 63 2d 73 68 61 72 64 2d 30 31   "svc-shard-01"
-	//   000000000000002a  uint64 startSeq=42
-	//   00000001          uint32 frameCount=1 (next 2 bytes start of frame_len)
-	// 4 + 2 + 12 + 8 + 4 = 30 header bytes; first 32 bytes cover the header + 2 bytes of frame_len (big-endian uint32: 00 00 ...)
 	t.Logf("segment first %d bytes hex: %x", len(head), head)
-	if string(enc[:4]) != "LBN1" {
-		t.Fatalf("magic mismatch: %q", string(enc[:4]))
+	if string(enc[:4]) != "LBN2" {
+		t.Fatalf("magic mismatch: want LBN2 got %q", string(enc[:4]))
 	}
 }
 
 func TestSegmentRoundTrip(t *testing.T) {
+	signer, verifier := testSignerPair(t)
 	sb := newSegmentBuffer("shard-A", 100)
 	frames := make([]Frame, 0, 8)
 	for i := uint64(0); i < 8; i++ {
@@ -56,11 +65,11 @@ func TestSegmentRoundTrip(t *testing.T) {
 			t.Fatalf("append %d: %v", i, err)
 		}
 	}
-	enc, err := sb.encode()
+	enc, err := sb.encode(signer)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
-	dec, err := decodeSegment(enc)
+	dec, err := decodeSegment(enc, verifier)
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -91,35 +100,38 @@ func TestSegmentRoundTrip(t *testing.T) {
 }
 
 func TestSegmentCorruptionCRC(t *testing.T) {
+	signer, verifier := testSignerPair(t)
 	sb := newSegmentBuffer("s", 1)
 	_ = sb.append(1, makeFrame(t, "s", 1, "hi").encode())
-	enc, err := sb.encode()
+	enc, err := sb.encode(signer)
 	if err != nil {
 		t.Fatalf("encode: %v", err)
 	}
 	// Flip a byte in the middle of the body (not the CRC footer).
 	enc[len(enc)/2] ^= 0x01
-	if _, err := decodeSegment(enc); !errors.Is(err, ErrSegmentCorrupt) {
+	if _, err := decodeSegment(enc, verifier); !errors.Is(err, ErrSegmentCorrupt) {
 		t.Fatalf("want ErrSegmentCorrupt, got %v", err)
 	}
 }
 
 func TestSegmentCorruptionMagic(t *testing.T) {
+	signer, verifier := testSignerPair(t)
 	sb := newSegmentBuffer("s", 1)
 	_ = sb.append(1, makeFrame(t, "s", 1, "hi").encode())
-	enc, _ := sb.encode()
+	enc, _ := sb.encode(signer)
 	copy(enc[:4], "XXXX")
-	_, err := decodeSegment(enc)
+	_, err := decodeSegment(enc, verifier)
 	if !errors.Is(err, ErrSegmentCorrupt) {
 		t.Fatalf("want ErrSegmentCorrupt, got %v", err)
 	}
 }
 
 func TestSegmentCorruptionTruncated(t *testing.T) {
+	signer, verifier := testSignerPair(t)
 	sb := newSegmentBuffer("s", 1)
 	_ = sb.append(1, makeFrame(t, "s", 1, "hi").encode())
-	enc, _ := sb.encode()
-	if _, err := decodeSegment(enc[:len(enc)/2]); !errors.Is(err, ErrSegmentCorrupt) {
+	enc, _ := sb.encode(signer)
+	if _, err := decodeSegment(enc[:len(enc)/2], verifier); !errors.Is(err, ErrSegmentCorrupt) {
 		t.Fatalf("want ErrSegmentCorrupt on truncation, got %v", err)
 	}
 }
@@ -135,9 +147,10 @@ func TestSegmentOutOfOrderAppend(t *testing.T) {
 }
 
 func TestObjectKeyLayout(t *testing.T) {
-	got := objectKey("liquid-bd", "shard-123", 4_200_000)
-	// seq 4_200_000 / 1_000_000 = 4 → padded to 16 digits; seq → 20 digits.
-	want := "liquid-bd/shard-123/0000000000000004/00000000000004200000.lbn"
+	got := objectKey("liquid-bd", "shard-123", 4_200_000, 0)
+	// seq 4_200_000 / 1_000_000 = 4 → padded to 16 digits; seq → 20 digits
+	// and a 20-digit zero nanos suffix.
+	want := "liquid-bd/shard-123/0000000000000004/00000000000004200000-00000000000000000000.lbn"
 	if got != want {
 		t.Fatalf("\nwant %s\ngot  %s", want, got)
 	}

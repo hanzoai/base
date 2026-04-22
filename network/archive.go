@@ -4,9 +4,11 @@
 // as per-shard segment files. Each segment is a length-prefixed list of
 // PQ-signed frames that can be replayed for point-in-time recovery.
 //
-// Segment format: magic "LBN1". Future format changes MUST bump the magic
-// (e.g. "LBN2") and version-detect on read. Never overload the existing
-// magic — forwards compatibility only.
+// Segment format: magic "LBN2" (authenticated — body+crc+pubkey signed by
+// Ed25519). Version 1 ("LBN1") existed only during dev and is rejected
+// unconditionally by readers to prevent downgrade attacks. Future format
+// changes MUST bump the magic to "LBN3"/... and version-detect on read;
+// never overload an existing magic — forwards compatibility only.
 //
 // This file defines the Archive interface and the URL-based backend
 // dispatcher. The consensus-side wiring (witness validator, frame feed)
@@ -16,6 +18,7 @@ package network
 
 import (
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"fmt"
 	"iter"
@@ -63,13 +66,42 @@ type ArchiveConfig struct {
 	// segment flush. Defaults to 5 minutes. After it elapses, the
 	// segment is retained for the next flush cycle (never dropped).
 	RetryDeadline time.Duration
+
+	// SigningKey is the Ed25519 private key used to sign every segment
+	// we write. Production callers MUST inject a KMS-held key; when
+	// unset (tests, dev), the archive writer auto-generates a transient
+	// key — fine in-process, useless across restarts.
+	SigningKey ed25519.PrivateKey
+
+	// TrustedSegmentKeys are Ed25519 public keys whose segments the
+	// reader accepts. The local SigningKey's public half is always
+	// trusted; additional keys cover rotation (PITR against archives
+	// written under a now-retired key).
+	TrustedSegmentKeys []ed25519.PublicKey
+
+	// BacklogMaxBytes caps the per-shard in-memory backlog of encoded
+	// segments waiting to upload. Once exceeded, the oldest segments
+	// are dropped (counted on IncDrops). Zero = unbounded (dev only);
+	// production callers MUST set this to a sane ceiling.
+	BacklogMaxBytes int
+
+	// BacklogMaxSegments caps the per-shard backlog by segment count.
+	// Either limit firing triggers the drop path. Zero = unbounded.
+	BacklogMaxSegments int
 }
 
-// Defaults applied when a field is zero.
+// Defaults applied when a field is zero. R6: BacklogMax* cap per-shard
+// in-memory backlog so a hostile / broken storage backend cannot OOM
+// the process. 64 MiB / 100 000 segments is "enough headroom for a real
+// S3 outage" but "small enough that even 32 shards on a 2 GiB pod can't
+// OOM". Operators override via `BASE_SHARD_BACKLOG_MAX` and
+// `BASE_SHARD_BACKLOG_SEGMENTS`.
 const (
 	DefaultSegmentTargetBytes = 8 * 1024 * 1024
 	DefaultFlushInterval      = 10 * time.Second
 	DefaultRetryDeadline      = 5 * time.Minute
+	DefaultBacklogMaxBytes    = 64 * 1024 * 1024
+	DefaultBacklogMaxSegments = 100_000
 )
 
 func (c ArchiveConfig) withDefaults() ArchiveConfig {
@@ -81,6 +113,12 @@ func (c ArchiveConfig) withDefaults() ArchiveConfig {
 	}
 	if c.RetryDeadline <= 0 {
 		c.RetryDeadline = DefaultRetryDeadline
+	}
+	if c.BacklogMaxBytes <= 0 {
+		c.BacklogMaxBytes = DefaultBacklogMaxBytes
+	}
+	if c.BacklogMaxSegments <= 0 {
+		c.BacklogMaxSegments = DefaultBacklogMaxSegments
 	}
 	return c
 }
@@ -96,9 +134,13 @@ type ArchiveMetrics struct {
 	// frames across all shards. Surfaced as base_archive_lag_bytes.
 	SetLagBytes func(bytes int64)
 	// IncFailures increments a failures counter whenever a segment
-	// exhausts its retry deadline. The segment is re-buffered, never
-	// dropped.
+	// exhausts its retry deadline. The segment is re-buffered unless
+	// the backlog cap is exceeded.
 	IncFailures func()
+	// IncDrops increments a drop counter whenever the backlog cap
+	// sheds the oldest segment. Liveness-over-durability — operators
+	// should page on this.
+	IncDrops func()
 }
 
 // BindArchiveMetrics builds an ArchiveMetrics that writes through to
@@ -110,9 +152,8 @@ func BindArchiveMetrics(m *Metrics) *ArchiveMetrics {
 	}
 	return &ArchiveMetrics{
 		SetLagBytes: func(b int64) { m.ArchiveLagBytes.Set(float64(b)) },
-		// Failures currently fold into ApplyErrors — bump a dedicated
-		// counter here once Agent #1 adds base_archive_failures_total.
-		IncFailures: func() { m.ApplyErrors.Inc() },
+		IncFailures: func() { m.ArchiveFailures.Inc() },
+		IncDrops:    func() { m.ArchiveDrops.Inc() },
 	}
 }
 
