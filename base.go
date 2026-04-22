@@ -89,8 +89,16 @@ func New() *Base {
 func NewWithConfig(config Config) *Base {
 	// initialize a default data directory based on the executable baseDir
 	if config.DefaultDataDir == "" {
-		baseDir, _ := inspectRuntime()
-		config.DefaultDataDir = filepath.Join(baseDir, "data")
+		// DATA_DIR env wins over the $CWD/data fallback so operator-managed
+		// pods with readOnlyRootFilesystem don't panic trying to create the
+		// data dir next to the binary. The --dir CLI flag still wins over
+		// both (explicit > env > default).
+		if env := os.Getenv("DATA_DIR"); env != "" {
+			config.DefaultDataDir = env
+		} else {
+			baseDir, _ := inspectRuntime()
+			config.DefaultDataDir = filepath.Join(baseDir, "data")
+		}
 	}
 
 	if config.DefaultQueryTimeout == 0 {
