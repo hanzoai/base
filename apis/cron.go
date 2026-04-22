@@ -37,16 +37,17 @@ func cronsList(e *core.RequestEvent) error {
 func cronRun(e *core.RequestEvent) error {
 	cronId := e.Request.PathValue("id")
 
-	var foundJob *cron.Job
+	if !e.App.Cron().HasJob(cronId) {
+		return e.NotFoundError("Missing or invalid cron job", nil)
+	}
 
-	jobs := e.App.Cron().Jobs()
-	for _, j := range jobs {
+	var foundJob *cron.Job
+	for _, j := range e.App.Cron().Jobs() {
 		if j.Id() == cronId {
 			foundJob = j
 			break
 		}
 	}
-
 	if foundJob == nil {
 		return e.NotFoundError("Missing or invalid cron job", nil)
 	}

@@ -1,228 +1,123 @@
-// Package cron implements a crontab-like service to execute and schedule
-// repeative tasks/jobs.
+// Package cron is a thin alias over Hanzo Tasks (tools/tasks) kept for
+// backward compatibility. New code should call app.Tasks() directly.
 //
-// Example:
-//
-//	c := cron.New()
-//	c.MustAdd("dailyReport", "0 0 * * *", func() { ... })
-//	c.Start()
+// Scheduled jobs registered through this package are delegated to a
+// *tasks.Client — durable when TASKS_URL is set, local goroutine tickers
+// otherwise. The Schedule / NewSchedule helpers remain for cron-expression
+// validation (used by settings validators).
 package cron
 
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"sync"
 	"time"
+
+	"github.com/hanzoai/base/tools/tasks"
 )
 
-// Cron is a crontab-like struct for tasks/jobs scheduling.
+// Cron is a crontab-like scheduler. Since the v2 refactor it is a shim
+// that delegates to a *tasks.Client.
 type Cron struct {
-	timezone   *time.Location
-	ticker     *time.Ticker
-	startTimer *time.Timer
-	tickerDone chan bool
-	jobs       []*Job
-	interval   time.Duration
-	mux        sync.RWMutex
+	mu       sync.RWMutex
+	client   *tasks.Client
+	timezone *time.Location
 }
 
-// New create a new Cron struct with default tick interval of 1 minute
-// and timezone in UTC.
-//
-// You can change the default tick interval with Cron.SetInterval().
-// You can change the default timezone with Cron.SetTimezone().
+// New creates a Cron backed by a new local-only tasks.Client.
+// Use NewFromTasks to share an existing client with the rest of the app.
 func New() *Cron {
 	return &Cron{
-		interval:   1 * time.Minute,
-		timezone:   time.UTC,
-		jobs:       []*Job{},
-		tickerDone: make(chan bool),
+		client:   tasks.New("", "", nil),
+		timezone: time.UTC,
 	}
 }
 
-// SetInterval changes the current cron tick interval
-// (it usually should be >= 1 minute).
-func (c *Cron) SetInterval(d time.Duration) {
-	// update interval
-	c.mux.Lock()
-	wasStarted := c.ticker != nil
-	c.interval = d
-	c.mux.Unlock()
-
-	// restart the ticker
-	if wasStarted {
-		c.Start()
+// NewFromTasks wraps an existing tasks.Client.
+func NewFromTasks(c *tasks.Client) *Cron {
+	return &Cron{
+		client:   c,
+		timezone: time.UTC,
 	}
 }
 
-// SetTimezone changes the current cron tick timezone.
+// SetInterval is retained for API compatibility. No-op: the tick cadence is
+// dictated by each schedule's expression, not a global interval.
+func (c *Cron) SetInterval(time.Duration) {}
+
+// SetTimezone updates the timezone used for cron-expression evaluation.
+// Kept for API compatibility; the underlying tasks.Client does not currently
+// take a per-client timezone — server-side schedules run in UTC.
 func (c *Cron) SetTimezone(l *time.Location) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
+	if l == nil {
+		return
+	}
+	c.mu.Lock()
 	c.timezone = l
+	c.mu.Unlock()
 }
 
-// MustAdd is similar to Add() but panic on failure.
-func (c *Cron) MustAdd(jobId string, cronExpr string, run func()) {
-	if err := c.Add(jobId, cronExpr, run); err != nil {
+// MustAdd is Add that panics on error.
+func (c *Cron) MustAdd(jobId string, cronExpr string, fn func()) {
+	if err := c.Add(jobId, cronExpr, fn); err != nil {
 		panic(err)
 	}
 }
 
-// Add registers a single cron job.
-//
-// If there is already a job with the provided id, then the old job
-// will be replaced with the new one.
-//
-// cronExpr is a regular cron expression, eg. "0 */3 * * *" (aka. at minute 0 past every 3rd hour).
-// Check cron.NewSchedule() for the supported tokens.
+// Add registers a recurring job. cronExpr is any expression accepted by
+// tasks.Client.Add (standard 5-field cron, macros like @daily, or a Go
+// duration string like "30s"). Re-adding with the same id replaces the
+// previous registration.
 func (c *Cron) Add(jobId string, cronExpr string, fn func()) error {
 	if fn == nil {
 		return errors.New("failed to add new cron job: fn must be non-nil function")
 	}
-
-	schedule, err := NewSchedule(cronExpr)
-	if err != nil {
-		return fmt.Errorf("failed to add new cron job: %w", err)
-	}
-
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	// remove previous (if any)
-	c.jobs = slices.DeleteFunc(c.jobs, func(j *Job) bool {
-		return j.Id() == jobId
-	})
-
-	// add new
-	c.jobs = append(c.jobs, &Job{
-		id:       jobId,
-		fn:       fn,
-		schedule: schedule,
-	})
-
-	return nil
-}
-
-// Remove removes a single cron job by its id.
-func (c *Cron) Remove(jobId string) {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	if c.jobs == nil {
-		return // nothing to remove
-	}
-
-	c.jobs = slices.DeleteFunc(c.jobs, func(j *Job) bool {
-		return j.Id() == jobId
-	})
-}
-
-// RemoveAll removes all registered cron jobs.
-func (c *Cron) RemoveAll() {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	c.jobs = []*Job{}
-}
-
-// Total returns the current total number of registered cron jobs.
-func (c *Cron) Total() int {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-
-	return len(c.jobs)
-}
-
-// Jobs returns a shallow copy of the currently registered cron jobs.
-func (c *Cron) Jobs() []*Job {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-
-	copy := make([]*Job, len(c.jobs))
-	for i, j := range c.jobs {
-		copy[i] = j
-	}
-
-	return copy
-}
-
-// Stop stops the current cron ticker (if not already).
-//
-// You can resume the ticker by calling Start().
-func (c *Cron) Stop() {
-	c.mux.Lock()
-	defer c.mux.Unlock()
-
-	if c.startTimer != nil {
-		c.startTimer.Stop()
-		c.startTimer = nil
-	}
-
-	if c.ticker == nil {
-		return // already stopped
-	}
-
-	c.tickerDone <- true
-	c.ticker.Stop()
-	c.ticker = nil
-}
-
-// Start starts the cron ticker.
-//
-// Calling Start() on already started cron will restart the ticker.
-func (c *Cron) Start() {
-	c.Stop()
-
-	// delay the ticker to start at 00 of 1 c.interval duration
-	now := time.Now()
-	next := now.Add(c.interval).Truncate(c.interval)
-	delay := next.Sub(now)
-
-	c.mux.Lock()
-	c.startTimer = time.AfterFunc(delay, func() {
-		c.mux.Lock()
-		c.ticker = time.NewTicker(c.interval)
-		c.mux.Unlock()
-
-		// run immediately at 00
-		c.runDue(time.Now())
-
-		// run after each tick
-		go func() {
-			for {
-				select {
-				case <-c.tickerDone:
-					return
-				case t := <-c.ticker.C:
-					c.runDue(t)
-				}
-			}
-		}()
-	})
-	c.mux.Unlock()
-}
-
-// HasStarted checks whether the current Cron ticker has been started.
-func (c *Cron) HasStarted() bool {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-
-	return c.ticker != nil
-}
-
-// runDue runs all registered jobs that are scheduled for the provided time.
-func (c *Cron) runDue(t time.Time) {
-	c.mux.RLock()
-	defer c.mux.RUnlock()
-
-	moment := NewMoment(t.In(c.timezone))
-
-	for _, j := range c.jobs {
-		if j.schedule.IsDue(moment) {
-			go j.Run()
+	// Validate cron-expression syntax up front so callers get the same
+	// error signal they got pre-refactor. Duration strings bypass this.
+	if _, durErr := time.ParseDuration(cronExpr); durErr != nil {
+		if _, err := NewSchedule(cronExpr); err != nil {
+			return fmt.Errorf("failed to add new cron job: %w", err)
 		}
 	}
+	return c.client.Add(jobId, cronExpr, fn)
 }
+
+// Remove deletes a registered job. No-op if the id is unknown.
+func (c *Cron) Remove(jobId string) { c.client.Remove(jobId) }
+
+// RemoveAll deletes every registered job.
+func (c *Cron) RemoveAll() { c.client.RemoveAll() }
+
+// Total returns the number of registered jobs.
+func (c *Cron) Total() int { return c.client.Total() }
+
+// HasJob reports whether a job with the given id is registered.
+func (c *Cron) HasJob(jobId string) bool { return c.client.HasJob(jobId) }
+
+// Jobs returns a snapshot of all registered jobs ordered by id.
+func (c *Cron) Jobs() []*Job {
+	schedules := c.client.Schedules()
+	out := make([]*Job, 0, len(schedules))
+	for _, s := range schedules {
+		out = append(out, &Job{
+			id:         s.Name,
+			expression: s.Expression,
+			client:     c.client,
+		})
+	}
+	return out
+}
+
+// Start resumes all paused tickers. Schedules are auto-started at Add()
+// time, so this is only meaningful after a prior Stop().
+func (c *Cron) Start() { c.client.ResumeAll() }
+
+// Stop pauses every local ticker without removing jobs. Registered
+// schedules remain discoverable via Jobs() / HasJob() and can be resumed
+// with Start(). To tear down the scheduler fully, call RemoveAll() or
+// tasks.Client.Stop() on the underlying client.
+func (c *Cron) Stop() { c.client.PauseAll() }
+
+// HasStarted reports whether at least one job is present and actively
+// ticking.
+func (c *Cron) HasStarted() bool { return c.client.ActiveTickerCount() > 0 }
