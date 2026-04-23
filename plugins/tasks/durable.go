@@ -9,9 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"go.temporal.io/api/workflowservice/v1"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/temporal"
+	"github.com/hanzoai/tasks/pkg/sdk/client"
+	"github.com/hanzoai/tasks/pkg/sdk/temporal"
 )
 
 // validIDPattern restricts space/org IDs to safe characters, preventing
@@ -253,22 +252,21 @@ func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string, orgID 
 	if err != nil {
 		return TaskPending, "", err
 	}
-	desc, err := c.DescribeWorkflowExecution(ctx, taskID, "")
+	info, err := c.DescribeWorkflow(ctx, taskID, "")
 	if err != nil {
 		return TaskPending, "", err
 	}
 
-	info := desc.WorkflowExecutionInfo
-	switch info.GetStatus().String() {
-	case "Running":
+	switch info.Status {
+	case client.WorkflowStatusRunning:
 		return TaskRunning, "", nil
-	case "Completed":
+	case client.WorkflowStatusCompleted:
 		return TaskCompleted, "", nil
-	case "Failed":
+	case client.WorkflowStatusFailed:
 		return TaskFailed, "workflow failed", nil
-	case "Canceled", "Cancelled":
+	case client.WorkflowStatusCanceled, client.WorkflowStatusTerminated:
 		return TaskCancelled, "", nil
-	case "TimedOut":
+	case client.WorkflowStatusTimedOut:
 		return TaskFailed, "timed out", nil
 	default:
 		return TaskPending, "", nil
@@ -311,33 +309,31 @@ func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, orgID ...
 		return nil, err
 	}
 	query := fmt.Sprintf(`TaskQueue = "%s"`, spaceID)
-	resp, err := c.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
-		Query: query,
-	})
+	resp, err := c.ListWorkflows(ctx, query, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("tasks: list failed: %w", err)
 	}
 
 	var result []*Task
-	for _, exec := range resp.GetExecutions() {
+	for _, exec := range resp.Executions {
 		task := &Task{
-			ID:      exec.Execution.GetWorkflowId(),
+			ID:      exec.WorkflowID,
 			SpaceID: spaceID,
 		}
-		switch exec.GetStatus().String() {
-		case "Running":
+		switch exec.Status {
+		case client.WorkflowStatusRunning:
 			task.State = TaskRunning
-		case "Completed":
+		case client.WorkflowStatusCompleted:
 			task.State = TaskCompleted
-		case "Failed":
+		case client.WorkflowStatusFailed:
 			task.State = TaskFailed
-		case "Canceled", "Cancelled":
+		case client.WorkflowStatusCanceled, client.WorkflowStatusTerminated:
 			task.State = TaskCancelled
 		default:
 			task.State = TaskPending
 		}
-		if exec.GetStartTime() != nil {
-			t := exec.GetStartTime().AsTime()
+		if !exec.StartTime.IsZero() {
+			t := exec.StartTime
 			task.StartedAt = &t
 		}
 		result = append(result, task)
@@ -370,26 +366,24 @@ func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID
 		return nil, err
 	}
 	query := fmt.Sprintf(`TaskQueue = "%s" AND WorkflowType IN ("PipelineWorkflow", "FanOutWorkflow")`, spaceID)
-	resp, err := c.ListWorkflow(ctx, &workflowservice.ListWorkflowExecutionsRequest{
-		Query: query,
-	})
+	resp, err := c.ListWorkflows(ctx, query, 0, nil)
 	if err != nil {
 		return nil, fmt.Errorf("tasks: list workflows failed: %w", err)
 	}
 
 	var result []*Workflow
-	for _, exec := range resp.GetExecutions() {
+	for _, exec := range resp.Executions {
 		wf := &Workflow{
-			ID:      exec.Execution.GetWorkflowId(),
+			ID:      exec.WorkflowID,
 			SpaceID: spaceID,
-			Name:    exec.GetType().GetName(),
+			Name:    exec.WorkflowType,
 		}
-		switch exec.GetStatus().String() {
-		case "Running":
+		switch exec.Status {
+		case client.WorkflowStatusRunning:
 			wf.State = TaskRunning
-		case "Completed":
+		case client.WorkflowStatusCompleted:
 			wf.State = TaskCompleted
-		case "Failed":
+		case client.WorkflowStatusFailed:
 			wf.State = TaskFailed
 		default:
 			wf.State = TaskPending
