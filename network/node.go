@@ -19,6 +19,11 @@ type node struct {
 	// transport; production will inject a QUIC/gRPC transport. Always set.
 	transport Transport
 
+	// membership is the live view of reachable members. When set, Start
+	// subscribes to change events and rebuilds the router on every
+	// update. Dynamic reconnects are delegated to the transport.
+	membership Membership
+
 	mu     sync.RWMutex
 	shards map[string]*Shard
 	walSrc walSource
@@ -26,10 +31,19 @@ type node struct {
 	cancel context.CancelFunc
 }
 
-// newNode constructs the live node with the production ZAP transport.
-// Tests that wire peers together in-process use NewWithTransport.
+// newNode constructs the live node with the production ZAP transport and
+// a DNS-based Membership built from BASE_PEERS. Tests that wire peers
+// together in-process use NewWithTransport.
 func newNode(cfg Config) (*node, error) {
-	return newNodeWithTransport(cfg, newZapTransport(cfg))
+	n, err := newNodeWithTransport(cfg, newZapTransport(cfg))
+	if err != nil {
+		return nil, err
+	}
+	// Production Membership tracks BASE_PEERS through DNS: a seed that
+	// resolves to N addresses yields N members; scale events propagate
+	// within refreshInterval (5s by default).
+	n.membership = NewDNSMembership(context.Background(), cfg.NodeID, cfg.Peers)
+	return n, nil
 }
 
 func newNodeWithTransport(cfg Config, t Transport) (*node, error) {
@@ -63,6 +77,16 @@ func newNodeWithTransport(cfg Config, t Transport) (*node, error) {
 	}, nil
 }
 
+// SetMembership injects a Membership source. The node subscribes on
+// Start and rebuilds the router on every change. Tests use this to
+// drive scale events; production wires a dnsMembership automatically
+// from newNode.
+func (n *node) SetMembership(m Membership) {
+	n.mu.Lock()
+	n.membership = m
+	n.mu.Unlock()
+}
+
 // NewWithTransport constructs a Network with a caller-supplied transport.
 // In-process tests inject a memory transport here; production callers use
 // the default wired by New.
@@ -80,20 +104,51 @@ func (n *node) Enabled() bool { return true }
 
 func (n *node) Start(ctx context.Context) error {
 	n.mu.Lock()
-	defer n.mu.Unlock()
 	if n.ctx != nil {
+		n.mu.Unlock()
 		return fmt.Errorf("network: already started")
 	}
 	n.ctx, n.cancel = context.WithCancel(ctx)
+	ourCtx := n.ctx
+	membership := n.membership
+	n.mu.Unlock()
 
 	// Transport fan-in: peer frames arrive here and are submitted to the
 	// local shard engine so every member converges on the same DAG.
-	if err := n.transport.Start(n.ctx, n.onPeerFrame); err != nil {
+	if err := n.transport.Start(ourCtx, n.onPeerFrame); err != nil {
 		n.cancel()
+		n.mu.Lock()
 		n.ctx = nil
+		n.mu.Unlock()
 		return fmt.Errorf("network: transport start: %w", err)
 	}
+
+	// Dynamic-membership watch: every Membership change rebuilds the
+	// router's member set. Transport learns about new peers via its own
+	// reconnect loop — we don't have to push dials from here. Dropped
+	// peers naturally time out on the transport side.
+	if membership != nil {
+		go n.watchMembership(ourCtx, membership)
+	}
 	return nil
+}
+
+// watchMembership blocks on the Membership change stream and forwards
+// updates to the router. Exits when ctx is cancelled (Stop).
+func (n *node) watchMembership(ctx context.Context, m Membership) {
+	updates := m.Watch(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case members, ok := <-updates:
+			if !ok {
+				return
+			}
+			n.router.setMembers(members)
+			n.metrics.MembershipSize.Set(float64(len(members)))
+		}
+	}
 }
 
 func (n *node) Stop(ctx context.Context) error {

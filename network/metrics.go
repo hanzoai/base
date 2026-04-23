@@ -57,6 +57,11 @@ type Metrics struct {
 	ApplyErrors   prometheus.Counter
 	WALHookErrors prometheus.Counter
 	WALBytes      prometheus.Counter
+
+	// MembershipSize is the live member count as reported by the
+	// Membership watcher. Dashboards alert on unexpected drops
+	// (scale-down events show up here before the transport notices).
+	MembershipSize prometheus.Gauge
 }
 
 // NewMetrics constructs the collectors. Register them on a caller-owned
@@ -137,6 +142,10 @@ func NewMetrics() *Metrics {
 			Name: "base_network_wal_bytes_total",
 			Help: "Total WAL payload bytes captured by the commit hook.",
 		}),
+		MembershipSize: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "base_network_membership_size",
+			Help: "Live member count reported by the Membership watcher.",
+		}),
 	}
 }
 
@@ -155,6 +164,7 @@ func (m *Metrics) Register(r prometheus.Registerer) error {
 		m.FramesDuplicate, m.FramesInvalid,
 		m.FramesRejectedShardMismatch, m.FramesRejectedSeqGap,
 		m.ApplyErrors, m.WALHookErrors, m.WALBytes,
+		m.MembershipSize,
 	}
 	for _, c := range collectors {
 		if err := r.Register(c); err != nil {
