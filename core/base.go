@@ -1494,6 +1494,21 @@ func (app *BaseApp) registerBaseHooks() {
 		Priority: 999,
 	})
 
+	// Per-user writer-pin middleware: shard-resolver + write-forward.
+	// No-op when app.network is nil (standalone) or Enabled() == false.
+	// Priority 500 puts it after auth (auth is ~100) but before
+	// record-specific business logic.
+	app.OnServe().Bind(&hook.Handler[*ServeEvent]{
+		Id: "__hzNetworkMiddleware__",
+		Func: func(e *ServeEvent) error {
+			if err := app.installNetworkMiddleware(e); err != nil {
+				return err
+			}
+			return e.Next()
+		},
+		Priority: 500,
+	})
+
 	app.Cron().Add("__hzDBOptimize__", "0 0 * * *", func() {
 		_, execErr := app.NonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
 		if execErr != nil {
