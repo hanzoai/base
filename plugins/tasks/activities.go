@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"go.temporal.io/sdk/activity"
+	"github.com/hanzoai/tasks/pkg/sdk/activity"
 )
 
 // ExecuteTaskActivity is the Temporal activity that executes a task.

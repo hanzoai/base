@@ -1,8 +1,8 @@
 package tasks
 
 import (
-	"go.temporal.io/sdk/client"
-	sdkworker "go.temporal.io/sdk/worker"
+	"github.com/hanzoai/tasks/pkg/sdk/client"
+	sdkworker "github.com/hanzoai/tasks/pkg/sdk/worker"
 )
 
 // Worker runs an embedded Temporal worker that polls a task queue
