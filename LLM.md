@@ -185,3 +185,24 @@ Behavior when active:
 The platform plugin (`plugins/platform/`) sets these same store keys automatically when `IAMEndpoint` is configured. The env vars provide the same behavior for standalone Base deployments without the platform plugin.
 
 Store keys: `StoreKeyExternalAuthOnly`, `StoreKeyJWKSURL`, `StoreKeyAuthUsersCollection`.
+
+## Network (Quasar replication) — singleton collapse (v0.48.1)
+
+`BASE_NETWORK=quasar` only engages the Quasar cross-pod plane when at least
+one peer is present. A pod started with `BASE_PEERS=""` (empty or unset)
+collapses to the standalone noop: no ZAP listener, no self-dial, no
+reconnect loop. Same binary scales 1 → N by adding peers to `BASE_PEERS`.
+
+Env matrix:
+
+| BASE_NETWORK | BASE_PEERS | Enabled | Behavior |
+|--------------|------------|---------|----------|
+| unset        | *          | false   | legacy single-node SQLite |
+| `standalone` | *          | false   | explicit standalone |
+| `quasar`     | empty      | false   | sole writer, no replication |
+| `quasar`     | a,b,...    | true    | full Quasar quorum over ZAP |
+
+`BASE_PEERS` entries may be the operator-emitted pod FQDN
+(`liquid-bd-0.liquid-bd-network.<ns>.svc.cluster.local:9651`) while
+`BASE_NODE_ID` is the bare hostname; `isSelfPeer` matches on the first DNS
+label so the transport never dials itself.
