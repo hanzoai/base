@@ -17,7 +17,7 @@ require (
 	github.com/hanzoai/dbx v1.15.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.36.0-pre
+	github.com/hanzoai/tasks v1.36.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.4.0
@@ -172,5 +172,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
-
-replace github.com/hanzoai/tasks => ../tasks
