@@ -49,14 +49,42 @@ func TestFromEnvQuasarMissingShardKey(t *testing.T) {
 	}
 }
 
-func TestFromEnvQuasarReplicationExceedsPeers(t *testing.T) {
+// TestReplicationAboveMembers: Replication=5 with only 3 available members
+// is valid — target quorum, router returns what's available. Lets the
+// same binary scale 1 → N without Config failing.
+func TestReplicationAboveMembers(t *testing.T) {
 	t.Setenv("BASE_NETWORK", "quasar")
 	t.Setenv("BASE_SHARD_KEY", "user_id")
 	t.Setenv("BASE_REPLICATION", "5")
-	t.Setenv("BASE_PEERS", "b:9651,c:9651") // 2 peers + self = 3 < 5
+	t.Setenv("BASE_PEERS", "b:9651,c:9651") // 2 peers + self = 3
 	t.Setenv("HOSTNAME", "a")
-	if _, err := FromEnv(); err == nil {
-		t.Error("expected error when replication > peers+1")
+	n, err := FromEnv()
+	if err != nil {
+		t.Fatalf("FromEnv: %v", err)
+	}
+	if !n.Enabled() {
+		t.Fatal("expected Enabled")
+	}
+}
+
+// TestSingletonCollapsesToStandalone: a 1/1 pod (no BASE_PEERS) never
+// needs consensus or ZAP — same code path as BASE_NETWORK=standalone.
+// No listener bound, no self-dial, no reconnect loop.
+func TestSingletonCollapsesToStandalone(t *testing.T) {
+	t.Setenv("BASE_NETWORK", "quasar")
+	t.Setenv("BASE_SHARD_KEY", "user_id")
+	t.Setenv("BASE_REPLICATION", "3")
+	t.Setenv("BASE_PEERS", "") // self only
+	t.Setenv("HOSTNAME", "a")
+	n, err := FromEnv()
+	if err != nil {
+		t.Fatalf("singleton FromEnv: %v", err)
+	}
+	if n.Enabled() {
+		t.Fatal("singleton must collapse to standalone (Enabled=false)")
+	}
+	if _, local := n.WriterFor("x"); !local {
+		t.Error("singleton must report local=true for WriterFor")
 	}
 }
 
