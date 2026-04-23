@@ -44,11 +44,16 @@ type Network interface {
 
 // New constructs a Network from an already-validated Config. Callers who
 // build a Config by hand use this; most callers use FromEnv.
+//
+// Singleton (len(Peers) == 0) collapses to the standalone no-op path. A
+// one-pod workload does not need consensus, does not need ZAP, does not
+// start a listener, and does not self-dial. Scaling up to N>1 flips the
+// same binary into a full network node by adding peers.
 func New(cfg Config) (Network, error) {
 	if err := cfg.validate(); err != nil {
 		return nil, fmt.Errorf("network: %w", err)
 	}
-	if !cfg.Enabled {
+	if !cfg.Enabled || len(cfg.Peers) == 0 {
 		return &noop{}, nil
 	}
 	return newNode(cfg)
