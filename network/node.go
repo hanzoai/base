@@ -26,10 +26,10 @@ type node struct {
 	cancel context.CancelFunc
 }
 
-// newNode constructs the live node with the default transport. Tests that
-// wire peers together in-process use NewWithTransport.
+// newNode constructs the live node with the production ZAP transport.
+// Tests that wire peers together in-process use NewWithTransport.
 func newNode(cfg Config) (*node, error) {
-	return newNodeWithTransport(cfg, nil)
+	return newNodeWithTransport(cfg, newZapTransport(cfg))
 }
 
 func newNodeWithTransport(cfg Config, t Transport) (*node, error) {
@@ -47,6 +47,8 @@ func newNodeWithTransport(cfg Config, t Transport) (*node, error) {
 	}
 
 	if t == nil {
+		// Test-only path: callers may pass a nil transport explicitly. The
+		// production entry point newNode() always injects the ZAP transport.
 		t = &nopTransport{}
 	}
 
