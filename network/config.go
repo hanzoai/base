@@ -116,14 +116,6 @@ func (c Config) validate() error {
 	if c.Replication < 1 {
 		return fmt.Errorf("BASE_REPLICATION=%d: must be >= 1", c.Replication)
 	}
-	// The local node is one of the replicas — peers are the others. We can
-	// host a Replication up to len(Peers)+1 (self).
-	if c.Replication > len(c.Peers)+1 {
-		return fmt.Errorf(
-			"BASE_REPLICATION=%d exceeds BASE_PEERS+self (%d)",
-			c.Replication, len(c.Peers)+1,
-		)
-	}
 	switch c.Role {
 	case RoleValidator, RoleArchive:
 	default:

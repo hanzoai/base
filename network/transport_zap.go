@@ -197,11 +197,36 @@ func (z *zapTransport) handle(_ context.Context, from string, msg *zap.Message) 
 	return nil, nil
 }
 
+// isSelfPeer returns true when the BASE_PEERS entry refers to this pod.
+//
+// Operator-emitted BASE_PEERS carries per-ordinal DNS names such as
+// "liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9651" while
+// BASE_NODE_ID is the bare hostname ("liquid-bd-0"). Plain equality misses
+// the match and the transport dials itself — luxfi/zap's handshake then
+// detects duplicate NodeID and closes, producing a 3s reconnect loop.
+//
+// Match rule: strip optional ":port" from the peer, take the first DNS
+// label, compare to self. Also accept exact equality so test transports
+// that use raw NodeID strings still work.
+func (z *zapTransport) isSelfPeer(peer string) bool {
+	if peer == "" || peer == z.self {
+		return true
+	}
+	host := peer
+	if i := strings.LastIndex(host, ":"); i >= 0 {
+		host = host[:i]
+	}
+	if dot := strings.Index(host, "."); dot >= 0 {
+		host = host[:dot]
+	}
+	return host == z.self
+}
+
 // dialAllOnce attempts to ConnectDirect to every peer except self. Errors
 // are logged at debug; the reconnect loop will retry.
 func (z *zapTransport) dialAllOnce() {
 	for _, p := range z.peers {
-		if p == z.self {
+		if z.isSelfPeer(p) {
 			continue
 		}
 		if err := z.node.ConnectDirect(p); err != nil {
@@ -226,7 +251,7 @@ func (z *zapTransport) reconnectLoop() {
 				connected[id] = struct{}{}
 			}
 			for _, p := range z.peers {
-				if p == z.self {
+				if z.isSelfPeer(p) {
 					continue
 				}
 				if _, ok := connected[p]; ok {
