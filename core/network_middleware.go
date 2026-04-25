@@ -14,7 +14,7 @@
 // comma-separated list of `nodeID=url` pairs. Without it we derive
 // the HTTP address from BASE_PEERS by swapping the P2P port for
 // the HTTP port (convention: operator-emitted BASE_PEERS carries
-// pod-FQDN:9651, we rewrite to pod-FQDN:8090).
+// pod-FQDN:9999, we rewrite to pod-FQDN:8090).
 //
 // Safe defaults: middleware is a no-op when app.Network() is nil
 // or reports Enabled() == false (singleton). The same app code
@@ -121,7 +121,7 @@ func shardResolver(shardKey string) func(*RequestEvent) error {
 //
 // The owner endpoint comes from the endpoints map when present.
 // Missing entries fall back to a convention-derived URL (swap
-// :9651 → :8090 on the P2P NodeID). Anything else → 503 (we know
+// :9999 → :8090 on the P2P NodeID). Anything else → 503 (we know
 // the request is misrouted but can't point anywhere useful).
 func writeForward(net baseNetwork, endpoints map[string]string) func(*RequestEvent) error {
 	return func(e *RequestEvent) error {
@@ -186,7 +186,7 @@ func parsePeerHTTPEndpoints(env string) map[string]string {
 
 // resolveWriterURL returns the HTTP URL for `owner`.
 //
-// Explicit map wins. Otherwise we derive: owner is "host:9651" (P2P
+// Explicit map wins. Otherwise we derive: owner is "host:9999" (P2P
 // port from BASE_PEERS); we swap to the HTTP port. Default HTTP
 // port is 8090 (BASE_LISTEN_HTTP default) but can be overridden
 // per-process via BASE_PEER_HTTP_PORT.
