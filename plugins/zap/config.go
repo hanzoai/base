@@ -12,7 +12,7 @@ import (
 
 // Config for the ZAP transport plugin.
 type Config struct {
-	// Port to listen on for ZAP connections (default 9652).
+	// Port to listen on for ZAP connections (default 9999).
 	Port int
 
 	// ServiceType for mDNS discovery (default "_hanzo-base._tcp").
@@ -32,7 +32,7 @@ func DefaultConfig() Config {
 		nodeID = "base-node"
 	}
 
-	port := 9652
+	port := 9999
 	if p := os.Getenv("ZAP_PORT"); p != "" {
 		fmt.Sscanf(p, "%d", &port)
 	}

@@ -56,7 +56,7 @@ func TestReplicationAboveMembers(t *testing.T) {
 	t.Setenv("BASE_NETWORK", "quasar")
 	t.Setenv("BASE_SHARD_KEY", "user_id")
 	t.Setenv("BASE_REPLICATION", "5")
-	t.Setenv("BASE_PEERS", "b:9651,c:9651") // 2 peers + self = 3
+	t.Setenv("BASE_PEERS", "b:9999,c:9999") // 2 peers + self = 3
 	t.Setenv("HOSTNAME", "a")
 	n, err := FromEnv()
 	if err != nil {
@@ -92,7 +92,7 @@ func TestFromEnvQuasarValid(t *testing.T) {
 	t.Setenv("BASE_NETWORK", "quasar")
 	t.Setenv("BASE_SHARD_KEY", "user_id")
 	t.Setenv("BASE_REPLICATION", "3")
-	t.Setenv("BASE_PEERS", "b:9651,c:9651")
+	t.Setenv("BASE_PEERS", "b:9999,c:9999")
 	t.Setenv("HOSTNAME", "a")
 	n, err := FromEnv()
 	if err != nil {
@@ -112,7 +112,7 @@ func TestInstallWALHookRejectsBadConn(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := NewWithTransport(cfg, nil)
 	if err != nil {
@@ -143,7 +143,7 @@ func TestInstallWALHookRegistersCallback(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := NewWithTransport(cfg, nil)
 	if err != nil {

@@ -77,7 +77,7 @@ func ConfigFromEnv() (Config, error) {
 		Role:       NodeRole(envOr("BASE_NODE_ROLE", string(RoleValidator))),
 		Archive:    envOr("BASE_ARCHIVE", "off"),
 		ListenHTTP: envOr("BASE_LISTEN_HTTP", ":8090"),
-		ListenP2P:  envOr("BASE_LISTEN_P2P", ":9651"),
+		ListenP2P:  envOr("BASE_LISTEN_P2P", ":9999"),
 	}
 
 	if v := strings.TrimSpace(os.Getenv("BASE_REPLICATION")); v != "" {
