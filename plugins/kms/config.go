@@ -17,7 +17,7 @@ import (
 // Config configures the KMS plugin.
 type Config struct {
 	// Nodes is the list of MPC node addresses.
-	// Example: ["https://kms-mpc-0:9651", "https://kms-mpc-1:9651", "https://kms-mpc-2:9651"]
+	// Example: ["https://kms-mpc-0:9999", "https://kms-mpc-1:9999", "https://kms-mpc-2:9999"]
 	Nodes []string
 
 	// OrgSlug is the organization identifier for key derivation.

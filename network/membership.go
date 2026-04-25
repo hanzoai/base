@@ -276,14 +276,14 @@ func splitHostPort(s string) (host, port string) {
 }
 
 // extractFirstPort returns the port of the first seed that has one.
-// Falls back to "9651" (Quasar default) when every seed is host-only.
+// Falls back to "9999" (Quasar default) when every seed is host-only.
 func extractFirstPort(seeds []string) string {
 	for _, s := range seeds {
 		if _, p := splitHostPort(s); p != "" {
 			return p
 		}
 	}
-	return "9651"
+	return "9999"
 }
 
 // staticMembership is the in-process test Membership — fixed list,
