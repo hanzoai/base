@@ -64,7 +64,7 @@ func TestParsePeerHTTPEndpoints(t *testing.T) {
 
 func TestResolveWriterURL(t *testing.T) {
 	eps := map[string]string{
-		"-0.-network.liquidity.svc:9651": "http://bd-0.internal:8090",
+		"-0.-network.liquidity.svc:9999": "http://bd-0.internal:8090",
 	}
 
 	cases := []struct {
@@ -74,10 +74,10 @@ func TestResolveWriterURL(t *testing.T) {
 		envPort string
 	}{
 		{"empty-owner", "", "", ""},
-		{"explicit-map", "-0.-network.liquidity.svc:9651", "http://bd-0.internal:8090", ""},
-		{"derived-default-port", "-1.-network.liquidity.svc:9651", "http://-1.-network.liquidity.svc:8090", ""},
+		{"explicit-map", "-0.-network.liquidity.svc:9999", "http://bd-0.internal:8090", ""},
+		{"derived-default-port", "-1.-network.liquidity.svc:9999", "http://-1.-network.liquidity.svc:8090", ""},
 		{"derived-no-port-in-owner", "-2", "http://-2:8090", ""},
-		{"derived-custom-http-port", "peer-a:9651", "http://peer-a:9443", "9443"},
+		{"derived-custom-http-port", "peer-a:9999", "http://peer-a:9443", "9443"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -216,7 +216,7 @@ func (f *fakeNet) Metrics() *network.Metrics                  { return nil }
 // TestWriteForwardReadPassthrough: GET requests always run local
 // even if WriterFor says remote.
 func TestWriteForwardReadPassthrough(t *testing.T) {
-	n := &fakeNet{owner: "other:9651", local: false}
+	n := &fakeNet{owner: "other:9999", local: false}
 	fn := writeForward(n, nil)
 
 	e := newTestReq(http.MethodGet, "/v1/things")
@@ -232,7 +232,7 @@ func TestWriteForwardReadPassthrough(t *testing.T) {
 
 // TestWriteForwardWriteLocal: mutating request + local writer → pass through.
 func TestWriteForwardWriteLocal(t *testing.T) {
-	n := &fakeNet{owner: "self:9651", local: true}
+	n := &fakeNet{owner: "self:9999", local: true}
 	fn := writeForward(n, nil)
 
 	e := newTestReq(http.MethodPost, "/v1/records")
@@ -248,8 +248,8 @@ func TestWriteForwardWriteLocal(t *testing.T) {
 // TestWriteForwardWriteNotLocal307: mutating request + remote writer
 // → 307 to the resolved URL.
 func TestWriteForwardWriteNotLocal307(t *testing.T) {
-	n := &fakeNet{owner: "peer-b:9651", local: false}
-	eps := map[string]string{"peer-b:9651": "http://peer-b.internal:8090"}
+	n := &fakeNet{owner: "peer-b:9999", local: false}
+	eps := map[string]string{"peer-b:9999": "http://peer-b.internal:8090"}
 	fn := writeForward(n, eps)
 
 	e := newTestReq(http.MethodPost, "/v1/records?filter=x")
@@ -272,7 +272,7 @@ func TestWriteForwardWriteNotLocal307(t *testing.T) {
 // TestWriteForwardConventionDerivedURL: no explicit map → port swap.
 func TestWriteForwardConventionDerivedURL(t *testing.T) {
 	n := &fakeNet{
-		owner: "-2.-network.liquidity.svc:9651",
+		owner: "-2.-network.liquidity.svc:9999",
 		local: false,
 	}
 	fn := writeForward(n, nil)
@@ -295,7 +295,7 @@ func TestWriteForwardConventionDerivedURL(t *testing.T) {
 // TestWriteForwardNoShardIDPassthrough: mutating request without a
 // resolved shard runs local. Fine for admin / auth / public endpoints.
 func TestWriteForwardNoShardIDPassthrough(t *testing.T) {
-	n := &fakeNet{owner: "peer:9651", local: false}
+	n := &fakeNet{owner: "peer:9999", local: false}
 	fn := writeForward(n, nil)
 
 	e := newTestReq(http.MethodPost, "/v1/public/signup")
