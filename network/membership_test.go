@@ -58,7 +58,7 @@ func TestDNSMembershipHeadless(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"liquid-bd-0",
-		[]string{"bd.liquidity.svc.cluster.local:9651"},
+		[]string{"bd.liquidity.svc.cluster.local:9999"},
 		r,
 		time.Hour,
 	)
@@ -73,8 +73,8 @@ func TestDNSMembershipHeadless(t *testing.T) {
 		if id == "liquid-bd-0" {
 			continue
 		}
-		if !stringsHasSuffix(string(id), ":9651") {
-			t.Errorf("member %q missing :9651 port", id)
+		if !stringsHasSuffix(string(id), ":9999") {
+			t.Errorf("member %q missing :9999 port", id)
 		}
 	}
 }
@@ -90,7 +90,7 @@ func TestDNSMembershipCompose(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"base-0",
-		[]string{"base-0:9651", "base-1:9651", "base-2:9651"},
+		[]string{"base-0:9999", "base-1:9999", "base-2:9999"},
 		r,
 		time.Hour,
 	)
@@ -111,7 +111,7 @@ func TestDNSMembershipScaleUp(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"liquid-bd-0",
-		[]string{"bd.svc:9651"},
+		[]string{"bd.svc:9999"},
 		r,
 		10*time.Millisecond,
 	)
@@ -146,7 +146,7 @@ func TestDNSMembershipScaleDown(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"liquid-bd-0",
-		[]string{"bd.svc:9651"},
+		[]string{"bd.svc:9999"},
 		r,
 		10*time.Millisecond,
 	)
