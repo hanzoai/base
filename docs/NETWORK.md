@@ -137,7 +137,7 @@ service. A finalized frame IS the commit.
 - Every Base pod is a quasar validator.
 - Peers discovered from `BASE_PEERS` seed list (CSV of DNS),
   gossip thereafter.
-- In k8s: headless Service, peers = `pod-0…N-1.svc.cluster.local:9651`.
+- In k8s: headless Service, peers = `pod-0…N-1.svc.cluster.local:9999`.
 - In compose: static DNS names.
 - Heartbeat TTL 1.5 s. On miss: the pod's shards are reassigned
   across survivors; new assignments sync the DAG from peers before
@@ -185,13 +185,13 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 | `BASE_NODE_ROLE`            | `validator` (default) \| `archive`          |  |
 | `BASE_ARCHIVE`              | `gs://…` \| `s3://…` \| `off` (default)     |  |
 | `BASE_LISTEN_HTTP`          | `:8090` default                             | Base HTTP. |
-| `BASE_LISTEN_P2P`           | `:9651` default                             | quasar p2p port. |
+| `BASE_LISTEN_P2P`           | `:9999` default                             | quasar p2p port. |
 | `BASE_SHARD_BACKLOG_MAX`    | bytes (64 MiB default)                      | R6 per-shard archive backlog cap; drop-oldest beyond. |
 | `BASE_SHARD_BACKLOG_SEGMENTS` | integer (100 000 default)                 | R6 segment-count cap; first-to-hit with MAX drops. |
 | `BASE_TLS_CA`               | path to PEM bundle                          | R5 mTLS CA for peer verification. Unset ⇒ no TLS. |
 | `BASE_TLS_SERVER_CERT`      | path to PEM                                 | R5 server cert presented to inbound peers. |
 | `BASE_TLS_SERVER_KEY`       | path to PEM                                 | R5 server key. |
-| `BASE_TLS_ALLOWED_SANS`     | CSV of DNS SANs                             | R5 SAN allowlist. Typically = `BASE_PEERS` stripped of `:9651`. |
+| `BASE_TLS_ALLOWED_SANS`     | CSV of DNS SANs                             | R5 SAN allowlist. Typically = `BASE_PEERS` stripped of `:9999`. |
 
 ### R1–R8 fix notes
 
@@ -385,7 +385,7 @@ services:
       BASE_NETWORK: quasar
       BASE_SHARD_KEY: user_id
       BASE_REPLICATION: 3
-      BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
+      BASE_PEERS: base-a:9999,base-b:9999,base-c:9999
       BASE_ARCHIVE: off
     ports: ["18090:8090"]
   base-b:
