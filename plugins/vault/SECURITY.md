@@ -20,7 +20,7 @@ zapdb_password: env    # from HSM via ZAPDB_ENCRYPTED_PASSWORD
 hsm_provider: aws      # aws | gcp | azure | env | file
 
 # Transport: ZAP p2p (no NATS)
-p2p_port: 9651
+p2p_port: 9999
 api_port: 8081
 
 # JWT: distinct issuer/audience per service
@@ -72,7 +72,7 @@ vault.MustRegister(app, vault.Config{
     MasterKey:   masterKeyFromHSM,    // 32 bytes, NEVER on disk
     ChainRPC:    "http://node:9650/ext/bc/I",  // I-Chain for anchoring
     SyncEnabled: true,
-    ZAPPort:     9900,
+    ZAPPort:     9999,
 })
 ```
 
