@@ -62,7 +62,7 @@ func TestComposePartial(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"base-0",
-		[]string{"base-0:9651", "base-1:9651", "base-2:9651"},
+		[]string{"base-0:9999", "base-1:9999", "base-2:9999"},
 		r,
 		10*time.Millisecond,
 	)
@@ -70,7 +70,7 @@ func TestComposePartial(t *testing.T) {
 
 	initial := m.Members()
 	if len(initial) != 3 { // base-0 (self) + base-1 + (literal "base-0" entry is self) + base-1
-		// Actually: self + (base-0 resolves to .2 but carries :9651 → different NodeID than self)
+		// Actually: self + (base-0 resolves to .2 but carries :9999 → different NodeID than self)
 		// Let's just assert it's >= 2 and <= 4
 		if len(initial) < 2 {
 			t.Errorf("initial partial: got %d members, want >= 2", len(initial))
@@ -105,9 +105,9 @@ func TestMixedSeeds(t *testing.T) {
 		context.Background(),
 		"liquid-bd-0",
 		[]string{
-			"bd.svc:9651",
-			"legacy-bd-primary:9651",
-			"archive-bd:9651",
+			"bd.svc:9999",
+			"legacy-bd-primary:9999",
+			"archive-bd:9999",
 		},
 		r,
 		time.Hour,
@@ -133,8 +133,8 @@ func TestSelfInSeedList(t *testing.T) {
 		context.Background(),
 		"liquid-bd-0",
 		[]string{
-			"liquid-bd-0.bd-network.ns.svc:9651", // self
-			"liquid-bd-1.bd-network.ns.svc:9651",
+			"liquid-bd-0.bd-network.ns.svc:9999", // self
+			"liquid-bd-1.bd-network.ns.svc:9999",
 		},
 		r,
 		time.Hour,
@@ -167,14 +167,14 @@ func TestDuplicateAddresses(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-primary:9651", "bd-backup:9651"},
+		[]string{"bd-primary:9999", "bd-backup:9999"},
 		r,
 		time.Hour,
 	)
 	defer m.Close()
 
 	got := m.Members()
-	// self + single 10.0.0.1:9651 = 2
+	// self + single 10.0.0.1:9999 = 2
 	if len(got) != 2 {
 		t.Errorf("duplicate IP: got %d members, want 2 (self + 10.0.0.1)", len(got))
 	}
@@ -191,7 +191,7 @@ func TestPortInheritance(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-a:9651", "bd-b"}, // bd-b missing port
+		[]string{"bd-a:9999", "bd-b"}, // bd-b missing port
 		r,
 		time.Hour,
 	)
@@ -202,8 +202,8 @@ func TestPortInheritance(t *testing.T) {
 		if id == "self" {
 			continue
 		}
-		if !strings.HasSuffix(string(id), ":9651") {
-			t.Errorf("member %q missing inherited :9651 port", id)
+		if !strings.HasSuffix(string(id), ":9999") {
+			t.Errorf("member %q missing inherited :9999 port", id)
 		}
 	}
 }
@@ -224,7 +224,7 @@ func TestFlakyResolver(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-a:9651", "bd-b:9651"},
+		[]string{"bd-a:9999", "bd-b:9999"},
 		r,
 		10*time.Millisecond,
 	)
@@ -258,7 +258,7 @@ func TestWatchBackPressure(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd:9651"},
+		[]string{"bd:9999"},
 		r,
 		10*time.Millisecond,
 	)
@@ -331,7 +331,7 @@ func TestConcurrentRefreshAndWatch(t *testing.T) {
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd:9651"},
+		[]string{"bd:9999"},
 		r,
 		5*time.Millisecond,
 	)

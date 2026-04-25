@@ -10,7 +10,7 @@ import (
 // R5 — Quasar p2p mTLS wrapper.
 //
 // The production transport must require peer authentication: without
-// mTLS, any host reachable on port 9651 (default BASE_LISTEN_P2P)
+// mTLS, any host reachable on port 9999 (default BASE_LISTEN_P2P)
 // forges envelopes for any known shardID. ShardIDs are derived from
 // JWT.sub / org_id and are enumerable, so the mTLS layer is the only
 // cryptographic boundary between the internet and the consensus DAG.

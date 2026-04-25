@@ -22,7 +22,7 @@ func main() {
     app := base.New()
 
     kms.MustRegister(app, kms.Config{
-        Nodes:     []string{"https://kms-mpc-0:9651", "https://kms-mpc-1:9651", "https://kms-mpc-2:9651"},
+        Nodes:     []string{"https://kms-mpc-0:9999", "https://kms-mpc-1:9999", "https://kms-mpc-2:9999"},
         OrgSlug:   "my-org",
         Threshold: 2,
         EncryptedCollections: map[string][]string{
