@@ -303,7 +303,7 @@ func TestAttack_NilFrameFields(t *testing.T) {
 
 // TestAttack_UnauthenticatedQuasarSubmit — R5 transport has no auth.
 //
-// Threat: any host reachable on port 9651 submits frames for any known
+// Threat: any host reachable on port 9999 submits frames for any known
 // shardID. ShardIDs are derived from JWT.sub / org_id so they're
 // enumerable.
 // Invariant: the production transport MUST require peer authentication
@@ -315,12 +315,12 @@ func TestAttack_UnauthenticatedQuasarSubmit(t *testing.T) {
 		Enabled:     true,
 		ShardKey:    "user_id",
 		Replication: 3,
-		Peers:       []string{"b:9651", "c:9651"},
+		Peers:       []string{"b:9999", "c:9999"},
 		NodeID:      "a",
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	nn, err := newNode(cfg)
 	if err != nil {
@@ -1272,7 +1272,7 @@ func TestAttack_NilVerifier(t *testing.T) {
 
 // TestAttack_P2PPortBindLocalOnly — accidental 0.0.0.0 exposure.
 //
-// Threat: the default ListenP2P is `:9651`, which binds every interface;
+// Threat: the default ListenP2P is `:9999`, which binds every interface;
 // on a multi-tenant node this is a lateral-movement surface.
 // Invariant: production must bind to the pod IP only. Config default is a
 // CI lint.

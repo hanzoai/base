@@ -60,7 +60,7 @@ ShardID was 'attacker-shard'`.
 **R5.** `transport.go` has no auth surface. `nopTransport` is the
 default (`node.go:49`). The doc's "PQ-signed" claim is delegated to
 Quasar, which sees frames only after shard-local submission. Any host
-reaching port 9651 forges for any known shardID.
+reaching port 9999 forges for any known shardID.
 
 **Fix.** Reject frames where `f.ShardID != Shard.ID` on ingestRemote;
 tie `localSeq` to the Quasar engine's finalised height, not the
@@ -111,7 +111,7 @@ cross-bucket. Needs operator-side validation.
 ### Slice 3 — Operator
 
 **R4.** `build_base_peers` emits
-`{workload}-{i}.{headless}.{ns}.svc.cluster.local:9651`. Per-pod DNS
+`{workload}-{i}.{headless}.{ns}.svc.cluster.local:9999`. Per-pod DNS
 records require `spec.hostname` + `spec.subdomain` on the pod —
 automatic for StatefulSets, not for Deployments. Deployment pod
 templates (`controller.rs:7572,8000,9131,7580,8492,8687`) set neither.
@@ -251,7 +251,7 @@ Status legend: `PASS` = defence in place; `SKIP` = blocked on blue's
 
 | Test | Threat | Invariant | Status |
 |------|--------|-----------|--------|
-| `TestAttack_UnauthenticatedQuasarSubmit` | Any host on :9651 submits frames for any shard. | Production transport requires mTLS + pod identity. | SKIP |
+| `TestAttack_UnauthenticatedQuasarSubmit` | Any host on :9999 submits frames for any shard. | Production transport requires mTLS + pod identity. | SKIP |
 | `TestAttack_ReplayOldFrame` | Attacker replays a captured envelope hours later. | Dedupe on (salt, cksm) coalesces. | PASS |
 | `TestAttack_PeerImpersonation` | Peer claims a stronger NodeID. | Peer identity attested by TLS cert CN / Noise static key. | SKIP |
 | `TestAttack_QuasarFloodDOS` | 2× channel-cap submits. | submitLocal never blocks >3 s. | PASS |
@@ -318,7 +318,7 @@ Status legend: `PASS` = defence in place; `SKIP` = blocked on blue's
 | `TestAttack_SegmentCRCWithBadSig` | Attacker recomputes CRC but can't sign. | Signature check MUST run even when CRC matches. | PASS |
 | `TestAttack_SegmentV1Downgrade` | Attacker writes unauthenticated LBN1 at the path. | LBN1 magic is a hard-reject. | PASS |
 | `TestAttack_NilVerifier` | Racy startup yields nil verifier. | decodeSegment(b, nil) returns ErrSegmentUnsigned. | PASS |
-| `TestAttack_P2PPortBindLocalOnly` | Default `:9651` binds every interface. | Production bind to pod IP only. | SKIP |
+| `TestAttack_P2PPortBindLocalOnly` | Default `:9999` binds every interface. | Production bind to pod IP only. | SKIP |
 | `TestAttack_FrameSeqZero` | First frame has Seq=0 colliding with txseq=0 sentinel. | First Seq emitted is 1, never 0. | PASS |
 
 ### Totals (at time of catalog publish)

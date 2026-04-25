@@ -32,7 +32,7 @@ func TestNodeScaleUp(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := newNodeWithTransport(cfg, &nopTransport{})
 	if err != nil {
@@ -82,7 +82,7 @@ func TestNodeScaleDown(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := newNodeWithTransport(cfg, &nopTransport{})
 	if err != nil {
@@ -129,7 +129,7 @@ func TestNodeScaleDownToOne(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := newNodeWithTransport(cfg, &nopTransport{})
 	if err != nil {
@@ -174,7 +174,7 @@ func TestNodeMembershipNotSet(t *testing.T) {
 		Role:        RoleValidator,
 		Archive:     "off",
 		ListenHTTP:  ":8090",
-		ListenP2P:   ":9651",
+		ListenP2P:   ":9999",
 	}
 	n, err := newNodeWithTransport(cfg, &nopTransport{})
 	if err != nil {

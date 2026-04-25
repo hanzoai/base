@@ -104,7 +104,7 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
-	// ZAP binary protocol transport (port 9652)
+	// ZAP binary protocol transport (port 9999)
 	zap.MustRegister(app)
 
 	// GitHub selfupdate
