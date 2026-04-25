@@ -54,7 +54,7 @@ type Config struct {
 	MasterKey   []byte `json:"-"`           // 32-byte master KEK (from HSM/K-Chain)
 	ChainRPC    string `json:"chainRpc"`    // optional: I-Chain RPC for merkle anchoring
 	SyncEnabled bool   `json:"syncEnabled"` // enable CRDT sync via ZAP
-	ZAPPort     int    `json:"zapPort"`     // ZAP listen port for sync (default 9900)
+	ZAPPort     int    `json:"zapPort"`     // ZAP listen port for sync (default 9999)
 }
 
 func (c Config) validate() error {
@@ -86,7 +86,7 @@ func Register(app core.App, config Config) error {
 		return err
 	}
 	if config.ZAPPort == 0 {
-		config.ZAPPort = 9900
+		config.ZAPPort = 9999
 	}
 
 	p := &plugin{
