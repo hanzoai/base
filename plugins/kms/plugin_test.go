@@ -20,7 +20,7 @@ func TestConfigValidate(t *testing.T) {
 		{
 			name: "valid config",
 			config: Config{
-				Nodes:     []string{"https://node1:9651"},
+				Nodes:     []string{"https://node1:9999"},
 				OrgSlug:   "test-org",
 				Threshold: 1,
 				EncryptedCollections: map[string][]string{

@@ -5,7 +5,7 @@
 //
 // This is the production Transport. It wires base/network Envelopes onto a
 // `github.com/luxfi/zap` Node: one TCP listener on BASE_LISTEN_P2P (default
-// :9651), explicit peer dial to every entry in BASE_PEERS (no mDNS in K8s),
+// :9999), explicit peer dial to every entry in BASE_PEERS (no mDNS in K8s),
 // and a single registered handler for envelope delivery.
 //
 // The envelope payload is the output of `Frame.encode()` — the shardID is
@@ -200,7 +200,7 @@ func (z *zapTransport) handle(_ context.Context, from string, msg *zap.Message) 
 // isSelfPeer returns true when the BASE_PEERS entry refers to this pod.
 //
 // Operator-emitted BASE_PEERS carries per-ordinal DNS names such as
-// "liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9651" while
+// "liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9999" while
 // BASE_NODE_ID is the bare hostname ("liquid-bd-0"). Plain equality misses
 // the match and the transport dials itself — luxfi/zap's handshake then
 // detects duplicate NodeID and closes, producing a 3s reconnect loop.
@@ -265,18 +265,18 @@ func (z *zapTransport) reconnectLoop() {
 	}
 }
 
-// portFromListen parses ":9651" or "0.0.0.0:9651" → 9651. Falls back to
-// 9651 on any parse error; validate() already guarantees ListenP2P is a
+// portFromListen parses ":9999" or "0.0.0.0:9999" → 9999. Falls back to
+// 9999 on any parse error; validate() already guarantees ListenP2P is a
 // well-formed host:port.
 func portFromListen(listen string) int {
 	listen = strings.TrimSpace(listen)
 	_, p, err := net.SplitHostPort(listen)
 	if err != nil {
-		return 9651
+		return 9999
 	}
 	port, err := strconv.Atoi(p)
 	if err != nil || port <= 0 || port > 65535 {
-		return 9651
+		return 9999
 	}
 	return port
 }
