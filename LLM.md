@@ -203,6 +203,6 @@ Env matrix:
 | `quasar`     | a,b,...    | true    | full Quasar quorum over ZAP |
 
 `BASE_PEERS` entries may be the operator-emitted pod FQDN
-(`liquid-bd-0.liquid-bd-network.<ns>.svc.cluster.local:9651`) while
+(`liquid-bd-0.liquid-bd-network.<ns>.svc.cluster.local:9999`) while
 `BASE_NODE_ID` is the bare hostname; `isSelfPeer` matches on the first DNS
 label so the transport never dials itself.
