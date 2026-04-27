@@ -15,7 +15,7 @@
 // ("0 3 * * *", "0 0 * * 1", "0 0 5 1,4,7,10 *"). Detection is automatic:
 // if time.ParseDuration succeeds, it's a duration; otherwise it's cron.
 //
-// If TASKS_URL is set, schedules run as durable Temporal workflows
+// If TASKS_URL is set, schedules run as durable Hanzo Tasks workflows
 // (retries, dead letter, audit trail). If not, runs locally via goroutine
 // timer (dev mode, same behavior as cron but no persistence).
 //
@@ -499,7 +499,7 @@ func (c *Client) createCronSchedule(name, cronExpr string) error {
 }
 
 // approximateCron converts a cron expression to a rough duration for local dev fallback.
-// Production uses Temporal's real cron scheduler; this is only for dev mode tickers.
+// Production uses Hanzo Tasks's real cron scheduler; this is only for dev mode tickers.
 func approximateCron(expr string) time.Duration {
 	fields := strings.Fields(expr)
 	switch len(fields) {
