@@ -17,7 +17,7 @@ require (
 	github.com/hanzoai/dbx v1.15.0
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.36.1
+	github.com/hanzoai/tasks v1.40.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.4.0
@@ -72,8 +72,11 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
+	github.com/luxfi/compress v0.0.5 // indirect
+	github.com/luxfi/concurrent v0.0.3 // indirect
 	github.com/luxfi/constants v1.5.0 // indirect
 	github.com/luxfi/container v0.0.4 // indirect
+	github.com/luxfi/database v1.18.1 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
 	github.com/luxfi/log v1.4.1 // indirect
 	github.com/luxfi/ringtail v0.2.0 // indirect
@@ -89,6 +92,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/psanford/sqlite3vfs v0.0.0-20251127171934-4e34e03a991a // indirect
+	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
