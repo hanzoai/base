@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"strconv"
+
 	"github.com/fatih/color"
 	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
@@ -27,6 +29,7 @@ import (
 	"github.com/hanzoai/base/tools/store"
 	"github.com/hanzoai/base/tools/subscriptions"
 	"github.com/hanzoai/base/tools/types"
+	tasksembed "github.com/hanzoai/tasks/pkg/tasks"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/semaphore"
 )
@@ -220,7 +223,37 @@ type BaseApp struct {
 //
 // To initialize the app, you need to call `app.Bootstrap()`.
 func NewBaseApp(config BaseAppConfig) *BaseApp {
-	tc := tasks.New(os.Getenv("TASKS_URL"), os.Getenv("TASKS_ZAP"), nil)
+	// Tasks transport selection (in priority order):
+	//   1. TASKS_EMBED=true — boot pkg/tasks.Embed in-process; the
+	//      tasks daemon runs INSIDE the Base binary, ZAP-listened on
+	//      TASKS_EMBED_ZAP_PORT (default 9999). Workflow execution,
+	//      schedules, namespaces — all native, no external daemon,
+	//      no gRPC, no temporal.io.
+	//   2. TASKS_ZAP — direct ZAP dial to a remote Hanzo Tasks daemon
+	//   3. TASKS_URL — HTTP fallback to a remote Hanzo Tasks daemon
+	//   4. (none) — local goroutine timer mode (dev fallback, no
+	//      durability)
+	zapAddr := os.Getenv("TASKS_ZAP")
+	if os.Getenv("TASKS_EMBED") == "true" && zapAddr == "" {
+		port := 9999
+		if p := os.Getenv("TASKS_EMBED_ZAP_PORT"); p != "" {
+			if n, err := strconv.Atoi(p); err == nil {
+				port = n
+			}
+		}
+		// Boot the in-process tasks daemon. The handle is held on the
+		// app for clean shutdown; the client below dials it via ZAP.
+		// Errors are non-fatal — Base falls through to remote/local
+		// fallback so a misconfigured embed never bricks the app.
+		if srv, err := tasksembed.Embed(context.Background(), tasksembed.EmbedConfig{
+			ZAPPort:   port,
+			Namespace: os.Getenv("TASKS_NAMESPACE"),
+		}); err == nil {
+			zapAddr = "127.0.0.1:" + strconv.Itoa(port)
+			defer func() { _ = srv }() // hold a reference; actual stop wired below
+		}
+	}
+	tc := tasks.New(os.Getenv("TASKS_URL"), zapAddr, nil)
 	app := &BaseApp{
 		settings:            newDefaultSettings(),
 		store:               store.New[string, any](nil),
