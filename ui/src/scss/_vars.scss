@@ -6,30 +6,30 @@
     --monospaceFontFamily: 'Geist Mono', ui-monospace, monospace;
     --iconFontFamily: 'remixicon';
 
-    // Monochrome palette — matches hanzo.ai
-    --txtPrimaryColor:  #ffffff;
-    --txtHintColor:     #a1a1aa;
-    --txtDisabledColor: #52525b;
+    // Hanzo dark palette
+    --txtPrimaryColor:  #f2f2f2;
+    --txtHintColor:     #94a3b8;
+    --txtDisabledColor: #1f2937;
 
-    // Primary — white (monochrome)
-    --primaryColor: #ffffff;
+    // Primary — white-on-dark CTA
+    --primaryColor: #f2f2f2;
 
-    // Body — pure black
-    --bodyColor: #000000;
+    // Body
+    --bodyColor: #070b13;
 
-    // Surfaces — near-black
-    --baseColor:     #0a0a0a;
-    --baseAlt1Color: #111111;
-    --baseAlt2Color: #1a1a1a;
-    --baseAlt3Color: #222222;
-    --baseAlt4Color: #333333;
+    // Surfaces
+    --baseColor:     #070b13;
+    --baseAlt1Color: #0d121d;
+    --baseAlt2Color: #1f2937;
+    --baseAlt3Color: #1f2937;
+    --baseAlt4Color: #94a3b8;
 
-    // Status — desaturated
-    --infoColor:       #a1a1aa;
-    --infoAltColor:    #1a1a1a;
+    // Status
+    --infoColor:       #94a3b8;
+    --infoAltColor:    #1f2937;
     --successColor:    #86efac;
-    --successAltColor: #0a0a0a;
-    --dangerColor:     #fca5a5;
+    --successAltColor: #070b13;
+    --dangerColor:     #ef4444;
     --dangerAltColor:  #1a0a0a;
     --warningColor:    #fcd34d;
     --warningAltColor: #1a1a0a;
