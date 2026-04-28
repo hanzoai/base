@@ -18,7 +18,7 @@ import (
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/routine"
-	"github.com/hanzoai/base/ui"
+	uireact "github.com/hanzoai/base/ui-react"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -92,7 +92,7 @@ func Serve(app core.App, config ServeConfig) error {
 			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
 		})
 	} else {
-	baseRouter.GET("/_/{path...}", Static(ui.DistDirFS, false)).
+	baseRouter.GET("/_/{path...}", Static(uireact.DistDirFS(), false)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
 			if e.Request.PathValue(StaticWildcardParam) != "" {
