@@ -1,8 +1,4 @@
 node_modules/
-# dist/ is generated but embed.go requires it to exist at build time.
-# We commit a placeholder (dist/index.html) and ignore the real build output.
-dist/*
-!dist/index.html
 .turbo/
 .vite/
 *.tsbuildinfo
