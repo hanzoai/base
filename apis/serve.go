@@ -92,7 +92,9 @@ func Serve(app core.App, config ServeConfig) error {
 			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
 		})
 	} else {
-	baseRouter.GET("/_/{path...}", Static(uireact.DistDirFS(), false)).
+	// indexFallback=true so deep links (/_/settings/auth, /_/records/...) hit
+	// the SPA index.html and let React Router resolve them client-side.
+	baseRouter.GET("/_/{path...}", Static(uireact.DistDirFS(), true)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
 			if e.Request.PathValue(StaticWildcardParam) != "" {
