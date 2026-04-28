@@ -1,15 +1,12 @@
-// Package uireact embeds the React + Vite 8 admin bundle.
+// Package uireact embeds the Base admin bundle (Hanzo GUI v7 + Vite).
 //
-// The Go HTTP handler serves the admin UI at the Base server's /_/ path.
-// Run `pnpm build` in this directory to produce dist/; the //go:embed
-// directive below picks up the resulting static assets.
+// Source lives in ../gui/apps/admin-base. Build there with `bun run build`,
+// then sync into ./dist via scripts/sync-admin-ui.sh. The //go:embed
+// directive below picks up the resulting static assets at compile time
+// of the Base binary.
 //
-// Deploy as a drop-in replacement for the legacy Svelte UI in ../ui by
-// swapping the import in base.go:
-//
-//	import uibase "github.com/hanzoai/base/ui-react"   // React
-//	// instead of
-//	import uibase "github.com/hanzoai/base/ui"         // Svelte (legacy)
+// The Go HTTP handler serves the admin UI at the Base server's /_/ path
+// — see apis/serve.go (gated behind BASE_ENABLE_ADMIN_UI=1).
 package uireact
 
 import (
