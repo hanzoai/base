@@ -2,6 +2,7 @@ package apis
 
 import (
 	"errors"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -104,6 +105,41 @@ func checkCollectionRateLimit(e *core.RequestEvent, collection *core.Collection,
 	}
 
 	return nil
+}
+
+// isIPInList checks if the specified IP is in a list of other individual IPs or subnets.
+func isIPInList(ipsOrSubnets []string, ip string) bool {
+	if ip == "" || len(ipsOrSubnets) == 0 {
+		return false
+	}
+
+	// normalize
+	searchAddr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return false
+	}
+
+	for _, item := range ipsOrSubnets {
+		// subnet?
+		prefix, err := netip.ParsePrefix(item)
+		if err == nil {
+			if prefix.Contains(searchAddr) {
+				return true
+			}
+			continue
+		}
+
+		// individual ip?
+		addr, err := netip.ParseAddr(item)
+		if err == nil {
+			if addr == searchAddr {
+				return true
+			}
+			continue
+		}
+	}
+
+	return false
 }
 
 // -------------------------------------------------------------------

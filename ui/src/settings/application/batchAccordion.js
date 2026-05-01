@@ -8,7 +8,7 @@ export function batchAccordion(pageData) {
         t.summary(
             null,
             t.i({ className: "ri-archive-stack-line", ariaHidden: true }),
-            t.span({ className: "txt" }, "Batch API"),
+            t.span({ className: "txt" }, "Batch Web API"),
             t.div({ className: "flex-fill" }),
             () => {
                 if (pageData.formSettings.batch.enabled) {

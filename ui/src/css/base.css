@@ -513,7 +513,9 @@ hr {
     text-decoration: none;
     border-radius: var(--borderRadius);
     color: var(--linkColor);
-    transition: color var(--animationSpeed);
+    transition:
+        color var(--animationSpeed),
+        opacity var(--animationSpeed);
     user-select: none;
     &:hover,
     &:focus-visible {

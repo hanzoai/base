@@ -249,7 +249,6 @@ export function rateLimitAccordion(pageData) {
                     t.label(
                         { htmlFor: "rateLimits.enabled" },
                         t.span({ className: "txt" }, "Enable"),
-                        t.small({ className: "txt-hint" }, " (experimental)"),
                     ),
                 ),
             ),

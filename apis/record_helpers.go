@@ -43,6 +43,13 @@ func RecordAuthResponse(e *core.RequestEvent, authRecord *core.Record, authMetho
 }
 
 func recordAuthResponse(e *core.RequestEvent, authRecord *core.Record, token string, authMethod string, meta any) error {
+	if authRecord.IsSuperuser() {
+		allowedIPs := e.App.Settings().SuperuserIPs
+		if len(allowedIPs) > 0 && !isIPInList(allowedIPs, e.RealIP()) {
+			return e.ForbiddenError("", errors.New("superuser IP is not whitelisted"))
+		}
+	}
+
 	originalRequestInfo, err := e.RequestInfo()
 	if err != nil {
 		return err

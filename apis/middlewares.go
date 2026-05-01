@@ -42,6 +42,9 @@ const (
 	DefaultLoadAuthTokenMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 20
 	DefaultLoadAuthTokenMiddlewareId       = "pbLoadAuthToken"
 
+	DefaultSuperuserIPsWhitelistMiddlewarePriority = DefaultLoadAuthTokenMiddlewarePriority + 5
+	DefaultSuperuserIPsWhitelistMiddlewareId       = "pbSuperuserIPsWhitelist"
+
 	DefaultSecurityHeadersMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 10
 	DefaultSecurityHeadersMiddlewareId       = "pbSecurityHeaders"
 
@@ -293,6 +296,28 @@ func securityHeaders() *hook.Handler[*core.RequestEvent] {
 
 			// @todo consider a default HSTS?
 			// (see also https://webkit.org/blog/8146/protecting-against-hsts-abuse/)
+
+			return e.Next()
+		},
+	}
+}
+
+// superuserIPsWhitelist middleware checks the current authenticated superuser IP
+// against the configured SuperuserIPs whitelist setting.
+//
+// This middleware is registered by default for all routes.
+func superuserIPsWhitelist() *hook.Handler[*core.RequestEvent] {
+	return &hook.Handler[*core.RequestEvent]{
+		Id:       DefaultSuperuserIPsWhitelistMiddlewareId,
+		Priority: DefaultSuperuserIPsWhitelistMiddlewarePriority,
+		Func: func(e *core.RequestEvent) error {
+			if e.HasSuperuserAuth() {
+				ips := e.App.Settings().SuperuserIPs
+
+				if len(ips) > 0 && !isIPInList(ips, e.RealIP()) {
+					return e.ForbiddenError("", errors.New("superuser IP is not whitelisted"))
+				}
+			}
 
 			return e.Next()
 		},
