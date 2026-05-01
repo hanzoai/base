@@ -1,6 +1,7 @@
 import { settingsSidebar } from "../settingsSidebar";
 import { batchAccordion } from "./batchAccordion";
 import { rateLimitAccordion, sortRules } from "./rateLimitAccordion";
+import { superuserAccordion } from "./superuserAccordion";
 import { trustedProxyAccordion } from "./trustedProxyAccordion";
 
 export function pageApplicationSettings() {
@@ -37,6 +38,53 @@ export function pageApplicationSettings() {
         }
     }
 
+    function hasSuperuserIPsChanged() {
+        return JSON.stringify(data.formSettings?.superuserIPs)
+            != JSON.stringify(data.originalFormSettings?.superuserIPs);
+    }
+
+    async function saveWithConfirm() {
+        const superuserIPs = app.utils.toArray(data.formSettings?.superuserIPs);
+
+        if (!superuserIPs.length) {
+            return save();
+        }
+
+        return app.modals.confirm(
+            t.div(
+                { className: "txt-center" },
+                t.h6(
+                    null,
+                    "The ONLY allowed superuser IPs will change to: ",
+                    t.br(),
+                    t.strong(null, superuserIPs.join(", ")),
+                ),
+                t.p(null, "Please make sure that your IP is in the list or you'll be locked."),
+                t.p(
+                    { className: "txt-hint" },
+                    "In case of lockout, you can reset the setting with the ",
+                    t.a(
+                        {
+                            href: import.meta.env.PB_SUPERUSER_IPS_RESET_DOCS,
+                            target: "_blank",
+                            rel: "noopener noreferrer",
+                            className: "link-primary txt-bold txt-sm",
+                        },
+                        t.code(
+                            null,
+                            "superuser ips",
+                            t.i({ ariaHidden: true, className: "ri-arrow-right-up-line txt-sm" }),
+                        ),
+                    ),
+                    " console command.",
+                ),
+            ),
+            () => save(),
+            null,
+            { yesButton: "Yes, save changes" },
+        );
+    }
+
     async function save() {
         if (data.isSaving || !data.hasChanges) {
             return;
@@ -48,8 +96,19 @@ export function pageApplicationSettings() {
 
         try {
             const redacted = app.utils.filterRedactedProps(data.formSettings);
-            const settings = await app.pb.settings.update(redacted);
-            init(settings);
+
+            const updatedSettings = await app.pb.settings.update(redacted);
+
+            // reauthenticate to ensure that the superuser has still access
+            if (hasSuperuserIPsChanged()) {
+                try {
+                    await app.pb.collection("_superusers").authRefresh();
+                } catch (_) {
+                    app.pb.authStore.clear();
+                }
+            }
+
+            init(updatedSettings);
 
             app.toasts.success("Successfully saved application settings.");
         } catch (err) {
@@ -73,6 +132,7 @@ export function pageApplicationSettings() {
         }
 
         data.originalFormSettings = {
+            superuserIPs: settings.superuserIPs || [],
             meta: settings.meta || {},
             batch: settings.batch || {},
             trustedProxy: settings.trustedProxy || { headers: [] },
@@ -118,7 +178,7 @@ export function pageApplicationSettings() {
                             inert: () => data.isSaving,
                             onsubmit: (e) => {
                                 e.preventDefault();
-                                save();
+                                saveWithConfirm();
                             },
                         },
                         t.div(
@@ -158,9 +218,10 @@ export function pageApplicationSettings() {
                         ),
                         t.div(
                             { className: "col-lg-12" },
+                            () => batchAccordion(data),
                             () => trustedProxyAccordion(data),
                             () => rateLimitAccordion(data),
-                            () => batchAccordion(data),
+                            () => superuserAccordion(data),
                         ),
                         t.div(
                             { className: "col-lg-12" },

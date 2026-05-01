@@ -375,7 +375,20 @@ watch(
 
             removeErrorState(input, container);
 
-            const errMsg = app.utils.getByPath(errs, name)?.message;
+            const errData = app.utils.getByPath(errs, name);
+            let errMsg = errData?.message || "";
+
+            // merge one level nested errors into a single message
+            if (!errMsg && !app.utils.isEmpty(errData)) {
+                const combinedErrs = [];
+                for (let key in errData) {
+                    if (errData[key]?.message) {
+                        combinedErrs.push(`${key}: ${errData[key]?.message}`);
+                    }
+                }
+                errMsg = combinedErrs.join("\n");
+            }
+
             if (!errMsg) {
                 continue;
             }

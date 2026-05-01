@@ -832,7 +832,7 @@ function deleteDropdownItem(data, modalSettings) {
         try {
             await app.pb.collections.delete(data.originalCollection.name);
 
-            modalSettings.ondelete?.(JSON.parse(JSON.stringify(data.originalCollection)));
+            modalSettings?.ondelete?.(JSON.parse(JSON.stringify(data.originalCollection)));
 
             app.utils.removeByKey(app.store.collections, "id", data.originalCollection.id);
 

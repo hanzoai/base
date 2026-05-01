@@ -235,12 +235,4 @@ window.app.checkApiError = function(err, showToast = true) {
         app.pb.cancelAllRequests();
         return app.pb.authStore.clear();
     }
-
-    // forbidden
-    if (statusCode === 403) {
-        app.pb.cancelAllRequests();
-        if (window.location.hash != LOGIN_PATH) {
-            window.location.hash = LOGIN_PATH;
-        }
-    }
 };
