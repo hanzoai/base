@@ -169,6 +169,12 @@ func TestFetch(t *testing.T) {
 			nil,
 		},
 		{
+			"matching kid (no alg)",
+			"abc",
+			true,
+			nil,
+		},
+		{
 			"matching kid",
 			"def",
 			false,
