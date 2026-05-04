@@ -267,7 +267,7 @@ export function pageCollections(route) {
                                 onclick: () => app.modals.openRecordUpsert(app.store.activeCollection),
                             },
                             t.i({ className: "ri-add-line", ariaHidden: true }),
-                            t.span({ className: "txt", textContent: "New Record" }),
+                            t.span({ className: "txt", textContent: "New record" }),
                         );
                     },
                 ),

@@ -2,8 +2,7 @@
 
 - Fixed UI logs pagination.
 
-- Replaced "IBM Plex Sans" text font with "Inter" as there were reports for being difficult to read on dark background as it was too "thin" (specifically on Firefox).
-    _If you are still having issues with the text readability, please open an issue with more details about your OS and browser to try to workaround it._
+- Fixed default CSP not allowing audio/video previews ([#7677](https://github.com/pocketbase/pocketbase/issues/7677)).
 
 - Serve fixed `Content-Type` for `.xlsx`, `.docx` and `.pptx` files to allow previews on iOS ([#7467](https://github.com/pocketbase/pocketbase/discussions/7467)).
 
