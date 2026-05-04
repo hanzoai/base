@@ -41,9 +41,6 @@ export function logsList(logsSettings) {
                 const max = app.utils.toRFC3339Datetime(maxDate);
 
                 normalizedFilter.push(`created >= "${min}" && created <= "${max}"`);
-            } else if (page > 1) {
-                // minimize duplicates in case there were new logs that push the old ones to later pages
-                normalizedFilter.push(`created <= "${data.logs[data.logs.length - 1].created}"`);
             }
 
             const result = await app.pb.logs.getList(page, perPage, {
