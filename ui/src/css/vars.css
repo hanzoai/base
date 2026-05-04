@@ -1,7 +1,7 @@
 :root,
 .dropdown,
 .base-surface {
-    --baseFontFamily: "Inter", system-ui, sans-serif, emoji;
+    --baseFontFamily: "IBM Plex Sans", system-ui, sans-serif, emoji;
     --monospaceFontFamily: "IBM Plex Mono", ui-monospace, monospace, emoji;
     --iconFontFamily: "remixicon";
 
@@ -103,7 +103,7 @@
     --lgFontSize: 15px;
 
     --lineHeight: 22px;
-    --smLineHeight: 15.5px; /* decimal for visual alignment */
+    --smLineHeight: 16px;
     --lgLineHeight: 24px;
 
     --btnHeight: 45px;
