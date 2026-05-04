@@ -19,11 +19,20 @@ export function logsList(logsSettings) {
         },
     });
 
+    // used as loose guard to prevent new logs to constantly push the old ones to later pages
+    let loadStartDate;
+
     async function load(reset = false) {
         logsSettings.isListLoading = true;
 
         try {
-            const page = reset ? 1 : data.lastPage + 1;
+            let page;
+            if (reset) {
+                page = 1;
+                loadStartDate = new Date().toISOString().replace("T", " ");
+            } else {
+                page = data.lastPage + 1;
+            }
 
             const normalizedFilter = (logsSettings.presets || []).concat(
                 app.utils.normalizeSearchFilter(logsSettings.filter, ["level", "message", "data"]),
@@ -41,6 +50,8 @@ export function logsList(logsSettings) {
                 const max = app.utils.toRFC3339Datetime(maxDate);
 
                 normalizedFilter.push(`created >= "${min}" && created <= "${max}"`);
+            } else {
+                normalizedFilter.push(`created <= "${loadStartDate}"`);
             }
 
             const result = await app.pb.logs.getList(page, perPage, {
