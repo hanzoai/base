@@ -43,7 +43,7 @@ export function collectionRulesTab(upsertData) {
                 app.components.slide(
                     () => local.showRulesInfo,
                     t.div(
-                        { className: "alert warning m-t-sm" },
+                        { className: "alert warning m-t-sm txt-sm" },
                         t.div(
                             { className: "content" },
                             t.p(null, "The following record fields are available:"),

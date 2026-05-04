@@ -103,7 +103,7 @@
     --lgFontSize: 15px;
 
     --lineHeight: 22px;
-    --smLineHeight: 17px;
+    --smLineHeight: 15.5px; /* decimal for visual alignment */
     --lgLineHeight: 24px;
 
     --btnHeight: 45px;

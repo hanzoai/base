@@ -23,11 +23,13 @@
     gap: var(--headerItemsGap);
     font-size: var(--smFontSize);
     line-height: var(--smLineHeight);
+
     /* for when the page is opened in "app" mode */
     @media (display-mode: minimal-ui) or (display-mode: standalone) {
         border-top: 1px solid var(--accentAlt1Color);
         border-bottom: 1px solid transparent;
     }
+
     .logo {
         display: inline-flex;
         vertical-align: top;

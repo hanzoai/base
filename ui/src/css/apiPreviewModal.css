@@ -17,7 +17,7 @@
 }
 
 .api-preview-sidebar {
-    width: 190px;
+    width: 195px;
     flex-shrink: 0;
     overflow: auto;
     scrollbar-width: thin;
