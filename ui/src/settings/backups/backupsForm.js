@@ -273,7 +273,7 @@ export function backupsForm(propsArg = {}) {
                                 ),
                                 t.button(
                                     {
-                                        className: () => `btn expanded ${data.isSaving ? "loading" : ""}`,
+                                        className: () => `btn expanded-lg ${data.isSaving ? "loading" : ""}`,
                                         disabled: () => !data.hasChanges || data.isSaving,
                                     },
                                     t.span({ className: "txt" }, "Save changes"),

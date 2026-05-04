@@ -356,7 +356,8 @@ export function pageMailSettings(route) {
                                             ),
                                             t.button(
                                                 {
-                                                    className: () => `btn expanded ${data.isSaving ? "loading" : ""}`,
+                                                    className: () =>
+                                                        `btn expanded-lg ${data.isSaving ? "loading" : ""}`,
                                                     disabled: () => !data.hasChanges || data.isSaving,
                                                 },
                                                 t.span({ className: "txt" }, "Save changes"),
@@ -367,7 +368,7 @@ export function pageMailSettings(route) {
                                     return t.button(
                                         {
                                             type: "button",
-                                            className: () => `btn expanded outline`,
+                                            className: () => `btn expanded-lg outline`,
                                             onclick: () => app.modals.openMailTest(),
                                         },
                                         t.i({ className: "ri-mail-check-line", ariaHidden: true }),

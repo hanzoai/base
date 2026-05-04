@@ -1,6 +1,9 @@
-## v0.38.0 (WIP)
+## v0.37.6 (WIP)
 
 - Fixed UI logs pagination.
+
+- Replaced "IBM Plex Sans" text font with "Inter" as there were reports for being difficult to read on dark background as it was too "thin" (specifically on Firefox).
+    _If you are still having issues with the text readability, please open an issue with more details about your OS and browser to try to workaround it._
 
 
 ## v0.37.5
