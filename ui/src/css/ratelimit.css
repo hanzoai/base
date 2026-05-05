@@ -61,6 +61,12 @@
         }
     }
 
+    td.col-new-btn {
+        padding: 3px;
+        &:focus-within {
+            background: var(--surfaceAlt2Color);
+        }
+    }
     .col-label {
         width: 60%;
     }

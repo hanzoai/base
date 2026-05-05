@@ -23,6 +23,10 @@
     ./pocketbase superuser ips 127.0.0.1 10.0.0.0 --dir=/custom/path/to/pb_data
     ```
 
+- Added rate limit option to exclude IPs/CIDR subnets ([#6410](https://github.com/pocketbase/pocketbase/issues/6410)).
+
+- (@todo) Bumped min Go GitHub action version to 1.26.3 because it comes with some [minor bug and security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.26.3).
+
 
 ## v0.37.5
 

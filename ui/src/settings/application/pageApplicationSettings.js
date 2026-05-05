@@ -15,8 +15,11 @@ export function pageApplicationSettings() {
         get originalFormSettingsHash() {
             return JSON.stringify(data.originalFormSettings);
         },
+        get formSettingsHash() {
+            return JSON.stringify(data.formSettings);
+        },
         get hasChanges() {
-            return data.originalFormSettingsHash != JSON.stringify(data.formSettings);
+            return data.originalFormSettingsHash != data.formSettingsHash;
         },
     });
 
@@ -136,7 +139,7 @@ export function pageApplicationSettings() {
             meta: settings.meta || {},
             batch: settings.batch || {},
             trustedProxy: settings.trustedProxy || { headers: [] },
-            rateLimits: settings.rateLimits || { rules: [] },
+            rateLimits: settings.rateLimits || { excludedIPs: [], rules: [] },
         };
 
         sortRules(data.originalFormSettings.rateLimits.rules);

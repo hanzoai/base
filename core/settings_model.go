@@ -290,7 +290,7 @@ func (s *Settings) PostValidate(ctx context.Context, app App) error {
 	defer s.mu.RUnlock()
 
 	return validation.ValidateStructWithContext(ctx, s,
-		validation.Field(&s.SuperuserIPs, validation.Each(validation.By(validators.IPOrSubnet))),
+		validation.Field(&s.SuperuserIPs, validation.Each(validation.Required, validation.By(validators.IPOrSubnet))),
 		validation.Field(&s.Meta),
 		validation.Field(&s.Logs),
 		validation.Field(&s.SMTP),
@@ -604,8 +604,9 @@ func (c TrustedProxyConfig) Validate() error {
 // -------------------------------------------------------------------
 
 type RateLimitsConfig struct {
-	Rules   []RateLimitRule `form:"rules" json:"rules"`
-	Enabled bool            `form:"enabled" json:"enabled"`
+	Rules       []RateLimitRule `form:"rules" json:"rules"`
+	ExcludedIPs []string        `form:"excludedIPs" json:"excludedIPs"`
+	Enabled     bool            `form:"enabled" json:"enabled"`
 }
 
 // FindRateLimitRule returns the first matching rule based on the provided labels.
@@ -650,6 +651,9 @@ func (c RateLimitsConfig) MarshalJSON() ([]byte, error) {
 	if c.Rules == nil {
 		c.Rules = []RateLimitRule{}
 	}
+	if c.ExcludedIPs == nil {
+		c.ExcludedIPs = []string{}
+	}
 
 	return json.Marshal(alias(c))
 }
@@ -661,6 +665,10 @@ func (c RateLimitsConfig) Validate() error {
 			&c.Rules,
 			validation.When(c.Enabled, validation.Required),
 			validation.By(checkUniqueRuleLabel),
+		),
+		validation.Field(
+			&c.ExcludedIPs,
+			validation.Each(validation.Required, validation.By(validators.IPOrSubnet)),
 		),
 	)
 }
