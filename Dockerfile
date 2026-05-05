@@ -1,19 +1,17 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS ui-builder
-RUN corepack enable && corepack prepare pnpm@latest --activate
-WORKDIR /ui
-COPY ui/package.json ui/pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-COPY ui/ .
-RUN pnpm build
-
+#
+# Hanzo Base — single Go binary, admin SPA embedded via //go:embed.
+#
+# The React admin SPA lives at ui-react/dist/ and is embedded by the Go
+# binary at compile time (ui-react/embed.go uses //go:embed all:dist).
+# The committed ui-react/dist is the source of truth for CI builds —
+# rebuild it locally with `pnpm --dir ui-react build` before tagging.
 FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
-COPY --from=ui-builder /ui/dist ./ui/dist
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 go build \
