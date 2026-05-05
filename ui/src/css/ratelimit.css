@@ -26,15 +26,15 @@
             border-radius: 0;
         }
         td {
-            background: var(--surfaceAlt2Color);
-            border-left: 1px solid var(--surfaceAlt3Color);
-            border-top: 1px solid var(--surfaceAlt3Color);
+            background: var(--inputColor);
+            border-left: 1px solid var(--inputBorderColor);
+            border-top: 1px solid var(--inputBorderColor);
             transition: background var(--animationSpeed);
             &:first-child {
                 border-left: 0px;
             }
             &:focus-within {
-                background: var(--surfaceAlt3Color);
+                background: var(--inputFocusColor);
             }
             &:has(.error:not(.hidden)) {
                 background: var(--surfaceDangerColor);
@@ -64,7 +64,7 @@
     td.col-new-btn {
         padding: 3px;
         &:focus-within {
-            background: var(--surfaceAlt2Color);
+            background: var(--inputColor);
         }
     }
     .col-label {

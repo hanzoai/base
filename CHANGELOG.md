@@ -1,6 +1,6 @@
 ## v0.38.0 (WIP)
 
-- Fixed UI logs pagination.
+- Fixed UI logs pagination when no custom range is specified.
 
 - Fixed default CSP not allowing audio/video previews ([#7677](https://github.com/pocketbase/pocketbase/issues/7677)).
 
@@ -8,7 +8,7 @@
 
 - Added an internal watcher to sync various runtime states between multiple PocketBase processes (e.g. memory store) using the same `pb_data`.
     _This is helpful in case for example a separate PocketBase console command change the collections or application settings while the server is still running._
-    _The watcher is debounced and implemented via `pb_data/.notify` dir watch as a workaround to avoid depending on OS and SQLite driver specific APIs._
+    _The watcher is debounced and implemented by watching the special `pb_data/.notify` dir as a workaround to avoid depending on OS and SQLite driver specific APIs._
 
 - Added new [Superuser IPs/CIDR subnets whitelist setting](https://pocketbase.io/docs/going-to-production/#limit-superusers-to-specific-ipssubnets).
     The optional setting can be changed from the UI under _Dasboard > Settings > Application > Superuser IPs_.
