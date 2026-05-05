@@ -27,14 +27,16 @@ jobs:
         with:
           node-version: '22'
           cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
+          cache-dependency-path: ui-react/pnpm-lock.yaml
 
       - uses: actions/setup-go@v6
         with:
           go-version: '>=1.26.1'
 
-      - name: Build admin UI
-        run: cd ui && pnpm install --frozen-lockfile && pnpm build
+      # ui-react/dist/ is committed and embedded by //go:embed all:dist
+      # in ui-react/embed.go. Skip the SPA rebuild here — the binary picks
+      # up whatever was committed. Refresh ui-react/dist locally with
+      # `pnpm --dir ui-react build` before tagging if the SPA changed.
 
       - name: Test
         run: go test ./...
