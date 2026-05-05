@@ -459,7 +459,7 @@ func (s *System) Serve(res http.ResponseWriter, req *http.Request, fileKey strin
 	// make an exception for specific content types and force a custom
 	// content type to send in the response so that it can be loaded properly
 	extContentType := realContentType
-	if ct, found := manualExtensionContentTypes[filepath.Ext(name)]; found {
+	if ct, found := manualExtensionContentTypes[filepath.Ext(fileKey)]; found {
 		extContentType = ct
 	}
 
