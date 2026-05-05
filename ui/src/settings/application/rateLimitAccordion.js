@@ -80,6 +80,23 @@ export function rateLimitAccordion(pageData) {
 
     const accordionData = store({
         predefinedTags: basePredefinedTags,
+        showMoreOptions: false,
+        get originalRateLimitFieldsHash() {
+            return JSON.stringify(pageData.originalFormSettings?.rateLimits.rules)
+                + JSON.stringify(pageData.originalFormSettings?.rateLimits.excludedIPs);
+        },
+        get hasRateLimitFieldsChanged() {
+            const newHash = JSON.stringify(pageData.formSettings?.rateLimits.rules)
+                + JSON.stringify(pageData.formSettings?.rateLimits.excludedIPs);
+            return accordionData.originalRateLimitFieldsHash != newHash;
+        },
+        get enableWarn() {
+            return (
+                !pageData.formSettings?.rateLimits?.enabled
+                && pageData.formSettings?.rateLimits?.rules?.length
+                && accordionData.hasRateLimitFieldsChanged
+            );
+        },
     });
 
     loadPredefinedTags();
@@ -206,6 +223,16 @@ export function rateLimitAccordion(pageData) {
                             delete app.store.errors.rateLimits;
                         },
                     ),
+                    // ensure that the excluded IP field is visible in case of an error
+                    watch(
+                        () => app.store.errors?.rateLimits?.excludedIPs,
+                        (newErr) => {
+                            if (newErr) {
+                                accordionData.showMoreOptions = true;
+                                return;
+                            }
+                        },
+                    ),
                 );
             },
             onunmount: () => {
@@ -224,7 +251,7 @@ export function rateLimitAccordion(pageData) {
                 return t.span({ className: "label" }, "Disabled");
             },
             () => {
-                if (!app.utils.isEmpty(app.store.errors?.rateLimits)) {
+                if (pageData.formSettingsHash && !app.utils.isEmpty(app.store.errors?.rateLimits)) {
                     return t.i({
                         className: "ri-error-warning-fill txt-danger",
                         ariaDescription: app.attrs.tooltip("Has errors", "left"),
@@ -237,18 +264,32 @@ export function rateLimitAccordion(pageData) {
             t.div(
                 { className: "col-lg-12" },
                 t.div(
-                    { className: "field" },
-                    t.input({
-                        id: "rateLimits.enabled",
-                        name: "rateLimits.enabled",
-                        type: "checkbox",
-                        className: "switch",
-                        checked: () => pageData.formSettings.rateLimits.enabled || false,
-                        onchange: (e) => (pageData.formSettings.rateLimits.enabled = e.target.checked),
-                    }),
-                    t.label(
-                        { htmlFor: "rateLimits.enabled" },
-                        t.span({ className: "txt" }, "Enable"),
+                    { className: "flex" },
+                    t.div(
+                        { className: "field" },
+                        t.input({
+                            id: "rateLimits.enabled",
+                            name: "rateLimits.enabled",
+                            type: "checkbox",
+                            className: "switch",
+                            checked: () => pageData.formSettings.rateLimits.enabled || false,
+                            onchange: (e) => (pageData.formSettings.rateLimits.enabled = e.target.checked),
+                        }),
+                        t.label(
+                            { htmlFor: "rateLimits.enabled" },
+                            t.span(
+                                { className: () => `txt ${accordionData.enableWarn ? "txt-warning" : ""}` },
+                                "Enable",
+                            ),
+                        ),
+                    ),
+                    t.button(
+                        {
+                            type: "button",
+                            className: "link-hint txt-sm m-l-auto",
+                            onclick: () => openRateLimitInfoModal(),
+                        },
+                        t.em(null, "Learn more about the rate limit rules"),
                     ),
                 ),
             ),
@@ -281,131 +322,208 @@ export function rateLimitAccordion(pageData) {
                                 t.th({ className: "col-action" }),
                             ),
                         ),
-                        t.tbody(null, () => {
-                            const rows = [];
-                            const rules = pageData.formSettings.rateLimits.rules || [];
+                        t.tbody(
+                            null,
+                            () => {
+                                const rows = [];
+                                const rules = pageData.formSettings.rateLimits.rules || [];
 
-                            for (let i = 0; i < rules.length; i++) {
-                                const rule = rules[i];
+                                for (let i = 0; i < rules.length; i++) {
+                                    const rule = rules[i];
 
-                                rows.push(
-                                    t.tr(
-                                        { className: "rate-limit-row" },
-                                        t.td(
-                                            { className: "col-label" },
-                                            t.div(
-                                                { className: "field" },
-                                                t.input({
-                                                    type: "text",
-                                                    required: true,
-                                                    className: "inline-error",
-                                                    id: "rateLimits.rules." + i + ".label",
-                                                    name: "rateLimits.rules." + i + ".label",
-                                                    placeholder: "tag (users:create) or path (/api/)",
-                                                    "html-list": "rateLimits.rules." + i + ".label_list",
-                                                    value: () => rule.label,
-                                                    oninput: (e) => (rule.label = e.target.value),
-                                                }),
-                                                t.datalist(
+                                    rows.push(
+                                        t.tr(
+                                            { className: "rate-limit-row" },
+                                            t.td(
+                                                { className: "col-label" },
+                                                t.div(
+                                                    { className: "field" },
+                                                    t.input({
+                                                        type: "text",
+                                                        required: true,
+                                                        className: "inline-error",
+                                                        id: "rateLimits.rules." + i + ".label",
+                                                        name: "rateLimits.rules." + i + ".label",
+                                                        placeholder: "tag (users:create) or path (/api/)",
+                                                        "html-list": "rateLimits.rules." + i + ".label_list",
+                                                        value: () => rule.label,
+                                                        oninput: (e) => (rule.label = e.target.value),
+                                                    }),
+                                                    t.datalist(
+                                                        {
+                                                            id: "rateLimits.rules." + i + ".label_list",
+                                                        },
+                                                        () => {
+                                                            return accordionData.predefinedTags.map((tag) => {
+                                                                return t.option({ value: tag.value }, tag.label || "");
+                                                            });
+                                                        },
+                                                    ),
+                                                ),
+                                            ),
+                                            t.td(
+                                                { className: "col-requests" },
+                                                t.div(
+                                                    { className: "field" },
+                                                    t.input({
+                                                        type: "number",
+                                                        required: true,
+                                                        placeholder: "Max requests*",
+                                                        className: "inline-error",
+                                                        min: 1,
+                                                        step: 1,
+                                                        name: "rateLimits.rules." + i + ".maxRequests",
+                                                        value: () => rule.maxRequests || 0,
+                                                        oninput: (e) => rule.maxRequests = parseInt(e.target.value, 10),
+                                                    }),
+                                                ),
+                                            ),
+                                            t.td(
+                                                { className: "col-duration" },
+                                                t.div(
+                                                    { className: "field" },
+                                                    t.input({
+                                                        type: "number",
+                                                        required: true,
+                                                        placeholder: "Interval*",
+                                                        className: "inline-error",
+                                                        min: 1,
+                                                        step: 1,
+                                                        name: "rateLimits.rules." + i + ".duration",
+                                                        value: () => rule.duration,
+                                                        oninput: (e) => rule.duration = parseInt(e.target.value, 10),
+                                                    }),
+                                                ),
+                                            ),
+                                            t.td(
+                                                { className: "col-audience" },
+                                                t.div(
+                                                    { className: "field" },
+                                                    app.components.select({
+                                                        name: "rateLimits.rules." + i + ".audience",
+                                                        className: "inline-error",
+                                                        options: audienceOptions,
+                                                        required: true,
+                                                        value: () => rule.audience || "",
+                                                        onchange: (selected) => {
+                                                            rule.audience = selected?.[0]?.value;
+                                                        },
+                                                    }),
+                                                ),
+                                            ),
+                                            t.td(
+                                                { className: "col-action" },
+                                                t.button(
                                                     {
-                                                        id: "rateLimits.rules." + i + ".label_list",
+                                                        type: "button",
+                                                        araiaDescription: app.attrs.tooltip("Remove rule"),
+                                                        className: "btn sm secondary transparent circle",
+                                                        onclick: () => removeRule(i),
                                                     },
-                                                    () => {
-                                                        return accordionData.predefinedTags.map((tag) => {
-                                                            return t.option({ value: tag.value }, tag.label || "");
-                                                        });
-                                                    },
+                                                    t.i({ className: "ri-close-line" }),
                                                 ),
                                             ),
                                         ),
-                                        t.td(
-                                            { className: "col-requests" },
-                                            t.div(
-                                                { className: "field" },
-                                                t.input({
-                                                    type: "number",
-                                                    required: true,
-                                                    placeholder: "Max requests*",
-                                                    className: "inline-error",
-                                                    min: 1,
-                                                    step: 1,
-                                                    name: "rateLimits.rules." + i + ".maxRequests",
-                                                    value: () => rule.maxRequests || 0,
-                                                    oninput: (e) => rule.maxRequests = parseInt(e.target.value, 10),
-                                                }),
-                                            ),
-                                        ),
-                                        t.td(
-                                            { className: "col-duration" },
-                                            t.div(
-                                                { className: "field" },
-                                                t.input({
-                                                    type: "number",
-                                                    required: true,
-                                                    placeholder: "Interval*",
-                                                    className: "inline-error",
-                                                    min: 1,
-                                                    step: 1,
-                                                    name: "rateLimits.rules." + i + ".duration",
-                                                    value: () => rule.duration,
-                                                    oninput: (e) => rule.duration = parseInt(e.target.value, 10),
-                                                }),
-                                            ),
-                                        ),
-                                        t.td(
-                                            { className: "col-audience" },
-                                            t.div(
-                                                { className: "field" },
-                                                app.components.select({
-                                                    name: "rateLimits.rules." + i + ".audience",
-                                                    className: "inline-error",
-                                                    options: audienceOptions,
-                                                    required: true,
-                                                    value: () => rule.audience || "",
-                                                    onchange: (selected) => {
-                                                        rule.audience = selected?.[0]?.value;
-                                                    },
-                                                }),
-                                            ),
-                                        ),
-                                        t.td(
-                                            { className: "col-action" },
-                                            t.button(
-                                                {
-                                                    type: "button",
-                                                    araiaDescription: app.attrs.tooltip("Remove rule"),
-                                                    className: "btn sm secondary transparent circle",
-                                                    onclick: () => removeRule(i),
-                                                },
-                                                t.i({ className: "ri-close-line" }),
-                                            ),
-                                        ),
-                                    ),
-                                );
-                            }
+                                    );
+                                }
 
-                            return rows;
-                        }),
+                                return rows;
+                            },
+                            t.tr(
+                                { className: "rate-limit-row" },
+                                t.td(
+                                    { colSpan: 99, className: "col-new-btn" },
+                                    t.button(
+                                        {
+                                            type: "button",
+                                            className: "btn secondary sm full-width",
+                                            onclick: () => newRule(),
+                                        },
+                                        t.i({ className: "ri-add-line", ariaHidden: true }),
+                                        t.span({ className: "txt" }, "Add rate limit rule"),
+                                    ),
+                                ),
+                            ),
+                        ),
                     ),
                 ),
-                t.div(
-                    { className: "flex m-t-sm" },
-                    t.button(
-                        {
-                            type: "button",
-                            className: "btn secondary sm",
-                            onclick: () => newRule(),
-                        },
-                        t.i({ className: "ri-add-line", ariaHidden: true }),
-                        t.span({ className: "txt" }, "Add rate limit rule"),
-                    ),
-                    t.button(
-                        {
-                            type: "button",
-                            className: "link-hint txt-sm m-l-auto",
-                            onclick: () => openRateLimitInfoModal(),
-                        },
-                        t.em(null, "Learn more about the rate limit rules"),
+            ),
+            t.div(
+                { className: "col-lg-12" },
+                t.button(
+                    {
+                        type: "button",
+                        className: () => `btn secondary sm ${!accordionData.showMoreOptions ? "transparent" : ""}`,
+                        onclick: () => accordionData.showMoreOptions = !accordionData.showMoreOptions,
+                    },
+                    t.span({ className: "txt" }, "More options"),
+                    t.i({
+                        ariaHidden: true,
+                        className: () => accordionData.showMoreOptions ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line",
+                    }),
+                ),
+                app.components.slide(
+                    () => accordionData.showMoreOptions,
+                    t.div(
+                        { className: "p-t-10" },
+                        t.div(
+                            { className: "fields" },
+                            t.div(
+                                { className: "field" },
+                                t.label(
+                                    { htmlFor: "excludedIPs" },
+                                    t.span({ className: "txt" }, "Excluded IPs and subnets"),
+                                ),
+                                t.input({
+                                    id: "excludedIPs",
+                                    name: "rateLimits.excludedIPs",
+                                    type: "text",
+                                    value: () => app.utils.joinNonEmpty(pageData.formSettings.rateLimits.excludedIPs),
+                                    oninput: (e) => {
+                                        const newValue = app.utils.splitNonEmpty(e.target.value, ",");
+                                        const newStr = app.utils.joinNonEmpty(newValue);
+                                        const oldStr = app.utils.joinNonEmpty(
+                                            pageData.formSettings.rateLimits.excludedIPs,
+                                        );
+
+                                        // has an actual change
+                                        if (oldStr != newStr) {
+                                            pageData.formSettings.rateLimits.excludedIPs = newValue;
+                                        }
+                                    },
+                                }),
+                            ),
+                            t.div(
+                                { className: "field addon" },
+                                t.button(
+                                    {
+                                        type: "button",
+                                        className: () =>
+                                            `btn sm secondary transparent ${
+                                                app.utils.isEmpty(pageData.formSettings.rateLimits.excludedIPs)
+                                                    ? "hidden"
+                                                    : ""
+                                            }`,
+                                        onclick: () => {
+                                            pageData.formSettings.rateLimits.excludedIPs = [];
+
+                                            if (app.store.errors?.rateLimits?.excludedIPs) {
+                                                delete app.store.errors.rateLimits.excludedIPs;
+                                            }
+                                        },
+                                    },
+                                    t.span({ className: "txt" }, "Clear"),
+                                ),
+                            ),
+                        ),
+                        t.div(
+                            { className: "field-help" },
+                            t.p(null, "Comma separated list of IPs and CIDR subnets to exclude from the rate limiter."),
+                            t.p(
+                                null,
+                                "Superusers are always excluded and they can send as many requests as they want.",
+                            ),
+                        ),
                     ),
                 ),
             ),

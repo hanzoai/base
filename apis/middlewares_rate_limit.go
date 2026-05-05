@@ -109,7 +109,7 @@ func checkCollectionRateLimit(e *core.RequestEvent, collection *core.Collection,
 
 // isIPInList checks if the specified IP is in a list of other individual IPs or subnets.
 func isIPInList(ipsOrSubnets []string, ip string) bool {
-	if ip == "" || len(ipsOrSubnets) == 0 {
+	if len(ipsOrSubnets) == 0 || ip == "" {
 		return false
 	}
 
@@ -189,7 +189,9 @@ func checkRateLimit(e *core.RequestEvent, rtId string, rule core.RateLimitRule) 
 }
 
 func skipRateLimit(e *core.RequestEvent) bool {
-	return !e.App.Settings().RateLimits.Enabled || e.HasSuperuserAuth()
+	return !e.App.Settings().RateLimits.Enabled ||
+		e.HasSuperuserAuth() ||
+		isIPInList(e.App.Settings().RateLimits.ExcludedIPs, e.RealIP())
 }
 
 var defaultAuthAudience = []string{core.RateLimitRuleAudienceAll, core.RateLimitRuleAudienceAuth}

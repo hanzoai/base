@@ -61,7 +61,7 @@ export function trustedProxyAccordion(pageData) {
         t.summary(
             null,
             t.i({ className: "ri-route-line", ariaHidden: true }),
-            t.span({ className: "txt" }, "User IP proxy headers"),
+            t.span({ className: "txt" }, "IP proxy headers"),
             () => {
                 if (proxyInfo.isLoading) {
                     return t.span({ className: "loader sm" });
