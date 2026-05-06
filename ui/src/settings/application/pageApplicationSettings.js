@@ -207,7 +207,11 @@ export function pageApplicationSettings() {
                                 t.input({
                                     id: "meta.appURL",
                                     name: "meta.appURL",
-                                    type: "url",
+                                    // note: text for compatibility with older versions
+                                    // (https://github.com/pocketbase/pocketbase/issues/7681)
+                                    //
+                                    // @todo consider reverting back to "url" once enforced on the backend too
+                                    type: "text",
                                     required: true,
                                     value: () => data.formSettings.meta.appURL || "",
                                     oninput: (e) => (data.formSettings.meta.appURL = e.target.value),
