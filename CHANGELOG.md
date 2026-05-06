@@ -6,6 +6,8 @@
 
 - Serve fixed `Content-Type` for `.xlsx`, `.docx` and `.pptx` files to allow previews on iOS ([#7467](https://github.com/pocketbase/pocketbase/discussions/7467)).
 
+- Changed settings app URL input to `type="text"` for compatibility with earlier versions ([#7681](https://github.com/pocketbase/pocketbase/issues/7681)).
+
 - Added an internal watcher to sync various runtime states between multiple PocketBase processes (e.g. memory store) using the same `pb_data`.
     _This is helpful in case for example a separate PocketBase console command change the collections or application settings while the server is still running._
     _The watcher is debounced and implemented by watching the special `pb_data/.notify` dir as a workaround to avoid depending on OS and SQLite driver specific APIs._

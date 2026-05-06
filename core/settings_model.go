@@ -548,6 +548,7 @@ func (c MetaConfig) Validate() error {
 	return validation.ValidateStruct(&c,
 		validation.Field(&c.AccentColor, validation.Length(7, 7), is.HexColor),
 		validation.Field(&c.AppName, validation.Required, validation.Length(1, 255)),
+		// @todo when replacing the URL validator we may need a system migration to normalize values without protocol
 		validation.Field(&c.AppURL, validation.Required, is.URL),
 		validation.Field(&c.SenderName, validation.Required, validation.Length(1, 255)),
 		validation.Field(&c.SenderAddress, is.EmailFormat, validation.Required),
