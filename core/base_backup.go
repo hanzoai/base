@@ -54,7 +54,13 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 	event.Context = ctx
 	event.Name = name
 	// default root dir entries to exclude from the backup generation
-	event.Exclude = []string{LocalBackupsDirName, LocalTempDirName, LocalAutocertCacheDirName, lostFoundDirName}
+	event.Exclude = []string{
+		LocalBackupsDirName,
+		LocalTempDirName,
+		LocalNotifyDirName,
+		LocalAutocertCacheDirName,
+		lostFoundDirName,
+	}
 
 	return app.OnBackupCreate().Trigger(event, func(e *BackupEvent) error {
 		// generate a default name if missing

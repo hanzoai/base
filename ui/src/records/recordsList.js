@@ -460,12 +460,12 @@ window.app.components.recordsList = function(propsArg = {}) {
 
                                 return t.div(
                                     { className: "sticky-content txt-center txt-hint" },
-                                    t.p({ className: "txt-bold" }, "No records found."),
+                                    t.div({ className: "txt-bold" }, "No records found."),
                                     t.button(
                                         {
                                             hidden: () => props.filter?.length || props.collection?.type == "view",
                                             type: "button",
-                                            className: "btn secondary expanded-lg",
+                                            className: "btn secondary expanded-lg m-t-10",
                                             onclick() {
                                                 app.modals.openRecordUpsert(props.collection);
                                             },
@@ -477,7 +477,7 @@ window.app.components.recordsList = function(propsArg = {}) {
                                         {
                                             hidden: () => !props.filter?.length,
                                             type: "button",
-                                            className: "btn secondary expanded-lg",
+                                            className: "btn secondary expanded-lg m-t-10",
                                             onclick() {
                                                 props.filter = "";
                                                 triggerOnchange();
