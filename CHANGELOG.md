@@ -1,3 +1,8 @@
+## v0.38.1 (WIP)
+
+- Silenced the superuser IPs confirmation if there is no change.
+
+
 ## v0.38.0
 
 - Fixed UI logs pagination when no custom range is specified.

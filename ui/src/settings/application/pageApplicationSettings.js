@@ -47,9 +47,14 @@ export function pageApplicationSettings() {
     }
 
     async function saveWithConfirm() {
+        const oldSuperuserIPs = app.utils.toArray(data.originalFormSettings?.superuserIPs);
         const superuserIPs = app.utils.toArray(data.formSettings?.superuserIPs);
 
-        if (!superuserIPs.length) {
+        if (
+            !superuserIPs.length
+            // no change
+            || JSON.stringify(oldSuperuserIPs) == JSON.stringify(superuserIPs)
+        ) {
             return save();
         }
 
