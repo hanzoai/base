@@ -283,14 +283,13 @@ export function logsList(logsSettings) {
 
                                     return t.div(
                                         { className: "sticky-content txt-center txt-hint" },
-                                        t.p({ className: "txt-bold" }, "No logs found."),
+                                        t.div({ className: "txt-bold" }, "No logs found."),
                                         t.button(
                                             {
                                                 hidden: () =>
-                                                    logsSettings.filter?.length
-                                                    || app.utils.isEmpty(logsSettings.zoom),
+                                                    logsSettings.filter?.length || app.utils.isEmpty(logsSettings.zoom),
                                                 type: "button",
-                                                className: "btn secondary expanded-lg",
+                                                className: "btn secondary expanded-lg m-t-10",
                                                 onclick() {
                                                     logsSettings.zoom = {};
                                                 },
@@ -301,7 +300,7 @@ export function logsList(logsSettings) {
                                             {
                                                 hidden: () => !logsSettings.filter?.length,
                                                 type: "button",
-                                                className: "btn secondary expanded-lg",
+                                                className: "btn secondary expanded-lg m-t-10",
                                                 onclick() {
                                                     logsSettings.filter = "";
                                                 },
