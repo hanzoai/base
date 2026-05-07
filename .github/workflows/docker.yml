@@ -9,6 +9,11 @@ on:
 env:
   IMAGE: ghcr.io/hanzoai/base
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
   test:
     runs-on: hanzo-build-linux-amd64
