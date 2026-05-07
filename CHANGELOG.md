@@ -1,4 +1,4 @@
-## v0.38.0 (WIP)
+## v0.38.0
 
 - Fixed UI logs pagination when no custom range is specified.
 
@@ -27,7 +27,7 @@
 
 - Added rate limit option to exclude IPs/CIDR subnets ([#6410](https://github.com/pocketbase/pocketbase/issues/6410)).
 
-- (@todo) Bumped min Go GitHub action version to 1.26.3 because it comes with some [minor bug and security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.26.3).
+- Bumped min Go GitHub action version to 1.26.3 because it comes with some [minor bug and security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.26.3).
 
 
 ## v0.37.5
