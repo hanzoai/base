@@ -2,6 +2,8 @@
 
 - Silenced the superuser IPs confirmation if there is no change.
 
+- Updated UI extensions APIs to allow top-level `await` in the initialization script.
+
 
 ## v0.38.0
 

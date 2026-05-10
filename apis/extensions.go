@@ -81,7 +81,8 @@ func copyExtensionMainjs(buf *bytes.Buffer, ext core.UIExtension) error {
 	defer f.Close()
 
 	// wrap in a self-executing function to avoid scope and concatenation issues
-	_, _ = buf.WriteString("(function(){")
+	// (the await/async is for top-level await)
+	_, _ = buf.WriteString("await (async function(){")
 
 	_, err = io.Copy(buf, f)
 	if err != nil {
