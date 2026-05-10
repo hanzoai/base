@@ -72,7 +72,7 @@ func TestUIExtensions_Mainjs(t *testing.T) {
 			},
 			AfterTestFunc:   successAfterTestFunc,
 			ExpectedStatus:  200,
-			ExpectedContent: []string{"(function(){ext1_main})();(function(){ext3_main})();"},
+			ExpectedContent: []string{"await (async function(){ext1_main})();await (async function(){ext3_main})();"},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 	}
