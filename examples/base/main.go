@@ -112,8 +112,8 @@ func main() {
 
 	// Multi-tenant platform (IAM + KMS integration)
 	platform.MustRegister(app, platform.PlatformConfig{
-		IAMEndpoint:     os.Getenv("IAM_ENDPOINT"),
-		KMSEndpoint:     os.Getenv("KMS_ENDPOINT"),
+		IAMEndpoint:     os.Getenv("IAM_URL"),
+		KMSEndpoint:     os.Getenv("KMS_URL"),
 		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
 	})
