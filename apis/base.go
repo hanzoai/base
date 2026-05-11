@@ -38,15 +38,15 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 
 	// External auth mode: allow JWKS-based auth without the platform plugin.
 	// EXTERNAL_AUTH_ONLY=true disables all built-in auth endpoints for
-	// non-superuser collections and requires JWKS_URL for token validation.
+	// non-superuser collections and requires IAM_KEYS_URL for token validation.
 	// The platform plugin sets these store keys directly; env vars provide
 	// the same behavior for standalone Base deployments.
 	if os.Getenv("EXTERNAL_AUTH_ONLY") == "true" {
-		jwksURL := os.Getenv("JWKS_URL")
+		jwksURL := os.Getenv("IAM_KEYS_URL")
 		if jwksURL != "" {
 			app.Store().Set(StoreKeyJWKSURL, jwksURL)
 		} else {
-			app.Logger().Warn("EXTERNAL_AUTH_ONLY is set but JWKS_URL is empty — token validation will fail")
+			app.Logger().Warn("EXTERNAL_AUTH_ONLY is set but IAM_KEYS_URL is empty — token validation will fail")
 		}
 		app.Store().Set(StoreKeyExternalAuthOnly, true)
 
