@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { base } from '~/lib/base';
 
-// Cron job surface. PocketBase exposes base.crons.* for the app's
+// Cron job surface. Hanzo Base exposes base.crons.* for the app's
 // registered jobs. Each job is read-only metadata + a "run now" trigger.
 function Crons() {
     const qc = useQueryClient();
