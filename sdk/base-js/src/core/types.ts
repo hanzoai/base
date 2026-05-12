@@ -1,9 +1,9 @@
 /**
  * Schema types — collection + field model shapes the admin UI needs.
  *
- * These were previously imported from `pocketbase` as `CollectionModel`
- * / `CollectionField`. Defining them natively in @hanzo/base so the
- * SDK has no upstream dependency.
+ * Defined natively in @hanzo/base so the SDK has no upstream
+ * dependency. Admin pages import `CollectionModel` / `CollectionField`
+ * directly from `@hanzo/base`.
  */
 
 import type { BaseRecord } from './state.js'
