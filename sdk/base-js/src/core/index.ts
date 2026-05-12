@@ -1,9 +1,8 @@
 /**
  * @hanzo/base -- Core entry point.
  *
- * Exposes the full Base client surface natively. No upstream `pocketbase`
- * dependency — every type and helper consumers used to import from the
- * upstream client lives here.
+ * Exposes the full Base client surface natively. No upstream package
+ * dependency — every type and helper the SDK needs lives here.
  */
 
 import { BaseClient } from './client.js'
