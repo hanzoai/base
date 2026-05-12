@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 
 import { base } from '~/lib/base';
 
-import type { CollectionField } from 'pocketbase';
+import type { CollectionField } from "/base";
 
 // ---------------------------------------------------------------------------
 // Types
