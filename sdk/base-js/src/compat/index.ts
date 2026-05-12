@@ -1,23 +1,48 @@
 /**
- * @hanzo/base/compat -- upstream-compatible client re-exports.
+ * @hanzo/base/compat -- drop-in replacement for the upstream client.
  *
- * Provides a migration shim so existing code can switch to @hanzo/base
- * without changes. Will be removed in a future major version.
+ * Re-exports every symbol consumers used to import from the upstream
+ * client. Switching the specifier (and only the specifier) carries
+ * existing code over with no further changes:
  *
- * Usage:
- *   import Base, { LocalAuthStore, isTokenExpired } from '@hanzo/base/compat'
+ *   - import Base, { LocalAuthStore } from 'pocketbase'
+ *   + import Base, { LocalAuthStore } from '@hanzo/base/compat'
+ *
+ * Everything here is implemented natively in @hanzo/base — there is
+ * NO upstream package dependency.
  */
 
 export {
   default,
   default as Base,
+  BaseClient,
+  MemoryAuthStore,
   LocalAuthStore,
   AsyncAuthStore,
-  BaseAuthStore,
-  isTokenExpired,
   ClientResponseError,
+  isTokenExpired,
+  getTokenPayload,
   cookieParse,
   cookieSerialize,
-  getTokenPayload,
   normalizeUnknownQueryParams,
-} from 'pocketbase'
+} from '../core/index.js'
+
+export type {
+  AuthStore,
+  AuthChangeCallback,
+  ClientConfig,
+  ListOptions,
+  ListResult,
+  BaseAuthStore,
+  BaseRecord,
+  RecordModel,
+  CollectionField,
+  CollectionModel,
+  RecordQueryOptions,
+  RecordFullListOptions,
+  FileOptions,
+  AuthResponse,
+  OAuth2Options,
+  ClientResponseErrorData,
+  CookieSerializeOptions,
+} from '../core/index.js'
