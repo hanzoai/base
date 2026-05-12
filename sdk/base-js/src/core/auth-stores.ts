@@ -1,10 +1,10 @@
 /**
  * Auth-store implementations beyond the in-memory default.
  *
- * Replaces upstream `LocalAuthStore` / `AsyncAuthStore` so the SDK has
- * no upstream client dependency. Implementations match the upstream
- * surface so existing apps switching from `pocketbase` to `@hanzo/base`
- * keep working.
+ * Native `LocalAuthStore` / `AsyncAuthStore` implementations so the
+ * SDK has zero upstream client dependency. The shape matches the
+ * legacy client's auth stores so existing apps migrating to
+ * `@hanzo/base` keep working.
  */
 
 import type { AuthStore, AuthChangeCallback } from './client.js'
