@@ -1,9 +1,9 @@
-// Base client — thin wrapper around PocketBase SDK bound to the host that
+// Base client — thin wrapper around Hanzo Base SDK bound to the host that
 // served the page, so the same bundle works against any Base deploy.
 //
 // The SDK handles auth cookies, realtime EventSource subscriptions, and
 // pagination. We expose a single shared instance via `base`.
-import PocketBase from 'pocketbase';
+import { BaseClient } from "/base";
 
 function resolveBaseUrl(): string {
   if (typeof window === 'undefined') return '';
@@ -11,7 +11,7 @@ function resolveBaseUrl(): string {
   return window.location.origin;
 }
 
-export const base = new PocketBase(resolveBaseUrl());
+export const base = new BaseClient(resolveBaseUrl());
 
 // Export commonly-used handles so pages don't have to reach into the SDK.
 export const superusers = base.collection('_superusers');
