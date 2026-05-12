@@ -1,15 +1,14 @@
 /**
- * @hanzo/base/compat -- drop-in replacement for the upstream client.
+ * @hanzo/base/compat -- drop-in for legacy client imports.
  *
- * Re-exports every symbol consumers used to import from the upstream
+ * Re-exports every symbol consumers used to import from the legacy
  * client. Switching the specifier (and only the specifier) carries
  * existing code over with no further changes:
  *
- *   - import Base, { LocalAuthStore } from 'pocketbase'
- *   + import Base, { LocalAuthStore } from '@hanzo/base/compat'
+ *   - import Base, { LocalAuthStore } from '@hanzo/base/compat'
  *
- * Everything here is implemented natively in @hanzo/base — there is
- * NO upstream package dependency.
+ * Everything here is implemented natively in @hanzo/base — no
+ * upstream package dependency.
  */
 
 export {
