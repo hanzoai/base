@@ -1,4 +1,4 @@
-// Typed fetch wrappers for the Base API. Replaces the PocketBase JS SDK.
+// Typed fetch wrappers for the Base API. Replaces the Hanzo Base SDK.
 
 const TOKEN_KEY = 'base_auth_token'
 const RECORD_KEY = 'base_auth_record'

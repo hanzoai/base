@@ -1,8 +1,12 @@
 /**
- * @hanzoai/base -- Core entry point.
+ * @hanzo/base -- Core entry point.
  *
- * Re-exports the client, collection, store, state, and realtime modules.
+ * Exposes the full Base client surface natively. No upstream `pocketbase`
+ * dependency — every type and helper consumers used to import from the
+ * upstream client lives here.
  */
+
+import { BaseClient } from './client.js'
 
 // Client
 export { BaseClient, BaseClientError, MemoryAuthStore, FileService } from './client.js'
@@ -35,3 +39,25 @@ export type {
   RealtimeCallback,
   ConnectionCallback,
 } from './realtime.js'
+
+// Schema types — admin UI consumers
+export type { CollectionField, CollectionModel, RecordModel } from './types.js'
+
+// Auth stores — beyond the in-memory default
+export { LocalAuthStore, AsyncAuthStore } from './auth-stores.js'
+export type { BaseAuthStore } from './auth-stores.js'
+
+// Token + cookie helpers
+export {
+  getTokenPayload,
+  isTokenExpired,
+  cookieParse,
+  cookieSerialize,
+  normalizeUnknownQueryParams,
+} from './tokens.js'
+export type { CookieSerializeOptions } from './tokens.js'
+
+// Default export — matches the upstream client default. Consumers can
+// `import Base from '@hanzo/base'` and continue calling `new Base(url)`
+// exactly as they did against the upstream package.
+export default BaseClient

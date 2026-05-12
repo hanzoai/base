@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { base } from '~/lib/base';
 
-import type { RecordModel } from 'pocketbase';
+import type { RecordModel } from "/base";
 
 // ---------------------------------------------------------------------------
 // Constants
