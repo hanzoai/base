@@ -1,6 +1,6 @@
 module github.com/hanzoai/base
 
-go 1.26.1
+go 1.26.3
 
 require (
 	cloud.google.com/go/storage v1.51.0
