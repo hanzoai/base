@@ -219,8 +219,13 @@ func realtimeSetSubscriptions(e *core.RequestEvent) error {
 	})
 }
 
-// updateClientsAuth updates the existing clients auth record with the new one (matched by ID).
-func realtimeUpdateClientsAuth(app core.App, newAuthRecord *core.Record) error {
+// realtimeUpdateClientsAuth updates the auth state of all clients related to the provided authRecord.
+//
+// Realtime connections has short lifetime by design, but to minimize abuse
+// if the new record has a different tokenKey (e.g. in case of password reset)
+// the auth state of the related realtime connections is also cleared
+// (aka. they remain active but unauthenticated, allowing to reauthenicate with the next subscription).
+func realtimeUpdateClientsAuth(app core.App, authRecord *core.Record) error {
 	chunks := app.SubscriptionsBroker().ChunkedClients(clientsChunkSize)
 
 	group := new(errgroup.Group)
@@ -230,9 +235,13 @@ func realtimeUpdateClientsAuth(app core.App, newAuthRecord *core.Record) error {
 			for _, client := range chunk {
 				clientAuth, _ := client.Get(RealtimeClientAuthKey).(*core.Record)
 				if clientAuth != nil &&
-					clientAuth.Id == newAuthRecord.Id &&
-					clientAuth.Collection().Name == newAuthRecord.Collection().Name {
-					client.Set(RealtimeClientAuthKey, newAuthRecord)
+					clientAuth.Id == authRecord.Id &&
+					clientAuth.Collection().Name == authRecord.Collection().Name {
+					if clientAuth.TokenKey() != authRecord.TokenKey() {
+						client.Unset(RealtimeClientAuthKey)
+					} else {
+						client.Set(RealtimeClientAuthKey, authRecord)
+					}
 				}
 			}
 
@@ -243,8 +252,8 @@ func realtimeUpdateClientsAuth(app core.App, newAuthRecord *core.Record) error {
 	return group.Wait()
 }
 
-// realtimeUnsetClientsAuthState unsets the auth state of all clients that have the provided auth model.
-func realtimeUnsetClientsAuthState(app core.App, authModel core.Model) error {
+// realtimeUnsetClientsAuthByRecordModelOrProxy unsets the auth state of all clients that have the provided auth model.
+func realtimeUnsetClientsAuthByRecordModelOrProxy(app core.App, authModel core.Model) error {
 	chunks := app.SubscriptionsBroker().ChunkedClients(clientsChunkSize)
 
 	group := new(errgroup.Group)
@@ -267,7 +276,76 @@ func realtimeUnsetClientsAuthState(app core.App, authModel core.Model) error {
 	return group.Wait()
 }
 
+// realtimeUnsetClientsAuthByCollection unsets the auth state of all authenticated clients related to the collection.
+func realtimeUnsetClientsAuthByCollection(app core.App, collection *core.Collection) error {
+	chunks := app.SubscriptionsBroker().ChunkedClients(clientsChunkSize)
+
+	group := new(errgroup.Group)
+
+	for _, chunk := range chunks {
+		group.Go(func() error {
+			for _, client := range chunk {
+				clientAuth, _ := client.Get(RealtimeClientAuthKey).(*core.Record)
+				if clientAuth != nil && clientAuth.Collection().Name == collection.Name {
+					client.Unset(RealtimeClientAuthKey)
+				}
+			}
+
+			return nil
+		})
+	}
+
+	return group.Wait()
+}
+
 func bindRealtimeEvents(app core.App) {
+	// reset the clients auth on collection secret change
+	// (@todo with the future tracking of old collections data consider replacing with *AfterUpdateSuccess to account for transaction rollback)
+	app.OnCollectionUpdate().Bind(&hook.Handler[*core.CollectionEvent]{
+		Func: func(e *core.CollectionEvent) error {
+			if !e.Collection.IsAuth() {
+				return e.Next()
+			}
+
+			cached, _ := e.App.FindCachedCollectionByNameOrId(e.Collection.Id)
+
+			if err := e.Next(); err != nil {
+				return err
+			}
+
+			if cached != nil && cached.AuthToken.Secret != e.Collection.AuthToken.Secret {
+				if err := realtimeUnsetClientsAuthByCollection(e.App, e.Collection); err != nil {
+					app.Logger().Warn(
+						"Failed to remove client(s) associated to the changed auth collection",
+						slog.String("collectionName", e.Collection.Name),
+						slog.String("error", err.Error()),
+					)
+				}
+			}
+
+			return nil
+		},
+		Priority: -99,
+	})
+
+	// unset the clients auth on auth collection delete
+	app.OnCollectionAfterDeleteSuccess().Bind(&hook.Handler[*core.CollectionEvent]{
+		Func: func(e *core.CollectionEvent) error {
+			if e.Collection.IsAuth() {
+				if err := realtimeUnsetClientsAuthByCollection(e.App, e.Collection); err != nil {
+					app.Logger().Warn(
+						"Failed to remove client(s) associated to the deleted auth collection",
+						slog.String("collectionName", e.Collection.Name),
+						slog.String("error", err.Error()),
+					)
+				}
+			}
+
+			return e.Next()
+		},
+		Priority: -99,
+	})
+
 	// update the clients that has auth record association
 	app.OnModelAfterUpdateSuccess().Bind(&hook.Handler[*core.ModelEvent]{
 		Func: func(e *core.ModelEvent) error {
@@ -294,7 +372,7 @@ func bindRealtimeEvents(app core.App) {
 		Func: func(e *core.ModelEvent) error {
 			collection := realtimeResolveRecordCollection(e.App, e.Model)
 			if collection != nil && collection.IsAuth() {
-				if err := realtimeUnsetClientsAuthState(e.App, e.Model); err != nil {
+				if err := realtimeUnsetClientsAuthByRecordModelOrProxy(e.App, e.Model); err != nil {
 					app.Logger().Warn(
 						"Failed to remove client(s) associated to the deleted auth model",
 						slog.Any("id", e.Model.PK()),
