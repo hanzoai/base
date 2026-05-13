@@ -498,28 +498,23 @@ func TestRealtimeAuthRecordUpdateEvent(t *testing.T) {
 	client.Set(apis.RealtimeClientAuthKey, authRecord1)
 	testApp.SubscriptionsBroker().Register(client)
 
-	// refetch the authRecord and change its email
+	// refetch the authRecord and change its name
 	authRecord2, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
-	authRecord2.SetEmail("new@example.com")
 
-	// mock update event without actually saving to avoid triggering the tokenKey change
-	e := new(core.ModelEvent)
-	e.App = testApp
-	e.Type = core.ModelEventTypeUpdate
-	e.Context = context.Background()
-	e.Model = authRecord2
+	newName := "test_new_name"
+	authRecord2.Set("name", newName)
 
-	err = testApp.OnModelAfterUpdateSuccess().Trigger(e)
+	err = testApp.Save(authRecord2)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	clientAuthRecord, _ := client.Get(apis.RealtimeClientAuthKey).(*core.Record)
-	if clientAuthRecord.Email() != authRecord2.Email() {
-		t.Fatalf("Expected authRecord with email %q, got %q", authRecord2.Email(), clientAuthRecord.Email())
+	if clientAuthRecord.Get("name") != newName {
+		t.Fatalf("Expected authRecord with email %q, got %q", newName, clientAuthRecord.Email())
 	}
 }
 
