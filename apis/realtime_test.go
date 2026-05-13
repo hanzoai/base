@@ -460,7 +460,10 @@ func TestRealtimeAuthRecordDeleteEvent(t *testing.T) {
 	e.Context = context.Background()
 	e.Model = authRecord1
 
-	testApp.OnModelAfterDeleteSuccess().Trigger(e)
+	err = testApp.OnModelAfterDeleteSuccess().Trigger(e)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if total := len(testApp.SubscriptionsBroker().Clients()); total != 3 {
 		t.Fatalf("Expected %d subscription clients, found %d", 3, total)
@@ -502,18 +505,205 @@ func TestRealtimeAuthRecordUpdateEvent(t *testing.T) {
 	}
 	authRecord2.SetEmail("new@example.com")
 
-	// mock update event
+	// mock update event without actually saving to avoid triggering the tokenKey change
 	e := new(core.ModelEvent)
 	e.App = testApp
 	e.Type = core.ModelEventTypeUpdate
 	e.Context = context.Background()
 	e.Model = authRecord2
 
-	testApp.OnModelAfterUpdateSuccess().Trigger(e)
+	err = testApp.OnModelAfterUpdateSuccess().Trigger(e)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clientAuthRecord, _ := client.Get(apis.RealtimeClientAuthKey).(*core.Record)
 	if clientAuthRecord.Email() != authRecord2.Email() {
 		t.Fatalf("Expected authRecord with email %q, got %q", authRecord2.Email(), clientAuthRecord.Email())
+	}
+}
+
+func TestRealtimeAuthRecordUnsetOnTokenKeyRefresh(t *testing.T) {
+	testApp, _ := tests.NewTestApp()
+	defer testApp.Cleanup()
+
+	// init realtime handlers
+	apis.NewRouter(testApp)
+
+	authRecord1, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client := subscriptions.NewDefaultClient()
+	client.Set(apis.RealtimeClientAuthKey, authRecord1)
+	testApp.SubscriptionsBroker().Register(client)
+
+	// refetch the authRecord and refresh its tokenKey
+	authRecord2, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	authRecord2.RefreshTokenKey()
+
+	err = testApp.Save(authRecord2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientAuthRecord, _ := client.Get(apis.RealtimeClientAuthKey).(*core.Record)
+	if clientAuthRecord != nil {
+		t.Fatalf("Expected authRecord to be unset, got %q", clientAuthRecord.Email())
+	}
+}
+
+func TestRealtimeAuthRecordUnsetOnCollectionSecretChange(t *testing.T) {
+	testApp, _ := tests.NewTestApp()
+	defer testApp.Cleanup()
+
+	// init realtime handlers
+	apis.NewRouter(testApp)
+
+	usersCollection, err := testApp.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientsCollection, err := testApp.FindCollectionByNameOrId("clients")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authRecord1, err := testApp.FindAuthRecordByEmail(usersCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client1 := subscriptions.NewDefaultClient()
+	client1.Set(apis.RealtimeClientAuthKey, authRecord1)
+
+	authRecord2, err := testApp.FindAuthRecordByEmail(usersCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client2 := subscriptions.NewDefaultClient()
+	client2.Set(apis.RealtimeClientAuthKey, authRecord2)
+
+	authRecord3, err := testApp.FindAuthRecordByEmail(clientsCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client3 := subscriptions.NewDefaultClient()
+	client3.Set(apis.RealtimeClientAuthKey, authRecord3)
+
+	clientMocks := map[*core.Record]subscriptions.Client{
+		authRecord1: client1,
+		authRecord2: client2,
+		authRecord3: client3,
+	}
+	for _, client := range clientMocks {
+		testApp.SubscriptionsBroker().Register(client)
+	}
+
+	// change the secret of the users collection (should trigger unset)
+	usersCollection.AuthToken.Secret = strings.Repeat("a", 30)
+	err = testApp.Save(usersCollection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// change something else of the clients collection (shouldn't trigger unset)
+	clientsCollection.ListRule = nil
+	err = testApp.Save(clientsCollection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectations := map[*core.Record]bool{
+		// record -> unset
+		authRecord1: true,
+		authRecord2: true,
+		authRecord3: false,
+	}
+	for record, expectedUnset := range expectations {
+		clientAuthRecord, _ := clientMocks[record].Get(apis.RealtimeClientAuthKey).(*core.Record)
+		unset := clientAuthRecord == nil
+		if unset != expectedUnset {
+			t.Fatalf("Expected unset state %v, got %v (%v)", expectedUnset, unset, clientAuthRecord)
+		}
+	}
+}
+
+func TestRealtimeAuthRecordUnsetOnCollectionDelete(t *testing.T) {
+	testApp, _ := tests.NewTestApp()
+	defer testApp.Cleanup()
+
+	// init realtime handlers
+	apis.NewRouter(testApp)
+
+	usersCollection, err := testApp.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	clientsCollection, err := testApp.FindCollectionByNameOrId("clients")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	authRecord1, err := testApp.FindAuthRecordByEmail(usersCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client1 := subscriptions.NewDefaultClient()
+	client1.Set(apis.RealtimeClientAuthKey, authRecord1)
+
+	authRecord2, err := testApp.FindAuthRecordByEmail(usersCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client2 := subscriptions.NewDefaultClient()
+	client2.Set(apis.RealtimeClientAuthKey, authRecord2)
+
+	authRecord3, err := testApp.FindAuthRecordByEmail(clientsCollection, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	client3 := subscriptions.NewDefaultClient()
+	client3.Set(apis.RealtimeClientAuthKey, authRecord3)
+
+	clientMocks := map[*core.Record]subscriptions.Client{
+		authRecord1: client1,
+		authRecord2: client2,
+		authRecord3: client3,
+	}
+	for _, client := range clientMocks {
+		testApp.SubscriptionsBroker().Register(client)
+	}
+
+	// mock users collection delete event to avoid triggering constraints check
+	e := new(core.ModelEvent)
+	e.App = testApp
+	e.Type = core.ModelEventTypeDelete
+	e.Context = context.Background()
+	e.Model = usersCollection
+
+	err = testApp.OnModelAfterDeleteSuccess().Trigger(e)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectations := map[*core.Record]bool{
+		// record -> unset
+		authRecord1: true,
+		authRecord2: true,
+		authRecord3: false,
+	}
+	for record, expectedUnset := range expectations {
+		clientAuthRecord, _ := clientMocks[record].Get(apis.RealtimeClientAuthKey).(*core.Record)
+		unset := clientAuthRecord == nil
+		if unset != expectedUnset {
+			t.Fatalf("Expected unset state %v, got %v (%v)", expectedUnset, unset, clientAuthRecord)
+		}
 	}
 }
 
