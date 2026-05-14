@@ -1678,3 +1678,40 @@ func TestCollectionSaveViewWrapping(t *testing.T) {
 		})
 	}
 }
+
+func TestCollectionSaveIndexesTableNameNormalization(t *testing.T) {
+	t.Parallel()
+
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	dummyCollection := core.NewBaseCollection("new_test")
+	dummyCollection.Fields.Add(&core.TextField{Name: "test"})
+	dummyCollection.Indexes = []string{
+		"create index `new_test_idx1` on `` (`test`) where 1=1",
+		"create index `new_test_idx2` on `test` (`test`) where 1=2",
+		"create index `new_test_idx3` on `someting_else` (`test`) where 1=3",
+	}
+
+	err := app.Save(dummyCollection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// refetch a clean state
+	dummyCollection, err = app.FindCollectionByNameOrId(dummyCollection.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(dummyCollection.Indexes) != 3 {
+		t.Fatalf("Expected 3 indexes, got %v", dummyCollection.Indexes)
+	}
+
+	for _, raw := range dummyCollection.Indexes {
+		parsed := dbutils.ParseIndex(raw)
+		if parsed.TableName != dummyCollection.Name {
+			t.Fatalf("Expected all indexes to have tableName %q, found %q:\n%s", dummyCollection.Name, parsed.TableName, raw)
+		}
+	}
+}

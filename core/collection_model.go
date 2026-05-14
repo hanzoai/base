@@ -348,6 +348,7 @@ func (app *BaseApp) registerCollectionHooks() {
 }
 
 // @todo experiment eventually replacing the rules *string with a struct?
+// @todo consider changing the Indexes field to a "getter" for the sqlite_master table?
 type baseCollection struct {
 	BaseModel
 
@@ -819,6 +820,25 @@ func onCollectionSave(e *CollectionEvent) error {
 	}
 
 	e.Collection.updateGeneratedIdIfExists(e.App)
+
+	// normalize indexes table name
+	for i, raw := range e.Collection.Indexes {
+		parsed := dbutils.ParseIndex(raw)
+
+		// no need to normalize
+		if parsed.TableName == e.Collection.Name {
+			continue
+		}
+
+		parsed.TableName = e.Collection.Name
+
+		normalized := parsed.Build()
+		if normalized == "" {
+			continue // leave to the model validator to decide whether to return an error
+		}
+
+		e.Collection.Indexes[i] = normalized
+	}
 
 	return e.Next()
 }
