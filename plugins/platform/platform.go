@@ -117,12 +117,19 @@ func MustRegister(app core.App, config PlatformConfig) {
 }
 
 // Register registers the platform plugin to the provided app instance.
+//
+// Hanzo Base is IAM-native — there is no legacy local-password / OTP /
+// MFA fallback. IAM must be reachable at boot. Set IAM_ENDPOINT to a
+// hanzo.id instance (external mode, default) or boot Base with an
+// in-process Casdoor (embedded mode, see core/iam_embedded.go). Both
+// modes give the same /oauth2/login?provider=hanzo contract.
 func Register(app core.App, config PlatformConfig) error {
 	if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
-		// When IAM is explicitly disabled, skip external auth entirely.
-		// Base superuser tokens will still work for _superusers collection.
-		// All other collections fall back to Base's native auth rules.
-		config.IAMEndpoint = ""
+		return fmt.Errorf(
+			"platform: IAM_ENDPOINT is required — Hanzo Base does not " +
+				"support local password / OTP / MFA. Set IAM_ENDPOINT to " +
+				"a Hanzo IAM instance (e.g. https://hanzo.id) or boot " +
+				"in-process IAM via IAM_MODE=embedded")
 	}
 	if config.KMSEndpoint == "" {
 		config.KMSEndpoint = "https://kms.hanzo.ai"
@@ -150,22 +157,18 @@ func Register(app core.App, config PlatformConfig) error {
 		return p.ensureSystemCollections()
 	})
 
-	// Configure the external identity provider as the exclusive auth source.
-	// All Base routes accept OIDC/JWKS tokens; built-in auth endpoints
-	// (password, OTP, email-change, etc.) are disabled for non-superuser
-	// collections.
-	if config.IAMEndpoint != "" {
-		jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
-		app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
-		app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+	// IAM is the only auth source. Every Base route validates JWTs
+	// against IAM's JWKS; the legacy local-password / OTP / MFA paths
+	// are unreachable (see apis/record_auth_*: 410 Gone with a
+	// Location pointer to the IAM equivalent).
+	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 
-		app.Logger().Info("platform: external auth enabled — built-in auth disabled for non-superuser collections",
-			slog.String("jwksURL", jwksURL),
-			slog.String("authEndpoint", config.IAMEndpoint),
-		)
-	} else {
-		app.Logger().Warn("platform: IAM disabled — Base superuser tokens accepted for all collections")
-	}
+	app.Logger().Info("platform: IAM is the only auth source",
+		slog.String("jwksURL", jwksURL),
+		slog.String("authEndpoint", config.IAMEndpoint),
+	)
 
 	// Serve: register API routes, identity header middleware, and org-scoping.
 	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
