@@ -184,20 +184,15 @@ const (
 	// find/create externally-authenticated user records in (default: "users").
 	StoreKeyAuthUsersCollection = "authUsersCollection"
 
-	// StoreKeyExternalAuthOnly controls whether the external identity provider
-	// (OIDC/JWKS) is the exclusive authentication source. When true:
-	//   - loadAuthToken tries JWKS first; local tokens are only accepted for
-	//     the _superusers collection (admin panel).
-	//   - Built-in auth endpoints (password, OTP, email-change, password-reset,
-	//     verification) are disabled for non-superuser collections.
-	//
-	// Set automatically by the platform plugin when an auth endpoint is configured.
+	// StoreKeyExternalAuthOnly controls whether the external identity
+	// provider (OIDC/JWKS via Hanzo IAM) is the exclusive auth source.
+	// In Hanzo Base this is always true once the platform plugin
+	// registers — the legacy local-password / OTP / MFA / impersonate
+	// surfaces have been removed (returning 404 from the router).
+	// Only the _superusers collection has a transitional exemption
+	// (admin-panel login), tracked for removal once admin → IAM
+	// redirect login lands.
 	StoreKeyExternalAuthOnly = "externalAuthOnly"
-
-	// Deprecated: use StoreKeyJWKSURL. Kept for backward compatibility.
-	StoreKeyIAMJWKSURL         = StoreKeyJWKSURL
-	StoreKeyIAMUsersCollection = StoreKeyAuthUsersCollection
-	StoreKeyIAMOnly            = StoreKeyExternalAuthOnly
 )
 
 // shared JWKS cache for external token validation (10 minute TTL on keys).
