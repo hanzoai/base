@@ -58,8 +58,12 @@ func TestCronsList(t *testing.T) {
 			ExpectedContent: []string{
 				`{"id":"__hzLogsCleanup__","expression":"0 */6 * * *"}`,
 				`{"id":"__hzDBOptimize__","expression":"0 0 * * *"}`,
-				`{"id":"__hzMFACleanup__","expression":"0 * * * *"}`,
-				`{"id":"__hzOTPCleanup__","expression":"0 * * * *"}`,
+			},
+			NotExpectedContent: []string{
+				// Removed in the IAM-native rip: IAM owns MFA/OTP, no
+				// local state for these crons to clean up.
+				`__hzMFACleanup__`,
+				`__hzOTPCleanup__`,
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},
