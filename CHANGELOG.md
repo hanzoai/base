@@ -5,9 +5,11 @@
 - Updated the _experimental_ UI extensions APIs to allow top-level `await` in the initialization script.
 
 - Force unset the auth state of existing realtime connections on user password, collection secret, etc. changes.
-    _This is not strictly necessery because the realtime connections have short-lived idle timeout by design but nonetheless it was implemented to restrict the abuse vectors._
+    _This is not strictly necessery because the realtime connections have short-lived idle timeout by design but nonetheless it was implemented to minimize the attack vectors._
 
 - Added error marker for each collection tab and fixed the styles of the raw errors tooltip.
+
+- Updated `modernc.org/sqlite` to v1.50.1 (SQLite 3.53.1).
 
 
 ## v0.38.0
