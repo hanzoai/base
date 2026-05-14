@@ -3,6 +3,7 @@
     z-index: 99999;
     max-width: 300px;
     min-width: 30px;
+    max-height: 90%;
     text-align: center;
     white-space: pre-line;
     word-break: break-word;
@@ -13,6 +14,7 @@
     font-size: var(--smFontSize);
     line-height: var(--smLineHeight);
     font-family: var(--baseFontFamily);
+    scrollbar-width: thin;
     margin: 3px;
     padding: 3px 5px;
     pointer-events: none;
@@ -26,5 +28,11 @@
         @starting-style {
             opacity: 0;
         }
+    }
+    &[data-style="code"] {
+        text-align: left;
+        white-space: pre-wrap;
+        max-width: 350px;
+        font-family: var(--monospaceFontFamily);
     }
 }

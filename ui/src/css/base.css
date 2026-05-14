@@ -411,6 +411,10 @@ hr {
 }
 
 /* txt helpers */
+.txt-base {
+    line-height: var(--lineHeight) !important;
+    font-size: var(--fontSize) !important;
+}
 .txt-sm {
     line-height: var(--smLineHeight) !important;
     font-size: var(--smFontSize) !important;

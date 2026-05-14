@@ -4,7 +4,7 @@
 
 ## v0.22.44
 
-- (_Backported from v0.38.1_) Force unset the auth state of existing realtime connections on user password change.
+- (_Backported from v0.38.1_) Force unset the auth state of existing realtime connections on user tokenKey change.
 
 
 ## v0.22.43
