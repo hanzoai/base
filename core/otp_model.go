@@ -118,10 +118,8 @@ func (m *OTP) HasExpired(maxElapsed time.Duration) bool {
 func (app *BaseApp) registerOTPHooks() {
 	recordRefHooks[*OTP](app, CollectionNameOTPs, CollectionTypeAuth)
 
-	// run on every hour to cleanup expired otp sessions
-	app.Cron().Add("__hzOTPCleanup__", "0 * * * *", func() {
-		if err := app.DeleteExpiredOTPs(); err != nil {
-			app.Logger().Warn("Failed to delete expired OTP sessions", "error", err)
-		}
-	})
+	// Cleanup cron removed — IAM owns OTP/MFA. The legacy local OTP
+	// collection is unreachable through the auth surfaces and is
+	// scheduled for removal alongside core/otp_model.go. The
+	// DeleteExpiredOTPs method stays callable for tests + migration.
 }

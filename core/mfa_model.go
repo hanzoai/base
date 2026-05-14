@@ -121,12 +121,11 @@ func (m *MFA) HasExpired(maxElapsed time.Duration) bool {
 func (app *BaseApp) registerMFAHooks() {
 	recordRefHooks[*MFA](app, CollectionNameMFAs, CollectionTypeAuth)
 
-	// run on every hour to cleanup expired mfa sessions
-	app.Cron().Add("__hzMFACleanup__", "0 * * * *", func() {
-		if err := app.DeleteExpiredMFAs(); err != nil {
-			app.Logger().Warn("Failed to delete expired MFA sessions", "error", err)
-		}
-	})
+	// Cleanup cron removed — IAM owns MFA. The legacy local MFA
+	// collection is unreachable through the auth surfaces (410 Gone
+	// at apis/record_auth_*) and is scheduled for removal alongside
+	// core/mfa_model.go. The DeleteExpiredMFAs method stays callable
+	// for tests + the in-progress data migration.
 
 	// delete existing mfas on password change
 	app.OnRecordUpdate().Bind(&hook.Handler[*RecordEvent]{
