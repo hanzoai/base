@@ -567,8 +567,8 @@ func TestExternalAuthGuard(t *testing.T) {
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  403,
-			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedStatus:  410,
+			ExpectedContent: []string{`This endpoint is retired`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -580,9 +580,9 @@ func TestExternalAuthGuard(t *testing.T) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
 			// The superuser endpoint is allowed through the guard — may succeed
-			// or fail on actual auth, but must NOT be 403 from the guard.
+			// or fail on actual auth, but must NOT be 410 from the guard.
 			ExpectedStatus:     200,
-			NotExpectedContent: []string{`Direct authentication is disabled`},
+			NotExpectedContent: []string{`This endpoint is retired`},
 		},
 		{
 			Name:   "allows users auth-with-password when external auth is off",
@@ -592,9 +592,9 @@ func TestExternalAuthGuard(t *testing.T) {
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				// external auth is NOT set (default off)
 			},
-			// Should NOT get 403 from the guard. Will fail on auth (wrong password).
+			// Should NOT get 410 from the guard. Will fail on auth (wrong password).
 			ExpectedStatus:     401,
-			NotExpectedContent: []string{`Direct authentication is disabled`},
+			NotExpectedContent: []string{`This endpoint is retired`},
 		},
 		{
 			Name:   "blocks users request-otp when external auth is on",
@@ -604,8 +604,8 @@ func TestExternalAuthGuard(t *testing.T) {
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  403,
-			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedStatus:  410,
+			ExpectedContent: []string{`This endpoint is retired`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -616,8 +616,8 @@ func TestExternalAuthGuard(t *testing.T) {
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  403,
-			ExpectedContent: []string{`Direct authentication is disabled`},
+			ExpectedStatus:  410,
+			ExpectedContent: []string{`This endpoint is retired`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
