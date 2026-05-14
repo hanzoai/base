@@ -3,13 +3,60 @@ package apis
 import (
 	"log/slog"
 	"net/http"
+	"os"
 	"slices"
+	"strings"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/auth"
 	"github.com/hanzoai/base/tools/security"
 	"golang.org/x/oauth2"
 )
+
+// externalIAMAuthMethods returns the auth-methods response a client
+// sees when Base is configured with an external IAM. It exposes a
+// single OAuth2 provider named "iam" — generic, no brand string in
+// Base code. The IAM endpoint is recovered from the JWKS URL the
+// platform plugin stored at boot.
+//
+// IAM_DISPLAY_NAME (optional env) feeds the UI button label; if
+// unset, DisplayName is empty and the UI renders a neutral fallback.
+func externalIAMAuthMethods(e *core.RequestEvent) authMethodsResponse {
+	jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
+	base := strings.TrimSuffix(jwksURL, "/.well-known/jwks")
+
+	state := security.RandomString(30)
+	verifier := security.RandomString(43)
+	challenge := security.S256Challenge(verifier)
+
+	authURL := ""
+	if base != "" {
+		authURL = base + "/oauth/authorize?response_type=code&state=" + state +
+			"&code_challenge=" + challenge +
+			"&code_challenge_method=S256" +
+			"&redirect_uri="
+	}
+
+	info := providerInfo{
+		Name:                "iam",
+		DisplayName:         os.Getenv("IAM_DISPLAY_NAME"),
+		State:               state,
+		AuthURL:             authURL,
+		AuthUrl:             authURL,
+		CodeVerifier:        verifier,
+		CodeChallenge:       challenge,
+		CodeChallengeMethod: "S256",
+	}
+
+	resp := authMethodsResponse{
+		OAuth2: oauth2Response{
+			Enabled:   true,
+			Providers: []providerInfo{info},
+		},
+	}
+	resp.AuthProviders = resp.OAuth2.Providers
+	return resp
+}
 
 type otpResponse struct {
 	Enabled  bool  `json:"enabled"`
@@ -76,6 +123,18 @@ func recordAuthMethods(e *core.RequestEvent) error {
 	collection, err := findAuthCollection(e)
 	if err != nil {
 		return err
+	}
+
+	// External-auth mode: one generic "iam" entry, nothing else.
+	// Base does not name the provider — IAM does. The local
+	// IAM_DISPLAY_NAME env (if set) becomes the UI label; otherwise
+	// the client renders a neutral "Sign in" button.
+	//
+	// _superusers still passes through to the full local response so
+	// the admin panel keeps working until we cut admin to IAM-only.
+	if externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool); externalOnly &&
+		collection.Name != core.CollectionNameSuperusers {
+		return e.JSON(http.StatusOK, externalIAMAuthMethods(e))
 	}
 
 	result := authMethodsResponse{
