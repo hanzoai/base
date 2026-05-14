@@ -377,6 +377,7 @@ func Register(app core.App, config PlatformConfig) error {
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
+		p.registerIAMProxy(e.Router)
 		return e.Next()
 	})
 
