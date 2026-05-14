@@ -597,28 +597,34 @@ func TestExternalAuthGuard(t *testing.T) {
 			NotExpectedContent: []string{`This endpoint is retired`},
 		},
 		{
-			Name:   "blocks users request-otp when external auth is on",
+			// request-otp was deleted entirely in the IAM-native rip; the
+			// router serves a 404. Asserting the absence of the guard's
+			// 410 message confirms the route binding is gone (not just
+			// guarded).
+			Name:   "request-otp is gone (router 404) when external auth is on",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/request-otp",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  410,
-			ExpectedContent: []string{`This endpoint is retired`},
-			ExpectedEvents:  map[string]int{"*": 0},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
 		},
 		{
-			Name:   "blocks users request-password-reset when external auth is on",
+			// request-password-reset was deleted entirely in the IAM-
+			// native rip. IAM owns password recovery.
+			Name:   "request-password-reset is gone (router 404) when external auth is on",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/request-password-reset",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  410,
-			ExpectedContent: []string{`This endpoint is retired`},
-			ExpectedEvents:  map[string]int{"*": 0},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
 		},
 		{
 			Name:   "auth-methods returns a single generic 'iam' oauth2 entry when external auth is on",
