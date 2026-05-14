@@ -621,14 +621,21 @@ func TestExternalAuthGuard(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:   "allows auth-methods when external auth is on",
+			Name:   "auth-methods returns a single generic 'iam' oauth2 entry when external auth is on",
 			Method: http.MethodGet,
 			URL:    "/api/collections/users/auth-methods",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+				app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.com/.well-known/jwks")
 			},
-			ExpectedStatus:  200,
-			ExpectedContent: []string{`"password"`},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"name":"iam"`,
+				`"oauth2":{"providers":[{"name":"iam"`,
+				`https://iam.example.com/oauth/authorize?response_type=code`,
+			},
+			// Base must not bake any specific brand name into the protocol layer.
+			NotExpectedContent: []string{`"hanzo"`, `"google"`, `"github"`},
 		},
 	}
 
