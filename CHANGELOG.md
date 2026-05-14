@@ -11,6 +11,8 @@
 
 - Updated `modernc.org/sqlite` to v1.50.1 (SQLite 3.53.1).
 
+- Other minor fixes (_updated API preview examples, fixed code comment typos, etc._).
+
 
 ## v0.38.0
 

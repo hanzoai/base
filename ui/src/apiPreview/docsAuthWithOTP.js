@@ -22,6 +22,10 @@ export function docsAuthWithOTP(collection) {
         t.p(null, "Authenticate with an one-time/short-lived password (OTP)."),
         t.p(
             null,
+            "On successful authentication the user will be also marked as verified (if the OTP source is email and the user is not verified already).",
+        ),
+        t.p(
+            null,
             "Note that when requesting an OTP we return an ",
             t.code(null, "otpId"),
             " even if a user with the provided email doesn't exist as a very basic enumeration protection.",

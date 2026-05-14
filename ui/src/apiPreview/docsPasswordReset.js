@@ -19,7 +19,7 @@ export function docsPasswordReset(collection) {
         t.p(null, `Sends ${collection.name} password reset email request.`),
         t.p(
             null,
-            "On successful password reset all previously issued auth tokens for the specific record will be automatically invalidated.",
+            "On successful password reset all previously issued auth tokens for the specific record will be invalidated (and the user will be marked as verified if not already).",
         ),
         app.components.codeBlockTabs({
             className: "sdk-examples m-t-sm",
@@ -41,7 +41,8 @@ export function docsPasswordReset(collection) {
                         // (optional) in your custom confirmation page:
                         // ---
 
-                        // note: after this call all previously issued auth tokens are invalidated
+                        // note: all previous user auth tokens will be invalidated
+                        // (and the user will be marked as verified if not already)
                         await pb.collection('${collection.name}').confirmPasswordReset(
                             'RESET_TOKEN',
                             'NEW_PASSWORD',
@@ -74,7 +75,8 @@ export function docsPasswordReset(collection) {
                         // (optional) in your custom confirmation page:
                         // ---
 
-                        // note: after this call all previously issued auth tokens are invalidated
+                        // note: all previous user auth tokens will be invalidated
+                        // (and the user will be marked as verified if not already)
                         await pb.collection('${collection.name}').confirmPasswordReset(
                           'RESET_TOKEN',
                           'NEW_PASSWORD',
@@ -102,6 +104,9 @@ export function docsPasswordReset(collection) {
                           '${baseURL}/api/collections/${collection.name}/request-password-reset'
 
                         # Confirm password reset
+                        #
+                        # note: all previous user auth tokens will be invalidated
+                        # (and the user will be marked as verified if not already)
                         curl -X POST \\
                           -H 'Content-Type:application/json' \\
                           -d '{ "token":"...", "password":"", "passwordConfirm":"" }' \\
