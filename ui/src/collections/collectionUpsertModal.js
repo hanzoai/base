@@ -63,6 +63,7 @@ function collectionUpsertModal(rawCollection, modalSettings) {
         originalCollection: {},
         collection: {},
         selectedTab: "",
+        errorTabs: {},
         get activeTab() {
             if (!app.collectionTypes[data.collection.type]?.tabs) {
                 return data.selectedTab;
@@ -211,6 +212,9 @@ function collectionUpsertModal(rawCollection, modalSettings) {
 
     function resetForm() {
         data.collection = JSON.parse(JSON.stringify(data.originalCollection));
+
+        // reset all errors
+        app.store.errors = null;
     }
 
     async function duplicate() {
@@ -343,6 +347,30 @@ function collectionUpsertModal(rawCollection, modalSettings) {
                                     return app.utils.replaceIndexFields(idx, { tableName: data.collection.name });
                                 });
                             }, 150);
+                        },
+                    ),
+
+                    // check for tab errors
+                    watch(
+                        () => JSON.stringify(app.store.errors),
+                        async (errors) => {
+                            if (!errors) {
+                                data.errorTabs = {};
+                                return;
+                            }
+
+                            // ui tick
+                            await new Promise((r) => setTimeout(r, 0));
+
+                            data.errorTabs = {}; // reset after the tick to minimize flickering
+
+                            const errorElems = modal?.querySelectorAll(".modal-content [data-tab] .error");
+                            for (let el of errorElems) {
+                                const tabName = el.closest("[data-tab]")?.dataset?.tab;
+                                if (tabName) {
+                                    data.errorTabs[tabName] = true;
+                                }
+                            }
                         },
                     ),
                 ];
@@ -546,24 +574,35 @@ function collectionUpsertModal(rawCollection, modalSettings) {
                     t.nav(
                         { className: "tabs-header equal-width" },
                         () => {
-                            const tabItems = [];
+                            const tabHeaderItems = [];
 
                             const tabs = app.collectionTypes[data.collection.type]?.tabs || {};
                             for (let tabName in tabs) {
-                                tabItems.push(
+                                tabHeaderItems.push(
                                     t.button(
                                         {
                                             type: "button",
+                                            "html-data-tab": tabName,
                                             disabled: () => data.isSaving,
                                             className: () => `tab-item ${data.activeTab == tabName ? "active" : ""}`,
                                             onclick: () => changeTab(tabName),
                                         },
                                         t.span({ className: "txt" }, tabName),
+                                        () => {
+                                            if (!data.errorTabs[tabName]) {
+                                                return;
+                                            }
+
+                                            return t.i({
+                                                className: "ri-error-warning-fill txt-danger txt-base",
+                                                ariaDescription: app.attrs.tooltip("Has errors"),
+                                            });
+                                        },
                                     ),
                                 );
                             }
 
-                            return tabItems;
+                            return tabHeaderItems;
                         },
                     ),
                 ),
@@ -571,7 +610,25 @@ function collectionUpsertModal(rawCollection, modalSettings) {
         ),
         t.div(
             { className: "modal-content" },
-            () => app.collectionTypes[data.collection.type]?.tabs?.[data.activeTab]?.(data),
+            () => {
+                const tabContentItems = [];
+
+                const tabs = app.collectionTypes[data.collection.type]?.tabs || {};
+                for (let tabName in tabs) {
+                    tabContentItems.push(
+                        t.div(
+                            {
+                                "html-data-tab": tabName,
+                                hidden: () => data.activeTab != tabName,
+                                className: "tab-content-wrapper block",
+                            },
+                            () => app.collectionTypes[data.collection.type]?.tabs?.[tabName]?.(data),
+                        ),
+                    );
+                }
+
+                return tabContentItems;
+            },
         ),
         t.footer(
             { className: "modal-footer" },
@@ -585,14 +642,14 @@ function collectionUpsertModal(rawCollection, modalSettings) {
                 t.span({ className: "txt" }, "Close"),
             ),
             () => {
-                const rawErrors = JSON.stringify(app.store.errors);
+                const rawErrors = JSON.stringify(app.store.errors, null, 2);
                 if (rawErrors == "" || rawErrors == "null" || rawErrors == "{}" || rawErrors == "[]") {
                     return;
                 }
 
                 return t.i({
-                    className: "ri-alert-line txt-danger",
-                    ariaDescription: app.attrs.tooltip(() => "Raw error:\n" + rawErrors),
+                    className: "ri-error-warning-line txt-danger",
+                    ariaDescription: app.attrs.tooltip(() => "Raw errors:\n" + rawErrors, "top", "code"),
                 });
             },
             t.div(

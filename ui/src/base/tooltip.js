@@ -7,9 +7,10 @@ const tooltip = t.div({
 });
 document.body.appendChild(tooltip);
 
-function updateTooltipPosition(node, position) {
+function updateTooltipPosition(node, position, styleClass) {
     let nodeRect = node.getBoundingClientRect();
 
+    tooltip.setAttribute("data-style", styleClass || "");
     tooltip.setAttribute("data-position", position);
 
     // reset tooltip position
@@ -76,7 +77,7 @@ function hideTooltip() {
     tooltip.hidePopover();
 }
 
-function showTooltip(node, text, position) {
+function showTooltip(node, text, position, styleClass) {
     if (!node || !text) {
         hideTooltip();
         return;
@@ -84,14 +85,14 @@ function showTooltip(node, text, position) {
 
     tooltip.showPopover();
     tooltip.textContent = text;
-    updateTooltipPosition(node, position);
+    updateTooltipPosition(node, position, styleClass);
 }
 
 document.body.addEventListener("mouseleave", () => {
     hideTooltip();
 });
 
-function tooltipAction(textOrFunc, position = "top") {
+function tooltipAction(textOrFunc, position = "top", styleClass = "") {
     return (el) => {
         if (!el._tooltipText) {
             el._tooltipText = store({
@@ -105,7 +106,7 @@ function tooltipAction(textOrFunc, position = "top") {
                 tooltipTextWatcher = watch(
                     () => el._tooltipText.value,
                     async (result) => {
-                        showTooltip(el, result, position);
+                        showTooltip(el, result, position, styleClass);
                     },
                 );
             }

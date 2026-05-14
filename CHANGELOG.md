@@ -1,4 +1,4 @@
-## v0.38.1 (WIP)
+## v0.38.1
 
 - Silenced the superuser IPs confirmation if there is no change.
 
@@ -6,6 +6,8 @@
 
 - Force unset the auth state of existing realtime connections on user password, collection secret, etc. changes.
     _This is not strictly necessery because the realtime connections have short-lived idle timeout by design but nonetheless it was implemented to restrict the abuse vectors._
+
+- Added error marker for each collection tab and fixed the styles of the raw errors tooltip.
 
 
 ## v0.38.0

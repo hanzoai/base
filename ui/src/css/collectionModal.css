@@ -65,6 +65,9 @@
         i {
             display: inline-block;
         }
+        .label {
+            vertical-align: baseline;
+        }
     }
     .rule-content {
         margin: 5px 0;
