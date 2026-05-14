@@ -49,44 +49,24 @@ func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 		collectionPathRateLimit("", "authWithOAuth2", "auth"),
 	)
 
-	sub.POST("/request-otp", recordRequestOTP).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "requestOTP"),
-	)
+	// auth-with-otp is the OTP-completion endpoint (challenge already
+	// issued elsewhere). Kept ONLY for the _superusers admin login
+	// transition path; the guard 410s it for every other collection.
 	sub.POST("/auth-with-otp", recordAuthWithOTP).Bind(
 		externalAuthGuard(),
 		collectionPathRateLimit("", "authWithOTP", "auth"),
 	)
 
-	sub.POST("/request-password-reset", recordRequestPasswordReset).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "requestPasswordReset"),
-	)
-	sub.POST("/confirm-password-reset", recordConfirmPasswordReset).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "confirmPasswordReset"),
-	)
-
-	sub.POST("/request-verification", recordRequestVerification).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "requestVerification"),
-	)
-	sub.POST("/confirm-verification", recordConfirmVerification).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "confirmVerification"),
-	)
-
-	sub.POST("/request-email-change", recordRequestEmailChange).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "requestEmailChange"),
-		RequireSameCollectionContextAuth(""),
-	)
-	sub.POST("/confirm-email-change", recordConfirmEmailChange).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "confirmEmailChange"),
-	)
-
-	sub.POST("/impersonate/{id}", recordAuthImpersonate).Bind(RequireSuperuserAuth())
+	// The legacy local-only request/confirm flows
+	//   /request-otp /request-password-reset /confirm-password-reset
+	//   /request-email-change /confirm-email-change
+	//   /request-verification /confirm-verification
+	//   /impersonate/{id}
+	// were removed in the IAM-native rip. IAM owns password recovery,
+	// email change, MFA/OTP issuance, and impersonation. Clients that
+	// hit a stale URL get a generic 404 from the router — which is
+	// the correct signal for a permanently-removed endpoint that no
+	// longer has even a deprecated handler bound.
 }
 
 func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
