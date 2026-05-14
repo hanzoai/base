@@ -1,6 +1,9 @@
 package apis
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/router"
@@ -96,14 +99,21 @@ func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
 	return collection, nil
 }
 
-// externalAuthGuard returns a middleware that blocks built-in auth endpoints
-// when external-only mode is active (StoreKeyExternalAuthOnly == true).
+// externalAuthGuard returns a middleware that returns 410 Gone for the
+// legacy built-in auth endpoints when external-only mode is active
+// (StoreKeyExternalAuthOnly == true) — which is the only mode the
+// platform plugin allows. There is no "local password / OTP / MFA"
+// path anymore: Hanzo IAM is the only auth source.
 //
-// The _superusers collection is exempt because the admin panel uses Base's
-// built-in OAuth2 flow (which redirects to the identity provider) to
-// establish admin sessions.
+// The _superusers collection is still exempt here because the admin
+// panel UI hasn't been switched to the IAM-redirect login flow yet
+// (tracked: admin-panel IAM login follow-up). Once that lands, this
+// exemption + the whole legacy apis/record_auth_* group goes away.
 //
-// When blocked, returns 403 directing users to the configured identity provider.
+// 410 Gone (not 403) is intentional — it signals the endpoint is
+// permanently retired, not temporarily forbidden, and lets clients
+// stop retrying. The Location header points at the IAM equivalent
+// so a redirecting client lands on the right page.
 func externalAuthGuard() *hook.Handler[*core.RequestEvent] {
 	return &hook.Handler[*core.RequestEvent]{
 		Id: "baseExternalAuthGuard",
@@ -113,16 +123,56 @@ func externalAuthGuard() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			// Allow _superusers — admin panel login uses built-in OAuth2.
+			// Allow _superusers — admin panel login still uses built-in
+			// OAuth2 redirects until we cut admin to IAM-only login.
 			collectionName := e.Request.PathValue("collection")
 			if collectionName == core.CollectionNameSuperusers {
 				return e.Next()
 			}
 
-			return e.ForbiddenError(
-				"Direct authentication is disabled. Use the configured identity provider.",
+			jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
+			if location := iamReplacementURL(e.Request.URL.Path, jwksURL); location != "" {
+				e.Response.Header().Set("Location", location)
+			}
+			return e.Error(
+				http.StatusGone,
+				"This endpoint is retired — Hanzo Base auth is delegated to IAM. "+
+					"See the Location header or the configured IAM_ENDPOINT.",
 				nil,
 			)
 		},
 	}
+}
+
+// iamReplacementURL maps a retired Base auth path to the IAM endpoint
+// that replaces it. Returns "" when no public IAM equivalent exists
+// (e.g. local OTP — IAM owns MFA internally, there is no public surface).
+//
+// jwksURL is the configured `${IAM_ENDPOINT}/.well-known/jwks` — we
+// strip the suffix to recover the base URL.
+func iamReplacementURL(reqPath, jwksURL string) string {
+	if jwksURL == "" {
+		return ""
+	}
+	const jwksSuffix = "/.well-known/jwks"
+	base := strings.TrimSuffix(jwksURL, jwksSuffix)
+	switch {
+	case strings.HasSuffix(reqPath, "/request-password-reset"),
+		strings.HasSuffix(reqPath, "/confirm-password-reset"):
+		return base + "/forget"
+	case strings.HasSuffix(reqPath, "/request-email-change"),
+		strings.HasSuffix(reqPath, "/confirm-email-change"):
+		return base + "/account"
+	case strings.HasSuffix(reqPath, "/request-verification"),
+		strings.HasSuffix(reqPath, "/confirm-verification"):
+		// IAM auto-verifies on signup; no public confirm endpoint.
+		return ""
+	case strings.HasSuffix(reqPath, "/request-otp"),
+		strings.HasSuffix(reqPath, "/auth-with-otp"):
+		// IAM owns MFA; no public OTP request endpoint.
+		return ""
+	case strings.HasSuffix(reqPath, "/auth-with-password"):
+		return base + "/oauth/authorize"
+	}
+	return ""
 }
