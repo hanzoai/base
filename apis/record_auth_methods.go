@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/hanzoai/base/core"
@@ -58,21 +57,6 @@ func externalIAMAuthMethods(e *core.RequestEvent) authMethodsResponse {
 	return resp
 }
 
-type otpResponse struct {
-	Enabled  bool  `json:"enabled"`
-	Duration int64 `json:"duration"` // in seconds
-}
-
-type mfaResponse struct {
-	Enabled  bool  `json:"enabled"`
-	Duration int64 `json:"duration"` // in seconds
-}
-
-type passwordResponse struct {
-	IdentityFields []string `json:"identityFields"`
-	Enabled        bool     `json:"enabled"`
-}
-
 type oauth2Response struct {
 	Providers []providerInfo `json:"providers"`
 	Enabled   bool           `json:"enabled"`
@@ -97,23 +81,14 @@ type providerInfo struct {
 }
 
 type authMethodsResponse struct {
-	Password passwordResponse `json:"password"`
-	OAuth2   oauth2Response   `json:"oauth2"`
-	MFA      mfaResponse      `json:"mfa"`
-	OTP      otpResponse      `json:"otp"`
+	OAuth2 oauth2Response `json:"oauth2"`
 
-	// legacy fields
-	// @todo remove after dropping v0.22 support
-	AuthProviders    []providerInfo `json:"authProviders"`
-	UsernamePassword bool           `json:"usernamePassword"`
-	EmailPassword    bool           `json:"emailPassword"`
+	// legacy alias kept so older SDK clients that read `authProviders`
+	// instead of `oauth2.providers` continue to work.
+	AuthProviders []providerInfo `json:"authProviders"`
 }
 
 func (amr *authMethodsResponse) fillLegacyFields() {
-	amr.EmailPassword = amr.Password.Enabled && slices.Contains(amr.Password.IdentityFields, "email")
-
-	amr.UsernamePassword = amr.Password.Enabled && slices.Contains(amr.Password.IdentityFields, "username")
-
 	if amr.OAuth2.Enabled {
 		amr.AuthProviders = amr.OAuth2.Providers
 	}
@@ -125,44 +100,23 @@ func recordAuthMethods(e *core.RequestEvent) error {
 		return err
 	}
 
-	// External-auth mode: one generic "iam" entry, nothing else.
-	// Base does not name the provider — IAM does. The local
-	// IAM_DISPLAY_NAME env (if set) becomes the UI label; otherwise
-	// the client renders a neutral "Sign in" button.
-	//
-	// _superusers still passes through to the full local response so
-	// the admin panel keeps working until we cut admin to IAM-only.
-	if externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool); externalOnly &&
-		collection.Name != core.CollectionNameSuperusers {
+	// In IAM-native mode (the only mode the platform plugin allows)
+	// every collection — including _superusers — advertises a single
+	// generic "iam" OAuth2 provider. Base does not name the provider;
+	// IAM does. The local IAM_DISPLAY_NAME env (if set) becomes the
+	// UI label; otherwise the client renders a neutral "Sign in"
+	// button.
+	if externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool); externalOnly {
 		return e.JSON(http.StatusOK, externalIAMAuthMethods(e))
 	}
 
+	// Standalone Base (no IAM configured) — keep the OAuth2 provider
+	// discovery response so the admin panel can still show whatever
+	// providers were registered on the collection.
 	result := authMethodsResponse{
-		Password: passwordResponse{
-			IdentityFields: make([]string, 0, len(collection.PasswordAuth.IdentityFields)),
-		},
 		OAuth2: oauth2Response{
 			Providers: make([]providerInfo, 0, len(collection.OAuth2.Providers)),
 		},
-		OTP: otpResponse{
-			Enabled: collection.OTP.Enabled,
-		},
-		MFA: mfaResponse{
-			Enabled: collection.MFA.Enabled,
-		},
-	}
-
-	if collection.PasswordAuth.Enabled {
-		result.Password.Enabled = true
-		result.Password.IdentityFields = collection.PasswordAuth.IdentityFields
-	}
-
-	if collection.OTP.Enabled {
-		result.OTP.Duration = collection.OTP.Duration
-	}
-
-	if collection.MFA.Enabled {
-		result.MFA.Duration = collection.MFA.Duration
 	}
 
 	if !collection.OAuth2.Enabled {
