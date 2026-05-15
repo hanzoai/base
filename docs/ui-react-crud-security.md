@@ -253,7 +253,7 @@ All routes are correctly protected.
 1. Open /collections/posts/records on a collection with active writes.
 2. Open browser DevTools > Network tab.
 3. Watch SSE connections: you'll see repeated CONNECT/DISCONNECT cycles on
-   /api/realtime as the effect tears down and rebuilds the subscription.
+   /v1/realtime as the effect tears down and rebuilds the subscription.
 4. Each cycle is a full SSE handshake (HTTP upgrade, auth token validation,
    server-side subscription map update).
 ```

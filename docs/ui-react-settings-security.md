@@ -54,7 +54,7 @@ Same pattern in `settings.backups.tsx` (S3 `secret` field at line 67) and `setti
 2. Server returns smtp.password: "***" (redacted)
 3. Form initializes password field to "***"
 4. Admin changes host to "smtp.newprovider.com", clicks Save
-5. PUT /api/settings sends { smtp: { password: "***", host: "smtp.newprovider.com", ... } }
+5. PUT /v1/settings sends { smtp: { password: "***", host: "smtp.newprovider.com", ... } }
 6. If server stores "***" literally → SMTP auth breaks, no emails sent
 7. Password reset, email verification, OTP all fail silently
 ```
@@ -136,7 +136,7 @@ The immediate risk is low in the current code path (no spread/merge after parse)
 
 **Impact**: If the old secret is not immediately invalidated server-side, an attacker with a valid token continues to have access after the admin believes they revoked it. The client-side secret generation is architecturally wrong but mitigated by HTTPS in practice.
 
-**Fix Hint**: Do not generate secrets client-side. Call a dedicated server endpoint (e.g., `POST /api/collections/:id/tokens/:type/regenerate`) that generates the secret server-side and returns only a success flag.
+**Fix Hint**: Do not generate secrets client-side. Call a dedicated server endpoint (e.g., `POST /v1/collections/:id/tokens/:type/regenerate`) that generates the secret server-side and returns only a success flag.
 
 ---
 

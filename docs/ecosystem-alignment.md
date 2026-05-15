@@ -91,12 +91,11 @@ dbx: snake_case for SQL column mapping.
 | Repo | External Prefix | Internal Prefix | Source |
 |------|----------------|-----------------|--------|
 | Commerce | `/v1/commerce/*` | `/api/v1/*` | commerce/commerce.go:694-710 (rewrite), :727 (group) |
-| Base | `/api/*` (configurable) | `/api/*` | base/apis/base.go:38-42 |
+| Base | `/v1/*` (fixed) | `/v1/*` | base/apis/base.go:62-64 |
 | Gateway | host+path routing | N/A | gateway/router_engine.go:29-33 |
 
 Commerce canonical external path: `/v1/<service>/*`.
-Base default: `/api/*`.
-CLAUDE.md mandate: `/v1/` not `/api/`.
+Base: `/v1/*` (one path, no env knob, no Casdoor compat).
 
 #### B2. Error Format
 
@@ -309,14 +308,14 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 - Accept both `created`/`createdAt` and `updated`/`updatedAt` in JSON input
 - Output `createdAt`/`updatedAt` by default
 - Env var `BASE_LEGACY_FIELD_NAMES=1` outputs `created`/`updated` for migration
-- Change default `BASE_API_PREFIX` from `/api` to `/v1`
+- Fix API prefix to `/v1` (no env knob, BASE_API_PREFIX removed)
 - Add `Deleted bool` to BaseModel with soft delete by default
 
 **Files to modify:**
 - `base/core/db_model.go:16-22` -- Add CreatedAt, UpdatedAt, Deleted to BaseModel
 - `base/core/collection_model.go:372-373` -- Rename Created/Updated fields
 - `base/core/field_autodate.go` -- Default names `createdAt`/`updatedAt` for new collections
-- `base/apis/base.go:39` -- Default apiPrefix to `/v1`
+- `base/apis/base.go:62-64` -- apiPrefix hard-coded `/v1` (no env knob)
 - `base/tools/search/provider.go` -- Support both old and new field names in sort/filter
 
 ### Phase 2: IAM Integration
@@ -439,7 +438,7 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 23. base/core/field_autodate.go:34-59 -- AutodateField (OnCreate/OnUpdate)
 24. base/core/record_model.go:56-142 -- Base hook system
 25. base/core/record_model_superusers.go:12 -- _superusers collection name
-26. base/apis/base.go:38-42 -- BASE_API_PREFIX defaults to "/api"
+26. base/apis/base.go:62-64 -- apiPrefix hard-coded "/v1"
 27. base/apis/serve.go:81-95 -- Admin UI disabled by default, root redirect
 28. base/apis/realtime.go:83 -- HZ_CONNECT event name (server)
 29. base/sdk/base-js/src/core/realtime.ts:163 -- PB_CONNECT (stale, needs fix)

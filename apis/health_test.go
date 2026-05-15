@@ -14,7 +14,7 @@ func TestHealthAPI(t *testing.T) {
 		{
 			Name:           "GET health status (guest)",
 			Method:         http.MethodGet, // automatically matches also HEAD as a side-effect of the Go std mux
-			URL:            "/api/health",
+			URL:            "/v1/health",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"code":200`,
@@ -30,7 +30,7 @@ func TestHealthAPI(t *testing.T) {
 		{
 			Name:   "GET health status (regular user)",
 			Method: http.MethodGet,
-			URL:    "/api/health",
+			URL:    "/v1/health",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -49,7 +49,7 @@ func TestHealthAPI(t *testing.T) {
 		{
 			Name:   "GET health status (superuser)",
 			Method: http.MethodGet,
-			URL:    "/api/health",
+			URL:    "/v1/health",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
