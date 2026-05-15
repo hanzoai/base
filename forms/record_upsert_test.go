@@ -81,19 +81,13 @@ func TestRecordUpsertLoad(t *testing.T) {
 			name: "auth collection record",
 			data: map[string]any{
 				"email": "test@example.com",
-				// special auth fields
-				"oldPassword":     "123",
-				"password":        "456",
-				"passwordConfirm": "789",
 			},
 			record: core.NewRecord(usersCol),
 			expected: []string{
 				`"email":"test@example.com"`,
-				`"password":"456"`,
 			},
 			notExpected: []string{
-				`"oldPassword"`,
-				`"passwordConfirm"`,
+				`"password"`,
 			},
 		},
 		{
@@ -101,21 +95,15 @@ func TestRecordUpsertLoad(t *testing.T) {
 			data: map[string]any{
 				"email":    "test@example.com",
 				"tokenKey": "abc", // should be ignored
-				// special auth fields
-				"password":        "456",
-				"oldPassword":     "123",
-				"passwordConfirm": "789",
 			},
 			managerAccessLevel: true,
 			record:             core.NewRecord(usersCol),
 			expected: []string{
 				`"email":"test@example.com"`,
 				`"tokenKey":""`,
-				`"password":"456"`,
 			},
 			notExpected: []string{
-				`"oldPassword"`,
-				`"passwordConfirm"`,
+				`"password"`,
 			},
 		},
 		{
@@ -123,21 +111,15 @@ func TestRecordUpsertLoad(t *testing.T) {
 			data: map[string]any{
 				"email":    "test@example.com",
 				"tokenKey": "abc",
-				// special auth fields
-				"password":        "456",
-				"oldPassword":     "123",
-				"passwordConfirm": "789",
 			},
 			superuserAccessLevel: true,
 			record:               core.NewRecord(usersCol),
 			expected: []string{
 				`"email":"test@example.com"`,
 				`"tokenKey":"abc"`,
-				`"password":"456"`,
 			},
 			notExpected: []string{
-				`"oldPassword"`,
-				`"passwordConfirm"`,
+				`"password"`,
 			},
 		},
 		{
@@ -526,113 +508,43 @@ func TestRecordUpsertSubmitValidations(t *testing.T) {
 			expectedErrors: []string{},
 		},
 
-		// auth
+		// auth — the local password flow is gone; only email +
+		// verified + system fields remain. Validations focus on the
+		// manager-access gating around verified + email and on the
+		// unique-email db constraint.
 		{
 			name:           "new auth collection record with empty data",
 			record:         core.NewRecord(usersCol),
 			data:           map[string]any{},
-			expectedErrors: []string{"password", "passwordConfirm"},
+			expectedErrors: []string{},
 		},
 		{
-			name:   "new auth collection record with invalid record and invalid form data (without manager access)",
+			name:   "new auth collection record with verified field change (without manager access)",
 			record: core.NewRecord(usersCol),
 			data: map[string]any{
 				"verified":        true,
 				"emailVisibility": true,
 				"email":           "test@example.com",
-				"password":        "456",
-				"passwordConfirm": "789",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
 			},
-			// fail the form validator
-			expectedErrors: []string{"verified", "passwordConfirm"},
+			// the verified flag flips on create only with manage access
+			expectedErrors: []string{"verified"},
 		},
 		{
-			name:   "new auth collection record with invalid record and valid form data (without manager access)",
-			record: core.NewRecord(usersCol),
-			data: map[string]any{
-				"verified":        false,
-				"emailVisibility": true,
-				"email":           "test@example.com",
-				"password":        "456",
-				"passwordConfirm": "456",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
-			},
-			// fail the record fields validator
-			expectedErrors: []string{"password", "username"},
-		},
-		{
-			name:          "new auth collection record with invalid record and invalid form data (with manager access)",
+			name:          "new auth collection record with manager access",
 			record:        core.NewRecord(usersCol),
 			managerAccess: true,
 			data: map[string]any{
 				"verified":        true,
-				"emailVisibility": true,
-				"email":           "test@example.com",
-				"password":        "456",
-				"passwordConfirm": "789",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
-			},
-			// fail the form validator
-			expectedErrors: []string{"passwordConfirm"},
-		},
-		{
-			name:          "new auth collection record with invalid record and valid form data (with manager access)",
-			record:        core.NewRecord(usersCol),
-			managerAccess: true,
-			data: map[string]any{
-				"verified":        true,
-				"emailVisibility": true,
-				"email":           "test@example.com",
-				"password":        "456",
-				"passwordConfirm": "456",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
-			},
-			// fail the record fields validator
-			expectedErrors: []string{"password", "username"},
-		},
-		{
-			name:   "new auth collection record with valid data",
-			record: core.NewRecord(usersCol),
-			data: map[string]any{
 				"emailVisibility": true,
 				"email":           "test_new@example.com",
-				"password":        "1234567890",
-				"passwordConfirm": "1234567890",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
 			},
 			expectedErrors: []string{},
 		},
 		{
-			name:   "new auth collection record with valid data and duplicated email",
+			name:   "new auth collection record with duplicated email",
 			record: core.NewRecord(usersCol),
 			data: map[string]any{
-				"email":           "test@example.com",
-				"password":        "1234567890",
-				"passwordConfirm": "1234567890",
-				// should be ignored (custom or hidden fields)
-				"tokenKey":    strings.Repeat("a", 2),
-				"custom":      "abc",
-				"oldPassword": "123",
+				"email": "test@example.com",
 			},
 			// fail the unique db validator
 			expectedErrors: []string{"email"},
@@ -644,100 +556,29 @@ func TestRecordUpsertSubmitValidations(t *testing.T) {
 			expectedErrors: []string{},
 		},
 		{
-			name:   "existing auth collection record with invalid record data and invalid form data (without manager access)",
+			name:   "existing auth collection record with email change attempt (without manager access)",
 			record: userRec,
 			data: map[string]any{
-				"verified":        true,
-				"email":           "test_new@example.com", // not allowed to change
-				"oldPassword":     "123",
-				"password":        "456",
-				"passwordConfirm": "789",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey": strings.Repeat("a", 2),
-				"custom":   "abc",
+				"verified": true,
+				"email":    "test_new@example.com", // not allowed to change
 			},
-			// fail form validator
-			expectedErrors: []string{"verified", "email", "oldPassword", "passwordConfirm"},
+			expectedErrors: []string{"verified", "email"},
 		},
 		{
-			name:   "existing auth collection record with invalid record data and valid form data (without manager access)",
-			record: userRec,
-			data: map[string]any{
-				"oldPassword":     "1234567890",
-				"password":        "12345678901",
-				"passwordConfirm": "12345678901",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey": strings.Repeat("a", 2),
-				"custom":   "abc",
-			},
-			// fail record fields validator
-			expectedErrors: []string{"username"},
-		},
-		{
-			name:          "existing auth collection record with invalid record data and invalid form data (with manager access)",
+			name:          "existing auth collection record with email change (with manager access)",
 			record:        userRec,
 			managerAccess: true,
 			data: map[string]any{
-				"verified":        true,
-				"email":           "test_new@example.com",
-				"oldPassword":     "123", // should be ignored
-				"password":        "456",
-				"passwordConfirm": "789",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey": strings.Repeat("a", 2),
-				"custom":   "abc",
+				"verified": true,
+				"email":    "test_new@example.com",
 			},
-			// fail form validator
-			expectedErrors: []string{"passwordConfirm"},
-		},
-		{
-			name:          "existing auth collection record with invalid record data and valid form data (with manager access)",
-			record:        userRec,
-			managerAccess: true,
-			data: map[string]any{
-				"verified":        true,
-				"email":           "test_new@example.com",
-				"oldPassword":     "1234567890",
-				"password":        "12345678901",
-				"passwordConfirm": "12345678901",
-				"username":        "!invalid",
-				// should be ignored (custom or hidden fields)
-				"tokenKey": strings.Repeat("a", 2),
-				"custom":   "abc",
-			},
-			// fail record fields validator
-			expectedErrors: []string{"username"},
+			expectedErrors: []string{},
 		},
 		{
 			name:   "existing auth collection record with base valid data",
 			record: userRec,
 			data: map[string]any{
 				"name": "test",
-			},
-			expectedErrors: []string{},
-		},
-		{
-			name:   "existing auth collection record with valid password and invalid oldPassword data",
-			record: userRec,
-			data: map[string]any{
-				"name":            "test",
-				"oldPassword":     "invalid",
-				"password":        "1234567890",
-				"passwordConfirm": "1234567890",
-			},
-			expectedErrors: []string{"oldPassword"},
-		},
-		{
-			name:   "existing auth collection record with valid password data",
-			record: userRec,
-			data: map[string]any{
-				"name":            "test",
-				"oldPassword":     "1234567890",
-				"password":        "0987654321",
-				"passwordConfirm": "0987654321",
 			},
 			expectedErrors: []string{},
 		},
