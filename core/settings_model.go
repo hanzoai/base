@@ -174,8 +174,8 @@ func newDefaultSettings() *Settings {
 				Rules: []RateLimitRule{
 					{Label: "*:auth", MaxRequests: 2, Duration: 3},
 					{Label: "*:create", MaxRequests: 20, Duration: 5},
-					{Label: "/api/batch", MaxRequests: 3, Duration: 1},
-					{Label: "/api/", MaxRequests: 300, Duration: 10},
+					{Label: "/v1/batch", MaxRequests: 3, Duration: 1},
+					{Label: "/v1/", MaxRequests: 300, Duration: 10},
 				},
 			},
 		},
@@ -671,8 +671,8 @@ type RateLimitRule struct {
 	//   - users:create
 	//   - *:create
 	//   - /
-	//   - /api
-	//   - POST /api/collections/
+	//   - /v1
+	//   - POST /v1/collections/
 	Label string `form:"label" json:"label"`
 
 	// Audience specifies the auth group the rule should apply for:

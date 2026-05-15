@@ -7,9 +7,9 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// registerOrgRoutes registers per-org API routes under /api/platform/org.
+// registerOrgRoutes registers per-org API routes under /v1/platform/org.
 func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/api/platform/org")
+	api := r.Group("/v1/platform/org")
 
 	api.GET("/config/{orgId}", p.handleGetOrgConfig)
 	api.GET("/creds/{orgId}/{provider}", p.handleGetOrgCreds)

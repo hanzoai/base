@@ -22,7 +22,7 @@ func TestSettingsList(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/settings",
+			URL:             "/v1/settings",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -30,7 +30,7 @@ func TestSettingsList(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -41,7 +41,7 @@ func TestSettingsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -62,7 +62,7 @@ func TestSettingsList(t *testing.T) {
 		{
 			Name:   "OnSettingsListRequest tx body write check",
 			Method: http.MethodGet,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -105,7 +105,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPatch,
-			URL:             "/api/settings",
+			URL:             "/v1/settings",
 			Body:            strings.NewReader(validData),
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
@@ -114,7 +114,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPatch,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Body:   strings.NewReader(validData),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -126,7 +126,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:   "authorized as superuser submitting empty data",
 			Method: http.MethodPatch,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Body:   strings.NewReader(``),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -153,7 +153,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:   "authorized as superuser submitting invalid data",
 			Method: http.MethodPatch,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Body:   strings.NewReader(`{"meta":{"appName":""}}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -174,7 +174,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:   "authorized as superuser submitting valid data",
 			Method: http.MethodPatch,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Body:   strings.NewReader(validData),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -206,7 +206,7 @@ func TestSettingsSet(t *testing.T) {
 		{
 			Name:   "OnSettingsUpdateRequest tx body write check",
 			Method: http.MethodPatch,
-			URL:    "/api/settings",
+			URL:    "/v1/settings",
 			Body:   strings.NewReader(validData),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -244,7 +244,7 @@ func TestSettingsTestS3(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/settings/test/s3",
+			URL:             "/v1/settings/test/s3",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -252,7 +252,7 @@ func TestSettingsTestS3(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/s3",
+			URL:    "/v1/settings/test/s3",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -263,7 +263,7 @@ func TestSettingsTestS3(t *testing.T) {
 		{
 			Name:   "authorized as superuser (missing body + no s3)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/s3",
+			URL:    "/v1/settings/test/s3",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -277,7 +277,7 @@ func TestSettingsTestS3(t *testing.T) {
 		{
 			Name:   "authorized as superuser (invalid filesystem)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/s3",
+			URL:    "/v1/settings/test/s3",
 			Body:   strings.NewReader(`{"filesystem":"invalid"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -292,7 +292,7 @@ func TestSettingsTestS3(t *testing.T) {
 		{
 			Name:   "authorized as superuser (valid filesystem and no s3)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/s3",
+			URL:    "/v1/settings/test/s3",
 			Body:   strings.NewReader(`{"filesystem":"storage"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -317,7 +317,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "unauthorized",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body: strings.NewReader(`{
 				"template": "verification",
 				"email": "test@example.com"
@@ -329,7 +329,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body: strings.NewReader(`{
 				"template": "verification",
 				"email": "test@example.com"
@@ -344,7 +344,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "authorized as superuser (invalid body)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body:   strings.NewReader(`{`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -356,7 +356,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "authorized as superuser (empty json)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -371,7 +371,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "authorized as superuser (verifiation template)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body: strings.NewReader(`{
 				"template": "verification",
 				"email": "test@example.com"
@@ -407,7 +407,7 @@ func TestSettingsTestEmail(t *testing.T) {
 		{
 			Name:   "authorized as superuser (email change)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
+			URL:    "/v1/settings/test/email",
 			Body: strings.NewReader(`{
 				"template": "email-change",
 				"email": "test@example.com"
@@ -471,7 +471,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/settings/apple/generate-client-secret",
+			URL:             "/v1/settings/apple/generate-client-secret",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -479,7 +479,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/settings/apple/generate-client-secret",
+			URL:    "/v1/settings/apple/generate-client-secret",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -490,7 +490,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:   "authorized as superuser (invalid body)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/apple/generate-client-secret",
+			URL:    "/v1/settings/apple/generate-client-secret",
 			Body:   strings.NewReader(`{`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -502,7 +502,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:   "authorized as superuser (empty json)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/apple/generate-client-secret",
+			URL:    "/v1/settings/apple/generate-client-secret",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -520,7 +520,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:   "authorized as superuser (invalid data)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/apple/generate-client-secret",
+			URL:    "/v1/settings/apple/generate-client-secret",
 			Body: strings.NewReader(`{
 				"clientId": "",
 				"teamId": "123456789",
@@ -544,7 +544,7 @@ func TestGenerateAppleClientSecret(t *testing.T) {
 		{
 			Name:   "authorized as superuser (valid data)",
 			Method: http.MethodPost,
-			URL:    "/api/settings/apple/generate-client-secret",
+			URL:    "/v1/settings/apple/generate-client-secret",
 			Body: strings.NewReader(fmt.Sprintf(`{
 				"clientId": "123",
 				"teamId": "1234567890",

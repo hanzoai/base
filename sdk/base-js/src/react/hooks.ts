@@ -479,11 +479,11 @@ export function useCRDTCounter(doc: CRDTDocument, field: string): number {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Derive WebSocket URL from HTTP URL: https://x -> wss://x/api/crdt */
+/** Derive WebSocket URL from HTTP URL: https://x -> wss://x/v1/crdt */
 function deriveCrdtWsUrl(httpUrl: string): string {
   const url = httpUrl.replace(/\/$/, '')
   if (url.startsWith('https://')) {
-    return url.replace('https://', 'wss://') + '/api/crdt'
+    return url.replace('https://', 'wss://') + '/v1/crdt'
   }
-  return url.replace('http://', 'ws://') + '/api/crdt'
+  return url.replace('http://', 'ws://') + '/v1/crdt'
 }

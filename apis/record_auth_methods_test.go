@@ -15,7 +15,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/missing/auth-methods",
+			URL:             "/v1/collections/missing/auth-methods",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -23,7 +23,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:            "non auth collection",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo1/auth-methods",
+			URL:             "/v1/collections/demo1/auth-methods",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -31,7 +31,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:           "auth collection with no OAuth2 providers",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/nologin/auth-methods",
+			URL:            "/v1/collections/nologin/auth-methods",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"oauth2":{"providers":[],"enabled":false}`,
@@ -41,7 +41,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:           "auth collection with OAuth2 providers",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/users/auth-methods",
+			URL:            "/v1/collections/users/auth-methods",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"oauth2":{`,
@@ -64,7 +64,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:   "RateLimit rule - nologin:listAuthMethods",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/auth-methods",
+			URL:    "/v1/collections/nologin/auth-methods",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -80,7 +80,7 @@ func TestRecordAuthMethodsList(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:listAuthMethods",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/auth-methods",
+			URL:    "/v1/collections/nologin/auth-methods",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
