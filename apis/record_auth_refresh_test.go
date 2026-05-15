@@ -15,7 +15,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/users/auth-refresh",
+			URL:             "/v1/collections/users/auth-refresh",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -23,7 +23,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "superuser trying to refresh the auth of another auth collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh",
+			URL:    "/v1/collections/users/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -34,7 +34,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "auth record + not an auth collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo1/auth-refresh",
+			URL:    "/v1/collections/demo1/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -45,7 +45,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "auth record + different auth collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/clients/auth-refresh?expand=rel,missing",
+			URL:    "/v1/collections/clients/auth-refresh?expand=rel,missing",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -56,7 +56,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "auth record + same auth collection as the token",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh?expand=rel,missing",
+			URL:    "/v1/collections/users/auth-refresh?expand=rel,missing",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -86,7 +86,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "auth record + same auth collection as the token but static/unrefreshable",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh",
+			URL:    "/v1/collections/users/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOmZhbHNlLCJ0eXBlIjoiYXV0aCJ9.8LJt8Jz66YTdn5bm_PalFa66lhgdZINXn5EDiVZNV7M",
 			},
@@ -109,7 +109,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "unverified auth record in onlyVerified collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/clients/auth-refresh",
+			URL:    "/v1/collections/clients/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoibzF5MGRkMHNwZDc4Nm1kIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.Vk_K1eyZL_I1VD6fWPHfkA_lBmtbw-fwPq3FSfsyoY8",
 			},
@@ -123,7 +123,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "verified auth record in onlyVerified collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/clients/auth-refresh",
+			URL:    "/v1/collections/clients/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
 			},
@@ -145,7 +145,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "OnRecordAuthRefreshRequest tx body write check",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh",
+			URL:    "/v1/collections/users/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -174,7 +174,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "RateLimit rule - users:authRefresh",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh",
+			URL:    "/v1/collections/users/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -193,7 +193,7 @@ func TestRecordAuthRefresh(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:authRefresh",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-refresh",
+			URL:    "/v1/collections/users/auth-refresh",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},

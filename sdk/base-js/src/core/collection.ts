@@ -379,7 +379,7 @@ export class CollectionService {
   // ---- Internal -----------------------------------------------------------
 
   private _collectionPath(): string {
-    return `/api/collections/${encodeURIComponent(this.collectionIdOrName)}`
+    return `/v1/collections/${encodeURIComponent(this.collectionIdOrName)}`
   }
 
   private _applyOptions(params: URLSearchParams, options?: RecordQueryOptions): void {

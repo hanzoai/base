@@ -304,11 +304,7 @@ func Serve(app core.App, config ServeConfig) error {
 		)
 
 		regular := color.New()
-		apiPfx := os.Getenv("BASE_API_PREFIX")
-		if apiPfx == "" {
-			apiPfx = "/api"
-		}
-		regular.Printf("├─ REST API:  %s\n", color.CyanString("%s%s/", baseURL, apiPfx))
+		regular.Printf("├─ REST API:  %s\n", color.CyanString("%s/v1/", baseURL))
 		regular.Printf("└─ Dashboard: %s\n", color.CyanString("%s/_/", baseURL))
 	}
 

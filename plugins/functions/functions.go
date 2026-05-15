@@ -81,7 +81,7 @@ type plugin struct {
 // --------------------------------------------------------------------------
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/api/functions")
+	api := r.Group("/v1/functions")
 
 	// Function CRUD
 	api.POST("", p.handleDeployFunction)

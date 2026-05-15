@@ -28,6 +28,17 @@ The changelog below follows Keep a Changelog.
 
 ### Changed
 
+- **All API routes mounted under `/v1/*` (was `/api/*`).** One path. `BASE_API_PREFIX`
+  env knob removed; the prefix is hard-coded in `apis/base.go`. Embedded IAM mount
+  moved from `/api/iam/*` to `/v1/iam/*`. Platform plugin sub-mounts moved
+  (`/api/platform/*` → `/v1/platform/*`). KMS plugin (`/api/kms/*` → `/v1/kms/*`),
+  Functions (`/api/functions/*` → `/v1/functions/*`), CloudSQL (`/api/cloud-sql/*`,
+  `/api/meta/*` → `/v1/cloud-sql/*`, `/v1/meta/*`) follow suit. The SDK
+  (`@hanzo/base-js`, `@hanzo/base-react`), the admin UI (`ui-react`), and the CLI
+  client (`cmd/cli`) all target `/v1/*`. Casdoor's `/api/*` upstream paths the
+  auth-proxy/iam clients call out to are untouched (they're the upstream's
+  contract, not ours). Rate-limit rule labels (`/api/batch`, `/api/`) and batch
+  action URL rewrites also moved to `/v1/`.
 - Platform plugin makes IAM **mandatory** — there is no local-auth fallback.
 - Logger surface swept from `log/slog.Logger` to `github.com/luxfi/log` via the
   `tools/logger` shim. Attribute helpers are now variadic positional pairs.

@@ -24,7 +24,7 @@ func TestRealtimeConnect(t *testing.T) {
 	scenarios := []tests.ApiScenario{
 		{
 			Method:         http.MethodGet,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Timeout:        100 * time.Millisecond,
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -46,7 +46,7 @@ func TestRealtimeConnect(t *testing.T) {
 		{
 			Name:           "CONNECT interrupt",
 			Method:         http.MethodGet,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Timeout:        100 * time.Millisecond,
 			ExpectedStatus: 200,
 			ExpectedEvents: map[string]int{
@@ -71,7 +71,7 @@ func TestRealtimeConnect(t *testing.T) {
 		{
 			Name:           "Skipping/ignoring messages",
 			Method:         http.MethodGet,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Timeout:        100 * time.Millisecond,
 			ExpectedStatus: 200,
 			ExpectedEvents: map[string]int{
@@ -118,7 +118,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:            "missing client",
 			Method:          http.MethodPost,
-			URL:             "/api/realtime",
+			URL:             "/v1/realtime",
 			Body:            strings.NewReader(`{"clientId":"missing","subscriptions":["test1", "test2"]}`),
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
@@ -127,7 +127,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:           "empty data",
 			Method:         http.MethodPost,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Body:           strings.NewReader(`{}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -142,7 +142,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client with invalid subscriptions limit",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body: strings.NewReader(`{
 				"clientId": "` + client.Id() + `",
 				"subscriptions": [` + strings.Join(invalidSubscriptionsLimit, ",") + `]
@@ -163,7 +163,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client with valid subscriptions limit",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body: strings.NewReader(`{
 				"clientId": "` + client.Id() + `",
 				"subscriptions": [` + strings.Join(validSubscriptionsLimit, ",") + `]
@@ -190,7 +190,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client with invalid topic length",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body: strings.NewReader(`{
 				"clientId": "` + client.Id() + `",
 				"subscriptions": ["abc", "` + strings.Repeat("a", 2501) + `"]
@@ -211,7 +211,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client with valid topic length",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body: strings.NewReader(`{
 				"clientId": "` + client.Id() + `",
 				"subscriptions": ["abc", "` + strings.Repeat("a", 2500) + `"]
@@ -238,7 +238,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:           "existing client - empty subscriptions",
 			Method:         http.MethodPost,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Body:           strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":[]}`),
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
@@ -259,7 +259,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:           "existing client - 2 new subscriptions",
 			Method:         http.MethodPost,
-			URL:            "/api/realtime",
+			URL:            "/v1/realtime",
 			Body:           strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
@@ -287,7 +287,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client - guest -> authorized superuser",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body:   strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -311,7 +311,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client - guest -> authorized regular auth record",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body:   strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -335,7 +335,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client - same auth",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body:   strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -367,7 +367,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:   "existing client - mismatched auth",
 			Method: http.MethodPost,
-			URL:    "/api/realtime",
+			URL:    "/v1/realtime",
 			Body:   strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -395,7 +395,7 @@ func TestRealtimeSubscribe(t *testing.T) {
 		{
 			Name:            "existing client - unauthorized client",
 			Method:          http.MethodPost,
-			URL:             "/api/realtime",
+			URL:             "/v1/realtime",
 			Body:            strings.NewReader(`{"clientId":"` + client.Id() + `","subscriptions":["test1", "test2"]}`),
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
