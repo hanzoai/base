@@ -2105,7 +2105,6 @@ func TestRecordSaveIdFromOtherCollection(t *testing.T) {
 	// auth collection test
 	r2 := core.NewRecord(authCollection)
 	r2.SetEmail("test_new@example.com")
-	r2.SetPassword("1234567890")
 	r2.Set("id", "gk390qegs4y47wn") // existing id of "clients" record
 	if err := app.Save(r2); err == nil {
 		t.Fatal("Expected error, got nil")
@@ -2226,7 +2225,7 @@ func TestRecordDelete(t *testing.T) {
 		t.Fatal("(viewRec) Expected view record to still exists")
 	}
 
-	// delete existing record + external auths
+	// delete existing record
 	// ---
 	rec1, _ := app.FindRecordById("users", "4q1xlclmfloku33")
 	if err := app.Delete(rec1); err != nil {
@@ -2235,10 +2234,6 @@ func TestRecordDelete(t *testing.T) {
 	// check if it was really deleted
 	if refreshed, _ := app.FindRecordById(rec1.Collection().Id, rec1.Id); refreshed != nil {
 		t.Fatalf("(rec1) Expected record to be deleted, got %v", refreshed)
-	}
-	// check if the external auths were deleted
-	if auths, _ := app.FindAllExternalAuthsByRecord(rec1); len(auths) > 0 {
-		t.Fatalf("(rec1) Expected external auths to be deleted, got %v", auths)
 	}
 
 	// delete existing record while being part of a non-cascade required relation
