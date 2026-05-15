@@ -18,10 +18,10 @@ func TestBatchRequest(t *testing.T) {
 		map[string]string{
 			router.JSONPayloadKey: `{
 				"requests":[
-					{"method":"POST", "url":"/api/collections/demo3/records", "body": {"title": "batch1"}},
-					{"method":"POST", "url":"/api/collections/demo3/records", "body": {"title": "batch2"}},
-					{"method":"POST", "url":"/api/collections/demo3/records", "body": {"title": "batch3"}},
-					{"method":"PATCH", "url":"/api/collections/demo3/records/lcl9d87w22ml6jy", "body": {"files-": "test_FLurQTgrY8.txt"}}
+					{"method":"POST", "url":"/v1/collections/demo3/records", "body": {"title": "batch1"}},
+					{"method":"POST", "url":"/v1/collections/demo3/records", "body": {"title": "batch2"}},
+					{"method":"POST", "url":"/v1/collections/demo3/records", "body": {"title": "batch3"}},
+					{"method":"PATCH", "url":"/v1/collections/demo3/records/lcl9d87w22ml6jy", "body": {"files-": "test_FLurQTgrY8.txt"}}
 				]
 			}`,
 		},
@@ -38,7 +38,7 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "disabled batch requets",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().Batch.Enabled = false
 			},
@@ -49,7 +49,7 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "max request limits reached",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
 					{"method":"GET", "url":"/test1"},
@@ -71,7 +71,7 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "trigger requests validations",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
 					{},
@@ -100,10 +100,10 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "unknown batch request action",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"GET", "url":"/api/health"}
+					{"method":"GET", "url":"/v1/health"}
 				]
 			}`),
 			ExpectedStatus: 400,
@@ -121,12 +121,12 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "base 2 successful and 1 failed (public collection)",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
-                    {"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch1"}},
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch2"}},
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": ""}}
+                    {"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch1"}},
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch2"}},
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": ""}}
 				]
 			}`),
 			ExpectedStatus: 400,
@@ -168,13 +168,13 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "base 4 successful (public collection)",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch1"}},
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch2"}},
-					{"method":"PUT", "url":"/api/collections/demo2/records", "body": {"title": "batch3"}},
-					{"method":"PUT", "url":"/api/collections/demo2/records?fields=*,id:excerpt(4,true)", "body": {"id":"achvryl401bhse3","title": "batch4"}}
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch1"}},
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch2"}},
+					{"method":"PUT", "url":"/v1/collections/demo2/records", "body": {"title": "batch3"}},
+					{"method":"PUT", "url":"/v1/collections/demo2/records?fields=*,id:excerpt(4,true)", "body": {"id":"achvryl401bhse3","title": "batch4"}}
 				]
 			}`),
 			ExpectedStatus: 200,
@@ -226,12 +226,12 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "mixed create/update/delete (rules failure)",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch_create"}},
-					{"method":"DELETE", "url":"/api/collections/demo2/records/achvryl401bhse3"},
-					{"method":"PATCH", "url":"/api/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}}
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch_create"}},
+					{"method":"DELETE", "url":"/v1/collections/demo2/records/achvryl401bhse3"},
+					{"method":"PATCH", "url":"/v1/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}}
 				]
 			}`),
 			ExpectedStatus: 400,
@@ -287,16 +287,16 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "mixed create/update/delete (rules success)",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Headers: map[string]string{
 				// test@example.com, clients
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
 			},
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch_create"}, "headers": {"Authorization": "ignored"}},
-					{"method":"DELETE", "url":"/api/collections/demo2/records/achvryl401bhse3", "headers": {"Authorization": "ignored"}},
-					{"method":"PATCH", "url":"/api/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}, "headers": {"Authorization": "ignored"}}
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch_create"}, "headers": {"Authorization": "ignored"}},
+					{"method":"DELETE", "url":"/v1/collections/demo2/records/achvryl401bhse3", "headers": {"Authorization": "ignored"}},
+					{"method":"PATCH", "url":"/v1/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}, "headers": {"Authorization": "ignored"}}
 				]
 			}`),
 			ExpectedStatus: 200,
@@ -358,16 +358,16 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "mixed create/update/delete (superuser auth)",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Headers: map[string]string{
 				// test@example.com, _superusers
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch_create"}},
-					{"method":"DELETE", "url":"/api/collections/demo2/records/achvryl401bhse3"},
-					{"method":"PATCH", "url":"/api/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}}
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch_create"}},
+					{"method":"DELETE", "url":"/v1/collections/demo2/records/achvryl401bhse3"},
+					{"method":"PATCH", "url":"/v1/collections/demo3/records/1tmknxy2868d869", "body": {"title": "batch_update"}}
 				]
 			}`),
 			ExpectedStatus: 200,
@@ -429,15 +429,15 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "cascade delete/update",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Headers: map[string]string{
 				// test@example.com, _superusers
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"DELETE", "url":"/api/collections/demo3/records/1tmknxy2868d869"},
-					{"method":"DELETE", "url":"/api/collections/demo3/records/mk5fmymtx4wsprk"}
+					{"method":"DELETE", "url":"/v1/collections/demo3/records/1tmknxy2868d869"},
+					{"method":"DELETE", "url":"/v1/collections/demo3/records/mk5fmymtx4wsprk"}
 				]
 			}`),
 			ExpectedStatus: 200,
@@ -486,11 +486,11 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "transaction timeout",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch1"}},
-					{"method":"POST", "url":"/api/collections/demo2/records", "body": {"title": "batch2"}}
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch1"}},
+					{"method":"POST", "url":"/v1/collections/demo2/records", "body": {"title": "batch2"}}
 				]
 			}`),
 			Headers: map[string]string{
@@ -536,7 +536,7 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "multipart/form-data + file upload",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Body:   formData,
 			Headers: map[string]string{
 				// test@example.com, clients
@@ -618,15 +618,15 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "create/update with expand query params",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Headers: map[string]string{
 				// test@example.com, _superusers
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo5/records?expand=rel_one", "body": {"total": 9, "rel_one":"qzaqccwrmva4o1n"}},
-					{"method":"PATCH", "url":"/api/collections/demo5/records/qjeql998mtp1azp?expand=rel_many", "body": {"total": 10}}
+					{"method":"POST", "url":"/v1/collections/demo5/records?expand=rel_one", "body": {"total": 9, "rel_one":"qzaqccwrmva4o1n"}},
+					{"method":"PATCH", "url":"/v1/collections/demo5/records/qjeql998mtp1azp?expand=rel_many", "body": {"total": 10}}
 				]
 			}`),
 			ExpectedStatus: 200,
@@ -665,15 +665,15 @@ func TestBatchRequest(t *testing.T) {
 		{
 			Name:   "check body limit middleware",
 			Method: http.MethodPost,
-			URL:    "/api/batch",
+			URL:    "/v1/batch",
 			Headers: map[string]string{
 				// test@example.com, _superusers
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
 			Body: strings.NewReader(`{
 				"requests": [
-					{"method":"POST", "url":"/api/collections/demo5/records?expand=rel_one", "body": {"total": 9, "rel_one":"qzaqccwrmva4o1n"}},
-					{"method":"PATCH", "url":"/api/collections/demo5/records/qjeql998mtp1azp?expand=rel_many", "body": {"total": 10}}
+					{"method":"POST", "url":"/v1/collections/demo5/records?expand=rel_one", "body": {"total": 9, "rel_one":"qzaqccwrmva4o1n"}},
+					{"method":"PATCH", "url":"/v1/collections/demo5/records/qjeql998mtp1azp?expand=rel_many", "body": {"total": 10}}
 				]
 			}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
