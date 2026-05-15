@@ -35,15 +35,6 @@ func GetUserVerificationToken(app core.App, collectionNameOrId, recordId string)
 	return record.NewVerificationToken()
 }
 
-// GetUserPasswordResetToken returns a password reset token for testing.
-func GetUserPasswordResetToken(app core.App, collectionNameOrId, recordId string) (string, error) {
-	record, err := app.FindRecordById(collectionNameOrId, recordId)
-	if err != nil {
-		return "", err
-	}
-	return record.NewPasswordResetToken()
-}
-
 // GetSuperuserAuthToken returns a valid auth token for a test superuser.
 func GetSuperuserAuthToken(app core.App, recordId string) (string, error) {
 	return GetUserAuthToken(app, core.CollectionNameSuperusers, recordId)
