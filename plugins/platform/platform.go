@@ -123,7 +123,16 @@ func MustRegister(app core.App, config PlatformConfig) {
 // in-process Casdoor (embedded mode, see core/iam_embedded.go). Both
 // modes give the same /oauth2/login?provider=hanzo contract.
 func Register(app core.App, config PlatformConfig) error {
-	if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
+	embedded := IsEmbeddedIAM()
+	if embedded {
+		// Embedded mode: the IAM endpoint is this same process. Point
+		// IAMEndpoint at the local mount so JWKS URL composition,
+		// auth-proxy fallbacks, and any downstream code that reads
+		// config.IAMEndpoint keep working without a second branch.
+		if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
+			config.IAMEndpoint = embeddedIAMMount
+		}
+	} else if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
 		return fmt.Errorf(
 			"platform: IAM_ENDPOINT is required — Hanzo Base does not " +
 				"support local password / OTP / MFA. Set IAM_ENDPOINT to " +
@@ -148,23 +157,55 @@ func Register(app core.App, config PlatformConfig) error {
 		dbPool:     NewDBPoolManager(poolConfig),
 	}
 
-	// Bootstrap: ensure system collections exist.
+	// In embedded mode, bring up the in-process OIDC provider so the
+	// platform plugin can mount its handlers in OnServe.
+	if embedded {
+		eiam, err := newEmbeddedIAM(app)
+		if err != nil {
+			return fmt.Errorf("platform: init embedded iam: %w", err)
+		}
+		p.embeddedIAM = eiam
+	}
+
+	// Bootstrap: ensure system collections exist. In embedded mode we
+	// also create _iam_users and seed the root user from env.
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
 		if err := e.Next(); err != nil {
 			return err
 		}
-		return p.ensureSystemCollections()
+		if err := p.ensureSystemCollections(); err != nil {
+			return err
+		}
+		if embedded {
+			if err := p.ensureUsersCollection(); err != nil {
+				return err
+			}
+			if err := p.bootstrapRootUser(); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 
 	// IAM is the only auth source. Every Base route validates JWTs
 	// against IAM's JWKS; the legacy local-password / OTP / MFA paths
 	// are unreachable (see apis/record_auth_*: 410 Gone with a
 	// Location pointer to the IAM equivalent).
-	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
-	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+	//
+	// In embedded mode we do NOT set jwksURL on the store — the URL
+	// would be a relative path (/api/iam/.well-known/jwks) the JWKS
+	// fetcher can't resolve. Instead the platformEmbeddedAuth
+	// middleware (registered below) validates bearer tokens directly
+	// with the in-process RSA signer.
 	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+	jwksURL := ""
+	if !embedded {
+		jwksURL = strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+		app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+	}
 
 	app.Logger().Info("platform: IAM is the only auth source",
+		"mode", iamModeLabel(embedded),
 		"jwksURL", jwksURL,
 		"authEndpoint", config.IAMEndpoint,
 	)
@@ -227,6 +268,18 @@ func Register(app core.App, config PlatformConfig) error {
 				return re.Next()
 			},
 		})
+
+		// Embedded IAM JWT validator. Runs BEFORE loadAuthToken so the
+		// downstream middleware sees a fully-populated re.Auth and the
+		// usual identity-header path Just Works. Only installed in
+		// embedded mode; external mode keeps the JWKS-over-HTTP path.
+		if p.embeddedIAM != nil {
+			e.Router.Bind(&hook.Handler[*core.RequestEvent]{
+				Id:       "platformEmbeddedAuth",
+				Priority: apis.DefaultLoadAuthTokenMiddlewarePriority - 1,
+				Func:     p.embeddedIAMAuthMiddleware,
+			})
+		}
 
 		// Global middleware: set identity headers from authenticated user or API key.
 		// Runs after both loadAuthToken and platformAPIKeyAuth.
@@ -376,7 +429,16 @@ func Register(app core.App, config PlatformConfig) error {
 		p.registerRoutes(e.Router)
 		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
-		p.registerIAMProxy(e.Router)
+
+		// /api/iam mount: in-process OIDC in embedded mode, transparent
+		// reverse proxy to IAM_ENDPOINT otherwise. Either way the
+		// admin UI sees the same surface.
+		if p.embeddedIAM != nil {
+			p.registerEmbeddedIAM(e.Router)
+		} else {
+			p.registerIAMProxy(e.Router)
+		}
+
 		return e.Next()
 	})
 
@@ -391,6 +453,11 @@ type plugin struct {
 	org        *OrgService
 	orgDB      *OrgDB
 	dbPool     *DBPoolManager
+
+	// embeddedIAM is non-nil only when IAM_MODE=embedded. When set, Base
+	// hosts the in-process OIDC provider at /api/iam/* and the reverse
+	// proxy is not mounted.
+	embeddedIAM *embeddedIAM
 }
 
 // --------------------------------------------------------------------------
