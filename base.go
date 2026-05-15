@@ -176,10 +176,12 @@ func NewWithConfig(config Config) *Base {
 }
 
 // Start starts the application, aka. registers the default system
-// commands (serve, superuser, cli, version) and executes base.RootCmd.
+// commands (serve, cli) and executes base.RootCmd.
+//
+// Superuser management lives in Hanzo IAM; there is no local-password
+// management CLI to register.
 func (base *Base) Start() error {
 	// register system commands
-	base.RootCmd.AddCommand(cmd.NewSuperuserCommand(base))
 	base.RootCmd.AddCommand(cmd.NewServeCommand(base, !base.hideStartBanner))
 	base.RootCmd.AddCommand(cmd.NewCLICommand())
 
