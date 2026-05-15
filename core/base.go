@@ -165,12 +165,9 @@ type BaseApp struct {
 	onCollectionAfterDeleteError   *hook.Hook[*CollectionErrorEvent]
 
 	// mailer event hooks
-	onMailerSend                    *hook.Hook[*MailerEvent]
-	onMailerRecordPasswordResetSend *hook.Hook[*MailerRecordEvent]
-	onMailerRecordVerificationSend  *hook.Hook[*MailerRecordEvent]
-	onMailerRecordEmailChangeSend   *hook.Hook[*MailerRecordEvent]
-	onMailerRecordOTPSend           *hook.Hook[*MailerRecordEvent]
-	onMailerRecordAuthAlertSend     *hook.Hook[*MailerRecordEvent]
+	onMailerSend                   *hook.Hook[*MailerEvent]
+	onMailerRecordVerificationSend *hook.Hook[*MailerRecordEvent]
+	onMailerRecordEmailChangeSend  *hook.Hook[*MailerRecordEvent]
 
 	// realtime api event hooks
 	onRealtimeConnectRequest   *hook.Hook[*RealtimeConnectRequestEvent]
@@ -187,18 +184,13 @@ type BaseApp struct {
 	onFileTokenRequest    *hook.Hook[*FileTokenRequestEvent]
 
 	// record auth API event hooks
-	onRecordAuthRequest                 *hook.Hook[*RecordAuthRequestEvent]
-	onRecordAuthWithPasswordRequest     *hook.Hook[*RecordAuthWithPasswordRequestEvent]
-	onRecordAuthWithOAuth2Request       *hook.Hook[*RecordAuthWithOAuth2RequestEvent]
-	onRecordAuthRefreshRequest          *hook.Hook[*RecordAuthRefreshRequestEvent]
-	onRecordRequestPasswordResetRequest *hook.Hook[*RecordRequestPasswordResetRequestEvent]
-	onRecordConfirmPasswordResetRequest *hook.Hook[*RecordConfirmPasswordResetRequestEvent]
-	onRecordRequestVerificationRequest  *hook.Hook[*RecordRequestVerificationRequestEvent]
-	onRecordConfirmVerificationRequest  *hook.Hook[*RecordConfirmVerificationRequestEvent]
-	onRecordRequestEmailChangeRequest   *hook.Hook[*RecordRequestEmailChangeRequestEvent]
-	onRecordConfirmEmailChangeRequest   *hook.Hook[*RecordConfirmEmailChangeRequestEvent]
-	onRecordRequestOTPRequest           *hook.Hook[*RecordCreateOTPRequestEvent]
-	onRecordAuthWithOTPRequest          *hook.Hook[*RecordAuthWithOTPRequestEvent]
+	onRecordAuthRequest                *hook.Hook[*RecordAuthRequestEvent]
+	onRecordAuthWithOAuth2Request      *hook.Hook[*RecordAuthWithOAuth2RequestEvent]
+	onRecordAuthRefreshRequest         *hook.Hook[*RecordAuthRefreshRequestEvent]
+	onRecordRequestVerificationRequest *hook.Hook[*RecordRequestVerificationRequestEvent]
+	onRecordConfirmVerificationRequest *hook.Hook[*RecordConfirmVerificationRequestEvent]
+	onRecordRequestEmailChangeRequest  *hook.Hook[*RecordRequestEmailChangeRequestEvent]
+	onRecordConfirmEmailChangeRequest  *hook.Hook[*RecordConfirmEmailChangeRequestEvent]
 
 	// record crud API event hooks
 	onRecordsListRequest  *hook.Hook[*RecordsListRequestEvent]
@@ -347,11 +339,8 @@ func (app *BaseApp) initHooks() {
 
 	// mailer event hooks
 	app.onMailerSend = &hook.Hook[*MailerEvent]{}
-	app.onMailerRecordPasswordResetSend = &hook.Hook[*MailerRecordEvent]{}
 	app.onMailerRecordVerificationSend = &hook.Hook[*MailerRecordEvent]{}
 	app.onMailerRecordEmailChangeSend = &hook.Hook[*MailerRecordEvent]{}
-	app.onMailerRecordOTPSend = &hook.Hook[*MailerRecordEvent]{}
-	app.onMailerRecordAuthAlertSend = &hook.Hook[*MailerRecordEvent]{}
 
 	// realtime API event hooks
 	app.onRealtimeConnectRequest = &hook.Hook[*RealtimeConnectRequestEvent]{}
@@ -369,17 +358,12 @@ func (app *BaseApp) initHooks() {
 
 	// record auth API event hooks
 	app.onRecordAuthRequest = &hook.Hook[*RecordAuthRequestEvent]{}
-	app.onRecordAuthWithPasswordRequest = &hook.Hook[*RecordAuthWithPasswordRequestEvent]{}
 	app.onRecordAuthWithOAuth2Request = &hook.Hook[*RecordAuthWithOAuth2RequestEvent]{}
 	app.onRecordAuthRefreshRequest = &hook.Hook[*RecordAuthRefreshRequestEvent]{}
-	app.onRecordRequestPasswordResetRequest = &hook.Hook[*RecordRequestPasswordResetRequestEvent]{}
-	app.onRecordConfirmPasswordResetRequest = &hook.Hook[*RecordConfirmPasswordResetRequestEvent]{}
 	app.onRecordRequestVerificationRequest = &hook.Hook[*RecordRequestVerificationRequestEvent]{}
 	app.onRecordConfirmVerificationRequest = &hook.Hook[*RecordConfirmVerificationRequestEvent]{}
 	app.onRecordRequestEmailChangeRequest = &hook.Hook[*RecordRequestEmailChangeRequestEvent]{}
 	app.onRecordConfirmEmailChangeRequest = &hook.Hook[*RecordConfirmEmailChangeRequestEvent]{}
-	app.onRecordRequestOTPRequest = &hook.Hook[*RecordCreateOTPRequestEvent]{}
-	app.onRecordAuthWithOTPRequest = &hook.Hook[*RecordAuthWithOTPRequestEvent]{}
 
 	// record crud API event hooks
 	app.onRecordsListRequest = &hook.Hook[*RecordsListRequestEvent]{}
@@ -1108,24 +1092,12 @@ func (app *BaseApp) OnMailerSend() *hook.Hook[*MailerEvent] {
 	return app.onMailerSend
 }
 
-func (app *BaseApp) OnMailerRecordPasswordResetSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
-	return hook.NewTaggedHook(app.onMailerRecordPasswordResetSend, tags...)
-}
-
 func (app *BaseApp) OnMailerRecordVerificationSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
 	return hook.NewTaggedHook(app.onMailerRecordVerificationSend, tags...)
 }
 
 func (app *BaseApp) OnMailerRecordEmailChangeSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
 	return hook.NewTaggedHook(app.onMailerRecordEmailChangeSend, tags...)
-}
-
-func (app *BaseApp) OnMailerRecordOTPSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
-	return hook.NewTaggedHook(app.onMailerRecordOTPSend, tags...)
-}
-
-func (app *BaseApp) OnMailerRecordAuthAlertSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
-	return hook.NewTaggedHook(app.onMailerRecordAuthAlertSend, tags...)
 }
 
 // -------------------------------------------------------------------
@@ -1180,24 +1152,12 @@ func (app *BaseApp) OnRecordAuthRequest(tags ...string) *hook.TaggedHook[*Record
 	return hook.NewTaggedHook(app.onRecordAuthRequest, tags...)
 }
 
-func (app *BaseApp) OnRecordAuthWithPasswordRequest(tags ...string) *hook.TaggedHook[*RecordAuthWithPasswordRequestEvent] {
-	return hook.NewTaggedHook(app.onRecordAuthWithPasswordRequest, tags...)
-}
-
 func (app *BaseApp) OnRecordAuthWithOAuth2Request(tags ...string) *hook.TaggedHook[*RecordAuthWithOAuth2RequestEvent] {
 	return hook.NewTaggedHook(app.onRecordAuthWithOAuth2Request, tags...)
 }
 
 func (app *BaseApp) OnRecordAuthRefreshRequest(tags ...string) *hook.TaggedHook[*RecordAuthRefreshRequestEvent] {
 	return hook.NewTaggedHook(app.onRecordAuthRefreshRequest, tags...)
-}
-
-func (app *BaseApp) OnRecordRequestPasswordResetRequest(tags ...string) *hook.TaggedHook[*RecordRequestPasswordResetRequestEvent] {
-	return hook.NewTaggedHook(app.onRecordRequestPasswordResetRequest, tags...)
-}
-
-func (app *BaseApp) OnRecordConfirmPasswordResetRequest(tags ...string) *hook.TaggedHook[*RecordConfirmPasswordResetRequestEvent] {
-	return hook.NewTaggedHook(app.onRecordConfirmPasswordResetRequest, tags...)
 }
 
 func (app *BaseApp) OnRecordRequestVerificationRequest(tags ...string) *hook.TaggedHook[*RecordRequestVerificationRequestEvent] {
@@ -1214,14 +1174,6 @@ func (app *BaseApp) OnRecordRequestEmailChangeRequest(tags ...string) *hook.Tagg
 
 func (app *BaseApp) OnRecordConfirmEmailChangeRequest(tags ...string) *hook.TaggedHook[*RecordConfirmEmailChangeRequestEvent] {
 	return hook.NewTaggedHook(app.onRecordConfirmEmailChangeRequest, tags...)
-}
-
-func (app *BaseApp) OnRecordRequestOTPRequest(tags ...string) *hook.TaggedHook[*RecordCreateOTPRequestEvent] {
-	return hook.NewTaggedHook(app.onRecordRequestOTPRequest, tags...)
-}
-
-func (app *BaseApp) OnRecordAuthWithOTPRequest(tags ...string) *hook.TaggedHook[*RecordAuthWithOTPRequestEvent] {
-	return hook.NewTaggedHook(app.onRecordAuthWithOTPRequest, tags...)
 }
 
 // -------------------------------------------------------------------
@@ -1564,10 +1516,6 @@ func (app *BaseApp) registerBaseHooks() {
 	app.registerCollectionHooks()
 	app.registerRecordHooks()
 	app.registerSuperuserHooks()
-	app.registerExternalAuthHooks()
-	app.registerMFAHooks()
-	app.registerOTPHooks()
-	app.registerAuthOriginHooks()
 }
 
 // getLoggerMinLevel returns the logger min level based on the
