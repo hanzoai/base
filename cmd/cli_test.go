@@ -77,12 +77,9 @@ func stubServer() *httptest.Server {
 		w.WriteHeader(204)
 	})
 
-	mux.HandleFunc("POST /api/collections/{col}/auth-with-password", func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(map[string]any{
-			"token":  "jwt-test-token",
-			"record": map[string]any{"id": "su1", "email": "admin@test.com"},
-		})
-	})
+	// auth-with-password was removed in the IAM-native rip; the CLI
+	// `login` command no longer hits Base. Tokens come from IAM via
+	// --token / $BASE_TOKEN.
 
 	mux.HandleFunc("GET /api/crons", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]map[string]any{
@@ -228,16 +225,33 @@ func TestCLIWhoami(t *testing.T) {
 	}
 }
 
-func TestCLILoginMissingFlags(t *testing.T) {
+// TestCLILoginRejectsLocalCreds verifies that the legacy
+// --email/--password flags now return a non-zero exit with a clear
+// IAM-handoff message instead of attempting a local auth call.
+func TestCLILoginRejectsLocalCreds(t *testing.T) {
+	t.Parallel()
+	ts := stubServer()
+	defer ts.Close()
+
+	_, err := runCLI(t, ts.URL, "login", "--email", "a@b.c", "--password", "x")
+	if err == nil {
+		t.Fatal("expected error when --email/--password are passed")
+	}
+	if !strings.Contains(err.Error(), "IAM") {
+		t.Fatalf("expected 'IAM' handoff message, got: %v", err)
+	}
+}
+
+// TestCLILoginNoArgsSucceeds verifies that `base login` with no flags
+// prints the IAM-handoff instructions and exits 0 (so it doesn't break
+// shell pipelines that do `base login && base whoami`).
+func TestCLILoginNoArgsSucceeds(t *testing.T) {
 	t.Parallel()
 	ts := stubServer()
 	defer ts.Close()
 
 	_, err := runCLI(t, ts.URL, "login")
-	if err == nil {
-		t.Fatal("expected error for missing --email and --password")
-	}
-	if !strings.Contains(err.Error(), "required") {
-		t.Fatalf("expected 'required' in error, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
