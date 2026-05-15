@@ -58,7 +58,7 @@ func init() {
 					cParsed := dbutils.ParseIndex(raw)
 
 					// index already exists (if needed it will be normalized on resave)
-					if strings.EqualFold(cParsed.IndexName, mParsed.IndexName) {
+					if cParsed.IndexName != "" && strings.EqualFold(cParsed.IndexName, mParsed.IndexName) {
 						continue masterLoop
 					}
 				}
@@ -69,6 +69,11 @@ func init() {
 		missingIndexesLoop:
 			for _, missing := range missingParsedIndexes {
 				missingSQL := missing.Build()
+
+				// it shouldn't be possible but for just in case if there is an edge case the regex doesn't cover
+				if missingSQL == "" {
+					return fmt.Errorf("failed to build sqlite_master index: %v", missingSQL)
+				}
 
 				// drop the missing index to recreate later
 				_, err := txApp.DB().DropIndex(missing.TableName, missing.IndexName).Execute()
