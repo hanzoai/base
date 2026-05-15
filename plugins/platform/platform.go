@@ -193,7 +193,7 @@ func Register(app core.App, config PlatformConfig) error {
 	// Location pointer to the IAM equivalent).
 	//
 	// In embedded mode we do NOT set jwksURL on the store — the URL
-	// would be a relative path (/api/iam/.well-known/jwks) the JWKS
+	// would be a relative path (/v1/iam/.well-known/jwks) the JWKS
 	// fetcher can't resolve. Instead the platformEmbeddedAuth
 	// middleware (registered below) validates bearer tokens directly
 	// with the in-process RSA signer.
@@ -430,7 +430,7 @@ func Register(app core.App, config PlatformConfig) error {
 		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
 
-		// /api/iam mount: in-process OIDC in embedded mode, transparent
+		// /v1/iam mount: in-process OIDC in embedded mode, transparent
 		// reverse proxy to IAM_ENDPOINT otherwise. Either way the
 		// admin UI sees the same surface.
 		if p.embeddedIAM != nil {
@@ -455,7 +455,7 @@ type plugin struct {
 	dbPool     *DBPoolManager
 
 	// embeddedIAM is non-nil only when IAM_MODE=embedded. When set, Base
-	// hosts the in-process OIDC provider at /api/iam/* and the reverse
+	// hosts the in-process OIDC provider at /v1/iam/* and the reverse
 	// proxy is not mounted.
 	embeddedIAM *embeddedIAM
 }
