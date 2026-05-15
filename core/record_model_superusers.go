@@ -72,36 +72,18 @@ func (app *BaseApp) registerSuperuserHooks() {
 	app.OnRecordCreateExecute(CollectionNameSuperusers).Bind(recordSaveHandler)
 	app.OnRecordUpdateExecute(CollectionNameSuperusers).Bind(recordSaveHandler)
 
-	// prevent sending password reset emails to the installer address
-	app.OnMailerRecordPasswordResetSend(CollectionNameSuperusers).Bind(&hook.Handler[*MailerRecordEvent]{
-		Id: "baseSuperusersInstallerPasswordReset",
-		Func: func(e *MailerRecordEvent) error {
-			if e.Record.Email() == DefaultInstallerEmail {
-				return errors.New("cannot reset the password for the installer superuser")
-			}
-
-			return e.Next()
-		},
-	})
-
 	collectionSaveHandler := &hook.Handler[*CollectionEvent]{
 		Id: "baseSuperusersCollectionSaveExec",
 		Func: func(e *CollectionEvent) error {
 			// don't allow name change even if executed with SaveNoValidate
 			e.Collection.Name = CollectionNameSuperusers
 
-			// for now don't allow superusers OAuth2 since we don't want
-			// to accidentally create a new superuser by just OAuth2 signin
+			// the _superusers collection is mirrored from IAM — no local
+			// password / OAuth2 / MFA / OTP path lives here. The PKCE
+			// flow against IAM is the only way in (see plugins/platform
+			// proxy + apis.recordAuthMethods).
 			e.Collection.OAuth2.Enabled = false
 			e.Collection.OAuth2.Providers = nil
-
-			// force password auth
-			e.Collection.PasswordAuth.Enabled = true
-
-			// for superusers we don't allow for now standalone OTP auth and always require to be combined with MFA
-			if e.Collection.OTP.Enabled {
-				e.Collection.MFA.Enabled = true
-			}
 
 			return e.Next()
 		},

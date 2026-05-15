@@ -483,24 +483,6 @@ type RecordEnrichEvent struct {
 // Auth Record API events data
 // -------------------------------------------------------------------
 
-type RecordCreateOTPRequestEvent struct {
-	hook.Event
-	*RequestEvent
-	baseCollectionEventData
-
-	Record   *Record
-	Password string
-}
-
-type RecordAuthWithOTPRequestEvent struct {
-	hook.Event
-	*RequestEvent
-	baseCollectionEventData
-
-	Record *Record
-	OTP    *OTP
-}
-
 type RecordAuthRequestEvent struct {
 	hook.Event
 	*RequestEvent
@@ -510,17 +492,6 @@ type RecordAuthRequestEvent struct {
 	Token      string
 	Meta       any
 	AuthMethod string
-}
-
-type RecordAuthWithPasswordRequestEvent struct {
-	hook.Event
-	*RequestEvent
-	baseCollectionEventData
-
-	Record        *Record
-	Identity      string
-	IdentityField string
-	Password      string
 }
 
 type RecordAuthWithOAuth2RequestEvent struct {
@@ -537,22 +508,6 @@ type RecordAuthWithOAuth2RequestEvent struct {
 }
 
 type RecordAuthRefreshRequestEvent struct {
-	hook.Event
-	*RequestEvent
-	baseCollectionEventData
-
-	Record *Record
-}
-
-type RecordRequestPasswordResetRequestEvent struct {
-	hook.Event
-	*RequestEvent
-	baseCollectionEventData
-
-	Record *Record
-}
-
-type RecordConfirmPasswordResetRequestEvent struct {
 	hook.Event
 	*RequestEvent
 	baseCollectionEventData
