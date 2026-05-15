@@ -24,10 +24,11 @@ package core
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
+
+	luxlog "github.com/luxfi/log"
 )
 
 // RequestEventKeyShardID stores the resolved shard ID on the
@@ -143,7 +144,7 @@ func writeForward(net baseNetwork, endpoints map[string]string) func(*RequestEve
 
 		target := resolveWriterURL(owner, endpoints)
 		if target == "" {
-			slog.Warn("write-forward: no HTTP endpoint for writer",
+			luxlog.Warn("write-forward: no HTTP endpoint for writer",
 				"owner", owner, "shardID", shardID)
 			return e.Error(http.StatusServiceUnavailable, "write-forward: writer not reachable", nil)
 		}

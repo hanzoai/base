@@ -399,8 +399,20 @@ func (app *BaseApp) UnsafeWithoutHooks() App {
 
 // Logger returns the default app logger.
 //
-// If the application is not bootstrapped yet, fallbacks to slog.Default().
-func (app *BaseApp) Logger() *slog.Logger {
+// If the application is not bootstrapped yet, fallbacks to slog.Default()
+// wrapped in a logger.SlogAdapter so that the return type stays stable.
+func (app *BaseApp) Logger() logger.Logger {
+	if app.logger == nil {
+		return logger.NewSlog(slog.Default())
+	}
+
+	return logger.NewSlog(app.logger)
+}
+
+// SlogLogger returns the raw *slog.Logger backing the app. Reserved for
+// the BatchHandler reload plumbing in this package and for tests that
+// need to type-assert the handler — business code should call Logger().
+func (app *BaseApp) SlogLogger() *slog.Logger {
 	if app.logger == nil {
 		return slog.Default()
 	}
@@ -1633,8 +1645,8 @@ func (app *BaseApp) initLogger() error {
 				return err
 			}
 
-			if e.App.Logger() != nil {
-				if h, ok := e.App.Logger().Handler().(*logger.BatchHandler); ok {
+			if sl := e.App.SlogLogger(); sl != nil {
+				if h, ok := sl.Handler().(*logger.BatchHandler); ok {
 					h.SetLevel(getLoggerMinLevel(e.App))
 				}
 			}

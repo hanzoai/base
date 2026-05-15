@@ -28,7 +28,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"strconv"
 	"strings"
@@ -36,6 +35,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	luxlog "github.com/luxfi/log"
 	"github.com/luxfi/zap"
 )
 
@@ -64,7 +64,7 @@ type zapTransport struct {
 	self  string
 	peers []string
 
-	logger *slog.Logger
+	logger luxlog.Logger
 
 	recv   atomic.Value // func(Envelope) — set once by Start, read by handler
 	ctx    context.Context
@@ -82,7 +82,7 @@ type zapTransport struct {
 func newZapTransport(cfg Config) *zapTransport {
 	port := portFromListen(cfg.ListenP2P)
 
-	logger := slog.Default().With("component", "base-network", "transport", "zap", "nodeID", cfg.NodeID)
+	logger := luxlog.New("component", "base-network", "transport", "zap", "nodeID", cfg.NodeID)
 
 	// luxfi/zap uses mDNS by default for peer discovery; K8s pods don't
 	// get link-local multicast so we disable it and rely on the explicit
@@ -92,7 +92,6 @@ func newZapTransport(cfg Config) *zapTransport {
 		ServiceType: zapServiceType,
 		Port:        port,
 		NoDiscovery: true,
-		Logger:      logger,
 	})
 
 	return &zapTransport{

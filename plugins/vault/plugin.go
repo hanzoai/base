@@ -37,13 +37,13 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
+	luxlog "github.com/luxfi/log"
 )
 
 // Config configures the vault plugin.
@@ -94,7 +94,7 @@ func Register(app core.App, config Config) error {
 		config: config,
 		orgKEK: deriveOrgKEK(config.MasterKey, config.OrgID),
 		shards: make(map[string]*UserShard),
-		logger: slog.Default().With("component", "vault"),
+		logger: luxlog.New("component", "vault"),
 	}
 
 	if err := os.MkdirAll(config.DataDir, 0700); err != nil {
@@ -128,7 +128,7 @@ type plugin struct {
 	orgKEK []byte // 32-byte org-level key encryption key
 	shards map[string]*UserShard
 	mu     sync.RWMutex
-	logger *slog.Logger
+	logger luxlog.Logger
 }
 
 // UserShard is an encrypted per-user SQLite database.
