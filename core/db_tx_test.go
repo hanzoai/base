@@ -97,7 +97,6 @@ func TestTransactionHooksCallsOnFailure(t *testing.T) {
 			// ---
 			newModel := core.NewRecord(existingModel.Collection())
 			newModel.SetEmail("test_new1@example.com")
-			newModel.SetPassword("1234567890")
 			if err := txApp2.Save(newModel); err != nil {
 				t.Fatal(err)
 			}
@@ -202,7 +201,6 @@ func TestTransactionHooksCallsOnSuccess(t *testing.T) {
 			// ---
 			newModel := core.NewRecord(existingModel.Collection())
 			newModel.SetEmail("test_new1@example.com")
-			newModel.SetPassword("1234567890")
 			if err := txApp2.Save(newModel); err != nil {
 				t.Fatal(err)
 			}

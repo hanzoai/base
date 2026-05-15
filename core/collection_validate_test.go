@@ -736,9 +736,9 @@ func TestCollectionValidate(t *testing.T) {
 		{
 			name: "renaming system field",
 			collection: func(app core.App) (*core.Collection, error) {
-				c, _ := app.FindCollectionByNameOrId(core.CollectionNameAuthOrigins)
-				f := c.Fields.GetByName("fingerprint")
-				f.SetName("fingerprint_new")
+				c, _ := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
+				f := c.Fields.GetByName("email")
+				f.SetName("email_new")
 				return c, nil
 			},
 			expectedErrors: []string{"fields"},
@@ -746,8 +746,8 @@ func TestCollectionValidate(t *testing.T) {
 		{
 			name: "deleting system field",
 			collection: func(app core.App) (*core.Collection, error) {
-				c, _ := app.FindCollectionByNameOrId(core.CollectionNameAuthOrigins)
-				c.Fields.RemoveByName("fingerprint")
+				c, _ := app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
+				c.Fields.RemoveByName("email")
 				return c, nil
 			},
 			expectedErrors: []string{"fields"},
@@ -789,39 +789,6 @@ func TestCollectionValidate(t *testing.T) {
 				return c, nil
 			},
 			expectedErrors: []string{"fields"},
-		},
-		{
-			name: "with reserved auth only field name (oldPassword)",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.Fields.Add(
-					&core.TextField{Name: "oldPassword"},
-				)
-				return c, nil
-			},
-			expectedErrors: []string{"fields"},
-		},
-		{
-			name: "with invalid password auth field options (1)",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.Fields.Add(
-					&core.TextField{Name: "password", System: true, Hidden: true}, // should be PasswordField
-				)
-				return c, nil
-			},
-			expectedErrors: []string{"fields"},
-		},
-		{
-			name: "with valid password auth field options (2)",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.Fields.Add(
-					&core.PasswordField{Name: "password", System: true, Hidden: true},
-				)
-				return c, nil
-			},
-			expectedErrors: []string{},
 		},
 		{
 			name: "with invalid tokenKey auth field options (1)",
