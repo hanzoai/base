@@ -35,33 +35,20 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	baseRouter.Bind(securityHeaders())
 	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
 
-	// External auth mode: allow JWKS-based auth without the platform plugin.
-	// EXTERNAL_AUTH_ONLY=true disables all built-in auth endpoints for
-	// non-superuser collections and requires IAM_KEYS_URL for token validation.
-	// The platform plugin sets these store keys directly; env vars provide
-	// the same behavior for standalone Base deployments.
-	if os.Getenv("EXTERNAL_AUTH_ONLY") == "true" {
-		jwksURL := os.Getenv("IAM_KEYS_URL")
-		if jwksURL != "" {
-			app.Store().Set(StoreKeyJWKSURL, jwksURL)
-		} else {
-			app.Logger().Warn("EXTERNAL_AUTH_ONLY is set but IAM_KEYS_URL is empty — token validation will fail")
-		}
-		app.Store().Set(StoreKeyExternalAuthOnly, true)
-
-		usersCollection := os.Getenv("AUTH_USERS_COLLECTION")
-		if usersCollection != "" {
-			app.Store().Set(StoreKeyAuthUsersCollection, usersCollection)
-		}
-
-		app.Logger().Info("external auth enabled via env — built-in auth disabled for non-superuser collections",
-			"jwksURL", jwksURL,
-		)
+	// One mount prefix per app — the only knob. Default `/v1`. Multi-app
+	// deployments set BASE_API_PREFIX=/v1/<app> so the gateway can route
+	// to the right service. Hanzo IAM is a sibling at `/v1/iam`,
+	// mounted by the platform plugin regardless of this prefix.
+	prefix := strings.TrimRight(os.Getenv("BASE_API_PREFIX"), "/")
+	if prefix == "" {
+		prefix = "/v1"
 	}
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	app.Logger().Info("base: API mount prefix", "prefix", prefix)
 
-	// One path: /v1. Not /api — that's Casdoor. Base mounts every API
-	// endpoint under /v1/* regardless of how it's deployed.
-	apiGroup := baseRouter.Group("/v1")
+	apiGroup := baseRouter.Group(prefix)
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
@@ -75,31 +62,9 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindHealthApi(app, apiGroup)
 	bindRealtimeApi(app, apiGroup)
 	bindPrivateApi(app, apiGroup)
-	// Auth mode: "iam" or "builtin" (default).
-	// Only ONE can be active. When "iam", _superusers collection is not used
-	// and all auth goes through OIDC/IAM. When "builtin", normal superuser
-	// password auth works and OIDC is not bound.
-	authMode := os.Getenv("BASE_AUTH_MODE")
-	if authMode == "" {
-		// Auto-detect: if OIDC is configured, default to iam mode
-		if os.Getenv("BASE_OIDC_ISSUER") != "" {
-			authMode = "iam"
-		} else {
-			authMode = "builtin"
-		}
-	}
 
-	switch authMode {
-	case "iam":
-		// OIDC only — IAM is the single auth source
-		bindSuperuserOIDCApi(app, baseRouter)
-		app.Logger().Info("Auth mode: iam (OIDC only, _superusers bypassed)")
-	default:
-		// Built-in only — normal _superusers, no OIDC
-		app.Logger().Info("Auth mode: builtin (_superusers collection)")
-	}
-
-	// Platform-standard health check at root level.
+	// Platform-standard health check at root level (outside the mount
+	// prefix so liveness probes don't have to know the app name).
 	BindHealthzRoute(baseRouter)
 
 	return baseRouter, nil
