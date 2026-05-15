@@ -7,15 +7,11 @@ import (
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/mails"
-	"github.com/hanzoai/base/tools/types"
 )
 
 const (
-	TestTemplateVerification  = "verification"
-	TestTemplatePasswordReset = "password-reset"
-	TestTemplateEmailChange   = "email-change"
-	TestTemplateOTP           = "otp"
-	TestTemplateAuthAlert     = "login-alert"
+	TestTemplateVerification = "verification"
+	TestTemplateEmailChange  = "email-change"
 )
 
 // TestEmailSend is a email template test request form.
@@ -51,10 +47,7 @@ func (form *TestEmailSend) Validate() error {
 			validation.Required,
 			validation.In(
 				TestTemplateVerification,
-				TestTemplatePasswordReset,
 				TestTemplateEmailChange,
-				TestTemplateOTP,
-				TestTemplateAuthAlert,
 			),
 		),
 	)
@@ -103,15 +96,8 @@ func (form *TestEmailSend) Submit() error {
 	switch form.Template {
 	case TestTemplateVerification:
 		return mails.SendRecordVerification(form.app, record)
-	case TestTemplatePasswordReset:
-		return mails.SendRecordPasswordReset(form.app, record)
 	case TestTemplateEmailChange:
 		return mails.SendRecordChangeEmail(form.app, record, form.Email)
-	case TestTemplateOTP:
-		return mails.SendRecordOTP(form.app, record, "_TEST_OTP_ID_", "123456")
-	case TestTemplateAuthAlert:
-		testEvent := types.NowDateTime().String() + " - TEST_IP TEST_USER_AGENT"
-		return mails.SendRecordAuthAlert(form.app, record, testEvent)
 	default:
 		return errors.New("unknown template " + form.Template)
 	}

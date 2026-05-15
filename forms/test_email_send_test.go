@@ -25,10 +25,7 @@ func TestEmailSendValidateAndSubmit(t *testing.T) {
 		{forms.TestTemplateVerification, "test@example.com", "invalid", []string{"collection"}},
 		{forms.TestTemplateVerification, "test@example.com", "demo1", []string{"collection"}},
 		{forms.TestTemplateVerification, "test@example.com", "users", nil},
-		{forms.TestTemplatePasswordReset, "test@example.com", "", nil},
 		{forms.TestTemplateEmailChange, "test@example.com", "", nil},
-		{forms.TestTemplateOTP, "test@example.com", "", nil},
-		{forms.TestTemplateAuthAlert, "test@example.com", "", nil},
 	}
 
 	for i, s := range scenarios {
@@ -74,16 +71,10 @@ func TestEmailSendValidateAndSubmit(t *testing.T) {
 
 			var expectedContent string
 			switch s.template {
-			case forms.TestTemplatePasswordReset:
-				expectedContent = "Reset password"
 			case forms.TestTemplateEmailChange:
 				expectedContent = "Confirm new email"
 			case forms.TestTemplateVerification:
 				expectedContent = "Verify"
-			case forms.TestTemplateOTP:
-				expectedContent = "one-time password"
-			case forms.TestTemplateAuthAlert:
-				expectedContent = "from a new location"
 			default:
 				expectedContent = "__UNKNOWN_TEMPLATE__"
 			}
