@@ -28,13 +28,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	luxlog "github.com/luxfi/log"
 	"github.com/luxfi/zap"
 )
 
@@ -79,7 +79,7 @@ type Client struct {
 	zapAddr    string
 	httpClient *http.Client
 	handler    Handler
-	logger     *slog.Logger
+	logger     luxlog.Logger
 	mu         sync.RWMutex
 	schedules  map[string]*scheduleEntry
 
@@ -100,7 +100,7 @@ func New(tasksURL, zapAddr string, handler Handler) *Client {
 			Timeout: 10 * time.Second,
 		},
 		handler:   handler,
-		logger:    slog.Default(),
+		logger:    luxlog.New("component", "tasks"),
 		schedules: make(map[string]*scheduleEntry),
 	}
 }
@@ -356,7 +356,6 @@ func (c *Client) connectZAP() error {
 			NodeID:      "tasks-sdk",
 			ServiceType: "_tasks-sdk._tcp",
 			Port:        0, // ephemeral
-			Logger:      c.logger,
 			NoDiscovery: true,
 		})
 		if err := c.zapNode.Start(); err != nil {

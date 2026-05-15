@@ -10,15 +10,20 @@ import (
 	"testing"
 
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/logger"
 )
 
 // logOnlyApp embeds core.App (panics on unimplemented methods) but overrides
-// Logger() which is the only method the auth proxy uses.
+// Logger()/SlogLogger() which are the only methods the auth proxy uses.
 type logOnlyApp struct {
 	core.App
 }
 
-func (a *logOnlyApp) Logger() *slog.Logger {
+func (a *logOnlyApp) Logger() logger.Logger {
+	return logger.NewSlog(slog.Default())
+}
+
+func (a *logOnlyApp) SlogLogger() *slog.Logger {
 	return slog.Default()
 }
 
