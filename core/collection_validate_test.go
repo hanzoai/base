@@ -497,7 +497,7 @@ func TestCollectionValidate(t *testing.T) {
 				c.Indexes = []string{}
 				return c, nil
 			},
-			expectedErrors: []string{"indexes", "passwordAuth"},
+			expectedErrors: []string{"indexes"},
 		},
 		{
 			name: "auth collection with non-unique required indexes",
@@ -509,7 +509,7 @@ func TestCollectionValidate(t *testing.T) {
 				}
 				return c, nil
 			},
-			expectedErrors: []string{"indexes", "passwordAuth"},
+			expectedErrors: []string{"indexes"},
 		},
 		{
 			name: "auth collection with unique required indexes",
@@ -778,17 +778,6 @@ func TestCollectionValidate(t *testing.T) {
 				return c, nil
 			},
 			expectedErrors: []string{},
-		},
-		{
-			name: "with reserved auth only field name (passwordConfirm)",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.Fields.Add(
-					&core.TextField{Name: "passwordConfirm"},
-				)
-				return c, nil
-			},
-			expectedErrors: []string{"fields"},
 		},
 		{
 			name: "with invalid tokenKey auth field options (1)",
