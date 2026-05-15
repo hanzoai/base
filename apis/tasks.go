@@ -1,7 +1,6 @@
 package apis
 
 import (
-	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -138,8 +137,8 @@ func tasksCreate(e *core.RequestEvent) error {
 	if ds := tasks.GetDurable(e.App); ds != nil && ds.IsConnected() {
 		if err := ds.SubmitTask(e.Request.Context(), task); err != nil {
 			e.App.Logger().Warn("tasks: durable submit failed, SQLite is authoritative",
-				slog.String("task_id", task.ID),
-				slog.String("error", err.Error()),
+				"task_id", task.ID,
+				"error", err.Error(),
 			)
 		}
 	}
@@ -306,8 +305,8 @@ func tasksCancel(e *core.RequestEvent) error {
 	if ds := tasks.GetDurable(e.App); ds != nil && ds.IsConnected() {
 		if err := ds.CancelTask(e.Request.Context(), id, orgID); err != nil {
 			e.App.Logger().Warn("tasks: durable cancel failed",
-				slog.String("task_id", id),
-				slog.String("error", err.Error()),
+				"task_id", id,
+				"error", err.Error(),
 			)
 		}
 	}
