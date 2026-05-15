@@ -251,7 +251,6 @@ func superuserOIDCCallback(app core.App) func(*core.RequestEvent) error {
 
 			superuser = core.NewRecord(col)
 			superuser.SetEmail(email)
-			superuser.SetRandomPassword()
 			superuser.SetVerified(true)
 
 			if saveErr := app.Save(superuser); saveErr != nil {
