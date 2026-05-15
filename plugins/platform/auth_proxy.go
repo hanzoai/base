@@ -18,9 +18,9 @@ type AuthProxyConfig struct {
 	IAMApp      string
 }
 
-// registerAuthRoutes registers IAM auth proxy routes under /api/platform/auth.
+// registerAuthRoutes registers IAM auth proxy routes under /v1/platform/auth.
 func (p *plugin) registerAuthRoutes(r *router.Router[*core.RequestEvent]) {
-	auth := r.Group("/api/platform/auth")
+	auth := r.Group("/v1/platform/auth")
 
 	auth.POST("/verify-phone", p.handleVerifyPhone)
 	auth.POST("/verify-code", p.handleVerifyCode)

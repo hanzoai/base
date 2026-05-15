@@ -192,7 +192,7 @@ func TestHandleVerifyPhone(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/verify-phone", `{"countryCode":"+1","phone":"5551234567"}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/verify-phone", `{"countryCode":"+1","phone":"5551234567"}`)
 
 	err := p.handleVerifyPhone(e)
 	if err != nil {
@@ -211,7 +211,7 @@ func TestHandleVerifyPhone(t *testing.T) {
 
 func TestHandleVerifyPhone_EmptyPhone(t *testing.T) {
 	p := newTestPlugin("http://unused")
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/verify-phone", `{"countryCode":"+1","phone":""}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/verify-phone", `{"countryCode":"+1","phone":""}`)
 
 	err := p.handleVerifyPhone(e)
 	if err != nil {
@@ -227,7 +227,7 @@ func TestHandleVerifyCode(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/verify-code", `{"phone":"5551234567","code":"123456"}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/verify-code", `{"phone":"5551234567","code":"123456"}`)
 
 	err := p.handleVerifyCode(e)
 	if err != nil {
@@ -246,7 +246,7 @@ func TestHandleVerifyCode(t *testing.T) {
 
 func TestHandleVerifyCode_MissingFields(t *testing.T) {
 	p := newTestPlugin("http://unused")
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/verify-code", `{"phone":"5551234567","code":""}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/verify-code", `{"phone":"5551234567","code":""}`)
 
 	err := p.handleVerifyCode(e)
 	if err != nil {
@@ -262,7 +262,7 @@ func TestHandleLogin(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/login", `{"username":"user@test.com","password":"secret"}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/login", `{"username":"user@test.com","password":"secret"}`)
 
 	err := p.handleLogin(e)
 	if err != nil {
@@ -278,7 +278,7 @@ func TestHandleSignup(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodPost, "/api/platform/auth/signup", `{"email":"new@test.com","password":"secret123"}`)
+	e, rec := makeEvent(http.MethodPost, "/v1/platform/auth/signup", `{"email":"new@test.com","password":"secret123"}`)
 
 	err := p.handleSignup(e)
 	if err != nil {
@@ -294,7 +294,7 @@ func TestHandleUserinfo(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodGet, "/api/platform/auth/userinfo", "")
+	e, rec := makeEvent(http.MethodGet, "/v1/platform/auth/userinfo", "")
 	e.Request.Header.Set("Authorization", "Bearer test-token")
 
 	err := p.handleUserinfo(e)
@@ -321,7 +321,7 @@ func TestHandleUserinfo_NoAuth(t *testing.T) {
 	defer iam.Close()
 
 	p := newTestPlugin(iam.URL)
-	e, rec := makeEvent(http.MethodGet, "/api/platform/auth/userinfo", "")
+	e, rec := makeEvent(http.MethodGet, "/v1/platform/auth/userinfo", "")
 	// No Authorization header.
 
 	err := p.handleUserinfo(e)

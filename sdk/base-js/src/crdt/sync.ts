@@ -98,7 +98,7 @@ export class CRDTSync {
   /**
    * Connect to the CRDT sync endpoint and start syncing a document.
    *
-   * @param wsUrl - WebSocket URL, e.g. "wss://myapp.hanzo.ai/api/crdt"
+   * @param wsUrl - WebSocket URL, e.g. "wss://myapp.hanzo.ai/v1/crdt"
    * @param document - The CRDTDocument to sync.
    * @param token - Optional auth token.
    */

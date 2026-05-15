@@ -532,7 +532,7 @@ func (p *plugin) ensureMembersCollection() error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/api/platform")
+	api := r.Group("/v1/platform")
 
 	// Org CRUD
 	api.POST("/orgs", p.handleCreateOrg)
