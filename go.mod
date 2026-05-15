@@ -24,6 +24,7 @@ require (
 	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/consensus v1.22.85
 	github.com/luxfi/fhe v1.7.9
+	github.com/luxfi/log v1.4.1
 	github.com/luxfi/zap v0.2.1
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
@@ -80,7 +81,6 @@ require (
 	github.com/luxfi/crypto/ipa v1.2.4 // indirect
 	github.com/luxfi/database v1.18.1 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
-	github.com/luxfi/log v1.4.1 // indirect
 	github.com/luxfi/ringtail v0.2.0 // indirect
 	github.com/luxfi/sampler v1.0.0 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
