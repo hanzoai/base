@@ -657,7 +657,6 @@ func TestRecordFieldsData(t *testing.T) {
 	m := core.NewRecord(collection)
 	m.Id = "test_id" // direct id assignment
 	m.Set("email", "test@example.com")
-	m.Set("password", "123") // hidden fields should be also returned
 	m.Set("tokenKey", "789")
 	m.Set("field1", 123)
 	m.Set("field2", 456)
@@ -668,7 +667,7 @@ func TestRecordFieldsData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := `{"email":"test@example.com","emailVisibility":false,"field1":"123","field2":"456","id":"test_id","password":"123","tokenKey":"789","verified":false}`
+	expected := `{"email":"test@example.com","emailVisibility":false,"field1":"123","field2":"456","id":"test_id","tokenKey":"789","verified":false}`
 
 	if v := string(raw); v != expected {
 		t.Fatalf("Expected\n%v\ngot\n%v", expected, v)
@@ -685,7 +684,6 @@ func TestRecordCustomData(t *testing.T) {
 	m := core.NewRecord(collection)
 	m.Id = "test_id" // direct id assignment
 	m.Set("email", "test@example.com")
-	m.Set("password", "123") // hidden fields should be also returned
 	m.Set("tokenKey", "789")
 	m.Set("field1", 123)
 	m.Set("field2", 456)
@@ -1241,7 +1239,7 @@ func TestRecordDBExport(t *testing.T) {
 		},
 		{
 			colAuth,
-			`{"email":"test_email","emailVisibility":true,"field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id","password":"_TEST_","tokenKey":"test_tokenKey","verified":false}`,
+			`{"email":"test_email","emailVisibility":true,"field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id","tokenKey":"test_tokenKey","verified":false}`,
 		},
 	}
 
@@ -1252,7 +1250,6 @@ func TestRecordDBExport(t *testing.T) {
 		"field3":          []string{"test1", "test2"},
 		"field4":          []string{"test11", "test12", "test11"}, // strip duplicate,
 		"unknown":         "test_unknown",
-		"password":        "test_passwordHash",
 		"username":        "test_username",
 		"emailVisibility": true,
 		"email":           "test_email",
@@ -1985,7 +1982,6 @@ func TestRecordSave(t *testing.T) {
 				c, _ := app.FindCollectionByNameOrId("nologin")
 				record := core.NewRecord(c)
 				record.Set("email", "test_new@example.com")
-				record.Set("password", "1234567890")
 				return record, nil
 			},
 			expectError: false,
@@ -2155,14 +2151,9 @@ func TestRecordSaveWithAutoTokenKeyRefresh(t *testing.T) {
 		expectedChange bool
 	}{
 		{
-			"no email or password change",
+			"no email change",
 			map[string]any{"name": "example"},
 			false,
-		},
-		{
-			"password change",
-			map[string]any{"password": "1234567890"},
-			true,
 		},
 		{
 			"email change",

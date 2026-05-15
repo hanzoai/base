@@ -1323,12 +1323,12 @@ func TestRecordCrudDelete(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*":                          0,
 				"OnRecordDeleteRequest":      1,
-				"OnModelDelete":              3, // +2 for the externalAuths
-				"OnModelDeleteExecute":       3,
-				"OnModelAfterDeleteSuccess":  3,
-				"OnRecordDelete":             3,
-				"OnRecordDeleteExecute":      3,
-				"OnRecordAfterDeleteSuccess": 3,
+				"OnModelDelete":              1,
+				"OnModelDeleteExecute":       1,
+				"OnModelAfterDeleteSuccess":  1,
+				"OnRecordDelete":             1,
+				"OnRecordDeleteExecute":      1,
+				"OnRecordAfterDeleteSuccess": 1,
 				"OnModelUpdate":              1,
 				"OnModelUpdateExecute":       1,
 				"OnModelAfterUpdateSuccess":  1,
@@ -1594,12 +1594,17 @@ func TestRecordCrudCreate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{`,
-				`"password":{"code":"validation_required"`,
-				`"passwordConfirm":{"code":"validation_required"`,
+				`"email":{"code":"validation_required"`,
 			},
 			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
+				"*":                          0,
+				"OnRecordCreateRequest":      1,
+				"OnRecordCreate":             1,
+				"OnModelCreate":              1,
+				"OnModelValidate":            1,
+				"OnRecordValidate":           1,
+				"OnModelAfterCreateError":    1,
+				"OnRecordAfterCreateError":   1,
 			},
 		},
 		{
@@ -2082,12 +2087,10 @@ func TestRecordCrudCreate(t *testing.T) {
 		// auth records
 		// -----------------------------------------------------------
 		{
-			Name:   "auth record with invalid form data",
+			Name:   "auth record with invalid email",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/records",
 			Body: strings.NewReader(`{
-				"password":"1234567",
-				"passwordConfirm":"1234560",
 				"email":"invalid",
 				"username":"Users75657"
 			}`),
@@ -2097,35 +2100,7 @@ func TestRecordCrudCreate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{`,
-				`"passwordConfirm":{"code":"validation_values_mismatch"`,
-			},
-			NotExpectedContent: []string{
-				// record fields are not checked if the base auth form fields have errors
-				`"rel":`,
-				`"email":`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
-		},
-		{
-			Name:   "auth record with valid form data but invalid record fields",
-			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
-			Body: strings.NewReader(`{
-				"password":"1234567",
-				"passwordConfirm":"1234567",
-				"rel":"invalid"
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{`,
-				`"rel":{"code":`,
-				`"password":{"code":`,
+				`"email":{"code":"validation_is_email"`,
 			},
 			ExpectedEvents: map[string]int{
 				"*":                        0,
@@ -2139,12 +2114,38 @@ func TestRecordCrudCreate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "auth record with valid data and explicitly verified state by guest",
+			Name:   "auth record with invalid record fields",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/records",
 			Body: strings.NewReader(`{
-				"password":"12345678",
-				"passwordConfirm":"12345678",
+				"email":"test_new@example.com",
+				"rel":"invalid"
+			}`),
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{`,
+				`"rel":{"code":`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                        0,
+				"OnRecordCreateRequest":    1,
+				"OnModelCreate":            1,
+				"OnModelValidate":          1,
+				"OnModelAfterCreateError":  1,
+				"OnRecordCreate":           1,
+				"OnRecordValidate":         1,
+				"OnRecordAfterCreateError": 1,
+			},
+		},
+		{
+			Name:   "auth record with explicit verified state by guest",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/records",
+			Body: strings.NewReader(`{
+				"email":"test_new@example.com",
 				"verified":true
 			}`),
 			ExpectedStatus: 400,
@@ -3007,12 +3008,10 @@ func TestRecordCrudUpdate(t *testing.T) {
 		// auth records
 		// -----------------------------------------------------------
 		{
-			Name:   "auth record with invalid form data",
+			Name:   "auth record with invalid email",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/users/records/bgs820n361vj1qd",
 			Body: strings.NewReader(`{
-				"password":"",
-				"passwordConfirm":"1234560",
 				"email":"invalid",
 				"verified":false
 			}`),
@@ -3022,36 +3021,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{`,
-				`"passwordConfirm":{`,
-				`"password":{`,
-			},
-			NotExpectedContent: []string{
-				// record fields are not checked if the base auth form fields have errors
-				`"email":`,
-				"verified", // superusers are allowed to change the verified state
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordUpdateRequest": 1,
-			},
-		},
-		{
-			Name:   "auth record with valid form data but invalid record fields",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/users/records/bgs820n361vj1qd",
-			Body: strings.NewReader(`{
-				"password":"1234567",
-				"passwordConfirm":"1234567",
-				"rel":"invalid"
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{`,
-				`"rel":{"code":`,
-				`"password":{"code":`,
+				`"email":{"code":"validation_is_email"`,
 			},
 			ExpectedEvents: map[string]int{
 				"*":                        0,
@@ -3065,12 +3035,36 @@ func TestRecordCrudUpdate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "try to change account managing fields by guest",
+			Name:   "auth record with invalid record fields",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/users/records/bgs820n361vj1qd",
+			Body: strings.NewReader(`{
+				"rel":"invalid"
+			}`),
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{`,
+				`"rel":{"code":`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                        0,
+				"OnRecordUpdateRequest":    1,
+				"OnModelUpdate":            1,
+				"OnModelValidate":          1,
+				"OnModelAfterUpdateError":  1,
+				"OnRecordUpdate":           1,
+				"OnRecordValidate":         1,
+				"OnRecordAfterUpdateError": 1,
+			},
+		},
+		{
+			Name:   "try to set verified by guest",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/nologin/records/phhq3wr65cap535",
 			Body: strings.NewReader(`{
-				"password":"12345678",
-				"passwordConfirm":"12345678",
 				"emailVisibility":true,
 				"verified":true
 			}`),
@@ -3078,7 +3072,6 @@ func TestRecordCrudUpdate(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{`,
 				`"verified":{"code":`,
-				`"oldPassword":{"code":`,
 			},
 			NotExpectedContent: []string{
 				`"emailVisibility":{"code":`,
@@ -3089,7 +3082,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "try to change account managing fields by auth record (owner)",
+			Name:   "try to set verified by auth record (owner)",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/users/records/4q1xlclmfloku33",
 			Headers: map[string]string{
@@ -3097,8 +3090,6 @@ func TestRecordCrudUpdate(t *testing.T) {
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
 			Body: strings.NewReader(`{
-				"password":"12345678",
-				"passwordConfirm":"12345678",
 				"emailVisibility":true,
 				"verified":true
 			}`),
@@ -3106,7 +3097,6 @@ func TestRecordCrudUpdate(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{`,
 				`"verified":{"code":`,
-				`"oldPassword":{"code":`,
 			},
 			NotExpectedContent: []string{
 				`"emailVisibility":{"code":`,
