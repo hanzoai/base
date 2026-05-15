@@ -163,7 +163,7 @@ export interface CronModel {
 
 export async function authWithPassword(identity: string, password: string) {
   const res = await request<{ token: string; record: Record<string, unknown> }>(
-    '/api/collections/_superusers/auth-with-password',
+    '/v1/collections/_superusers/auth-with-password',
     {
       method: 'POST',
       body: JSON.stringify({ identity, password }),
@@ -180,27 +180,27 @@ export async function authWithPassword(identity: string, password: string) {
 export async function listCollections(params?: { sort?: string; filter?: string; batch?: number }): Promise<CollectionModel[]> {
   // Base returns paginated; use perPage=500 to get all in one shot
   const q = qs({ sort: params?.sort, filter: params?.filter, perPage: params?.batch ?? 500 })
-  const res = await request<ListResult<CollectionModel>>(`/api/collections${q}`)
+  const res = await request<ListResult<CollectionModel>>(`/v1/collections${q}`)
   return res.items
 }
 
 export async function getCollection(id: string): Promise<CollectionModel> {
-  return request<CollectionModel>(`/api/collections/${encodeURIComponent(id)}`)
+  return request<CollectionModel>(`/v1/collections/${encodeURIComponent(id)}`)
 }
 
 export async function updateCollection(id: string, data: Record<string, unknown>): Promise<CollectionModel> {
-  return request<CollectionModel>(`/api/collections/${encodeURIComponent(id)}`, {
+  return request<CollectionModel>(`/v1/collections/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function deleteCollection(id: string): Promise<void> {
-  return request<void>(`/api/collections/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return request<void>(`/v1/collections/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function importCollections(collections: CollectionModel[]): Promise<void> {
-  return request<void>('/api/collections/import', {
+  return request<void>('/v1/collections/import', {
     method: 'PUT',
     body: JSON.stringify({ collections }),
   })
@@ -217,16 +217,16 @@ export async function listRecords(
   params?: { sort?: string; filter?: string },
 ): Promise<ListResult<RecordModel>> {
   const q = qs({ page, perPage, sort: params?.sort, filter: params?.filter })
-  return request<ListResult<RecordModel>>(`/api/collections/${encodeURIComponent(collection)}/records${q}`)
+  return request<ListResult<RecordModel>>(`/v1/collections/${encodeURIComponent(collection)}/records${q}`)
 }
 
 export async function getRecord(collection: string, id: string): Promise<RecordModel> {
-  return request<RecordModel>(`/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`)
+  return request<RecordModel>(`/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`)
 }
 
 export async function createRecord(collection: string, data: FormData | Record<string, unknown>): Promise<RecordModel> {
   const body = data instanceof FormData ? data : JSON.stringify(data)
-  return request<RecordModel>(`/api/collections/${encodeURIComponent(collection)}/records`, {
+  return request<RecordModel>(`/v1/collections/${encodeURIComponent(collection)}/records`, {
     method: 'POST',
     body,
   })
@@ -234,14 +234,14 @@ export async function createRecord(collection: string, data: FormData | Record<s
 
 export async function updateRecord(collection: string, id: string, data: FormData | Record<string, unknown>): Promise<RecordModel> {
   const body = data instanceof FormData ? data : JSON.stringify(data)
-  return request<RecordModel>(`/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`, {
+  return request<RecordModel>(`/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     body,
   })
 }
 
 export async function deleteRecord(collection: string, id: string): Promise<void> {
-  return request<void>(`/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  return request<void>(`/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ export async function deleteRecord(collection: string, id: string): Promise<void
 
 export async function listLogs(page: number, perPage: number, params?: { sort?: string; filter?: string }): Promise<ListResult<LogModel>> {
   const q = qs({ page, perPage, sort: params?.sort, filter: params?.filter })
-  return request<ListResult<LogModel>>(`/api/logs${q}`)
+  return request<ListResult<LogModel>>(`/v1/logs${q}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -258,18 +258,18 @@ export async function listLogs(page: number, perPage: number, params?: { sort?: 
 // ---------------------------------------------------------------------------
 
 export async function getSettings(): Promise<Record<string, unknown>> {
-  return request<Record<string, unknown>>('/api/settings')
+  return request<Record<string, unknown>>('/v1/settings')
 }
 
 export async function updateSettings(data: Record<string, unknown>): Promise<Record<string, unknown>> {
-  return request<Record<string, unknown>>('/api/settings', {
+  return request<Record<string, unknown>>('/v1/settings', {
     method: 'PATCH',
     body: JSON.stringify(data),
   })
 }
 
 export async function testEmail(collection: string, toEmail: string, template: string): Promise<void> {
-  return request<void>('/api/settings/test/email', {
+  return request<void>('/v1/settings/test/email', {
     method: 'POST',
     body: JSON.stringify({ email: toEmail, template, collection }),
   })
@@ -280,30 +280,30 @@ export async function testEmail(collection: string, toEmail: string, template: s
 // ---------------------------------------------------------------------------
 
 export async function listBackups(): Promise<BackupModel[]> {
-  return request<BackupModel[]>('/api/backups')
+  return request<BackupModel[]>('/v1/backups')
 }
 
 export async function createBackup(name: string): Promise<void> {
-  return request<void>('/api/backups', {
+  return request<void>('/v1/backups', {
     method: 'POST',
     body: JSON.stringify({ name }),
   })
 }
 
 export async function deleteBackup(key: string): Promise<void> {
-  return request<void>(`/api/backups/${encodeURIComponent(key)}`, { method: 'DELETE' })
+  return request<void>(`/v1/backups/${encodeURIComponent(key)}`, { method: 'DELETE' })
 }
 
 export async function restoreBackup(key: string): Promise<void> {
-  return request<void>(`/api/backups/${encodeURIComponent(key)}/restore`, { method: 'POST' })
+  return request<void>(`/v1/backups/${encodeURIComponent(key)}/restore`, { method: 'POST' })
 }
 
 export function getBackupDownloadURL(key: string, token: string): string {
-  return `/api/backups/${encodeURIComponent(key)}?token=${encodeURIComponent(token)}`
+  return `/v1/backups/${encodeURIComponent(key)}?token=${encodeURIComponent(token)}`
 }
 
 export async function getFileToken(): Promise<string> {
-  const res = await request<{ token: string }>('/api/files/token', { method: 'POST' })
+  const res = await request<{ token: string }>('/v1/files/token', { method: 'POST' })
   return res.token
 }
 
@@ -312,12 +312,12 @@ export async function getFileToken(): Promise<string> {
 // ---------------------------------------------------------------------------
 
 export async function listCrons(): Promise<CronModel[]> {
-  const res = await request<CronModel[]>('/api/crons')
+  const res = await request<CronModel[]>('/v1/crons')
   return res
 }
 
 export async function runCron(jobId: string): Promise<void> {
-  return request<void>(`/api/crons/${encodeURIComponent(jobId)}`, { method: 'POST' })
+  return request<void>(`/v1/crons/${encodeURIComponent(jobId)}`, { method: 'POST' })
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +326,6 @@ export async function runCron(jobId: string): Promise<void> {
 
 export async function listSuperusers(params?: { sort?: string }): Promise<RecordModel[]> {
   const q = qs({ sort: params?.sort, perPage: 200 })
-  const res = await request<ListResult<RecordModel>>(`/api/collections/_superusers/records${q}`)
+  const res = await request<ListResult<RecordModel>>(`/v1/collections/_superusers/records${q}`)
   return res.items
 }
