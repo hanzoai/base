@@ -113,7 +113,6 @@ func TestNewCollection(t *testing.T) {
 				`"type":"email"`,
 				`"name":"id"`,
 				`"name":"email"`,
-				`"name":"password"`,
 				`"name":"tokenKey"`,
 				`"name":"emailVisibility"`,
 				`"name":"verified"`,
@@ -124,7 +123,6 @@ func TestNewCollection(t *testing.T) {
 				`"createRule":null`,
 				`"updateRule":null`,
 				`"deleteRule":null`,
-				`"identityFields":["email"]`,
 			},
 		},
 	}
@@ -273,7 +271,6 @@ func TestNewAuthCollection(t *testing.T) {
 				`"type":"email"`,
 				`"name":"id"`,
 				`"name":"email"`,
-				`"name":"password"`,
 				`"name":"tokenKey"`,
 				`"name":"emailVisibility"`,
 				`"name":"verified"`,
@@ -284,7 +281,6 @@ func TestNewAuthCollection(t *testing.T) {
 				`"createRule":null`,
 				`"updateRule":null`,
 				`"deleteRule":null`,
-				`"identityFields":["email"]`,
 			},
 		},
 		{
@@ -299,7 +295,6 @@ func TestNewAuthCollection(t *testing.T) {
 				`"type":"email"`,
 				`"name":"id"`,
 				`"name":"email"`,
-				`"name":"password"`,
 				`"name":"tokenKey"`,
 				`"name":"emailVisibility"`,
 				`"name":"verified"`,
@@ -310,7 +305,6 @@ func TestNewAuthCollection(t *testing.T) {
 				`"createRule":null`,
 				`"updateRule":null`,
 				`"deleteRule":null`,
-				`"identityFields":["email"]`,
 			},
 		},
 	}
@@ -1315,7 +1309,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			},
 			expectError: false,
 			expectColumns: []string{
-				"id", "email", "tokenKey", "password",
+				"id", "email", "tokenKey",
 				"verified", "emailVisibility", "example",
 			},
 		},
@@ -1362,7 +1356,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			},
 			expectError: false,
 			expectColumns: []string{
-				"id", "email", "emailVisibility", "password", "tokenKey",
+				"id", "email", "emailVisibility", "tokenKey",
 				"verified", "username", "name_updated", "created", "updated", "example",
 			},
 		},
@@ -1397,7 +1391,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			},
 			expectError: false,
 			expectColumns: []string{
-				"id", "email", "emailVisibility", "password", "tokenKey", "verified",
+				"id", "email", "emailVisibility", "tokenKey", "verified",
 			},
 		},
 	}
