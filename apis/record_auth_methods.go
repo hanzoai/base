@@ -1,7 +1,6 @@
 package apis
 
 import (
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -132,8 +131,8 @@ func recordAuthMethods(e *core.RequestEvent) error {
 		if err != nil {
 			e.App.Logger().Debug(
 				"Failed to setup OAuth2 provider",
-				slog.String("name", config.Name),
-				slog.String("error", err.Error()),
+				"name", config.Name,
+				"error", err.Error(),
 			)
 			continue // skip provider
 		}
