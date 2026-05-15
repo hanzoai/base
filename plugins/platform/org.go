@@ -10,7 +10,6 @@ package platform
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -65,8 +64,8 @@ func (s *OrgService) GetConfig(orgId string) map[string]any {
 	)
 	if err != nil {
 		s.app.Logger().Debug("org config not found",
-			slog.String("org_id", orgId),
-			slog.String("error", err.Error()),
+			"org_id", orgId,
+			"error", err.Error(),
 		)
 		return nil
 	}
@@ -275,9 +274,9 @@ func (s *OrgService) ProvisionCustomer(orgId, userId string, opts map[string]any
 	}
 
 	s.app.Logger().Info("provisioned org customer",
-		slog.String("org_id", orgId),
-		slog.String("user_id", userId),
-		slog.String("customer_id", custId),
+		"org_id", orgId,
+		"user_id", userId,
+		"customer_id", custId,
 	)
 
 	return customerRecordToMap(record), nil

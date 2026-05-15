@@ -2,7 +2,6 @@ package base
 
 import (
 	"fmt"
-	"log/slog"
 	"runtime/debug"
 
 	"github.com/fatih/color"
@@ -62,7 +61,7 @@ func checkModerncDeps(app core.App) {
 			driverVersion,
 			expectedDriverVersion,
 		)
-		app.Logger().Warn(msg, slog.String("current", driverVersion), slog.String("expected", expectedDriverVersion))
+		app.Logger().Warn(msg, "current", driverVersion, "expected", expectedDriverVersion)
 	} else if libcVersion != expectedLibcVersion {
 		msg = fmt.Sprintf(
 			"You are using modernc.org/libc %s which differs from the expected and tested %s.\n"+
@@ -72,7 +71,7 @@ func checkModerncDeps(app core.App) {
 			expectedLibcVersion,
 			expectedLibcVersion,
 		)
-		app.Logger().Warn(msg, slog.String("current", libcVersion), slog.String("expected", expectedLibcVersion))
+		app.Logger().Warn(msg, "current", libcVersion, "expected", expectedLibcVersion)
 	}
 
 	// ensure that the message is printed to the default stderr too
