@@ -154,12 +154,12 @@ func clusterLeaderCmd(nf *NetworkFlags, daemonName string) *cobra.Command {
 			if env.IsRemote() {
 				ctx := env.K8sContext()
 				ns := env.K8sNamespace()
-				fmt.Fprintf(os.Stdout, "[dry-run] kubectl --context %s -n %s exec deployment/%s -- wget -qO- http://localhost:8090/api/health\n",
+				fmt.Fprintf(os.Stdout, "[dry-run] kubectl --context %s -n %s exec deployment/%s -- wget -qO- http://localhost:8090/v1/health\n",
 					ctx, ns, daemonName)
 				return nil
 			}
 
-			fmt.Fprintf(os.Stdout, "[local] curl http://localhost:8090/api/health\n")
+			fmt.Fprintf(os.Stdout, "[local] curl http://localhost:8090/v1/health\n")
 			return nil
 		},
 	}
