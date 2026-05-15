@@ -158,10 +158,10 @@ See the full alignment guide below. Summary of conflicts:
 | Area | Base Current | Ecosystem Standard | Status |
 |------|-------------|-------------------|--------|
 | Timestamp fields | `created`/`updated` | `createdAt`/`updatedAt` | CONFLICT |
-| API prefix | `/api` | `/v1` | CONFLICT |
+| API prefix | configurable via `BASE_API_PREFIX` (default `/v1`) | `/v1` or `/v1/<app>` | DONE |
 | Soft delete | Hard delete only | `Deleted bool` flag | MISSING |
 | Multi-tenancy | None | Per-org SQLite + CEK | MISSING |
-| Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS) | DONE (EXTERNAL_AUTH_ONLY env var) |
+| Auth | Built-in auth collections | Hanzo IAM (OIDC/JWKS, mandatory) | DONE (platform plugin, one way) |
 | SSE event name | `CONNECT` | `CONNECT` | OK (server + SDK aligned) |
 | Error format | `{status, message, data}` | `{status, message, data}` | OK |
 | Pagination | `{items, page, perPage, totalItems, totalPages}` | Same | OK |
@@ -169,22 +169,56 @@ See the full alignment guide below. Summary of conflicts:
 Migration path: 5 phases, backward-compatible aliases first.
 Full details: research brief produced by scientist agent on 2026-04-10.
 
-## External Auth Mode (2026-04-10)
+## IAM-native auth (one and only one way)
 
-Set `EXTERNAL_AUTH_ONLY=true` to defer all auth to an external OIDC provider.
-Optional env vars: `JWKS_URL` (token validation endpoint), `AUTH_USERS_COLLECTION` (default: "users").
+Hanzo IAM is the **only** auth source. There is no `BASE_AUTH_MODE` toggle,
+no built-in password / OTP / MFA / OAuth2 / email-change / password-reset
+surface, no legacy `/_/auth/oidc/*` parallel path. The platform plugin
+(`plugins/platform/`) is mandatory and registers IAM unconditionally;
+booting without `IAM_ENDPOINT` (or `IAM_MODE=embedded`) errors at startup.
 
-Behavior when active:
-- Built-in auth endpoints blocked for non-superuser collections (password, OTP, OAuth2, email change, password reset, verification)
-- `auth-methods`, `auth-refresh`, `impersonate` still work
-- `_superusers` collection is exempt (admin panel login)
-- `loadAuthToken` validates bearer tokens via JWKS, creates ephemeral user records from JWT claims
-- Superuser local tokens always accepted as fallback (admin sessions, CLI tools)
-- Regular user local tokens rejected
+Two ways to host IAM, identical OIDC contract from the client side:
 
-The platform plugin (`plugins/platform/`) sets these same store keys automatically when `IAMEndpoint` is configured. The env vars provide the same behavior for standalone Base deployments without the platform plugin.
+1. **External** (default): set `IAM_ENDPOINT=https://hanzo.id` (or your
+   tenant). `/v1/iam/*` is a transparent reverse proxy to that endpoint.
+   Full Hanzo IAM features: federation, MFA, social, magic links,
+   multi-tenant orgs.
+2. **Embedded**: set `IAM_MODE=embedded`. `/v1/iam/*` is served in-process
+   by the minimal OIDC provider in `plugins/platform/iam_embedded.go`
+   (email+password only, no federation). For single-tenant solo
+   deployments. See section below for the surface details.
 
-Store keys: `StoreKeyExternalAuthOnly`, `StoreKeyJWKSURL`, `StoreKeyAuthUsersCollection`.
+Both modes expose the same six paths under `/v1/iam/*` (discovery, JWKS,
+authorize, login, token, userinfo) and the same RS256 JWT shape. The
+`@hanzo/iam/browser` SDK does PKCE redirect against either with no
+client-side branching — only the feature ceiling differs.
+
+The middleware mirrors IAM identity into `_superusers` by email, so an
+admin row with the JWT's email automatically authorizes admin endpoints
+(collections, settings, logs, backups). Identity from IAM; admin
+privilege from a `_superusers` row keyed by email.
+
+Store keys: `StoreKeyExternalAuthOnly` (always true once platform
+registers), `StoreKeyJWKSURL` (external mode), `StoreKeyAuthUsersCollection`
+(default `"users"`).
+
+## Mount prefix (`BASE_API_PREFIX`)
+
+One knob for where the app's data plane lives. Default `/v1`. For
+multi-app deployments where a gateway routes by path, set
+`BASE_API_PREFIX=/v1/<app>` (e.g. `/v1/base`, `/v1/team`).
+
+The SPA client must match: `VITE_API_PREFIX` (in `gui/apps/admin-*/vite.config.ts`
+`define` block) is the client-side counterpart. Both are configured at
+deploy together.
+
+**IAM is always a fixed sibling at `/v1/iam`** regardless of
+`BASE_API_PREFIX`. In production a gateway typically routes `/v1/iam/*`
+to the central IAM service; in solo/dev mode `IAM_MODE=embedded` serves
+it in-process. Apps do NOT mount their own IAM at `/v1/<app>/iam`.
+
+Root liveness probe stays at `/healthz` (outside the mount prefix) so
+ops doesn't have to know the app name.
 
 ## Embedded IAM Mode (`IAM_MODE=embedded`)
 
