@@ -3,14 +3,18 @@
 // Usage:
 //
 //	go run cmd/typegen/main.go --url http://localhost:8090 --output types.ts \
-//	  --admin-email admin@example.com --admin-password secret
+//	  --token "$BASE_TOKEN"
 //
 // It connects to the Base API, reads all collection schemas, and emits
 // TypeScript interfaces with a Collections type map.
+//
+// The legacy --admin-email / --admin-password flags were removed in the
+// IAM-native rip; pass a pre-obtained IAM JWT via --token or the
+// BASE_TOKEN env var. Anonymous access (--token "") still works for
+// public-readable collections.
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -21,12 +25,6 @@ import (
 	"strings"
 	"unicode"
 )
-
-// --- API response types ---
-
-type authResponse struct {
-	Token string `json:"token"`
-}
 
 type field struct {
 	Name         string   `json:"name"`
@@ -50,11 +48,10 @@ type collection struct {
 // --- CLI flags ---
 
 var (
-	flagURL      = flag.String("url", "http://localhost:8090", "Base instance URL")
-	flagOutput   = flag.String("output", "", "Output file path (default: stdout)")
-	flagEmail    = flag.String("admin-email", "", "Superuser email for auth")
-	flagPassword = flag.String("admin-password", "", "Superuser password for auth")
-	flagExclude  = flag.String("exclude", "", "Comma-separated collection names to exclude")
+	flagURL     = flag.String("url", "http://localhost:8090", "Base instance URL")
+	flagOutput  = flag.String("output", "", "Output file path (default: stdout)")
+	flagToken   = flag.String("token", "", "Bearer token (IAM-issued JWT). Falls back to $BASE_TOKEN.")
+	flagExclude = flag.String("exclude", "", "Comma-separated collection names to exclude")
 )
 
 func main() {
@@ -69,10 +66,10 @@ func main() {
 func run() error {
 	baseURL := strings.TrimRight(*flagURL, "/")
 
-	// 1. Authenticate
-	token, err := authenticate(baseURL, *flagEmail, *flagPassword)
-	if err != nil {
-		return fmt.Errorf("auth: %w", err)
+	// 1. Resolve token (flag wins; otherwise env)
+	token := *flagToken
+	if token == "" {
+		token = os.Getenv("BASE_TOKEN")
 	}
 
 	// 2. Fetch collections
@@ -121,40 +118,6 @@ func run() error {
 
 	_, err = fmt.Print(ts)
 	return err
-}
-
-// authenticate obtains a superuser auth token.
-// If email/password are empty it returns an empty token (anonymous access).
-func authenticate(baseURL, email, password string) (string, error) {
-	if email == "" || password == "" {
-		return "", nil
-	}
-
-	body, err := json.Marshal(map[string]string{
-		"identity": email,
-		"password": password,
-	})
-	if err != nil {
-		return "", err
-	}
-
-	url := baseURL + "/api/collections/_superusers/auth-with-password"
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("POST %s: %w", url, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		b, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("POST %s: status %d: %s", url, resp.StatusCode, string(b))
-	}
-
-	var ar authResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {
-		return "", fmt.Errorf("decode auth response: %w", err)
-	}
-	return ar.Token, nil
 }
 
 // fetchCollections retrieves all collections from the Base API.

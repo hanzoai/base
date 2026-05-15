@@ -1,69 +1,54 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 // NewLoginCommand returns the `login` subcommand.
+//
+// The legacy `base login --email --password` flow is gone — Hanzo IAM
+// is the only auth source for Base, and it issues tokens via the OIDC
+// PKCE flow at /api/iam/oauth/authorize (proxied by the platform
+// plugin to IAM_ENDPOINT). The CLI consumes those tokens via the
+// `--token` persistent flag or the BASE_TOKEN env var (see config.go).
+//
+// This command stays bound so `base login --help` returns a useful
+// message instead of "unknown command". Running it without args
+// prints the IAM-handoff instructions; running with --email/--password
+// returns a non-zero exit code with the same instructions.
 func NewLoginCommand(clientFn func() *Client, formatFn func() Format) *cobra.Command {
 	var email string
 	var password string
 	var superuser bool
 
 	cmd := &cobra.Command{
-		Use:          "login",
-		Short:        "Authenticate and store a token",
-		Example:      "base login --email admin@example.com --password secret123",
+		Use:   "login",
+		Short: "Obtain an auth token from Hanzo IAM (out-of-band) and pass it via --token",
+		Long: "Base no longer accepts a local password. Run the IAM PKCE flow " +
+			"(e.g. through hanzo.id or your org's IAM endpoint) to obtain a JWT, " +
+			"then pass it to subsequent commands via --token, $BASE_TOKEN, or " +
+			"~/.config/base/token.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if email == "" || password == "" {
-				return fmt.Errorf("--email and --password are required")
+			fmt.Fprintln(os.Stderr,
+				"base login: local password auth has been removed. "+
+					"Obtain an IAM-issued JWT and pass it via --token or BASE_TOKEN.")
+			if email != "" || password != "" {
+				return fmt.Errorf("local login is not supported; use IAM and pass --token")
 			}
-
-			collection := "users"
-			if superuser {
-				collection = "_superusers"
-			}
-
-			body := map[string]string{
-				"identity": email,
-				"password": password,
-			}
-
-			c := clientFn()
-			data, _, err := c.Post("/collections/"+collection+"/auth-with-password", body)
-			if err != nil {
-				return fmt.Errorf("login failed: %w", err)
-			}
-
-			var resp struct {
-				Token string `json:"token"`
-			}
-			if err := json.Unmarshal(data, &resp); err != nil {
-				return fmt.Errorf("parse auth response: %w", err)
-			}
-
-			if resp.Token == "" {
-				return fmt.Errorf("no token in response")
-			}
-
-			if err := SaveToken(resp.Token); err != nil {
-				return fmt.Errorf("save token: %w", err)
-			}
-
-			color.Green("Logged in. Token saved to %s", tokenPath())
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&email, "email", "", "email / identity")
-	cmd.Flags().StringVar(&password, "password", "", "password")
-	cmd.Flags().BoolVar(&superuser, "superuser", false, "authenticate as superuser")
+	cmd.Flags().StringVar(&email, "email", "", "(removed) use IAM and --token instead")
+	cmd.Flags().StringVar(&password, "password", "", "(removed) use IAM and --token instead")
+	cmd.Flags().BoolVar(&superuser, "superuser", false, "(removed) use IAM and --token instead")
+	_ = cmd.Flags().MarkHidden("email")
+	_ = cmd.Flags().MarkHidden("password")
+	_ = cmd.Flags().MarkHidden("superuser")
 
 	return cmd
 }
@@ -77,7 +62,7 @@ func NewWhoamiCommand(clientFn func() *Client, formatFn func() Format) *cobra.Co
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c := clientFn()
 			if c.Token == "" {
-				fmt.Fprintln(os.Stderr, "Not logged in. Run `base login` first.")
+				fmt.Fprintln(os.Stderr, "Not logged in. Obtain an IAM token and pass --token or set BASE_TOKEN.")
 				return nil
 			}
 
