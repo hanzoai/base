@@ -42,9 +42,11 @@ func loadInstaller(
 	baseURL string,
 	installerFunc func(app core.App, systemSuperuser *core.Record, baseURL string) error,
 ) error {
-	// In IAM auth mode, skip the installer entirely — IAM handles first login.
-	// No _superusers collection needed; all admin access goes through OIDC.
-	if os.Getenv("BASE_AUTH_MODE") == "iam" || (os.Getenv("BASE_AUTH_MODE") == "" && os.Getenv("BASE_OIDC_ISSUER") != "") {
+	// IAM is the only auth source — once the platform plugin marks the
+	// store as external-only, the local "first superuser" installer is
+	// moot. IAM seeds the superuser via EMBEDDED_IAM_ROOT_EMAIL (embedded
+	// mode) or via the upstream IAM tenant (external mode).
+	if externalOnly, _ := app.Store().Get(StoreKeyExternalAuthOnly).(bool); externalOnly {
 		return nil
 	}
 
