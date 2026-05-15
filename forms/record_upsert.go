@@ -11,7 +11,6 @@ import (
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/core/validators"
 	"github.com/hanzoai/base/tools/security"
-	"github.com/spf13/cast"
 )
 
 const (
@@ -25,12 +24,6 @@ type RecordUpsert struct {
 	app         core.App
 	record      *core.Record
 	accessLevel int
-
-	// extra password fields
-	disablePasswordValidations bool
-	password                   string
-	passwordConfirm            string
-	oldPassword                string
 }
 
 // NewRecordUpsert creates a new [RecordUpsert] form from the provided [core.App] and [core.Record] instances
@@ -89,23 +82,6 @@ func (form *RecordUpsert) HasManageAccess() bool {
 func (form *RecordUpsert) Load(data map[string]any) {
 	excludeFields := []string{core.FieldNameExpand}
 
-	isAuth := form.record.Collection().IsAuth()
-
-	// load the special auth form fields
-	if isAuth {
-		if v, ok := data["password"]; ok {
-			form.password = cast.ToString(v)
-		}
-		if v, ok := data["passwordConfirm"]; ok {
-			form.passwordConfirm = cast.ToString(v)
-		}
-		if v, ok := data["oldPassword"]; ok {
-			form.oldPassword = cast.ToString(v)
-		}
-
-		excludeFields = append(excludeFields, "passwordConfirm", "oldPassword") // skip non-schema password fields
-	}
-
 	for k, v := range data {
 		if slices.Contains(excludeFields, k) {
 			continue
@@ -114,35 +90,29 @@ func (form *RecordUpsert) Load(data map[string]any) {
 		// set only known collection fields
 		field := form.record.SetIfFieldExists(k, v)
 
-		// restore original value if hidden field (with exception of the auth "password")
+		// restore original value if hidden field
 		//
 		// note: this is an extra measure against loading hidden fields
 		// but usually is not used by the default route handlers since
 		// they filter additionally the data before calling Load
-		if form.accessLevel != accessLevelSuperuser && field != nil && field.GetHidden() && (!isAuth || field.GetName() != core.FieldNamePassword) {
+		if form.accessLevel != accessLevelSuperuser && field != nil && field.GetHidden() {
 			form.record.SetRaw(field.GetName(), form.record.Original().GetRaw(field.GetName()))
 		}
 	}
 }
 
 func (form *RecordUpsert) validateFormFields() error {
-	isAuth := form.record.Collection().IsAuth()
-	if !isAuth {
+	if !form.record.Collection().IsAuth() {
 		return nil
 	}
-
-	form.syncPasswordFields()
 
 	isNew := form.record.IsNew()
 
 	original := form.record.Original()
 
 	validateData := map[string]any{
-		"email":           form.record.Email(),
-		"verified":        form.record.Verified(),
-		"password":        form.password,
-		"passwordConfirm": form.passwordConfirm,
-		"oldPassword":     form.oldPassword,
+		"email":    form.record.Email(),
+		"verified": form.record.Verified(),
 	}
 
 	return validation.Validate(validateData,
@@ -165,47 +135,8 @@ func (form *RecordUpsert) validateFormFields() error {
 					validation.By(validators.Equal(original.Verified())),
 				),
 			),
-			validation.Key(
-				"password",
-				validation.When(
-					!form.disablePasswordValidations && (isNew || form.passwordConfirm != "" || form.oldPassword != ""),
-					validation.Required,
-				),
-			),
-			validation.Key(
-				"passwordConfirm",
-				validation.When(
-					!form.disablePasswordValidations && (isNew || form.password != "" || form.oldPassword != ""),
-					validation.Required,
-				),
-				validation.When(!form.disablePasswordValidations, validation.By(validators.Equal(form.password))),
-			),
-			validation.Key(
-				"oldPassword",
-				// require old password only on update when:
-				// - form.HasManageAccess() is not satisfied
-				// - changing the existing password
-				validation.When(
-					!form.disablePasswordValidations && !isNew && !form.HasManageAccess() && (form.password != "" || form.passwordConfirm != ""),
-					validation.Required,
-					validation.By(form.checkOldPassword),
-				),
-			),
 		),
 	)
-}
-
-func (form *RecordUpsert) checkOldPassword(value any) error {
-	v, ok := value.(string)
-	if !ok {
-		return validators.ErrUnsupportedValueType
-	}
-
-	if !form.record.Original().ValidatePassword(v) {
-		return validation.NewError("validation_invalid_old_password", "Missing or invalid old password.")
-	}
-
-	return nil
 }
 
 // Deprecated: It was previously used as part of the record create action but it is not needed anymore and will be removed in the future.
@@ -291,26 +222,3 @@ func (form *RecordUpsert) Submit() error {
 	return form.app.SaveWithContext(form.ctx, form.record)
 }
 
-// syncPasswordFields syncs the form's auth password fields with their
-// corresponding record field values.
-//
-// This could be useful in case the password fields were programmatically set
-// directly by modifying the related record model.
-func (form *RecordUpsert) syncPasswordFields() {
-	if !form.record.Collection().IsAuth() {
-		return // not an auth collection
-	}
-
-	form.disablePasswordValidations = false
-
-	rawPassword := form.record.GetRaw(core.FieldNamePassword)
-	if v, ok := rawPassword.(*core.PasswordFieldValue); ok && v != nil {
-		if
-		// programmatically set custom plain password value
-		(v.Plain != "" && v.Plain != form.password) ||
-			// random generated password for new record
-			(v.Plain == "" && v.Hash != "" && form.record.IsNew()) {
-			form.disablePasswordValidations = true
-		}
-	}
-}

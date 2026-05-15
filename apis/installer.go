@@ -82,7 +82,7 @@ func findOrCreateInstallerSuperuser(app core.App) (*core.Record, error) {
 
 		record = core.NewRecord(col)
 		record.SetEmail(core.DefaultInstallerEmail)
-		record.SetRandomPassword()
+		record.SetVerified(true)
 
 		err = app.Save(record)
 		if err != nil {
