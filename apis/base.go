@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 		}
 
 		app.Logger().Info("external auth enabled via env — built-in auth disabled for non-superuser collections",
-			slog.String("jwksURL", jwksURL),
+			"jwksURL", jwksURL,
 		)
 	}
 
