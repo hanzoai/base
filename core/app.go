@@ -1231,24 +1231,6 @@ type App interface {
 	// It allows intercepting the email message or to use a custom mailer client.
 	OnMailerSend() *hook.Hook[*MailerEvent]
 
-	// OnMailerRecordAuthAlertSend hook is triggered when
-	// sending a new device login auth alert email, allowing you to
-	// intercept and customize the email message that is being sent.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnMailerRecordAuthAlertSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
-
-	// OnMailerBeforeRecordResetPasswordSend hook is triggered when
-	// sending a password reset email to an auth record, allowing
-	// you to intercept and customize the email message that is being sent.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnMailerRecordPasswordResetSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
-
 	// OnMailerBeforeRecordVerificationSend hook is triggered when
 	// sending a verification email to an auth record, allowing
 	// you to intercept and customize the email message that is being sent.
@@ -1266,15 +1248,6 @@ type App interface {
 	// then all event handlers registered via the created hook will be
 	// triggered and called only if their event data origin matches the tags.
 	OnMailerRecordEmailChangeSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
-
-	// OnMailerRecordOTPSend hook is triggered when sending an OTP email
-	// to an auth record, allowing you to intercept and customize the
-	// email message that is being sent.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnMailerRecordOTPSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
 
 	// ---------------------------------------------------------------
 	// Realtime API event hooks
@@ -1346,17 +1319,6 @@ type App interface {
 	// triggered and called only if their event data origin matches the tags.
 	OnRecordAuthRequest(tags ...string) *hook.TaggedHook[*RecordAuthRequestEvent]
 
-	// OnRecordAuthWithPasswordRequest hook is triggered on each
-	// Record auth with password API request.
-	//
-	// [RecordAuthWithPasswordRequestEvent.Record] could be nil if no matching identity is found, allowing
-	// you to manually locate a different Record model (by reassigning [RecordAuthWithPasswordRequestEvent.Record]).
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnRecordAuthWithPasswordRequest(tags ...string) *hook.TaggedHook[*RecordAuthWithPasswordRequestEvent]
-
 	// OnRecordAuthWithOAuth2Request hook is triggered on each Record
 	// OAuth2 sign-in/sign-up API request (after token exchange and before external provider linking).
 	//
@@ -1381,28 +1343,6 @@ type App interface {
 	// then all event handlers registered via the created hook will be
 	// triggered and called only if their event data origin matches the tags.
 	OnRecordAuthRefreshRequest(tags ...string) *hook.TaggedHook[*RecordAuthRefreshRequestEvent]
-
-	// OnRecordRequestPasswordResetRequest hook is triggered on
-	// each Record request password reset API request.
-	//
-	// Could be used to additionally validate the request data or implement
-	// completely different password reset behavior.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnRecordRequestPasswordResetRequest(tags ...string) *hook.TaggedHook[*RecordRequestPasswordResetRequestEvent]
-
-	// OnRecordConfirmPasswordResetRequest hook is triggered on
-	// each Record confirm password reset API request.
-	//
-	// Could be used to additionally validate the request data or implement
-	// completely different persistence behavior.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnRecordConfirmPasswordResetRequest(tags ...string) *hook.TaggedHook[*RecordConfirmPasswordResetRequestEvent]
 
 	// OnRecordRequestVerificationRequest hook is triggered on
 	// each Record request verification API request.
@@ -1447,25 +1387,6 @@ type App interface {
 	// then all event handlers registered via the created hook will be
 	// triggered and called only if their event data origin matches the tags.
 	OnRecordConfirmEmailChangeRequest(tags ...string) *hook.TaggedHook[*RecordConfirmEmailChangeRequestEvent]
-
-	// OnRecordRequestOTPRequest hook is triggered on each Record
-	// request OTP API request.
-	//
-	// [RecordCreateOTPRequestEvent.Record] could be nil if no matching identity is found, allowing
-	// you to manually create or locate a different Record model (by reassigning [RecordCreateOTPRequestEvent.Record]).
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnRecordRequestOTPRequest(tags ...string) *hook.TaggedHook[*RecordCreateOTPRequestEvent]
-
-	// OnRecordAuthWithOTPRequest hook is triggered on each Record
-	// auth with OTP API request.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnRecordAuthWithOTPRequest(tags ...string) *hook.TaggedHook[*RecordAuthWithOTPRequestEvent]
 
 	// ---------------------------------------------------------------
 	// Record CRUD API event hooks

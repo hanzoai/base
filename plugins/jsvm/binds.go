@@ -685,11 +685,8 @@ func mailsBinds(vm *goja.Runtime) {
 	obj := vm.NewObject()
 	vm.Set("$mails", obj)
 
-	obj.Set("sendRecordPasswordReset", mails.SendRecordPasswordReset)
 	obj.Set("sendRecordVerification", mails.SendRecordVerification)
 	obj.Set("sendRecordChangeEmail", mails.SendRecordChangeEmail)
-	obj.Set("sendRecordOTP", mails.SendRecordOTP)
-	obj.Set("sendRecordAuthAlert", mails.SendRecordAuthAlert)
 }
 
 func securityBinds(vm *goja.Runtime) {
