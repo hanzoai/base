@@ -397,8 +397,8 @@ func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID
 func logDurableError(logger *slog.Logger, op string, taskID string, err error) {
 	if logger != nil {
 		logger.Warn("tasks: durable "+op+" failed, SQLite state is authoritative",
-			slog.String("task_id", taskID),
-			slog.String("error", err.Error()),
+			"task_id", taskID,
+			"error", err.Error(),
 		)
 	}
 }

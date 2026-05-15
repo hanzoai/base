@@ -28,7 +28,6 @@ package scheduler
 import (
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -256,7 +255,7 @@ func (p *plugin) processDueFunctions() {
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to find due functions",
-			slog.String("error", err.Error()),
+			"error", err.Error(),
 		)
 		return
 	}
@@ -308,8 +307,8 @@ func (p *plugin) claimFunction(record *core.Record) bool {
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to claim function",
-			slog.String("id", record.Id),
-			slog.String("error", err.Error()),
+			"id", record.Id,
+			"error", err.Error(),
 		)
 		return false
 	}
@@ -387,8 +386,8 @@ func (p *plugin) markCompleted(record *core.Record, result any) {
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to mark function completed",
-			slog.String("id", record.Id),
-			slog.String("error", err.Error()),
+			"id", record.Id,
+			"error", err.Error(),
 		)
 	}
 }
@@ -408,8 +407,8 @@ func (p *plugin) markFailed(record *core.Record, errMsg string) {
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to mark function failed",
-			slog.String("id", record.Id),
-			slog.String("error", err.Error()),
+			"id", record.Id,
+			"error", err.Error(),
 		)
 	}
 }
@@ -431,8 +430,8 @@ func (p *plugin) scheduleRetry(record *core.Record, retryCount int, origErr erro
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to schedule retry",
-			slog.String("id", record.Id),
-			slog.String("error", err.Error()),
+			"id", record.Id,
+			"error", err.Error(),
 		)
 	}
 }

@@ -21,7 +21,6 @@ package cloudsql
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -205,7 +204,7 @@ func (p *plugin) ensureCollections() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating cloud sql system collection", slog.String("name", collectionCloudSQLDBs))
+	p.app.Logger().Info("creating cloud sql system collection", "name", collectionCloudSQLDBs)
 	return p.app.Save(c)
 }
 
@@ -263,8 +262,8 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	dbName := "t_" + sanitizeDBName(body.DatabaseName)
 	if err := p.createDatabase(dbName); err != nil {
 		p.app.Logger().Error("failed to create Cloud SQL database",
-			slog.String("tenantId", body.TenantID),
-			slog.String("error", err.Error()),
+			"tenantId", body.TenantID,
+			"error", err.Error(),
 		)
 		return e.InternalServerError("failed to provision database", err)
 	}
@@ -358,8 +357,8 @@ func (p *plugin) handleDeleteDatabase(e *core.RequestEvent) error {
 
 	if err := p.dropDatabase(dbName); err != nil {
 		p.app.Logger().Warn("failed to drop Cloud SQL database",
-			slog.String("databaseName", dbName),
-			slog.String("error", err.Error()),
+			"databaseName", dbName,
+			"error", err.Error(),
 		)
 	}
 
