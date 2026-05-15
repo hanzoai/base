@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -272,7 +271,7 @@ func wsUpgradeHandler(app core.App, hub *WSHub) func(*core.RequestEvent) error {
 		hub.register(client)
 
 		app.Logger().Debug("WebSocket connection established",
-			slog.String("clientId", clientID))
+			"clientId", clientID)
 
 		// send connected message
 		connMsg := WSMessage{
@@ -313,8 +312,8 @@ func handleWSMessages(ctx context.Context, app core.App, hub *WSHub, client *wsC
 		if err != nil {
 			if !errors.Is(err, io.EOF) && !errors.Is(err, net.ErrClosed) {
 				app.Logger().Debug("WebSocket read error",
-					slog.String("clientId", client.id),
-					slog.String("error", err.Error()))
+					"clientId", client.id,
+					"error", err.Error())
 			}
 			return
 		}

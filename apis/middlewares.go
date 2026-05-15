@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -584,15 +583,15 @@ func logRequest(event *core.RequestEvent, err error) {
 
 	attrs := make([]any, 0, 15)
 
-	attrs = append(attrs, slog.String("type", "request"))
+	attrs = append(attrs, "type", "request")
 
 	started := cast.ToTime(event.Get(requestEventKeyExecStart))
 	if !started.IsZero() {
-		attrs = append(attrs, slog.Float64("execTime", float64(time.Since(started))/float64(time.Millisecond)))
+		attrs = append(attrs, "execTime", float64(time.Since(started))/float64(time.Millisecond))
 	}
 
 	if meta := event.Get(RequestEventKeyLogMeta); meta != nil {
-		attrs = append(attrs, slog.Any("meta", meta))
+		attrs = append(attrs, "meta", meta)
 	}
 
 	status := event.Status()
@@ -619,38 +618,38 @@ func logRequest(event *core.RequestEvent, err error) {
 
 			attrs = append(
 				attrs,
-				slog.String("error", errMsg),
-				slog.Any("details", apiErr.RawData()),
+				"error", errMsg,
+				"details", apiErr.RawData(),
 			)
 		} else {
-			attrs = append(attrs, slog.String("error", err.Error()))
+			attrs = append(attrs, "error", err.Error())
 		}
 	}
 
 	attrs = append(
 		attrs,
-		slog.String("url", requestUri),
-		slog.String("method", method),
-		slog.Int("status", status),
-		slog.String("referer", cutStr(event.Request.Referer(), 2000)),
-		slog.String("userAgent", cutStr(event.Request.UserAgent(), 2000)),
+		"url", requestUri,
+		"method", method,
+		"status", status,
+		"referer", cutStr(event.Request.Referer(), 2000),
+		"userAgent", cutStr(event.Request.UserAgent(), 2000),
 	)
 
 	if event.Auth != nil {
-		attrs = append(attrs, slog.String("auth", event.Auth.Collection().Name))
+		attrs = append(attrs, "auth", event.Auth.Collection().Name)
 
 		if event.App.Settings().Logs.LogAuthId {
-			attrs = append(attrs, slog.String("authId", event.Auth.Id))
+			attrs = append(attrs, "authId", event.Auth.Id)
 		}
 	} else {
-		attrs = append(attrs, slog.String("auth", ""))
+		attrs = append(attrs, "auth", "")
 	}
 
 	if event.App.Settings().Logs.LogIP {
 		attrs = append(
 			attrs,
-			slog.String("userIP", event.RealIP()),
-			slog.String("remoteIP", event.RemoteIP()),
+			"userIP", event.RealIP(),
+			"remoteIP", event.RemoteIP(),
 		)
 	}
 

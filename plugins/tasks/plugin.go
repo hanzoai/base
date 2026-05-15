@@ -3,7 +3,6 @@ package tasks
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -185,14 +184,14 @@ func (p *plugin) connectDurable() {
 	cfg := p.config.Durable
 
 	p.app.Logger().Info("tasks: connecting to durable execution backend",
-		slog.String("address", cfg.Address),
-		slog.String("namespace", cfg.Namespace),
+		"address", cfg.Address,
+		"namespace", cfg.Namespace,
 	)
 
 	ds, err := NewDurableStore(cfg.Address, cfg.Namespace)
 	if err != nil {
 		p.app.Logger().Warn("tasks: durable connection failed, running SQLite-only",
-			slog.String("error", err.Error()),
+			"error", err.Error(),
 		)
 		return
 	}
@@ -201,8 +200,8 @@ func (p *plugin) connectDurable() {
 	p.app.Store().Set(DurableKey, ds)
 
 	p.app.Logger().Info("tasks: durable execution connected",
-		slog.String("address", cfg.Address),
-		slog.String("namespace", cfg.Namespace),
+		"address", cfg.Address,
+		"namespace", cfg.Namespace,
 	)
 
 	// Start embedded worker if configured.
@@ -215,13 +214,13 @@ func (p *plugin) connectDurable() {
 		p.worker = NewWorker(ds.Client, queue)
 		if err := p.worker.Start(); err != nil {
 			p.app.Logger().Warn("tasks: worker start failed",
-				slog.String("queue", queue),
-				slog.String("error", err.Error()),
+				"queue", queue,
+				"error", err.Error(),
 			)
 			p.worker = nil
 		} else {
 			p.app.Logger().Info("tasks: worker polling",
-				slog.String("queue", queue),
+				"queue", queue,
 			)
 		}
 	}
@@ -375,12 +374,12 @@ func (p *plugin) tick() {
 
 	// 1. Check timeouts.
 	if err := p.store.CheckTimeouts(); err != nil {
-		p.app.Logger().Error("tasks: timeout check failed", slog.String("error", err.Error()))
+		p.app.Logger().Error("tasks: timeout check failed", "error", err.Error())
 	}
 
 	// 2. Advance workflows.
 	if err := p.store.AdvanceWorkflows(); err != nil {
-		p.app.Logger().Error("tasks: workflow advance failed", slog.String("error", err.Error()))
+		p.app.Logger().Error("tasks: workflow advance failed", "error", err.Error())
 	}
 
 	// 3. Auto-execute pending tasks if OnExecute is configured (local mode).
@@ -425,8 +424,8 @@ func (p *plugin) executeTask(task *Task) {
 	if err != nil {
 		if failErr := p.store.FailTask(task.ID, err.Error()); failErr != nil {
 			p.app.Logger().Error("tasks: failed to record task failure",
-				slog.String("task_id", task.ID),
-				slog.String("error", failErr.Error()),
+				"task_id", task.ID,
+				"error", failErr.Error(),
 			)
 		}
 		return
@@ -434,8 +433,8 @@ func (p *plugin) executeTask(task *Task) {
 
 	if err := p.store.CompleteTask(task.ID, output); err != nil {
 		p.app.Logger().Error("tasks: failed to complete task",
-			slog.String("task_id", task.ID),
-			slog.String("error", err.Error()),
+			"task_id", task.ID,
+			"error", err.Error(),
 		)
 	}
 }

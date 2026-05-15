@@ -1,8 +1,6 @@
 package platform
 
 import (
-	"log/slog"
-
 	"github.com/hanzoai/base/core"
 )
 
@@ -40,7 +38,7 @@ func (p *plugin) ensureOrgConfigsCollection() error {
 	// Unique index on org_id.
 	c.AddIndex("idx_org_configs_org_id", true, "org_id", "")
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgConfigs))
+	p.app.Logger().Info("creating platform system collection", "name", collectionOrgConfigs)
 	return p.app.Save(c)
 }
 
@@ -76,6 +74,6 @@ func (p *plugin) ensureOrgCustomersCollection() error {
 	// Unique composite index on (org_id, customer_id).
 	c.AddIndex("idx_org_customers_org_custid", true, "org_id, customer_id", "")
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgCustomers))
+	p.app.Logger().Info("creating platform system collection", "name", collectionOrgCustomers)
 	return p.app.Save(c)
 }
