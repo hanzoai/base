@@ -17,7 +17,7 @@ func TestRecordCrudSuperuserList(t *testing.T) {
 		{
 			Name:            "guest",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:             "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -25,7 +25,7 @@ func TestRecordCrudSuperuserList(t *testing.T) {
 		{
 			Name:   "non-superusers auth",
 			Method: http.MethodGet,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -37,7 +37,7 @@ func TestRecordCrudSuperuserList(t *testing.T) {
 		{
 			Name:   "superusers auth",
 			Method: http.MethodGet,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -70,7 +70,7 @@ func TestRecordCrudSuperuserView(t *testing.T) {
 		{
 			Name:            "guest",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:             "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -78,7 +78,7 @@ func TestRecordCrudSuperuserView(t *testing.T) {
 		{
 			Name:   "non-superusers auth",
 			Method: http.MethodGet,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -90,7 +90,7 @@ func TestRecordCrudSuperuserView(t *testing.T) {
 		{
 			Name:   "superusers auth",
 			Method: http.MethodGet,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -119,7 +119,7 @@ func TestRecordCrudSuperuserDelete(t *testing.T) {
 		{
 			Name:            "guest",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
+			URL:             "/v1/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -127,7 +127,7 @@ func TestRecordCrudSuperuserDelete(t *testing.T) {
 		{
 			Name:   "non-superusers auth",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -139,7 +139,7 @@ func TestRecordCrudSuperuserDelete(t *testing.T) {
 		{
 			Name:   "superusers auth",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sbmbsdb40jyxf7h",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -159,7 +159,7 @@ func TestRecordCrudSuperuserDelete(t *testing.T) {
 		{
 			Name:   "delete the last superuser",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -210,7 +210,7 @@ func TestRecordCrudSuperuserCreate(t *testing.T) {
 		{
 			Name:            "guest",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:             "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			Body:            body(),
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
@@ -219,7 +219,7 @@ func TestRecordCrudSuperuserCreate(t *testing.T) {
 		{
 			Name:   "non-superusers auth",
 			Method: http.MethodPost,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -232,7 +232,7 @@ func TestRecordCrudSuperuserCreate(t *testing.T) {
 		{
 			Name:   "superusers auth",
 			Method: http.MethodPost,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -279,7 +279,7 @@ func TestRecordCrudSuperuserUpdate(t *testing.T) {
 		{
 			Name:            "guest",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:             "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Body:            body(),
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
@@ -288,7 +288,7 @@ func TestRecordCrudSuperuserUpdate(t *testing.T) {
 		{
 			Name:   "non-superusers auth",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -301,7 +301,7 @@ func TestRecordCrudSuperuserUpdate(t *testing.T) {
 		{
 			Name:   "superusers auth",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers + "/records/sywbhecnh46rhm0",
 			Headers: map[string]string{
 				// _superusers, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",

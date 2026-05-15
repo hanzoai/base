@@ -34,8 +34,8 @@ func TestClientGet(t *testing.T) {
 	if gotMethod != "GET" {
 		t.Fatalf("expected GET, got %s", gotMethod)
 	}
-	if gotPath != "/api/collections" {
-		t.Fatalf("expected /api/collections, got %s", gotPath)
+	if gotPath != "/v1/collections" {
+		t.Fatalf("expected /v1/collections, got %s", gotPath)
 	}
 	if gotAuth != "test-token-123" {
 		t.Fatalf("expected test-token-123, got %s", gotAuth)
@@ -76,8 +76,8 @@ func TestClientPost(t *testing.T) {
 	if gotMethod != "POST" {
 		t.Fatalf("expected POST, got %s", gotMethod)
 	}
-	if gotPath != "/api/collections/posts/records" {
-		t.Fatalf("expected /api/collections/posts/records, got %s", gotPath)
+	if gotPath != "/v1/collections/posts/records" {
+		t.Fatalf("expected /v1/collections/posts/records, got %s", gotPath)
 	}
 	if gotContentType != "application/json" {
 		t.Fatalf("expected application/json, got %s", gotContentType)
@@ -116,8 +116,8 @@ func TestClientPatch(t *testing.T) {
 	if gotMethod != "PATCH" {
 		t.Fatalf("expected PATCH, got %s", gotMethod)
 	}
-	if gotPath != "/api/collections/posts/records/abc123" {
-		t.Fatalf("expected /api/collections/posts/records/abc123, got %s", gotPath)
+	if gotPath != "/v1/collections/posts/records/abc123" {
+		t.Fatalf("expected /v1/collections/posts/records/abc123, got %s", gotPath)
 	}
 }
 
@@ -141,8 +141,8 @@ func TestClientDelete(t *testing.T) {
 	if gotMethod != "DELETE" {
 		t.Fatalf("expected DELETE, got %s", gotMethod)
 	}
-	if gotPath != "/api/collections/posts/records/abc123" {
-		t.Fatalf("expected /api/collections/posts/records/abc123, got %s", gotPath)
+	if gotPath != "/v1/collections/posts/records/abc123" {
+		t.Fatalf("expected /v1/collections/posts/records/abc123, got %s", gotPath)
 	}
 	if status != 204 {
 		t.Fatalf("expected 204, got %d", status)

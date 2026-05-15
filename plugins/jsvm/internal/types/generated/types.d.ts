@@ -13608,8 +13608,8 @@ namespace core {
    *   - users:create
    *   - *:create
    *   - /
-   *   - /api
-   *   - POST /api/collections/
+   *   - /v1
+   *   - POST /v1/collections/
    * ```
    */
   label: string

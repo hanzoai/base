@@ -1,6 +1,6 @@
 package apis
 
-// TaskCreateRequest is the body for POST /api/tasks.
+// TaskCreateRequest is the body for POST /v1/tasks.
 type TaskCreateRequest struct {
 	SpaceID      string            `json:"space_id"`
 	Title        string            `json:"title"`
@@ -29,7 +29,7 @@ type RetryConfig struct {
 	Backoff     float64 `json:"backoff_coefficient"`
 }
 
-// TaskUpdateRequest is the body for PUT /api/tasks/{id}.
+// TaskUpdateRequest is the body for PUT /v1/tasks/{id}.
 type TaskUpdateRequest struct {
 	Title       *string           `json:"title"`
 	Description *string           `json:"description"`
@@ -38,40 +38,40 @@ type TaskUpdateRequest struct {
 	Metadata    map[string]string `json:"metadata"`
 }
 
-// TaskClaimRequest is the body for POST /api/tasks/{id}/claim.
+// TaskClaimRequest is the body for POST /v1/tasks/{id}/claim.
 type TaskClaimRequest struct {
 	AgentID string `json:"agent_id"`
 }
 
-// TaskCompleteRequest is the body for POST /api/tasks/{id}/complete.
+// TaskCompleteRequest is the body for POST /v1/tasks/{id}/complete.
 type TaskCompleteRequest struct {
 	Output map[string]any `json:"output"`
 }
 
-// TaskFailRequest is the body for POST /api/tasks/{id}/fail.
+// TaskFailRequest is the body for POST /v1/tasks/{id}/fail.
 type TaskFailRequest struct {
 	Error string `json:"error"`
 }
 
-// TaskProgressRequest is the body for POST /api/tasks/{id}/progress.
+// TaskProgressRequest is the body for POST /v1/tasks/{id}/progress.
 type TaskProgressRequest struct {
 	Progress int `json:"progress"`
 }
 
-// TaskNextRequest is the body for POST /api/tasks/next.
+// TaskNextRequest is the body for POST /v1/tasks/next.
 type TaskNextRequest struct {
 	SpaceID string `json:"space_id"`
 	Queue   string `json:"queue"`    // alias for space_id
 	AgentID string `json:"agent_id"`
 }
 
-// TaskSignalRequest is the body for POST /api/tasks/{id}/signal.
+// TaskSignalRequest is the body for POST /v1/tasks/{id}/signal.
 type TaskSignalRequest struct {
 	Name string `json:"name"`
 	Data any    `json:"data,omitempty"`
 }
 
-// WorkflowCreateRequest is the body for POST /api/tasks/workflows.
+// WorkflowCreateRequest is the body for POST /v1/tasks/workflows.
 type WorkflowCreateRequest struct {
 	SpaceID     string              `json:"space_id"`
 	Queue       string              `json:"queue"`       // alias for space_id

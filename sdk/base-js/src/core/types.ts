@@ -12,7 +12,7 @@ import type { BaseRecord } from './state.js'
  * A single field in a collection schema.
  *
  * Field types and their option shapes mirror the Base admin API
- * (`/api/collections/{id}` → `fields[]`), so existing admin UIs read
+ * (`/v1/collections/{id}` → `fields[]`), so existing admin UIs read
  * the structure unchanged.
  */
 export interface CollectionField {
@@ -54,7 +54,7 @@ export interface CollectionField {
 
 /**
  * A collection definition. Mirrors the Base admin API
- * `/api/collections/{id}` payload.
+ * `/v1/collections/{id}` payload.
  *
  * `type` selects the back-end behaviour: `base` is a regular collection,
  * `auth` is an auth collection (users), `view` is a virtual read-only

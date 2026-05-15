@@ -49,7 +49,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:            "PUT private tag as guest → 401",
 			Method:          http.MethodPut,
-			URL:             "/api/private/watchlist",
+			URL:             "/v1/private/watchlist",
 			Body:            bytes.NewReader(ciphertext),
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"status":401`},
@@ -57,14 +57,14 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:            "GET private tag as guest → 401",
 			Method:          http.MethodGet,
-			URL:             "/api/private/watchlist",
+			URL:             "/v1/private/watchlist",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"status":401`},
 		},
 		{
 			Name:            "LIST private tags as guest → 401",
 			Method:          http.MethodGet,
-			URL:             "/api/private",
+			URL:             "/v1/private",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"status":401`},
 		},
@@ -73,7 +73,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:            "PUT with dotdot tag → 400",
 			Method:          http.MethodPut,
-			URL:             "/api/private/..bad",
+			URL:             "/v1/private/..bad",
 			Body:            bytes.NewReader(ciphertext),
 			Headers:         map[string]string{"Authorization": privateUserAToken},
 			ExpectedStatus:  400,
@@ -84,7 +84,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:           "PUT ciphertext returns size + timestamp",
 			Method:         http.MethodPut,
-			URL:            "/api/private/watchlist",
+			URL:            "/v1/private/watchlist",
 			Body:           bytes.NewReader(ciphertext),
 			Headers:        map[string]string{"Authorization": privateUserAToken},
 			ExpectedStatus: 200,
@@ -96,7 +96,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:            "PUT empty body → 400 (must DELETE)",
 			Method:          http.MethodPut,
-			URL:             "/api/private/empty",
+			URL:             "/v1/private/empty",
 			Body:            bytes.NewReader([]byte{}),
 			Headers:         map[string]string{"Authorization": privateUserAToken},
 			ExpectedStatus:  400,
@@ -107,7 +107,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:    "LIST returns seeded tag",
 			Method:  http.MethodGet,
-			URL:     "/api/private",
+			URL:     "/v1/private",
 			Headers: map[string]string{"Authorization": privateUserAToken},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				if err := seedPrivateRow(app, "watchlist", ciphertext); err != nil {
@@ -124,7 +124,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:    "GET returns seeded ciphertext bytes",
 			Method:  http.MethodGet,
-			URL:     "/api/private/watchlist",
+			URL:     "/v1/private/watchlist",
 			Headers: map[string]string{"Authorization": privateUserAToken},
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				if err := seedPrivateRow(app, "watchlist", ciphertext); err != nil {
@@ -147,7 +147,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:            "GET non-existent tag → 404",
 			Method:          http.MethodGet,
-			URL:             "/api/private/nope",
+			URL:             "/v1/private/nope",
 			Headers:         map[string]string{"Authorization": privateUserAToken},
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"status":404`},
@@ -157,7 +157,7 @@ func TestPrivateAPI(t *testing.T) {
 		{
 			Name:           "DELETE seeded tag → 204",
 			Method:         http.MethodDelete,
-			URL:            "/api/private/watchlist",
+			URL:            "/v1/private/watchlist",
 			Headers:        map[string]string{"Authorization": privateUserAToken},
 			ExpectedStatus: 204,
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
