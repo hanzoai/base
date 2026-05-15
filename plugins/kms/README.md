@@ -103,15 +103,15 @@ All endpoints require superuser authentication.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/kms/secrets` | Create an encrypted secret |
-| `GET` | `/api/kms/secrets/{key}` | Retrieve and decrypt a secret |
-| `DELETE` | `/api/kms/secrets/{key}` | Delete a secret |
-| `GET` | `/api/kms/secrets` | List all secret names |
-| `POST` | `/api/kms/unlock` | Unlock the cluster (derive CEK from passphrase) |
-| `POST` | `/api/kms/lock` | Lock the cluster (zero CEK from memory) |
-| `POST` | `/api/kms/invite` | Wrap CEK for a new member's HPKE public key |
-| `POST` | `/api/kms/sync` | Trigger CRDT sync across MPC nodes |
-| `GET` | `/api/kms/status` | Health status of all MPC nodes |
+| `POST` | `/v1/kms/secrets` | Create an encrypted secret |
+| `GET` | `/v1/kms/secrets/{key}` | Retrieve and decrypt a secret |
+| `DELETE` | `/v1/kms/secrets/{key}` | Delete a secret |
+| `GET` | `/v1/kms/secrets` | List all secret names |
+| `POST` | `/v1/kms/unlock` | Unlock the cluster (derive CEK from passphrase) |
+| `POST` | `/v1/kms/lock` | Lock the cluster (zero CEK from memory) |
+| `POST` | `/v1/kms/invite` | Wrap CEK for a new member's HPKE public key |
+| `POST` | `/v1/kms/sync` | Trigger CRDT sync across MPC nodes |
+| `GET` | `/v1/kms/status` | Health status of all MPC nodes |
 
 ## Enterprise Features
 
@@ -133,7 +133,7 @@ Enterprise features are configured on the MPC node (`EnterpriseConfig`):
 │  Application (Hanzo Base)                                     │
 │  ┌─────────────────────┐                                      │
 │  │  KMS Plugin          │                                     │
-│  │  • encrypt/decrypt   │  REST API (/api/kms/*)              │
+│  │  • encrypt/decrypt   │  REST API (/v1/kms/*)              │
 │  │  • FHE index         │                                     │
 │  │  • record hooks      │                                     │
 │  └────────┬────────────┘                                      │

@@ -15,7 +15,7 @@ import (
 func stubServer() *httptest.Server {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /api/collections", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/collections", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"items": []map[string]any{
 				{"id": "col1", "name": "users", "type": "auth"},
@@ -28,7 +28,7 @@ func stubServer() *httptest.Server {
 		})
 	})
 
-	mux.HandleFunc("GET /api/collections/{name}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/collections/{name}", func(w http.ResponseWriter, r *http.Request) {
 		name := r.PathValue("name")
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":   "col1",
@@ -40,7 +40,7 @@ func stubServer() *httptest.Server {
 		})
 	})
 
-	mux.HandleFunc("GET /api/collections/{col}/records", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/collections/{col}/records", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"items": []map[string]any{
 				{"id": "rec1", "title": "hello"},
@@ -52,28 +52,28 @@ func stubServer() *httptest.Server {
 		})
 	})
 
-	mux.HandleFunc("GET /api/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"id":    r.PathValue("id"),
 			"title": "found",
 		})
 	})
 
-	mux.HandleFunc("POST /api/collections/{col}/records", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /v1/collections/{col}/records", func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 		body["id"] = "new123"
 		json.NewEncoder(w).Encode(body)
 	})
 
-	mux.HandleFunc("PATCH /api/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("PATCH /v1/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
 		body["id"] = r.PathValue("id")
 		json.NewEncoder(w).Encode(body)
 	})
 
-	mux.HandleFunc("DELETE /api/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("DELETE /v1/collections/{col}/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 	})
 
@@ -81,13 +81,13 @@ func stubServer() *httptest.Server {
 	// `login` command no longer hits Base. Tokens come from IAM via
 	// --token / $BASE_TOKEN.
 
-	mux.HandleFunc("GET /api/crons", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/crons", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]map[string]any{
 			{"id": "cleanup", "expression": "0 0 * * *"},
 		})
 	})
 
-	mux.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /v1/health", func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]any{
 			"code":    200,
 			"message": "API is healthy.",
