@@ -162,7 +162,7 @@ func TestEmbeddedIAM_BootstrapNoOpWhenEnvMissing(t *testing.T) {
 func TestEmbeddedIAM_JWKSContainsPublicKey(t *testing.T) {
 	_, p := newEmbeddedTestPlugin(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/iam/.well-known/jwks", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/.well-known/jwks", nil)
 	rec := httptest.NewRecorder()
 	e := newReqEvent(p.app, req, rec)
 
@@ -204,7 +204,7 @@ func TestEmbeddedIAM_JWKSContainsPublicKey(t *testing.T) {
 func TestEmbeddedIAM_Discovery(t *testing.T) {
 	_, p := newEmbeddedTestPlugin(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/iam/.well-known/openid-configuration", nil)
+	req := httptest.NewRequest(http.MethodGet, "/v1/iam/.well-known/openid-configuration", nil)
 	req.Host = "base.example.com"
 	rec := httptest.NewRecorder()
 	e := newReqEvent(p.app, req, rec)
@@ -218,7 +218,7 @@ func TestEmbeddedIAM_Discovery(t *testing.T) {
 		t.Fatalf("decode discovery: %v", err)
 	}
 
-	wantIss := "http://base.example.com/api/iam"
+	wantIss := "http://base.example.com/v1/iam"
 	if doc["issuer"] != wantIss {
 		t.Errorf("issuer = %v, want %s", doc["issuer"], wantIss)
 	}
@@ -246,7 +246,7 @@ func TestEmbeddedIAM_FullFlow(t *testing.T) {
 		"redirect_uri": {"http://app.example.com/cb"},
 		"state":        {"xyz"},
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/iam/oauth/login",
+	req := httptest.NewRequest(http.MethodPost, "/v1/iam/oauth/login",
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Host = "base.example.com"
@@ -282,7 +282,7 @@ func TestEmbeddedIAM_FullFlow(t *testing.T) {
 		"redirect_uri": {"http://app.example.com/cb"},
 		"client_id":    {"test-client"},
 	}
-	req2 := httptest.NewRequest(http.MethodPost, "/api/iam/oauth/token",
+	req2 := httptest.NewRequest(http.MethodPost, "/v1/iam/oauth/token",
 		strings.NewReader(tokForm.Encode()))
 	req2.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req2.Host = "base.example.com"
@@ -324,7 +324,7 @@ func TestEmbeddedIAM_FullFlow(t *testing.T) {
 	if claims["aud"] != "test-client" {
 		t.Errorf("aud claim wrong: %v", claims["aud"])
 	}
-	if claims["iss"] != "http://base.example.com/api/iam" {
+	if claims["iss"] != "http://base.example.com/v1/iam" {
 		t.Errorf("iss claim wrong: %v", claims["iss"])
 	}
 	if _, ok := claims["sub"].(string); !ok {
@@ -344,7 +344,7 @@ func TestEmbeddedIAM_FullFlow(t *testing.T) {
 	}
 
 	// Step 4: /oauth/userinfo with the JWT.
-	req3 := httptest.NewRequest(http.MethodGet, "/api/iam/oauth/userinfo", nil)
+	req3 := httptest.NewRequest(http.MethodGet, "/v1/iam/oauth/userinfo", nil)
 	req3.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 	rec3 := httptest.NewRecorder()
 	e3 := newReqEvent(p.app, req3, rec3)
@@ -374,7 +374,7 @@ func TestEmbeddedIAM_LoginRejectsBadPassword(t *testing.T) {
 		"client_id":    {"c"},
 		"redirect_uri": {"http://x/cb"},
 	}
-	req := httptest.NewRequest(http.MethodPost, "/api/iam/oauth/login",
+	req := httptest.NewRequest(http.MethodPost, "/v1/iam/oauth/login",
 		strings.NewReader(form.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	rec := httptest.NewRecorder()
@@ -393,7 +393,7 @@ func TestEmbeddedIAM_AuthorizeRendersForm(t *testing.T) {
 	_, p := newEmbeddedTestPlugin(t)
 
 	req := httptest.NewRequest(http.MethodGet,
-		"/api/iam/oauth/authorize?client_id=test&redirect_uri=http://x/cb&state=abc", nil)
+		"/v1/iam/oauth/authorize?client_id=test&redirect_uri=http://x/cb&state=abc", nil)
 	rec := httptest.NewRecorder()
 	e := newReqEvent(p.app, req, rec)
 	if err := p.handleEmbeddedAuthorize(e); err != nil {
@@ -403,7 +403,7 @@ func TestEmbeddedIAM_AuthorizeRendersForm(t *testing.T) {
 		t.Fatalf("authorize status = %d", rec.Code)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`name="email"`, `name="password"`, `value="test"`, `value="abc"`, "/api/iam/oauth/login"} {
+	for _, want := range []string{`name="email"`, `name="password"`, `value="test"`, `value="abc"`, "/v1/iam/oauth/login"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("login form missing %q", want)
 		}

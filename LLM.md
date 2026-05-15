@@ -189,18 +189,19 @@ Store keys: `StoreKeyExternalAuthOnly`, `StoreKeyJWKSURL`, `StoreKeyAuthUsersCol
 ## Embedded IAM Mode (`IAM_MODE=embedded`)
 
 Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider
-at `/api/iam/*` instead of reverse-proxying to an external Hanzo IAM
-(Casdoor). Same `@hanzo/iam/browser` PKCE contract from the client's
-perspective — the path doesn't change, only the implementation.
+at `/v1/iam/*` instead of reverse-proxying to an external Hanzo IAM.
+Same `@hanzo/iam/browser` PKCE contract from the client's perspective —
+the path doesn't change, only the implementation. We use `/v1/iam`, not
+`/api/iam` — this is NOT Casdoor.
 
-Surface (minimal viable, NOT a full Casdoor):
+Surface (minimal viable, NOT a full Hanzo IAM):
 
-- `GET /api/iam/.well-known/openid-configuration` — OIDC discovery (issuer derived from request Host)
-- `GET /api/iam/.well-known/jwks` — public RSA JWK
-- `GET /api/iam/oauth/authorize` — plain HTML login form
-- `POST /api/iam/oauth/login` — verifies email+password, redirects to `redirect_uri?code=...&state=...`
-- `POST /api/iam/oauth/token` — exchanges single-use code for RS256-signed JWT (1h TTL)
-- `GET /api/iam/oauth/userinfo` — bearer-validated user record
+- `GET /v1/iam/.well-known/openid-configuration` — OIDC discovery (issuer derived from request Host)
+- `GET /v1/iam/.well-known/jwks` — public RSA JWK
+- `GET /v1/iam/oauth/authorize` — plain HTML login form
+- `POST /v1/iam/oauth/login` — verifies email+password, redirects to `redirect_uri?code=...&state=...`
+- `POST /v1/iam/oauth/token` — exchanges single-use code for RS256-signed JWT (1h TTL)
+- `GET /v1/iam/oauth/userinfo` — bearer-validated user record
 
 Signing key: `${DataDir}/iam.key` (RSA-2048 PEM, 0600). Generated on
 first boot; back it up alongside the SQLite database — losing it
