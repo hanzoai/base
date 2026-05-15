@@ -47,7 +47,7 @@ func TestBaseBindsCount(t *testing.T) {
 	vm := goja.New()
 	baseBinds(vm)
 
-	testBindsCount(vm, "this", 41, t)
+	testBindsCount(vm, "this", 40, t)
 }
 
 func TestBaseBindsSleep(t *testing.T) {
@@ -412,10 +412,6 @@ func TestBaseBindsNamedFields(t *testing.T) {
 		{
 			"new EditorField({name: 'test'})",
 			isType[*core.EditorField],
-		},
-		{
-			"new PasswordField({name: 'test'})",
-			isType[*core.PasswordField],
 		},
 		{
 			"new DateField({name: 'test'})",
@@ -796,7 +792,7 @@ func TestMailsBindsCount(t *testing.T) {
 	vm := goja.New()
 	mailsBinds(vm)
 
-	testBindsCount(vm, "$mails", 5, t)
+	testBindsCount(vm, "$mails", 2, t)
 }
 
 func TestMailsBinds(t *testing.T) {
@@ -815,11 +811,6 @@ func TestMailsBinds(t *testing.T) {
 	vm.Set("record", record)
 
 	_, vmErr := vm.RunString(`
-		$mails.sendRecordPasswordReset($app, record);
-		if (!$app.testMailer.lastMessage().html.includes("/_/#/auth/confirm-password-reset/")) {
-			throw new Error("Expected record password reset email, got:" + JSON.stringify($app.testMailer.lastMessage()))
-		}
-
 		$mails.sendRecordVerification($app, record);
 		if (!$app.testMailer.lastMessage().html.includes("/_/#/auth/confirm-verification/")) {
 			throw new Error("Expected record verification email, got:" + JSON.stringify($app.testMailer.lastMessage()))
@@ -828,16 +819,6 @@ func TestMailsBinds(t *testing.T) {
 		$mails.sendRecordChangeEmail($app, record, "new@example.com");
 		if (!$app.testMailer.lastMessage().html.includes("/_/#/auth/confirm-email-change/")) {
 			throw new Error("Expected record email change email, got:" + JSON.stringify($app.testMailer.lastMessage()))
-		}
-
-		$mails.sendRecordOTP($app, record, "test_otp_id", "test_otp_pass");
-		if (!$app.testMailer.lastMessage().html.includes("test_otp_pass")) {
-			throw new Error("Expected record OTP email, got:" + JSON.stringify($app.testMailer.lastMessage()))
-		}
-
-		$mails.sendRecordAuthAlert($app, record, "test_alert_info");
-		if (!$app.testMailer.lastMessage().html.includes("test_alert_info")) {
-			throw new Error("Expected record OTP email, got:" + JSON.stringify($app.testMailer.lastMessage()))
 		}
 	`)
 	if vmErr != nil {
@@ -1613,7 +1594,7 @@ func TestHooksBindsCount(t *testing.T) {
 	vm := goja.New()
 	hooksBinds(app, vm, nil)
 
-	testBindsCount(vm, "this", 82, t)
+	testBindsCount(vm, "this", 74, t)
 }
 
 func TestHooksBinds(t *testing.T) {
