@@ -1316,8 +1316,7 @@ func (record *Record) PublicExport() map[string]any {
 	}
 
 	if record.Collection().IsAuth() {
-		// always hide the password and tokenKey fields
-		delete(export, FieldNamePassword)
+		// always hide the tokenKey field
 		delete(export, FieldNameTokenKey)
 
 		if !record.ignoreEmailVisibility && !record.GetBool(FieldNameEmailVisibility) {
@@ -1466,7 +1465,7 @@ func onRecordValidate(e *RecordEvent) error {
 
 func onRecordSaveExecute(e *RecordEvent) error {
 	if e.Record.Collection().IsAuth() {
-		// ensure that the token key is regenerated on password change or email change
+		// ensure that the token key is regenerated on email change
 		if !e.Record.IsNew() {
 			lastSavedRecord, err := e.App.FindRecordById(e.Record.Collection(), e.Record.Id)
 			if err != nil {
@@ -1474,8 +1473,7 @@ func onRecordSaveExecute(e *RecordEvent) error {
 			}
 
 			if lastSavedRecord.TokenKey() == e.Record.TokenKey() &&
-				(lastSavedRecord.Get(FieldNamePassword) != e.Record.Get(FieldNamePassword) ||
-					lastSavedRecord.Email() != e.Record.Email()) {
+				lastSavedRecord.Email() != e.Record.Email() {
 				e.Record.RefreshTokenKey()
 			}
 		}
