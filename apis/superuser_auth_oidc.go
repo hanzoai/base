@@ -113,7 +113,7 @@ func bindSuperuserOIDCApi(app core.App, r *router.Router[*core.RequestEvent]) {
 	r.GET("/_/auth/oidc/callback", superuserOIDCCallback(app)).Bind(
 		SkipSuccessActivityLog(),
 	)
-	r.GET("/_/api/oidc/config", superuserOIDCConfigHandler(app))
+	r.GET("/_/v1/oidc/config", superuserOIDCConfigHandler(app))
 }
 
 // superuserOIDCConfigHandler returns a handler that reports whether OIDC is enabled.

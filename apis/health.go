@@ -14,7 +14,7 @@ func BindHealthzRoute(rg *router.Router[*core.RequestEvent]) {
 	rg.GET("/healthz", healthCheck)
 }
 
-// bindHealthApi registers /api/health (backward compatible).
+// bindHealthApi registers /v1/health.
 func bindHealthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	rg.GET("/health", healthCheck)
 }

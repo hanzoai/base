@@ -17,7 +17,7 @@ func TestCronsList(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/crons",
+			URL:             "/v1/crons",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -25,7 +25,7 @@ func TestCronsList(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/crons",
+			URL:    "/v1/crons",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -36,7 +36,7 @@ func TestCronsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser (empty list)",
 			Method: http.MethodGet,
-			URL:    "/api/crons",
+			URL:    "/v1/crons",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -50,7 +50,7 @@ func TestCronsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/crons",
+			URL:    "/v1/crons",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -96,7 +96,7 @@ func TestCronsRun(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/crons/test",
+			URL:             "/v1/crons/test",
 			Delay:           50 * time.Millisecond,
 			BeforeTestFunc:  beforeTestFunc,
 			AfterTestFunc:   expectedCalls(0),
@@ -107,7 +107,7 @@ func TestCronsRun(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/crons/test",
+			URL:    "/v1/crons/test",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -121,7 +121,7 @@ func TestCronsRun(t *testing.T) {
 		{
 			Name:   "authorized as superuser (missing job)",
 			Method: http.MethodPost,
-			URL:    "/api/crons/missing",
+			URL:    "/v1/crons/missing",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -135,7 +135,7 @@ func TestCronsRun(t *testing.T) {
 		{
 			Name:   "authorized as superuser (existing job)",
 			Method: http.MethodPost,
-			URL:    "/api/crons/test",
+			URL:    "/v1/crons/test",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},

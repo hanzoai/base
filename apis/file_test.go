@@ -23,7 +23,7 @@ func TestFileToken(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/files/token",
+			URL:             "/v1/files/token",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -31,7 +31,7 @@ func TestFileToken(t *testing.T) {
 		{
 			Name:   "regular user",
 			Method: http.MethodPost,
-			URL:    "/api/files/token",
+			URL:    "/v1/files/token",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -47,7 +47,7 @@ func TestFileToken(t *testing.T) {
 		{
 			Name:   "superuser",
 			Method: http.MethodPost,
-			URL:    "/api/files/token",
+			URL:    "/v1/files/token",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -63,7 +63,7 @@ func TestFileToken(t *testing.T) {
 		{
 			Name:   "hook token overwrite",
 			Method: http.MethodPost,
-			URL:    "/api/files/token",
+			URL:    "/v1/files/token",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -148,7 +148,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodGet,
-			URL:             "/api/files/missing/4q1xlclmfloku33/300_1SEi6Q6U72.png",
+			URL:             "/v1/files/missing/4q1xlclmfloku33/300_1SEi6Q6U72.png",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -156,7 +156,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "missing record",
 			Method:          http.MethodGet,
-			URL:             "/api/files/_users_auth_/missing/300_1SEi6Q6U72.png",
+			URL:             "/v1/files/_users_auth_/missing/300_1SEi6Q6U72.png",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -164,7 +164,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "missing file",
 			Method:          http.MethodGet,
-			URL:             "/api/files/_users_auth_/4q1xlclmfloku33/missing.png",
+			URL:             "/v1/files/_users_auth_/4q1xlclmfloku33/missing.png",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -172,7 +172,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "existing image",
 			Method:          http.MethodGet,
-			URL:             "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
+			URL:             "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
 			ExpectedStatus:  200,
 			ExpectedContent: []string{string(testImg)},
 			ExpectedEvents: map[string]int{
@@ -183,7 +183,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - missing thumb (should fallback to the original)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=999x999",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=999x999",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError == nil {
@@ -202,7 +202,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (crop center)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -221,7 +221,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (crop top)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50t",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50t",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -240,7 +240,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (crop bottom)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50b",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50b",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -259,7 +259,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (fit)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50f",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x50f",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -278,7 +278,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (zero width)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=0x50",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=0x50",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -297,7 +297,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing image - existing thumb (zero height)",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x0",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png?thumb=70x0",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError != nil {
@@ -316,7 +316,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "existing non image file - thumb parameter should be ignored",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/oap640cot4yru2s/test_kfd2wYLxkz.txt?thumb=100x100",
+			URL:    "/v1/files/_users_auth_/oap640cot4yru2s/test_kfd2wYLxkz.txt?thumb=100x100",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.OnFileDownloadRequest().BindFunc(func(e *core.FileDownloadRequestEvent) error {
 					if e.ThumbError == nil {
@@ -337,7 +337,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "protected file - superuser with expired file token",
 			Method:          http.MethodGet,
-			URL:             "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MTc2ODgxMzAwNCwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJ0eXBlIjoiZmlsZSJ9.WHf_Yt9X9L-hdXzpY3ZOQa89JQ9rrKb56ni9AAQt0AY",
+			URL:             "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MTc2ODgxMzAwNCwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJ0eXBlIjoiZmlsZSJ9.WHf_Yt9X9L-hdXzpY3ZOQa89JQ9rrKb56ni9AAQt0AY",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -345,7 +345,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "protected file - superuser with valid file token",
 			Method:          http.MethodGet,
-			URL:             "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6NDkyMjQxNjYwNCwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJ0eXBlIjoiZmlsZSJ9.OuICrgrFGLFWo3zuC0-_Lm3VO3N8U03mOYoDZB7vQp8",
+			URL:             "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6NDkyMjQxNjYwNCwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJ0eXBlIjoiZmlsZSJ9.OuICrgrFGLFWo3zuC0-_Lm3VO3N8U03mOYoDZB7vQp8",
 			ExpectedStatus:  200,
 			ExpectedContent: []string{"PNG"},
 			ExpectedEvents: map[string]int{
@@ -356,7 +356,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "protected file - guest without view access",
 			Method:          http.MethodGet,
-			URL:             "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png",
+			URL:             "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -364,7 +364,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "protected file - guest with view access",
 			Method: http.MethodGet,
-			URL:    "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png",
+			URL:    "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				// mock public view access
 				c, err := app.FindCachedCollectionByNameOrId("demo1")
@@ -386,7 +386,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "protected file - auth record without view access",
 			Method: http.MethodGet,
-			URL:    "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
+			URL:    "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				// mock restricted user view access
 				c, err := app.FindCachedCollectionByNameOrId("demo1")
@@ -405,7 +405,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "protected file - auth record with view access",
 			Method: http.MethodGet,
-			URL:    "/api/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
+			URL:    "/v1/files/demo1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				// mock user view access
 				c, err := app.FindCachedCollectionByNameOrId("demo1")
@@ -427,7 +427,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "protected file in view (view's View API rule failure)",
 			Method:          http.MethodGet,
-			URL:             "/api/files/view1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
+			URL:             "/v1/files/view1/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -435,7 +435,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:            "protected file in view (view's View API rule success)",
 			Method:          http.MethodGet,
-			URL:             "/api/files/view1/84nmscqy84lsi1t/test_d61b33QdDU.txt?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
+			URL:             "/v1/files/view1/84nmscqy84lsi1t/test_d61b33QdDU.txt?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjQ5MjI0MTcyMTAsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwidHlwZSI6ImZpbGUifQ.eE47sRcF1Vm4DQ7bpRFntr3Xr2wjPVlwJtdgssP9Rxw",
 			ExpectedStatus:  200,
 			ExpectedContent: []string{"test"},
 			ExpectedEvents: map[string]int{
@@ -449,7 +449,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "RateLimit rule - users:file",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -465,7 +465,7 @@ func TestFileDownload(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:file",
 			Method: http.MethodGet,
-			URL:    "/api/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
+			URL:    "/v1/files/_users_auth_/4q1xlclmfloku33/300_1SEi6Q6U72.png",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -526,10 +526,10 @@ func TestConcurrentThumbsGeneration(t *testing.T) {
 	fileKey := "wsmn24bux7wo113/al1h9ijdeojtsjy/300_Jsjq7RdBgA.png"
 
 	urls := []string{
-		"/api/files/" + fileKey + "?thumb=111x111",
-		"/api/files/" + fileKey + "?thumb=111x111", // should still result in single thumb
-		"/api/files/" + fileKey + "?thumb=111x222",
-		"/api/files/" + fileKey + "?thumb=111x333",
+		"/v1/files/" + fileKey + "?thumb=111x111",
+		"/v1/files/" + fileKey + "?thumb=111x111", // should still result in single thumb
+		"/v1/files/" + fileKey + "?thumb=111x222",
+		"/v1/files/" + fileKey + "?thumb=111x333",
 	}
 
 	var wg sync.WaitGroup

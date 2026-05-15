@@ -26,7 +26,7 @@ func NewClient(baseURL, token, tenant string) *Client {
 		BaseURL:   strings.TrimRight(baseURL, "/"),
 		Token:     token,
 		Tenant:    tenant,
-		APIPrefix: "/api",
+		APIPrefix: "/v1",
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 	}
 }

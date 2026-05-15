@@ -157,7 +157,7 @@ export class RealtimeService {
     this._intentionalDisconnect = false
     this._setState('connecting')
 
-    const url = `${this._baseUrl}/api/realtime`
+    const url = `${this._baseUrl}/v1/realtime`
     this._eventSource = new EventSource(url)
 
     this._eventSource.addEventListener('CONNECT', (e: MessageEvent) => {
@@ -240,7 +240,7 @@ export class RealtimeService {
 
     const token = this._getToken()
     try {
-      await fetch(`${this._baseUrl}/api/realtime`, {
+      await fetch(`${this._baseUrl}/v1/realtime`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -113,7 +113,7 @@ export class FileService {
     const collectionId = (record.collectionId ?? record.collectionName ?? '') as string
     const parts = [
       this._baseUrl,
-      'api',
+      'v1',
       'files',
       encodeURIComponent(collectionId),
       encodeURIComponent(record.id),
@@ -269,7 +269,7 @@ export class BaseClient {
     if (options?.perPage) params.set('perPage', String(options.perPage))
 
     const qs = params.toString()
-    const path = `/api/collections/${encodeURIComponent(collection)}/records${qs ? '?' + qs : ''}`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/records${qs ? '?' + qs : ''}`
     const result = await this._request<ListResult>('GET', path)
 
     this.store.setQuery(collection, options?.filter ?? '', result.items)
@@ -281,26 +281,26 @@ export class BaseClient {
     if (options?.expand) params.set('expand', options.expand)
     if (options?.fields) params.set('fields', options.fields)
     const qs = params.toString()
-    const path = `/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}${qs ? '?' + qs : ''}`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}${qs ? '?' + qs : ''}`
     return this._request<BaseRecord>('GET', path)
   }
 
   async create(collection: string, data: Record<string, unknown>): Promise<BaseRecord> {
-    const path = `/api/collections/${encodeURIComponent(collection)}/records`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/records`
     const record = await this._request<BaseRecord>('POST', path, data)
     this.store.applyServerUpdate(collection, 'create', record)
     return record
   }
 
   async update(collection: string, id: string, data: Record<string, unknown>): Promise<BaseRecord> {
-    const path = `/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`
     const record = await this._request<BaseRecord>('PATCH', path, data)
     this.store.applyServerUpdate(collection, 'update', record)
     return record
   }
 
   async delete(collection: string, id: string): Promise<void> {
-    const path = `/api/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`
     await this._request<void>('DELETE', path)
     this.store.applyServerUpdate(collection, 'delete', { id } as BaseRecord)
   }
@@ -312,7 +312,7 @@ export class BaseClient {
     identity: string,
     password: string,
   ): Promise<{ token: string; record: BaseRecord }> {
-    const path = `/api/collections/${encodeURIComponent(collection)}/auth-with-password`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/auth-with-password`
     const result = await this._request<{ token: string; record: BaseRecord }>('POST', path, {
       identity,
       password,
@@ -329,7 +329,7 @@ export class BaseClient {
   }
 
   async refreshAuth(collection: string): Promise<{ token: string; record: BaseRecord }> {
-    const path = `/api/collections/${encodeURIComponent(collection)}/auth-refresh`
+    const path = `/v1/collections/${encodeURIComponent(collection)}/auth-refresh`
     const result = await this._request<{ token: string; record: BaseRecord }>('POST', path)
     this.authStore.save(result.token, result.record)
     return result
@@ -391,7 +391,7 @@ export class BaseClient {
   // ---- Health check -------------------------------------------------------
 
   async health(): Promise<{ code: number; message: string }> {
-    return this.send('/api/health')
+    return this.send('/v1/health')
   }
 
   // ---- Realtime convenience -----------------------------------------------

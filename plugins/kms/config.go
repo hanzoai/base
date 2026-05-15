@@ -54,7 +54,7 @@ type Config struct {
 
 	// AutoUnlock controls whether the plugin unlocks on startup using
 	// Passphrase or the KMS_PASSPHRASE env var (default false).
-	// Only use for dev/testing. In production, use the /api/kms/unlock endpoint.
+	// Only use for dev/testing. In production, use the /v1/kms/unlock endpoint.
 	AutoUnlock bool
 }
 

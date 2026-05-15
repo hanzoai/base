@@ -24,7 +24,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/missing/records",
+			URL:             "/v1/collections/missing/records",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -32,7 +32,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:            "unauthenticated trying to access nil rule collection (aka. need superuser auth)",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo1/records",
+			URL:             "/v1/collections/demo1/records",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -40,7 +40,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated record trying to access nil rule collection (aka. need superuser auth)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records",
+			URL:    "/v1/collections/demo1/records",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -51,7 +51,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:            "public collection but with superuser only filter param (aka. @collection, @request, etc.)",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo2/records?filter=%40collection.demo2.title='test1'",
+			URL:             "/v1/collections/demo2/records?filter=%40collection.demo2.title='test1'",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -59,7 +59,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:            "public collection but with superuser only sort param (aka. @collection, @request, etc.)",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo2/records?sort=@request.auth.title",
+			URL:             "/v1/collections/demo2/records?sort=@request.auth.title",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -67,7 +67,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:            "public collection but with ENCODED superuser only filter/sort (aka. @collection)",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo2/records?filter=%40collection.demo2.title%3D%27test1%27",
+			URL:             "/v1/collections/demo2/records?filter=%40collection.demo2.title%3D%27test1%27",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -75,7 +75,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "public collection",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/demo2/records",
+			URL:            "/v1/collections/demo2/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -96,7 +96,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "public collection (using the collection id)",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/sz5l5z67tg7gku0/records",
+			URL:            "/v1/collections/sz5l5z67tg7gku0/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -117,7 +117,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authorized as superuser trying to access nil rule collection (aka. need superuser auth)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records",
+			URL:    "/v1/collections/demo1/records",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -141,7 +141,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "valid query params",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records?filter=text~'test'&sort=-bool",
+			URL:    "/v1/collections/demo1/records?filter=text~'test'&sort=-bool",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -163,7 +163,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "invalid filter",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records?filter=invalid~'test'",
+			URL:    "/v1/collections/demo1/records?filter=invalid~'test'",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -174,7 +174,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "expand relations",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records?expand=rel_one,rel_many.rel,missing&perPage=2&sort=created",
+			URL:    "/v1/collections/demo1/records?expand=rel_one,rel_many.rel,missing&perPage=2&sort=created",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -214,7 +214,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated record model that DOESN'T match the collection list rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -234,7 +234,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated record that matches the collection list rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -260,7 +260,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated regular record that matches the collection list rule with hidden field",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -301,7 +301,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated regular record filtering with a hidden field",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo3/records?filter=title~'test'",
+			URL:    "/v1/collections/demo3/records?filter=title~'test'",
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -326,7 +326,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "superuser filtering with a hidden field",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo3/records?filter=title~'test'",
+			URL:    "/v1/collections/demo3/records?filter=title~'test'",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -364,7 +364,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           ":rule modifer",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/demo5/records",
+			URL:            "/v1/collections/demo5/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -383,7 +383,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "multi-match - at least one of (guest - non-satisfied relation filter API rule)",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
+			URL:            "/v1/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -401,7 +401,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "multi-match - at least one of (clients)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
+			URL:    "/v1/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length?=2"),
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -424,7 +424,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "multi-match - all (clients)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length=2"),
+			URL:    "/v1/collections/demo4/records?filter=" + url.QueryEscape("rel_many_no_cascade_required.files:length=2"),
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -445,7 +445,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "OnRecordsListRequest tx body write check",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo4/records",
+			URL:    "/v1/collections/demo4/records",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -474,7 +474,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "check email visibility as guest",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/nologin/records",
+			URL:            "/v1/collections/nologin/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -504,7 +504,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "check email visibility as any authenticated record",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records",
+			URL:    "/v1/collections/nologin/records",
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -538,7 +538,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "check email visibility as manage auth record",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records",
+			URL:    "/v1/collections/nologin/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -572,7 +572,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "check email visibility as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records",
+			URL:    "/v1/collections/nologin/records",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -605,7 +605,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "check self email visibility resolver",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records",
+			URL:    "/v1/collections/nologin/records",
 			Headers: map[string]string{
 				// nologin, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZGM0OWs2amdlam40MGgzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.0IefiphujJikMIaWzX0X5VLSWnCN1W6P5g3glRRIVtA",
@@ -642,7 +642,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "public view records",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/view2/records?filter=state=false",
+			URL:            "/v1/collections/view2/records?filter=state=false",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -666,7 +666,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "guest that doesn't match the view collection list rule",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/view1/records",
+			URL:            "/v1/collections/view1/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -683,7 +683,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "authenticated record that matches the view collection list rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/view1/records",
+			URL:    "/v1/collections/view1/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -707,7 +707,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:           "view collection with numeric ids",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/numeric_id_view/records",
+			URL:            "/v1/collections/numeric_id_view/records",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"page":1`,
@@ -730,7 +730,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "RateLimit rule - view2:list",
 			Method: http.MethodGet,
-			URL:    "/api/collections/view2/records",
+			URL:    "/v1/collections/view2/records",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -746,7 +746,7 @@ func TestRecordCrudList(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:list",
 			Method: http.MethodGet,
-			URL:    "/api/collections/view2/records",
+			URL:    "/v1/collections/view2/records",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -772,7 +772,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/missing/records/0yxhwia2amd8gec",
+			URL:             "/v1/collections/missing/records/0yxhwia2amd8gec",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -780,7 +780,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:            "missing record",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo2/records/missing",
+			URL:             "/v1/collections/demo2/records/missing",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -788,7 +788,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:            "unauthenticated trying to access nil rule collection (aka. need superuser auth)",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:             "/v1/collections/demo1/records/imy661ixudk5izi",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -796,7 +796,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "authenticated record trying to access nil rule collection (aka. need superuser auth)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -808,7 +808,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "authenticated record that doesn't match the collection view rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/users/records/bgs820n361vj1qd",
+			URL:    "/v1/collections/users/records/bgs820n361vj1qd",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -820,7 +820,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:           "public collection view",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"0yxhwia2amd8gec"`,
@@ -835,7 +835,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:           "public collection view (using the collection id)",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/sz5l5z67tg7gku0/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/sz5l5z67tg7gku0/records/0yxhwia2amd8gec",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"0yxhwia2amd8gec"`,
@@ -850,7 +850,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "authorized as superuser trying to access nil rule collection view (aka. need superuser auth)",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -868,7 +868,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "authenticated record that does match the collection view rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/users/records/4q1xlclmfloku33",
+			URL:    "/v1/collections/users/records/4q1xlclmfloku33",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -890,7 +890,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "expand relations",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records/al1h9ijdeojtsjy?expand=rel_one,rel_many.rel,missing&perPage=2&sort=created",
+			URL:    "/v1/collections/demo1/records/al1h9ijdeojtsjy?expand=rel_one,rel_many.rel,missing&perPage=2&sort=created",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -915,7 +915,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "OnRecordViewRequest tx body write check",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1/records/al1h9ijdeojtsjy",
+			URL:    "/v1/collections/demo1/records/al1h9ijdeojtsjy",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -944,7 +944,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:           "check email visibility as guest",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/nologin/records/oos036e9xvqeexy",
+			URL:            "/v1/collections/nologin/records/oos036e9xvqeexy",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"oos036e9xvqeexy"`,
@@ -965,7 +965,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "check email visibility as any authenticated record",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records/oos036e9xvqeexy",
+			URL:    "/v1/collections/nologin/records/oos036e9xvqeexy",
 			Headers: map[string]string{
 				// clients, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJ2ODUxcTRyNzkwcmhrbmwiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZ2szOTBxZWdzNHk0N3duIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.xCGkWuACPNAEUBLQVK4KKp72HzA2aOtWZnP47iBs5os",
@@ -990,7 +990,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "check email visibility as manage auth record",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records/oos036e9xvqeexy",
+			URL:    "/v1/collections/nologin/records/oos036e9xvqeexy",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1011,7 +1011,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "check email visibility as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records/oos036e9xvqeexy",
+			URL:    "/v1/collections/nologin/records/oos036e9xvqeexy",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1035,7 +1035,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "check self email visibility resolver",
 			Method: http.MethodGet,
-			URL:    "/api/collections/nologin/records/dc49k6jgejn40h3",
+			URL:    "/v1/collections/nologin/records/dc49k6jgejn40h3",
 			Headers: map[string]string{
 				// nologin, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJrcHY3MDlzazJscWJxazgiLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiZGM0OWs2amdlam40MGgzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.0IefiphujJikMIaWzX0X5VLSWnCN1W6P5g3glRRIVtA",
@@ -1063,7 +1063,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:           "public view record",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/view2/records/84nmscqy84lsi1t",
+			URL:            "/v1/collections/view2/records/84nmscqy84lsi1t",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"84nmscqy84lsi1t"`,
@@ -1084,7 +1084,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:            "guest that doesn't match the view collection view rule",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/view1/records/84nmscqy84lsi1t",
+			URL:             "/v1/collections/view1/records/84nmscqy84lsi1t",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1092,7 +1092,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "authenticated record that matches the view collection view rule",
 			Method: http.MethodGet,
-			URL:    "/api/collections/view1/records/84nmscqy84lsi1t",
+			URL:    "/v1/collections/view1/records/84nmscqy84lsi1t",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1112,7 +1112,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:           "view record with numeric id",
 			Method:         http.MethodGet,
-			URL:            "/api/collections/numeric_id_view/records/1",
+			URL:            "/v1/collections/numeric_id_view/records/1",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"1"`,
@@ -1129,7 +1129,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "RateLimit rule - numeric_id_view:view",
 			Method: http.MethodGet,
-			URL:    "/api/collections/numeric_id_view/records/1",
+			URL:    "/v1/collections/numeric_id_view/records/1",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -1145,7 +1145,7 @@ func TestRecordCrudView(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:view",
 			Method: http.MethodGet,
-			URL:    "/api/collections/numeric_id_view/records/1",
+			URL:    "/v1/collections/numeric_id_view/records/1",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -1180,7 +1180,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/missing/records/0yxhwia2amd8gec",
+			URL:             "/v1/collections/missing/records/0yxhwia2amd8gec",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1188,7 +1188,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:            "missing record",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/demo2/records/missing",
+			URL:             "/v1/collections/demo2/records/missing",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1196,7 +1196,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:            "unauthenticated trying to delete nil rule collection (aka. need superuser auth)",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:             "/v1/collections/demo1/records/imy661ixudk5izi",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1204,7 +1204,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "authenticated record trying to delete nil rule collection (aka. need superuser auth)",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1216,7 +1216,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "authenticated record that doesn't match the collection delete rule",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/users/records/bgs820n361vj1qd",
+			URL:    "/v1/collections/users/records/bgs820n361vj1qd",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1228,7 +1228,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:            "trying to delete a view collection record",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/view1/records/imy661ixudk5izi",
+			URL:             "/v1/collections/view1/records/imy661ixudk5izi",
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1236,7 +1236,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:           "public collection record delete",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/nologin/records/dc49k6jgejn40h3",
+			URL:            "/v1/collections/nologin/records/dc49k6jgejn40h3",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
 				"*":                          0,
@@ -1252,7 +1252,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:           "public collection record delete (using the collection id as identifier)",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/kpv709sk2lqbqk8/records/dc49k6jgejn40h3",
+			URL:            "/v1/collections/kpv709sk2lqbqk8/records/dc49k6jgejn40h3",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
 				"*":                          0,
@@ -1268,7 +1268,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser trying to delete nil rule collection view (aka. need superuser auth)",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/clients/records/o1y0dd0spd786md",
+			URL:    "/v1/collections/clients/records/o1y0dd0spd786md",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1287,7 +1287,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "OnRecordDeleteRequest tx body write check",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/clients/records/o1y0dd0spd786md",
+			URL:    "/v1/collections/clients/records/o1y0dd0spd786md",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1313,7 +1313,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "authenticated record that match the collection delete rule",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/users/records/4q1xlclmfloku33",
+			URL:    "/v1/collections/users/records/4q1xlclmfloku33",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1343,7 +1343,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:            "@request :isset (rule failure check)",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/demo5/records/la4y2w4o98acwuj",
+			URL:             "/v1/collections/demo5/records/la4y2w4o98acwuj",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1351,7 +1351,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:           "@request :isset (rule pass check)",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/demo5/records/la4y2w4o98acwuj?test=1",
+			URL:            "/v1/collections/demo5/records/la4y2w4o98acwuj?test=1",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{
 				"*":                          0,
@@ -1370,7 +1370,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "trying to delete a record while being part of a non-cascade required relation",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo3/records/7nwo8tuiatetxdm",
+			URL:    "/v1/collections/demo3/records/7nwo8tuiatetxdm",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1396,7 +1396,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "delete a record with non-cascade references",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo3/records/1tmknxy2868d869",
+			URL:    "/v1/collections/demo3/records/1tmknxy2868d869",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1421,7 +1421,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "delete a record with cascade references",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/users/records/oap640cot4yru2s",
+			URL:    "/v1/collections/users/records/oap640cot4yru2s",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1459,7 +1459,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "RateLimit rule - demo5:delete",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo5/records/la4y2w4o98acwuj?test=1",
+			URL:    "/v1/collections/demo5/records/la4y2w4o98acwuj?test=1",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -1475,7 +1475,7 @@ func TestRecordCrudDelete(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:delete",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo5/records/la4y2w4o98acwuj?test=1",
+			URL:    "/v1/collections/demo5/records/la4y2w4o98acwuj?test=1",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
 				app.Settings().RateLimits.Rules = []core.RateLimitRule{
@@ -1522,7 +1522,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/missing/records",
+			URL:             "/v1/collections/missing/records",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1530,7 +1530,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:            "guest trying to access nil-rule collection",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/demo1/records",
+			URL:             "/v1/collections/demo1/records",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1538,7 +1538,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record trying to access nil-rule collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo1/records",
+			URL:    "/v1/collections/demo1/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -1550,7 +1550,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:            "trying to create a new view collection record",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/view1/records",
+			URL:             "/v1/collections/view1/records",
 			Body:            strings.NewReader(`{"text":"new"}`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
@@ -1559,7 +1559,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:            "submit invalid body",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/demo2/records",
+			URL:             "/v1/collections/demo2/records",
 			Body:            strings.NewReader(`{"`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
@@ -1568,7 +1568,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:           "submit nil body",
 			Method:         http.MethodPost,
-			URL:            "/api/collections/demo2/records",
+			URL:            "/v1/collections/demo2/records",
 			Body:           nil,
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -1589,7 +1589,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:           "submit empty json body",
 			Method:         http.MethodPost,
-			URL:            "/api/collections/nologin/records",
+			URL:            "/v1/collections/nologin/records",
 			Body:           strings.NewReader(`{}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -1610,7 +1610,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:           "guest submit in public collection",
 			Method:         http.MethodPost,
-			URL:            "/api/collections/demo2/records",
+			URL:            "/v1/collections/demo2/records",
 			Body:           strings.NewReader(`{"title":"new"}`),
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -1635,7 +1635,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:            "guest trying to submit in restricted collection",
 			Method:          http.MethodPost,
-			URL:             "/api/collections/demo3/records",
+			URL:             "/v1/collections/demo3/records",
 			Body:            strings.NewReader(`{"title":"test123"}`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
@@ -1644,7 +1644,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record submit in restricted collection (rule failure check)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body:   strings.NewReader(`{"title":"test123"}`),
 			Headers: map[string]string{
 				// users, test@example.com
@@ -1657,7 +1657,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record submit in restricted collection (rule pass check) + expand relations",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo4/records?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
+			URL:    "/v1/collections/demo4/records?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
 			Body: strings.NewReader(`{
 				"title":"test123",
 				"rel_one_no_cascade":"mk5fmymtx4wsprk",
@@ -1707,7 +1707,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "superuser submit in restricted collection (rule skip check) + expand relations",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo4/records?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
+			URL:    "/v1/collections/demo4/records?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
 			Body: strings.NewReader(`{
 				"title":"test123",
 				"rel_one_no_cascade":"mk5fmymtx4wsprk",
@@ -1755,7 +1755,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "superuser submit via multipart form data",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body:   formData,
 			Headers: map[string]string{
 				"Content-Type":  mp.FormDataContentType(),
@@ -1784,7 +1784,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "submit via multipart form data with @jsonPayload key and unsatisfied @request.body rule",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body:   formData2,
 			Headers: map[string]string{
 				"Content-Type": mp2.FormDataContentType(),
@@ -1806,7 +1806,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "submit via multipart form data with @jsonPayload key and satisfied @request.body rule",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body:   formData3,
 			Headers: map[string]string{
 				"Content-Type": mp3.FormDataContentType(),
@@ -1844,7 +1844,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "unique field error check",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo2/records",
+			URL:    "/v1/collections/demo2/records",
 			Body: strings.NewReader(`{
 				"title":"test2"
 			}`),
@@ -1870,7 +1870,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "OnRecordCreateRequest tx body write check",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo2/records",
+			URL:    "/v1/collections/demo2/records",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -1900,7 +1900,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "invalid custom insertion id (less than 15 chars)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "12345678901234",
 				"title": "test"
@@ -1926,7 +1926,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "invalid custom insertion id (more than 15 chars)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "1234567890123456",
 				"title": "test"
@@ -1952,7 +1952,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "valid custom insertion id (exactly 15 chars)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "123456789012345",
 				"title": "test"
@@ -1982,7 +1982,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "valid custom insertion id existing in another non-auth collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "0yxhwia2amd8gec",
 				"title": "test"
@@ -2012,7 +2012,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "valid custom insertion auth id duplicating in another auth collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Body: strings.NewReader(`{
 				"id":"o1y0dd0spd786md",
 				"title":"test",
@@ -2046,7 +2046,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "@request.body.field with compute modifers (rule failure check)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo5/records",
+			URL:    "/v1/collections/demo5/records",
 			Body: strings.NewReader(`{
 				"total+":4,
 				"total-":2
@@ -2058,7 +2058,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "@request.body.field with compute modifers (rule pass check)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo5/records",
+			URL:    "/v1/collections/demo5/records",
 			Body: strings.NewReader(`{
 				"total+":4,
 				"total-":1
@@ -2089,7 +2089,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with invalid email",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Body: strings.NewReader(`{
 				"email":"invalid",
 				"username":"Users75657"
@@ -2116,7 +2116,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with invalid record fields",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Body: strings.NewReader(`{
 				"email":"test_new@example.com",
 				"rel":"invalid"
@@ -2143,7 +2143,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with explicit verified state by guest",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Body: strings.NewReader(`{
 				"email":"test_new@example.com",
 				"verified":true
@@ -2162,7 +2162,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with valid data and explicitly verified state by random user",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -2190,7 +2190,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with valid data by superuser",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/records",
+			URL:    "/v1/collections/users/records",
 			Body: strings.NewReader(`{
 				"id":"o1o1y0pd78686mq",
 				"username":"test.valid",
@@ -2235,7 +2235,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "auth record with valid data by auth record with manage access",
 			Method: http.MethodPost,
-			URL:    "/api/collections/nologin/records",
+			URL:    "/v1/collections/nologin/records",
 			Body: strings.NewReader(`{
 				"email":"new@example.com",
 				"password":"12345678",
@@ -2282,7 +2282,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "create with hidden field as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "abcde1234567890",
 				"title": "test_create"
@@ -2339,7 +2339,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "create with hidden field as superuser",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo3/records",
+			URL:    "/v1/collections/demo3/records",
 			Body: strings.NewReader(`{
 				"id": "abcde1234567890",
 				"title": "test_create"
@@ -2398,7 +2398,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "RateLimit rule - demo2:create",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo2/records",
+			URL:    "/v1/collections/demo2/records",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
@@ -2415,7 +2415,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:create",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo2/records",
+			URL:    "/v1/collections/demo2/records",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
@@ -2434,7 +2434,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "body > collection BodyLimit",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo1/records",
+			URL:    "/v1/collections/demo1/records",
 			// the exact body doesn't matter as long as it returns 413
 			Body: bytes.NewReader(make([]byte, apis.DefaultMaxBodySize+5+20+2+1)),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
@@ -2467,7 +2467,7 @@ func TestRecordCrudCreate(t *testing.T) {
 		{
 			Name:   "body <= collection BodyLimit",
 			Method: http.MethodPost,
-			URL:    "/api/collections/demo1/records",
+			URL:    "/v1/collections/demo1/records",
 			// the exact body doesn't matter as long as it doesn't return 413
 			Body: bytes.NewReader(make([]byte, apis.DefaultMaxBodySize+5+20+2)),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
@@ -2532,7 +2532,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:            "missing collection",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/missing/records/0yxhwia2amd8gec",
+			URL:             "/v1/collections/missing/records/0yxhwia2amd8gec",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -2540,7 +2540,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:            "guest trying to access nil-rule collection record",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:             "/v1/collections/demo1/records/imy661ixudk5izi",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -2548,7 +2548,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "auth record trying to access nil-rule collection",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -2560,7 +2560,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:            "trying to update a view collection record",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/view1/records/imy661ixudk5izi",
+			URL:             "/v1/collections/view1/records/imy661ixudk5izi",
 			Body:            strings.NewReader(`{"text":"new"}`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
@@ -2569,7 +2569,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:            "submit invalid body",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:             "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:            strings.NewReader(`{"`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"data":{}`},
@@ -2578,7 +2578,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:           "submit nil body (aka. no fields change)",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:           nil,
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -2602,7 +2602,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:           "submit empty body (aka. no fields change)",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:           strings.NewReader(`{}`),
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -2626,7 +2626,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:           "trigger field validation",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:           strings.NewReader(`{"title":"a"}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -2647,7 +2647,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:           "guest submit in public collection",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:            "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:           strings.NewReader(`{"title":"new"}`),
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -2672,7 +2672,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:            "guest trying to submit in restricted collection",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:             "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body:            strings.NewReader(`{"title":"new"}`),
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
@@ -2681,7 +2681,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "auth record submit in restricted collection (rule failure check)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:    "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			Headers: map[string]string{
 				// users, test@example.com
@@ -2694,7 +2694,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "auth record submit in restricted collection (rule pass check) + expand relations",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo4/records/i9naidtvr6qsgb4?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
+			URL:    "/v1/collections/demo4/records/i9naidtvr6qsgb4?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
 			Body: strings.NewReader(`{
 				"title":"test123",
 				"rel_one_no_cascade":"mk5fmymtx4wsprk",
@@ -2744,7 +2744,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "superuser submit in restricted collection (rule skip check) + expand relations",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo4/records/i9naidtvr6qsgb4?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
+			URL:    "/v1/collections/demo4/records/i9naidtvr6qsgb4?expand=missing,rel_one_no_cascade,rel_many_no_cascade_required",
 			Body: strings.NewReader(`{
 				"title":"test123",
 				"rel_one_no_cascade":"mk5fmymtx4wsprk",
@@ -2792,7 +2792,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "superuser submit via multipart form data",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:    "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body:   formData,
 			Headers: map[string]string{
 				"Content-Type":  mp.FormDataContentType(),
@@ -2821,7 +2821,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "submit via multipart form data with @jsonPayload key and unsatisfied @request.body rule",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:    "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body:   formData2,
 			Headers: map[string]string{
 				"Content-Type": mp2.FormDataContentType(),
@@ -2843,7 +2843,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "submit via multipart form data with @jsonPayload key and satisfied @request.body rule",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:    "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body:   formData3,
 			Headers: map[string]string{
 				"Content-Type": mp3.FormDataContentType(),
@@ -2883,7 +2883,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "OnRecordUpdateRequest tx body write check",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:    "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -2910,7 +2910,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "try to change the id of an existing record",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/mk5fmymtx4wsprk",
+			URL:    "/v1/collections/demo3/records/mk5fmymtx4wsprk",
 			Body: strings.NewReader(`{
 				"id": "mk5fmymtx4wspra"
 			}`),
@@ -2936,7 +2936,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "unique field error check",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2/records/llvuca81nly1qls",
+			URL:    "/v1/collections/demo2/records/llvuca81nly1qls",
 			Body: strings.NewReader(`{
 				"title":"test2"
 			}`),
@@ -2965,7 +2965,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "@request.body.field with compute modifers (rule failure check)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo5/records/la4y2w4o98acwuj",
+			URL:    "/v1/collections/demo5/records/la4y2w4o98acwuj",
 			Body: strings.NewReader(`{
 				"total+":3,
 				"total-":1
@@ -2979,7 +2979,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "@request.body.field with compute modifers (rule pass check)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo5/records/la4y2w4o98acwuj",
+			URL:    "/v1/collections/demo5/records/la4y2w4o98acwuj",
 			Body: strings.NewReader(`{
 				"total+":2,
 				"total-":1
@@ -3010,7 +3010,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "auth record with invalid email",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/users/records/bgs820n361vj1qd",
+			URL:    "/v1/collections/users/records/bgs820n361vj1qd",
 			Body: strings.NewReader(`{
 				"email":"invalid",
 				"verified":false
@@ -3037,7 +3037,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "auth record with invalid record fields",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/users/records/bgs820n361vj1qd",
+			URL:    "/v1/collections/users/records/bgs820n361vj1qd",
 			Body: strings.NewReader(`{
 				"rel":"invalid"
 			}`),
@@ -3063,7 +3063,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "try to set verified by guest",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/nologin/records/phhq3wr65cap535",
+			URL:    "/v1/collections/nologin/records/phhq3wr65cap535",
 			Body: strings.NewReader(`{
 				"emailVisibility":true,
 				"verified":true
@@ -3084,7 +3084,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "try to set verified by auth record (owner)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/users/records/4q1xlclmfloku33",
+			URL:    "/v1/collections/users/records/4q1xlclmfloku33",
 			Headers: map[string]string{
 				// users, test@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -3109,7 +3109,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "try to unset/downgrade email and verified fields (owner)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/users/records/oap640cot4yru2s",
+			URL:    "/v1/collections/users/records/oap640cot4yru2s",
 			Headers: map[string]string{
 				// users, test2@example.com
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoib2FwNjQwY290NHlydTJzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.h9l_1A2r42IIOOi-5IjuzCGuUhlMmxdFDVhncE3FUqg",
@@ -3135,7 +3135,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "update with hidden field as regular user",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/1tmknxy2868d869",
+			URL:    "/v1/collections/demo3/records/1tmknxy2868d869",
 			Body: strings.NewReader(`{
 				"title": "test_update"
 			}`),
@@ -3191,7 +3191,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "update with hidden field as superuser",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo3/records/1tmknxy2868d869",
+			URL:    "/v1/collections/demo3/records/1tmknxy2868d869",
 			Body: strings.NewReader(`{
 				"title": "test_update"
 			}`),
@@ -3248,7 +3248,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "RateLimit rule - demo2:update",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:    "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
@@ -3265,7 +3265,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "RateLimit rule - *:update",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2/records/0yxhwia2amd8gec",
+			URL:    "/v1/collections/demo2/records/0yxhwia2amd8gec",
 			Body:   strings.NewReader(`{"title":"new"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Settings().RateLimits.Enabled = true
@@ -3284,7 +3284,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "body > collection BodyLimit",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			// the exact body doesn't matter as long as it returns 413
 			Body: bytes.NewReader(make([]byte, apis.DefaultMaxBodySize+5+20+2+1)),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
@@ -3317,7 +3317,7 @@ func TestRecordCrudUpdate(t *testing.T) {
 		{
 			Name:   "body <= collection BodyLimit",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1/records/imy661ixudk5izi",
+			URL:    "/v1/collections/demo1/records/imy661ixudk5izi",
 			// the exact body doesn't matter as long as it doesn't return 413
 			Body: bytes.NewReader(make([]byte, apis.DefaultMaxBodySize+5+20+2)),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {

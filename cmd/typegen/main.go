@@ -122,7 +122,7 @@ func run() error {
 
 // fetchCollections retrieves all collections from the Base API.
 func fetchCollections(baseURL, token string) ([]collection, error) {
-	url := baseURL + "/api/collections?perPage=500"
+	url := baseURL + "/v1/collections?perPage=500"
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err

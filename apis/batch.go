@@ -36,7 +36,7 @@ type BatchActionHandlerFunc func(app core.App, ir *core.InternalRequest, params 
 // Note: when adding new routes make sure that their middlewares are inlined!
 var ValidBatchActions = map[*regexp.Regexp]BatchActionHandlerFunc{
 	// "upsert" handler
-	regexp.MustCompile(`^PUT /api/collections/(?P<collection>[^\/\?]+)/records(?P<query>\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
+	regexp.MustCompile(`^PUT /v1/collections/(?P<collection>[^\/\?]+)/records(?P<query>\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
 		var id string
 		if len(ir.Body) > 0 && ir.Body["id"] != "" {
 			id = cast.ToString(ir.Body["id"])
@@ -48,7 +48,7 @@ var ValidBatchActions = map[*regexp.Regexp]BatchActionHandlerFunc{
 				// ---
 				params["id"] = id // required for the path value
 				ir.Method = "PATCH"
-				ir.URL = "/v1/base/collections/" + params["collection"] + "/records/" + id + params["query"]
+				ir.URL = "/v1/collections/" + params["collection"] + "/records/" + id + params["query"]
 				return recordUpdate(false, next)
 			}
 		}
@@ -56,16 +56,16 @@ var ValidBatchActions = map[*regexp.Regexp]BatchActionHandlerFunc{
 		// create
 		// ---
 		ir.Method = "POST"
-		ir.URL = "/v1/base/collections/" + params["collection"] + "/records" + params["query"]
+		ir.URL = "/v1/collections/" + params["collection"] + "/records" + params["query"]
 		return recordCreate(false, next)
 	},
-	regexp.MustCompile(`^POST /api/collections/(?P<collection>[^\/\?]+)/records(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
+	regexp.MustCompile(`^POST /v1/collections/(?P<collection>[^\/\?]+)/records(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
 		return recordCreate(false, next)
 	},
-	regexp.MustCompile(`^PATCH /api/collections/(?P<collection>[^\/\?]+)/records/(?P<id>[^\/\?]+)(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
+	regexp.MustCompile(`^PATCH /v1/collections/(?P<collection>[^\/\?]+)/records/(?P<id>[^\/\?]+)(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
 		return recordUpdate(false, next)
 	},
-	regexp.MustCompile(`^DELETE /api/collections/(?P<collection>[^\/\?]+)/records/(?P<id>[^\/\?]+)(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
+	regexp.MustCompile(`^DELETE /v1/collections/(?P<collection>[^\/\?]+)/records/(?P<id>[^\/\?]+)(\?.*)?$`): func(app core.App, ir *core.InternalRequest, params map[string]string, next func(any) error) HandleFunc {
 		return recordDelete(false, next)
 	},
 }
