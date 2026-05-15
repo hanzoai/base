@@ -1,6 +1,6 @@
 // Package platform — IAM_MODE=embedded in-process OIDC provider.
 //
-// When IAM_MODE=embedded is set, Base does NOT proxy /api/iam to an
+// When IAM_MODE=embedded is set, Base does NOT proxy /v1/iam to an
 // external IAM. Instead it hosts a minimal OIDC provider in-process,
 // sufficient for @hanzo/iam/browser PKCE clients to sign in, validate
 // JWTs via JWKS, and read userinfo.
@@ -9,7 +9,7 @@
 // federation, no MFA, no refresh tokens, no password reset. A user
 // either signs in with email+password (bcrypt cost 12) or they don't.
 // For everything richer (orgs, providers, MFA, audit trail), boot
-// against an external Casdoor at IAM_ENDPOINT.
+// against an external Hanzo IAM at IAM_ENDPOINT.
 //
 // On-disk artifacts:
 //
@@ -18,7 +18,7 @@
 //     all outstanding JWTs become unverifiable.
 //   - _iam_users collection — email, password (bcrypt), name.
 //
-// Endpoints (mounted under /api/iam):
+// Endpoints (mounted under /v1/iam):
 //
 //   GET  /.well-known/openid-configuration
 //   GET  /.well-known/jwks
@@ -62,8 +62,8 @@ const (
 
 	// embeddedIAMMount is the URL prefix all embedded handlers live under.
 	// It matches the proxy mount so @hanzo/iam/browser sees the same
-	// surface regardless of mode.
-	embeddedIAMMount = "/api/iam"
+	// surface regardless of mode. One path: /v1/iam. Not Casdoor's /api.
+	embeddedIAMMount = "/v1/iam"
 
 	// embeddedIAMKeyID identifies the in-process signing key in JWKS.
 	embeddedIAMKeyID = "embedded-1"
@@ -298,7 +298,7 @@ func AuthenticateEmbeddedIAMUser(app core.App, email, password string) (*core.Re
 
 // registerEmbeddedIAM mounts the in-process OIDC endpoints. Called by
 // platform.Register when IAM_MODE=embedded. It replaces (not augments)
-// the reverse-proxy mount; clients see /api/iam/* either way.
+// the reverse-proxy mount; clients see /v1/iam/* either way.
 func (p *plugin) registerEmbeddedIAM(r *router.Router[*core.RequestEvent]) {
 	if p.embeddedIAM == nil {
 		return
@@ -374,7 +374,7 @@ var authorizeForm = template.Must(template.New("login").Parse(`<!doctype html>
 <html><head><meta charset="utf-8"><title>Sign in</title></head>
 <body style="font-family: system-ui; max-width: 360px; margin: 60px auto;">
 <h1 style="font-size: 1.25rem;">Sign in</h1>
-<form method="POST" action="/api/iam/oauth/login">
+<form method="POST" action="/v1/iam/oauth/login">
   <input type="hidden" name="client_id" value="{{.ClientID}}">
   <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
   <input type="hidden" name="state" value="{{.State}}">

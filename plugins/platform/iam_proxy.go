@@ -1,15 +1,15 @@
-// Package platform — /api/iam/* proxy onto the configured IAM_ENDPOINT.
+// Package platform — /v1/iam/* proxy onto the configured IAM_ENDPOINT.
 //
 // The admin UI (apps/admin-base) and any first-party Base client
-// targets a same-origin "/api/iam" endpoint. Whether that endpoint
+// targets a same-origin "/v1/iam" endpoint. Whether that endpoint
 // is satisfied by:
 //
-//   - an external IAM (Hanzo's hanzo.id, an enterprise Casdoor, …)
+//   - an external IAM (Hanzo's hanzo.id, an enterprise Hanzo IAM, …)
 //     reached via this transparent reverse proxy, or
-//   - an in-process IAM (IAM_MODE=embedded — planned),
+//   - an in-process IAM (IAM_MODE=embedded),
 //
-// is opaque to the client. Both expose the same OIDC/Casdoor surface
-// at the same path. One way.
+// is opaque to the client. Both expose the same OIDC surface at the
+// same path. One way. We do NOT use /api/* — that's Casdoor's path.
 
 package platform
 
@@ -24,7 +24,7 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// registerIAMProxy mounts /api/iam/{path...} forwarding to IAM_ENDPOINT.
+// registerIAMProxy mounts /v1/iam/{path...} forwarding to IAM_ENDPOINT.
 // The proxy is opaque — every method, body, query param, and header
 // (except hop-by-hop) passes through. SSE / streaming responses are
 // flushed as bytes arrive.
@@ -35,7 +35,7 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	}
 	upstreamBase, err := url.Parse(endpoint)
 	if err != nil {
-		p.app.Logger().Error("platform: invalid IAMEndpoint for /api/iam proxy",
+		p.app.Logger().Error("platform: invalid IAMEndpoint for /v1/iam proxy",
 			"endpoint", endpoint, "err", err)
 		return
 	}
@@ -45,8 +45,8 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	client := &http.Client{Timeout: 0}
 
 	handler := func(e *core.RequestEvent) error {
-		// Map /api/iam/<rest> → ${IAMEndpoint}/<rest>.
-		rest := strings.TrimPrefix(e.Request.URL.Path, "/api/iam")
+		// Map /v1/iam/<rest> → ${IAMEndpoint}/<rest>.
+		rest := strings.TrimPrefix(e.Request.URL.Path, "/v1/iam")
 		if rest == "" {
 			rest = "/"
 		}
@@ -114,11 +114,11 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		}
 	}
 
-	r.GET("/api/iam/{path...}", handler)
-	r.POST("/api/iam/{path...}", handler)
-	r.PUT("/api/iam/{path...}", handler)
-	r.PATCH("/api/iam/{path...}", handler)
-	r.DELETE("/api/iam/{path...}", handler)
+	r.GET("/v1/iam/{path...}", handler)
+	r.POST("/v1/iam/{path...}", handler)
+	r.PUT("/v1/iam/{path...}", handler)
+	r.PATCH("/v1/iam/{path...}", handler)
+	r.DELETE("/v1/iam/{path...}", handler)
 }
 
 func isLikelyStreaming(path string) bool {
