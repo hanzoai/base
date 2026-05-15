@@ -572,17 +572,20 @@ func TestExternalAuthGuard(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:   "allows _superusers auth-with-password when external auth is on",
+			// _superusers no longer has a local-auth exemption — the admin
+			// panel logs in via the IAM PKCE flow proxied at
+			// /api/iam/oauth/authorize. Every collection's legacy local
+			// auth surface is 410 Gone in external-only mode.
+			Name:   "blocks _superusers auth-with-password when external auth is on",
 			Method: http.MethodPost,
 			URL:    "/api/collections/_superusers/auth-with-password",
 			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			// The superuser endpoint is allowed through the guard — may succeed
-			// or fail on actual auth, but must NOT be 410 from the guard.
-			ExpectedStatus:     200,
-			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedStatus:  410,
+			ExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
 			Name:   "allows users auth-with-password when external auth is off",
