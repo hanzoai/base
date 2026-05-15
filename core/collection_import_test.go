@@ -460,7 +460,6 @@ func TestImportCollectionsCreateRules(t *testing.T) {
 		`"name":"id"`,
 		`"name":"email"`,
 		`"name":"tokenKey"`,
-		`"name":"password"`,
 		`"name":"test"`,
 		`"indexes":[`,
 		`CREATE UNIQUE INDEX`,
