@@ -225,7 +225,25 @@ func (p *plugin) bootstrapRootUser() error {
 	if _, err := p.createIAMUser(email, password, "Root"); err != nil {
 		return fmt.Errorf("bootstrap root user %s: %w", email, err)
 	}
-	p.app.Logger().Info("embedded iam: bootstrapped root user", "email", email)
+
+	// Mirror the root identity into _superusers so admin endpoints
+	// (collections, settings, logs, backups) authorize after the OIDC
+	// round-trip. The collection has no password field in IAM-native
+	// mode — IAM owns the credential. Email is the only join key.
+	// Idempotent: skip if a row already exists.
+	if su, _ := p.app.FindAuthRecordByEmail(core.CollectionNameSuperusers, email); su == nil {
+		col, err := p.app.FindCollectionByNameOrId(core.CollectionNameSuperusers)
+		if err != nil {
+			return fmt.Errorf("bootstrap root superuser: find _superusers: %w", err)
+		}
+		su := core.NewRecord(col)
+		su.SetEmail(email)
+		if err := p.app.Save(su); err != nil {
+			return fmt.Errorf("bootstrap root superuser: save: %w", err)
+		}
+	}
+
+	p.app.Logger().Info("embedded iam: bootstrapped root user + superuser", "email", email)
 	return nil
 }
 
@@ -643,6 +661,16 @@ func (p *plugin) embeddedIAMAuthMiddleware(e *core.RequestEvent) error {
 
 	email, _ := claims["email"].(string)
 	name, _ := claims["name"].(string)
+
+	// If a _superusers record exists for the same email, prefer it so
+	// admin operations (collections, settings, logs) authorize without
+	// a second login. Identity comes from IAM; admin privilege is the
+	// presence of a _superusers row keyed by email.
+	if email != "" {
+		if su, suErr := p.app.FindAuthRecordByEmail(core.CollectionNameSuperusers, email); suErr == nil && su != nil {
+			rec = su
+		}
+	}
 
 	e.Set("authSub", rec.Id)
 	e.Set("authEmail", email)
