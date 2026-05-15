@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
@@ -171,9 +170,9 @@ func (api *fileApi) download(e *core.RequestEvent) error {
 				if err := api.createThumb(e, fsys, originalPath, event.ServedPath, thumbSize); err != nil {
 					e.App.Logger().Warn(
 						"Fallback to original - failed to create thumb "+event.ServedName,
-						slog.Any("error", err),
-						slog.String("original", originalPath),
-						slog.String("thumb", event.ServedPath),
+						"error", err,
+						"original", originalPath,
+						"thumb", event.ServedPath,
 					)
 
 					// fallback to the original

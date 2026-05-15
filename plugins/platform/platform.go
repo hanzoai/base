@@ -16,7 +16,6 @@ package platform
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
@@ -166,8 +165,8 @@ func Register(app core.App, config PlatformConfig) error {
 	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 
 	app.Logger().Info("platform: IAM is the only auth source",
-		slog.String("jwksURL", jwksURL),
-		slog.String("authEndpoint", config.IAMEndpoint),
+		"jwksURL", jwksURL,
+		"authEndpoint", config.IAMEndpoint,
 	)
 
 	// Serve: register API routes, identity header middleware, and org-scoping.
@@ -432,7 +431,7 @@ func (p *plugin) ensureOrgsCollection() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgs))
+	p.app.Logger().Info("creating platform system collection", "name", collectionOrgs)
 	return p.app.Save(c)
 }
 
@@ -457,7 +456,7 @@ func (p *plugin) ensureMembersCollection() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating platform system collection", slog.String("name", collectionOrgMembers))
+	p.app.Logger().Info("creating platform system collection", "name", collectionOrgMembers)
 	return p.app.Save(c)
 }
 
@@ -527,8 +526,8 @@ func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
 		pid, kmsErr := CreateOrgProject(body.Slug, p.config)
 		if kmsErr != nil {
 			p.app.Logger().Warn("failed to create KMS project",
-				slog.String("slug", body.Slug),
-				slog.String("error", kmsErr.Error()),
+				"slug", body.Slug,
+				"error", kmsErr.Error(),
 			)
 		} else {
 			kmsProjectId = pid
@@ -562,8 +561,8 @@ func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
 	if len(p.config.DefaultTemplates) > 0 {
 		if err := CreateOrgCollections(p.app, body.Slug, p.config.DefaultTemplates); err != nil {
 			p.app.Logger().Warn("failed to create org collections",
-				slog.String("slug", body.Slug),
-				slog.String("error", err.Error()),
+				"slug", body.Slug,
+				"error", err.Error(),
 			)
 		}
 	}
@@ -685,8 +684,8 @@ func (p *plugin) handleDeleteOrg(e *core.RequestEvent) error {
 			if strings.HasPrefix(col.Name, prefix) {
 				if delErr := p.app.Delete(col); delErr != nil {
 					p.app.Logger().Warn("failed to delete org collection",
-						slog.String("collection", col.Name),
-						slog.String("error", delErr.Error()),
+						"collection", col.Name,
+						"error", delErr.Error(),
 					)
 				}
 			}
