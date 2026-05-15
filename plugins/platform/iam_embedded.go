@@ -38,6 +38,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"html/template"
@@ -328,6 +329,10 @@ func (p *plugin) registerEmbeddedIAM(r *router.Router[*core.RequestEvent]) {
 	r.POST(embeddedIAMMount+"/oauth/login", p.handleEmbeddedLogin)
 	r.POST(embeddedIAMMount+"/oauth/token", p.handleEmbeddedToken)
 	r.GET(embeddedIAMMount+"/oauth/userinfo", p.handleEmbeddedUserinfo)
+
+	// Social (Google / GitHub / Apple) + wallet (SIWE). Each provider
+	// is opt-in via env, so this is a no-op if nothing is configured.
+	p.registerEmbeddedSocialRoutes(r)
 }
 
 // requestOrigin returns the scheme://host the embedded IAM should
@@ -384,29 +389,252 @@ func (p *plugin) handleEmbeddedJWKS(e *core.RequestEvent) error {
 // Authorize + login
 // --------------------------------------------------------------------------
 
-// authorizeForm is the minimal login form rendered by /oauth/authorize.
-// Plain HTML, no JS, no CSS framework — the embedded mode is meant for
-// dev/single-tenant and the consuming UI is whatever the client renders
-// after the redirect.
-var authorizeForm = template.Must(template.New("login").Parse(`<!doctype html>
-<html><head><meta charset="utf-8"><title>Sign in</title></head>
-<body style="font-family: system-ui; max-width: 360px; margin: 60px auto;">
-<h1 style="font-size: 1.25rem;">Sign in</h1>
-<form method="POST" action="/v1/iam/oauth/login">
-  <input type="hidden" name="client_id" value="{{.ClientID}}">
-  <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
-  <input type="hidden" name="state" value="{{.State}}">
-  <label style="display:block;margin:8px 0">Email
-    <input type="email" name="email" required autocomplete="username"
-      style="width:100%;padding:8px;box-sizing:border-box">
-  </label>
-  <label style="display:block;margin:8px 0">Password
-    <input type="password" name="password" required autocomplete="current-password"
-      style="width:100%;padding:8px;box-sizing:border-box">
-  </label>
-  <button type="submit" style="width:100%;padding:10px;margin-top:8px">Sign in</button>
-</form>
-</body></html>`))
+// authorizeForm renders the embedded IAM login page. Self-contained:
+// no JS, no external fonts, no CSS framework. Dark theme + canonical
+// block-H mark + Hanzo Red CTA. Brand name + accent are env-driven
+// (BRAND_NAME / BRAND_ACCENT) so white-label deployments override
+// without touching the binary. Error state re-renders this template
+// with `Error` set so failed credentials don't drop to a generic
+// JSON 401.
+var authorizeForm = template.Must(template.New("login").Parse(authorizeFormHTML))
+
+// Monochrome. Black + white only — no accent colour. The Hanzo brand
+// is brand-neutral so white-label deployments can drop in their own
+// mark/name without restyling. The only knobs are BRAND_NAME and
+// BRAND_SUBTITLE; everything visual is grayscale.
+const authorizeFormHTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in to {{.BrandName}}</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:#000;color:#f5f5f5;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+  -webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;
+}
+.card{
+  width:100%;max-width:380px;background:#0a0a0a;border:1px solid #262626;
+  border-radius:16px;padding:32px 28px 28px;
+  box-shadow:0 24px 48px -20px rgba(0,0,0,.7),0 2px 6px rgba(0,0,0,.5);
+}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:24px}
+.brand .mark{
+  width:36px;height:36px;background:#000;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  border:1px solid #262626;
+}
+.brand .mark svg{width:26px;height:26px}
+.brand .title{font-size:14px;font-weight:600;letter-spacing:-.01em;color:#f5f5f5;line-height:1.2}
+.brand .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#737373;margin-top:2px}
+h1{font-size:22px;font-weight:600;letter-spacing:-.02em;margin:0 0 6px;color:#f5f5f5}
+.hint{font-size:13px;color:#a3a3a3;margin:0 0 24px;line-height:1.5}
+.providers{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+.providers a, .providers button{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:10px 14px;font-size:13px;font-weight:500;
+  background:#0a0a0a;color:#f5f5f5;border:1px solid #262626;border-radius:8px;
+  text-decoration:none;cursor:pointer;font-family:inherit;
+  transition:background .12s,border-color .12s;
+}
+.providers a:hover,.providers button:hover{background:#1a1a1a;border-color:#404040}
+.providers svg{width:16px;height:16px;flex-shrink:0}
+.divider{
+  display:flex;align-items:center;gap:10px;margin:18px 0;
+  font-size:11px;color:#737373;text-transform:uppercase;letter-spacing:.1em;
+}
+.divider:before,.divider:after{content:"";flex:1;height:1px;background:#262626}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:500;color:#d4d4d4;margin-bottom:6px}
+.field input{
+  width:100%;padding:10px 12px;font-size:14px;line-height:1.4;
+  background:#000;color:#f5f5f5;border:1px solid #262626;border-radius:8px;
+  outline:none;transition:border-color .12s,box-shadow .12s;
+  font-family:inherit;
+}
+.field input:focus{border-color:#737373;box-shadow:0 0 0 3px rgba(255,255,255,.06)}
+.field input::placeholder{color:#525252}
+button[type=submit]{
+  width:100%;margin-top:8px;padding:11px 16px;font-size:14px;font-weight:600;
+  background:#f5f5f5;color:#000;border:0;border-radius:8px;cursor:pointer;
+  transition:background .12s,transform .04s;
+  font-family:inherit;
+}
+button[type=submit]:hover{background:#ffffff}
+button[type=submit]:active{transform:translateY(1px);background:#e5e5e5}
+.error{
+  margin-bottom:16px;padding:10px 12px;font-size:13px;
+  background:#1a1a1a;color:#f5f5f5;
+  border:1px solid #404040;border-radius:8px;
+}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand">
+    <span class="mark" aria-hidden="true">
+      <svg viewBox="0 0 67 67" fill="#fff" aria-hidden="true">
+        <path d="M22.21 67V44.6369H0V67H22.21Z"/>
+        <path d="M66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184Z"/>
+        <path d="M22.21 0H0V22.3184H22.21V0Z"/>
+        <path d="M66.7198 0H44.5098V22.3184H66.7198V0Z"/>
+        <path d="M66.7198 67V44.6369H44.5098V67H66.7198Z"/>
+      </svg>
+    </span>
+    <div>
+      <div class="title">{{.BrandName}}</div>
+      <div class="sub">{{.BrandSubtitle}}</div>
+    </div>
+  </div>
+
+  <h1>Sign in</h1>
+  <p class="hint">Continue with your {{.BrandName}} account.</p>
+
+  {{if .Error}}<div class="error" role="alert">{{.Error}}</div>{{end}}
+
+  {{if or .Providers .WalletEnabled}}
+  <div class="providers">
+    {{range .Providers}}
+    <a href="/v1/iam/oauth/social/{{.Key}}?client_id={{$.ClientID}}&redirect_uri={{$.RedirectURI}}&state={{$.State}}">
+      {{if eq .Key "google"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.35 11.1h-9.17v2.93h5.27c-.23 1.24-1.6 3.64-5.27 3.64-3.17 0-5.76-2.62-5.76-5.86s2.59-5.86 5.76-5.86c1.8 0 3.01.77 3.7 1.43l2.53-2.43C16.74 3.36 14.7 2.4 12.18 2.4 6.96 2.4 2.78 6.58 2.78 11.8s4.18 9.4 9.4 9.4c5.43 0 9.02-3.81 9.02-9.18 0-.62-.07-1.09-.17-1.55l-7.85-.37z"/></svg>{{end}}
+      {{if eq .Key "github"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M12 2C6.48 2 2 6.48 2 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.69c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.1.39-1.99 1.03-2.69-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33s1.71.11 2.5.33c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.69 0 3.84-2.34 4.68-4.57 4.93.36.31.69.92.69 1.85V21c0 .27.18.58.69.48A10.02 10.02 0 0022 12c0-5.52-4.48-10-10-10z"/></svg>{{end}}
+      {{if eq .Key "apple"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>{{end}}
+      Continue with {{.Name}}
+    </a>
+    {{end}}
+    {{if .WalletEnabled}}
+    <button type="button" id="connect-wallet">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M19 7H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm0 10H5V9h14v8zm-3-4c0-.83.67-1.5 1.5-1.5S19 12.17 19 13s-.67 1.5-1.5 1.5S16 13.83 16 13zM3 6V5c0-1.1.9-2 2-2h12v2H5v1H3z"/></svg>
+      Connect Wallet
+    </button>
+    {{end}}
+  </div>
+  <div class="divider">or continue with email</div>
+  {{end}}
+
+  <form method="POST" action="/v1/iam/oauth/login" novalidate>
+    <input type="hidden" name="client_id" value="{{.ClientID}}">
+    <input type="hidden" name="redirect_uri" value="{{.RedirectURI}}">
+    <input type="hidden" name="state" value="{{.State}}">
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" type="email" name="email" required autocomplete="username"
+             placeholder="you@example.com" autofocus value="{{.Email}}">
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" type="password" name="password" required autocomplete="current-password">
+    </div>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+
+{{if .WalletEnabled}}
+<script>
+document.getElementById('connect-wallet').addEventListener('click', async () => {
+  if (!window.ethereum) { alert('No browser wallet detected. Install MetaMask or similar.'); return }
+  try {
+    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' })
+    const address = accounts[0]
+    const challResp = await fetch('/v1/iam/oauth/wallet/challenge', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, client_id: {{.ClientIDJSON}}, redirect_uri: {{.RedirectURIJSON}}, state: {{.StateJSON}} })
+    })
+    if (!challResp.ok) { alert('Wallet challenge failed: ' + (await challResp.text())); return }
+    const { nonce, message } = await challResp.json()
+    const signature = await window.ethereum.request({ method: 'personal_sign', params: [message, address] })
+    const verifyResp = await fetch('/v1/iam/oauth/wallet/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, message, signature, nonce })
+    })
+    if (!verifyResp.ok) { alert('Verify failed: ' + (await verifyResp.text())); return }
+    const { redirect } = await verifyResp.json()
+    window.location.href = redirect
+  } catch (e) { alert(String(e && e.message || e)) }
+})
+</script>
+{{end}}
+</body>
+</html>`
+
+// brandFromEnv returns the brand name + subtitle for the embedded
+// login template. Defaults match Hanzo. Override at deploy via
+// BRAND_NAME / BRAND_SUBTITLE. The visual surface is intentionally
+// monochrome — no accent colour — so white-label deployments don't
+// need to restyle.
+func brandFromEnv() (name, subtitle string) {
+	name = os.Getenv("BRAND_NAME")
+	if name == "" {
+		name = "Hanzo"
+	}
+	subtitle = os.Getenv("BRAND_SUBTITLE")
+	if subtitle == "" {
+		subtitle = "Identity"
+	}
+	return
+}
+
+// providerView is the per-button data the login template iterates over.
+type providerView struct {
+	Key  string
+	Name string
+}
+
+// authorizeView is the full data model for the login template.
+type authorizeView struct {
+	ClientID        string
+	RedirectURI     string
+	State           string
+	Email           string
+	Error           string
+	BrandName       string
+	BrandSubtitle   string
+	Providers       []providerView
+	WalletEnabled   bool
+	ClientIDJSON    template.JS
+	RedirectURIJSON template.JS
+	StateJSON       template.JS
+}
+
+func jsString(s string) template.JS {
+	b, _ := json.Marshal(s)
+	return template.JS(b)
+}
+
+func (p *plugin) renderAuthorize(e *core.RequestEvent, clientID, redirectURI, state, email, errMsg string, status int) error {
+	name, subtitle := brandFromEnv()
+
+	var provs []providerView
+	for _, pr := range enabledSocialProviders() {
+		provs = append(provs, providerView{Key: pr.Key, Name: pr.Name})
+	}
+
+	view := authorizeView{
+		ClientID:        clientID,
+		RedirectURI:     redirectURI,
+		State:           state,
+		Email:           email,
+		Error:           errMsg,
+		BrandName:       name,
+		BrandSubtitle:   subtitle,
+		Providers:       provs,
+		WalletEnabled:   walletLoginEnabled(),
+		ClientIDJSON:    jsString(clientID),
+		RedirectURIJSON: jsString(redirectURI),
+		StateJSON:       jsString(state),
+	}
+
+	e.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if status != 0 {
+		e.Response.WriteHeader(status)
+	}
+	return authorizeForm.Execute(e.Response, view)
+}
 
 func (p *plugin) handleEmbeddedAuthorize(e *core.RequestEvent) error {
 	q := e.Request.URL.Query()
@@ -422,12 +650,7 @@ func (p *plugin) handleEmbeddedAuthorize(e *core.RequestEvent) error {
 		return e.BadRequestError("client_id and redirect_uri are required", nil)
 	}
 
-	e.Response.Header().Set("Content-Type", "text/html; charset=utf-8")
-	return authorizeForm.Execute(e.Response, map[string]string{
-		"ClientID":    template.HTMLEscapeString(clientID),
-		"RedirectURI": template.HTMLEscapeString(redirectURI),
-		"State":       template.HTMLEscapeString(state),
-	})
+	return p.renderAuthorize(e, clientID, redirectURI, state, "", "", 0)
 }
 
 func (p *plugin) handleEmbeddedLogin(e *core.RequestEvent) error {
@@ -446,7 +669,9 @@ func (p *plugin) handleEmbeddedLogin(e *core.RequestEvent) error {
 
 	user, err := p.authenticateIAMUser(email, password)
 	if err != nil {
-		return e.Error(http.StatusUnauthorized, "invalid credentials", nil)
+		// Re-render the polished form with an inline error so the
+		// user lands on the same page rather than a generic JSON 401.
+		return p.renderAuthorize(e, clientID, redirectURI, state, email, "Invalid email or password.", http.StatusUnauthorized)
 	}
 
 	code, err := generateOpaqueCode()
