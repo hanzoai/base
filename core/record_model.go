@@ -1319,6 +1319,14 @@ func (record *Record) PublicExport() map[string]any {
 		// always hide the tokenKey field
 		delete(export, FieldNameTokenKey)
 
+		// historical compat: never leak a "password" key from an auth
+		// record's public export, even if a caller has stuffed one in
+		// as ad-hoc custom data. The system password field itself is
+		// long gone — this only protects against accidental Set
+		// (auth collections are mirrors of IAM and should not surface
+		// credential-shaped strings).
+		delete(export, "password")
+
 		if !record.ignoreEmailVisibility && !record.GetBool(FieldNameEmailVisibility) {
 			delete(export, FieldNameEmail)
 		}
