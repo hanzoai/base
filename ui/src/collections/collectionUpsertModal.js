@@ -180,6 +180,11 @@ function collectionUpsertModal(rawCollection, modalSettings) {
 
             const rawCollection = JSON.stringify(await request);
 
+            // manually reload scaffolds to ensure that followup collections would have up-to-date clean state
+            app.store.collectionScaffolds = await app.pb.collections.getScaffolds({
+                requestKey: "save.reloadScaffolds",
+            });
+
             data.originalCollection = JSON.parse(rawCollection);
             data.collection = JSON.parse(rawCollection);
             app.store.addOrUpdateCollection(JSON.parse(rawCollection));
@@ -770,6 +775,11 @@ function syncFieldsAndIndexesWithScaffold(collection) {
 
     // merge new scaffold indexes
     app.utils.mergeUnique(collection.indexes, newScaffold.indexes);
+
+    // ensure that all indexes reference the latest colection name
+    collection.indexes = collection.indexes?.map((idx) => {
+        return app.utils.replaceIndexFields(idx, { tableName: collection.name || "" });
+    });
 }
 
 function truncateDropdownItem(data, modalSettings) {
