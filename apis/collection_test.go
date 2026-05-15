@@ -20,7 +20,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/collections",
+			URL:             "/v1/collections",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -28,7 +28,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -39,7 +39,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -73,7 +73,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser + paging and sorting",
 			Method: http.MethodGet,
-			URL:    "/api/collections?page=2&perPage=2&sort=-created",
+			URL:    "/v1/collections?page=2&perPage=2&sort=-created",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -92,7 +92,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser + invalid filter",
 			Method: http.MethodGet,
-			URL:    "/api/collections?filter=invalidfield~'demo2'",
+			URL:    "/v1/collections?filter=invalidfield~'demo2'",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -103,7 +103,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser + valid filter",
 			Method: http.MethodGet,
-			URL:    "/api/collections?filter=name~'demo'",
+			URL:    "/v1/collections?filter=name~'demo'",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -127,7 +127,7 @@ func TestCollectionsList(t *testing.T) {
 		{
 			Name:   "OnCollectionsListRequest tx body write check",
 			Method: http.MethodGet,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -164,7 +164,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/demo1",
+			URL:             "/v1/collections/demo1",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -172,7 +172,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -183,7 +183,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:   "authorized as superuser + nonexisting collection identifier",
 			Method: http.MethodGet,
-			URL:    "/api/collections/missing",
+			URL:    "/v1/collections/missing",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -194,7 +194,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:   "authorized as superuser + using the collection name",
 			Method: http.MethodGet,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -211,7 +211,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:   "authorized as superuser + using the collection id",
 			Method: http.MethodGet,
-			URL:    "/api/collections/wsmn24bux7wo113",
+			URL:    "/v1/collections/wsmn24bux7wo113",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -228,7 +228,7 @@ func TestCollectionView(t *testing.T) {
 		{
 			Name:   "OnCollectionViewRequest tx body write check",
 			Method: http.MethodGet,
-			URL:    "/api/collections/wsmn24bux7wo113",
+			URL:    "/v1/collections/wsmn24bux7wo113",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -274,7 +274,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/demo1",
+			URL:             "/v1/collections/demo1",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -282,7 +282,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -293,7 +293,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + nonexisting collection identifier",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/missing",
+			URL:    "/v1/collections/missing",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -304,7 +304,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + using the collection name",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo5",
+			URL:    "/v1/collections/demo5",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -327,7 +327,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + using the collection id",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/9n89pl5vkct6330",
+			URL:    "/v1/collections/9n89pl5vkct6330",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -350,7 +350,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + trying to delete a system collection",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/" + core.CollectionNameSuperusers,
+			URL:    "/v1/collections/" + core.CollectionNameSuperusers,
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -370,7 +370,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + trying to delete a referenced collection",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo2",
+			URL:    "/v1/collections/demo2",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -390,7 +390,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + deleting a view",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/view2",
+			URL:    "/v1/collections/view2",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -409,7 +409,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "OnCollectionDeleteRequest tx body write check",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/view2",
+			URL:    "/v1/collections/view2",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -446,7 +446,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPost,
-			URL:             "/api/collections",
+			URL:             "/v1/collections",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -454,7 +454,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body:   strings.NewReader(`{"name":"new","type":"base","fields":[{"type":"text","name":"test"}]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
@@ -466,7 +466,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + empty data",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body:   strings.NewReader(``),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -493,7 +493,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + invalid data (eg. existing name)",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body:   strings.NewReader(`{"name":"demo1","type":"base","fields":[{"type":"text","name":""}]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -519,7 +519,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + valid data",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body:   strings.NewReader(`{"name":"new","type":"base","fields":[{"type":"text","id":"12345789","name":"test"}]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -549,7 +549,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating auth collection (default settings merge test)",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"auth",
@@ -599,7 +599,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating base collection with reserved auth fields",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -642,7 +642,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "trying to create base collection with reserved system fields",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -677,7 +677,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "OnCollectionCreateRequest tx body write check",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body:   strings.NewReader(`{"name":"new","type":"base"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -707,7 +707,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "trying to create view collection with invalid options",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"view",
@@ -736,7 +736,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating view collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"view",
@@ -771,7 +771,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating base collection with invalid indexes",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -807,7 +807,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating base collection with index name from another collection",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -851,7 +851,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating base collection with 2 indexes using the same name",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -883,7 +883,7 @@ func TestCollectionCreate(t *testing.T) {
 		{
 			Name:   "creating base collection with valid indexes (+ random table name)",
 			Method: http.MethodPost,
-			URL:    "/api/collections",
+			URL:    "/v1/collections",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"type":"base",
@@ -949,7 +949,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPatch,
-			URL:             "/api/collections/demo1",
+			URL:             "/v1/collections/demo1",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -957,7 +957,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -968,7 +968,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + missing collection",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/missing",
+			URL:    "/v1/collections/missing",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -980,7 +980,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + empty body",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -1006,7 +1006,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "OnCollectionUpdateRequest tx body write check",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -1033,7 +1033,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + invalid data (eg. existing name)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body: strings.NewReader(`{
 				"name":"demo2",
 				"type":"auth"
@@ -1061,7 +1061,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "authorized as superuser + valid data",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body:   strings.NewReader(`{"name":"new"}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -1093,7 +1093,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "trying to update collection with reserved fields",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"fields":[
@@ -1138,7 +1138,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "trying to update collection with changed/removed system fields",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo1",
+			URL:    "/v1/collections/demo1",
 			Body: strings.NewReader(`{
 				"name":"new",
 				"fields":[
@@ -1167,7 +1167,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "trying to update auth collection with invalid options",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/users",
+			URL:    "/v1/collections/users",
 			Body: strings.NewReader(`{
 				"oauth2":{"enabled":true,"providers":[{"name":"missing"}]}
 			}`),
@@ -1196,7 +1196,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "trying to update view collection with invalid options",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/view1",
+			URL:    "/v1/collections/view1",
 			Body: strings.NewReader(`{
 				"fields":[{"type":"text","id":"12345789","name":"ignored!@#$"}],
 				"viewQuery":"invalid"
@@ -1223,7 +1223,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "updating view collection",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/view2",
+			URL:    "/v1/collections/view2",
 			Body: strings.NewReader(`{
 				"name":"view2_update",
 				"fields":[{"type":"text","id":"12345789","name":"ignored!@#$"}],
@@ -1261,7 +1261,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "updating base collection with invalid indexes",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2",
+			URL:    "/v1/collections/demo2",
 			Body: strings.NewReader(`{
 				"indexes": [
 					"create unique idx_test1 on demo1 (text)",
@@ -1291,7 +1291,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "updating base collection with index name from another collection",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2",
+			URL:    "/v1/collections/demo2",
 			Body: strings.NewReader(`{
 				"indexes": [
 					"create index exist_test on new (test)"
@@ -1330,7 +1330,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "updating base collection with 2 indexes using the same name",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2",
+			URL:    "/v1/collections/demo2",
 			Body: strings.NewReader(`{
 				"indexes": [
 					"create index duplicate_idx on new (created)",
@@ -1361,7 +1361,7 @@ func TestCollectionUpdate(t *testing.T) {
 		{
 			Name:   "updating base collection with valid indexes (+ random table name)",
 			Method: http.MethodPatch,
-			URL:    "/api/collections/demo2",
+			URL:    "/v1/collections/demo2",
 			Body: strings.NewReader(`{
 				"indexes": [
 					"create unique index idx_test1 on demo2 (title)",
@@ -1421,7 +1421,7 @@ func TestCollectionScaffolds(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/collections/meta/scaffolds",
+			URL:             "/v1/collections/meta/scaffolds",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1429,7 +1429,7 @@ func TestCollectionScaffolds(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/collections/meta/scaffolds",
+			URL:    "/v1/collections/meta/scaffolds",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -1440,7 +1440,7 @@ func TestCollectionScaffolds(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/collections/meta/scaffolds",
+			URL:    "/v1/collections/meta/scaffolds",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1473,7 +1473,7 @@ func TestCollectionTruncate(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodDelete,
-			URL:             "/api/collections/demo5/truncate",
+			URL:             "/v1/collections/demo5/truncate",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -1481,7 +1481,7 @@ func TestCollectionTruncate(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo5/truncate",
+			URL:    "/v1/collections/demo5/truncate",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -1492,7 +1492,7 @@ func TestCollectionTruncate(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo5/truncate",
+			URL:    "/v1/collections/demo5/truncate",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1510,7 +1510,7 @@ func TestCollectionTruncate(t *testing.T) {
 		{
 			Name:   "authorized as superuser but collection with required cascade delete references",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/demo3/truncate",
+			URL:    "/v1/collections/demo3/truncate",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -1535,7 +1535,7 @@ func TestCollectionTruncate(t *testing.T) {
 		{
 			Name:   "authorized as superuser trying to truncate view collection",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/view2/truncate",
+			URL:    "/v1/collections/view2/truncate",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},

@@ -573,7 +573,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "auth-with-password is gone (router 404) for users",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-with-password",
+			URL:    "/v1/collections/users/auth-with-password",
 			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -588,7 +588,7 @@ func TestExternalAuthGuard(t *testing.T) {
 			// via the IAM PKCE flow proxied at /v1/iam/oauth/authorize.
 			Name:   "auth-with-password is gone (router 404) for _superusers",
 			Method: http.MethodPost,
-			URL:    "/api/collections/_superusers/auth-with-password",
+			URL:    "/v1/collections/_superusers/auth-with-password",
 			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -600,7 +600,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "auth-with-oauth2 is gone (router 404)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-with-oauth2",
+			URL:    "/v1/collections/users/auth-with-oauth2",
 			Body:   strings.NewReader(`{"provider":"google","code":"x","redirectURL":"http://localhost"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -612,7 +612,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "auth-with-otp is gone (router 404)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-with-otp",
+			URL:    "/v1/collections/users/auth-with-otp",
 			Body:   strings.NewReader(`{"otpId":"x","password":"y"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -624,7 +624,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "oauth2-redirect is gone (router 404)",
 			Method: http.MethodGet,
-			URL:    "/api/oauth2-redirect?state=x&code=y",
+			URL:    "/v1/oauth2-redirect?state=x&code=y",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
@@ -635,7 +635,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "request-otp is gone (router 404)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/request-otp",
+			URL:    "/v1/collections/users/request-otp",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -647,7 +647,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "request-password-reset is gone (router 404)",
 			Method: http.MethodPost,
-			URL:    "/api/collections/users/request-password-reset",
+			URL:    "/v1/collections/users/request-password-reset",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
@@ -659,7 +659,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			Name:   "auth-methods returns a single generic 'iam' oauth2 entry when external auth is on",
 			Method: http.MethodGet,
-			URL:    "/api/collections/users/auth-methods",
+			URL:    "/v1/collections/users/auth-methods",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 				app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.com/.well-known/jwks")

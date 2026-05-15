@@ -15,7 +15,7 @@ func TestLogsList(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/logs",
+			URL:             "/v1/logs",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -23,7 +23,7 @@ func TestLogsList(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/logs",
+			URL:    "/v1/logs",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -34,7 +34,7 @@ func TestLogsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/logs",
+			URL:    "/v1/logs",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -57,7 +57,7 @@ func TestLogsList(t *testing.T) {
 		{
 			Name:   "authorized as superuser + filter",
 			Method: http.MethodGet,
-			URL:    "/api/logs?filter=data.status>200",
+			URL:    "/v1/logs?filter=data.status>200",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -90,7 +90,7 @@ func TestLogView(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
+			URL:             "/v1/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -98,7 +98,7 @@ func TestLogView(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
+			URL:    "/v1/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -109,7 +109,7 @@ func TestLogView(t *testing.T) {
 		{
 			Name:   "authorized as superuser (nonexisting request log)",
 			Method: http.MethodGet,
-			URL:    "/api/logs/missing1-9f38-44fb-bf82-c8f53b310d91",
+			URL:    "/v1/logs/missing1-9f38-44fb-bf82-c8f53b310d91",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -125,7 +125,7 @@ func TestLogView(t *testing.T) {
 		{
 			Name:   "authorized as superuser (existing request log)",
 			Method: http.MethodGet,
-			URL:    "/api/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
+			URL:    "/v1/logs/873f2133-9f38-44fb-bf82-c8f53b310d91",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -154,7 +154,7 @@ func TestLogsStats(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodGet,
-			URL:             "/api/logs/stats",
+			URL:             "/v1/logs/stats",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -162,7 +162,7 @@ func TestLogsStats(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodGet,
-			URL:    "/api/logs/stats",
+			URL:    "/v1/logs/stats",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -173,7 +173,7 @@ func TestLogsStats(t *testing.T) {
 		{
 			Name:   "authorized as superuser",
 			Method: http.MethodGet,
-			URL:    "/api/logs/stats",
+			URL:    "/v1/logs/stats",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -190,7 +190,7 @@ func TestLogsStats(t *testing.T) {
 		{
 			Name:   "authorized as superuser + filter",
 			Method: http.MethodGet,
-			URL:    "/api/logs/stats?filter=data.status>200",
+			URL:    "/v1/logs/stats?filter=data.status>200",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},

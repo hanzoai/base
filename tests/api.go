@@ -102,7 +102,7 @@ type ApiScenario struct {
 //	    scenario := tests.ApiScenario{
 //	        Name:           "list example collection",
 //	        Method:         http.MethodGet,
-//	        URL:            "/api/collections/example/records",
+//	        URL:            "/v1/collections/example/records",
 //	        ExpectedStatus: 200,
 //	        ExpectedContent: []string{
 //	            `"totalItems":3`,
@@ -132,7 +132,7 @@ func (scenario *ApiScenario) Test(t *testing.T) {
 //	    scenario := tests.ApiScenario{
 //	        Name:           "list example collection",
 //	        Method:         http.MethodGet,
-//	        URL:            "/api/collections/example/records",
+//	        URL:            "/v1/collections/example/records",
 //	        ExpectedStatus: 200,
 //	        ExpectedContent: []string{
 //	            `"totalItems":3`,

@@ -98,7 +98,7 @@ console.log('=== FileService ===')
 const files = new FileService('https://example.hanzo.ai')
 const record = { id: 'rec123', collectionId: 'posts', collectionName: 'posts' }
 const url = files.getURL(record, 'photo.jpg')
-assertEq(url, 'https://example.hanzo.ai/api/files/posts/rec123/photo.jpg', 'basic file URL')
+assertEq(url, 'https://example.hanzo.ai/v1/files/posts/rec123/photo.jpg', 'basic file URL')
 
 const urlThumb = files.getURL(record, 'photo.jpg', { thumb: '100x100' })
 assert(urlThumb.includes('thumb=100x100'), 'thumb param in URL')
