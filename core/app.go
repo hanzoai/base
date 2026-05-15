@@ -13,6 +13,7 @@ import (
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/logger"
 	"github.com/hanzoai/base/tools/mailer"
 	"github.com/hanzoai/base/tools/store"
 	"github.com/hanzoai/base/tools/subscriptions"
@@ -36,8 +37,15 @@ type App interface {
 
 	// Logger returns the default app logger.
 	//
-	// If the application is not bootstrapped yet, fallbacks to slog.Default().
-	Logger() *slog.Logger
+	// If the application is not bootstrapped yet, fallbacks to slog.Default()
+	// wrapped in a logger.SlogAdapter so callers always observe the same
+	// interface.
+	Logger() logger.Logger
+
+	// SlogLogger returns the raw *slog.Logger backing the app. Reserved
+	// for the BatchHandler reload plumbing and for tests that need to
+	// type-assert the handler — business code should call Logger().
+	SlogLogger() *slog.Logger
 
 	// IsBootstrapped checks if the application was initialized
 	// (aka. whether Bootstrap() was called).
