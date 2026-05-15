@@ -2,7 +2,7 @@
 
 Hanzo Base v1.0.0 is the IAM-native 1.0 line. Local-password / OTP / MFA /
 external-auth-link surfaces have been ripped from the runtime. Authentication is
-delegated to Hanzo IAM (or any RFC-compliant OIDC IdP) over `/api/iam/*`, or to
+delegated to Hanzo IAM (or any RFC-compliant OIDC IdP) over `/v1/iam/*`, or to
 an in-process OIDC provider via `IAM_MODE=embedded` for single-tenant single-binary
 deployments.
 
@@ -10,14 +10,14 @@ The changelog below follows Keep a Changelog.
 
 ### Added
 
-- `IAM_MODE=embedded`: in-process OIDC provider mounted at `/api/iam/*`. Implements
+- `IAM_MODE=embedded`: in-process OIDC provider mounted at `/v1/iam/*`. Implements
   OIDC discovery, JWKS (RSA-2048, key at `${DataDir}/iam.key`, 0600), authorize/login/token/userinfo.
   RS256-signed JWTs, 1h TTL. Users live in `_iam_users` (email + bcrypt-cost-12 password).
 - `./base iam-user create <email>` CLI subcommand for bootstrapping embedded-mode users.
   Honors `EMBEDDED_IAM_ROOT_EMAIL` / `EMBEDDED_IAM_ROOT_PASSWORD` on first boot.
-- Platform plugin mounts `/api/iam/*` as a transparent proxy to the configured `IAM_URL`,
+- Platform plugin mounts `/v1/iam/*` as a transparent proxy to the configured `IAM_URL`,
   collapsing the legacy `@hanzo/iam/browser` PKCE contract to one path.
-- `/api/collections/<c>/auth-methods` now returns a generic `iam` provider when external
+- `/v1/collections/<c>/auth-methods` now returns a generic `iam` provider when external
   auth is on (no brand string in responses).
 - Migration `1747094400_drop_legacy_auth_artifacts.go` drops legacy auth tables on
   `./base migrate up`.

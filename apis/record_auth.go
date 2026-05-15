@@ -14,7 +14,7 @@ import (
 // The mutating local-auth surface (auth-with-password, auth-with-otp,
 // auth-with-oauth2, oauth2-redirect, request/confirm flows, impersonate)
 // was removed in the IAM-native rip. Hanzo IAM is the only auth source;
-// clients run the PKCE flow against /api/iam/oauth/authorize, which the
+// clients run the PKCE flow against /v1/iam/oauth/authorize, which the
 // platform plugin mounts as a transparent proxy to IAM_ENDPOINT.
 //
 // The two endpoints kept here are read-only or refresh existing
@@ -56,7 +56,7 @@ func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
 // password / OTP / MFA path.
 //
 // No collection is exempt. The admin panel UI uses the IAM PKCE flow
-// against /api/iam/oauth/authorize (transparent proxy mounted by the
+// against /v1/iam/oauth/authorize (transparent proxy mounted by the
 // platform plugin), so _superusers does not need a built-in auth
 // surface either.
 //

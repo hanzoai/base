@@ -11,7 +11,7 @@ import (
 //
 // The legacy `base login --email --password` flow is gone — Hanzo IAM
 // is the only auth source for Base, and it issues tokens via the OIDC
-// PKCE flow at /api/iam/oauth/authorize (proxied by the platform
+// PKCE flow at /v1/iam/oauth/authorize (proxied by the platform
 // plugin to IAM_ENDPOINT). The CLI consumes those tokens via the
 // `--token` persistent flag or the BASE_TOKEN env var (see config.go).
 //
