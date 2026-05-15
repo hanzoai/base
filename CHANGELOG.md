@@ -10,7 +10,8 @@
 - Added error marker for each collection tab and fixed the styles of the raw errors tooltip.
 
 - Fixed indexes collection update error ([#7689](https://github.com/pocketbase/pocketbase/issues/7689)).
-    _The fix comes with a system migration that resaves all collection models to ensure that their indexes are normalized and available in the collection model (it will also include indexes created manually via the sqlite3 cli or other external tools)._
+    _⚠️ The fix comes with a system migration that resaves all collections with indexes to ensure that all indexes are normalized and available in the `Collection.Indexes` field (it will also include indexes created manually via the sqlite3 cli or other external tool)._
+    _If you are using a test `pb_data` for your Go automation tests you may want to apply the migration to it too so that it runs only once and not for each execution of your tests, aka. you could run once `go run main.go migrate up --dir="/path/to/test_pb_data"`._
 
 - Updated `modernc.org/sqlite` to v1.50.1 (SQLite 3.53.1).
 
