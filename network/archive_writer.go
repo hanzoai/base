@@ -5,12 +5,13 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"iter"
-	"log/slog"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	luxlog "github.com/luxfi/log"
 )
 
 // uploader is the minimal put/get/list surface every backend must
@@ -214,7 +215,7 @@ func (w *archiveWriter) enforceBacklogCapLocked(q *shardQueue) {
 		dropped := q.backlog[0]
 		q.backlog = q.backlog[1:]
 		w.lagBytes.Add(-int64(len(dropped.data)))
-		slog.Error("archive: backlog cap exceeded, dropping oldest segment",
+		luxlog.Error("archive: backlog cap exceeded, dropping oldest segment",
 			"shard", q.shardID,
 			"dropped_seq", dropped.startSeq,
 			"dropped_bytes", len(dropped.data),
@@ -313,7 +314,7 @@ func (w *archiveWriter) drain() {
 			it.q.backlog = append(it.q.backlog, it.pending)
 			w.enforceBacklogCapLocked(it.q)
 			w.mu.Unlock()
-			slog.Error("archive: flush on close failed", "shard", it.q.shardID, "err", err)
+			luxlog.Error("archive: flush on close failed", "shard", it.q.shardID, "err", err)
 			if w.m != nil && w.m.IncFailures != nil {
 				w.m.IncFailures()
 			}
@@ -335,14 +336,14 @@ func (w *archiveWriter) uploadWithRetry(q *shardQueue, p segmentPending) {
 		if err == nil {
 			return
 		}
-		slog.Warn("archive: upload failed, will retry",
+		luxlog.Warn("archive: upload failed, will retry",
 			"shard", q.shardID, "bytes", len(p.data), "err", err)
 		select {
 		case <-w.stopCh:
 			w.reBuffer(q, p)
 			return
 		case <-ctx.Done():
-			slog.Error("archive: upload retry deadline exceeded, re-buffering",
+			luxlog.Error("archive: upload retry deadline exceeded, re-buffering",
 				"shard", q.shardID, "bytes", len(p.data))
 			if w.m != nil && w.m.IncFailures != nil {
 				w.m.IncFailures()
@@ -468,7 +469,7 @@ func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSe
 				// SILENTLY SKIPPED. Halting PITR on a single poisoned
 				// segment hands the attacker a DoS against restore;
 				// surfacing the skip as a metric keeps it visible.
-				slog.Warn("archive: skipping unverifiable segment",
+				luxlog.Warn("archive: skipping unverifiable segment",
 					"shard", shardID, "key", m.key, "err", err)
 				if w.m != nil && w.m.IncFailures != nil {
 					w.m.IncFailures()

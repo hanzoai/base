@@ -89,12 +89,13 @@ func TestBaseAppLoggerLevelDevPrint(t *testing.T) {
 			})
 
 			// write and persist logs
+			sl := app.SlogLogger()
 			for _, l := range s.levels {
-				app.Logger().Log(ctx, slog.Level(l), "test")
+				sl.Log(ctx, slog.Level(l), "test")
 			}
-			handler, ok := app.Logger().Handler().(*logger.BatchHandler)
+			handler, ok := sl.Handler().(*logger.BatchHandler)
 			if !ok {
-				t.Fatalf("Expected BatchHandler, got %v", app.Logger().Handler())
+				t.Fatalf("Expected BatchHandler, got %v", sl.Handler())
 			}
 			if err := handler.WriteAll(ctx); err != nil {
 				t.Fatalf("Failed to write all logs: %v", err)
