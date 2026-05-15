@@ -10,11 +10,10 @@ import (
 
 // Supported record token types
 const (
-	TokenTypeAuth          = "auth"
-	TokenTypeFile          = "file"
-	TokenTypeVerification  = "verification"
-	TokenTypePasswordReset = "passwordReset"
-	TokenTypeEmailChange   = "emailChange"
+	TokenTypeAuth         = "auth"
+	TokenTypeFile         = "file"
+	TokenTypeVerification = "verification"
+	TokenTypeEmailChange  = "emailChange"
 )
 
 // List with commonly used record token claims
@@ -92,29 +91,6 @@ func (m *Record) NewVerificationToken() (string, error) {
 		},
 		key,
 		m.Collection().VerificationToken.DurationTime(),
-	)
-}
-
-// NewPasswordResetToken generates and returns a new auth record password reset request token.
-func (m *Record) NewPasswordResetToken() (string, error) {
-	if !m.Collection().IsAuth() {
-		return "", ErrNotAuthRecord
-	}
-
-	key := (m.TokenKey() + m.Collection().PasswordResetToken.Secret)
-	if key == "" {
-		return "", ErrMissingSigningKey
-	}
-
-	return security.NewJWT(
-		jwt.MapClaims{
-			TokenClaimType:         TokenTypePasswordReset,
-			TokenClaimId:           m.Id,
-			TokenClaimCollectionId: m.Collection().Id,
-			TokenClaimEmail:        m.Email(),
-		},
-		key,
-		m.Collection().PasswordResetToken.DurationTime(),
 	)
 }
 

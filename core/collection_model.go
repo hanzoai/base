@@ -567,7 +567,6 @@ func (m Collection) MarshalJSON() ([]byte, error) {
 		// hide secret keys from the serialization
 		alias.AuthToken.Secret = ""
 		alias.FileToken.Secret = ""
-		alias.PasswordResetToken.Secret = ""
 		alias.EmailChangeToken.Secret = ""
 		alias.VerificationToken.Secret = ""
 		for i := range alias.OAuth2.Providers {
@@ -910,7 +909,6 @@ func (c *Collection) initDefaultFields() {
 		c.initIdField()
 	case CollectionTypeAuth:
 		c.initIdField()
-		c.initPasswordField()
 		c.initTokenKeyField()
 		c.initEmailField()
 		c.initEmailVisibilityField()
@@ -946,25 +944,6 @@ func (c *Collection) initIdField() {
 		if field.Pattern == "" {
 			field.Pattern = defaultLowercaseRecordIdPattern
 		}
-	}
-}
-
-func (c *Collection) initPasswordField() {
-	field, _ := c.Fields.GetByName(FieldNamePassword).(*PasswordField)
-	if field == nil {
-		// load default field
-		c.Fields.Add(&PasswordField{
-			Name:     FieldNamePassword,
-			System:   true,
-			Hidden:   true,
-			Required: true,
-			Min:      8,
-		})
-	} else {
-		// enforce system defaults
-		field.System = true
-		field.Hidden = true
-		field.Required = true
 	}
 }
 

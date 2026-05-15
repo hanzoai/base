@@ -8,7 +8,6 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
 	"github.com/hanzoai/base/tools/auth"
-	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
@@ -47,34 +46,11 @@ func (m *Collection) unsetMissingOAuth2MappedFields() {
 func (m *Collection) setDefaultAuthOptions() {
 	m.collectionAuthOptions = collectionAuthOptions{
 		VerificationTemplate:       defaultVerificationTemplate,
-		ResetPasswordTemplate:      defaultResetPasswordTemplate,
 		ConfirmEmailChangeTemplate: defaultConfirmEmailChangeTemplate,
 		AuthRule:                   types.Pointer(""),
-		AuthAlert: AuthAlertConfig{
-			Enabled:       true,
-			EmailTemplate: defaultAuthAlertTemplate,
-		},
-		PasswordAuth: PasswordAuthConfig{
-			Enabled:        true,
-			IdentityFields: []string{FieldNameEmail},
-		},
-		MFA: MFAConfig{
-			Enabled:  false,
-			Duration: 1800, // 30min
-		},
-		OTP: OTPConfig{
-			Enabled:       false,
-			Duration:      180, // 3min
-			Length:        8,
-			EmailTemplate: defaultOTPTemplate,
-		},
 		AuthToken: TokenConfig{
 			Secret:   security.RandomString(50),
 			Duration: 604800, // 7 days
-		},
-		PasswordResetToken: TokenConfig{
-			Secret:   security.RandomString(50),
-			Duration: 1800, // 30min
 		},
 		EmailChangeToken: TokenConfig{
 			Secret:   security.RandomString(50),
@@ -94,6 +70,14 @@ func (m *Collection) setDefaultAuthOptions() {
 var _ optionsValidator = (*collectionAuthOptions)(nil)
 
 // collectionAuthOptions defines the options for the "auth" type collection.
+//
+// Auth-type collections under IAM-native Base are passive mirrors of
+// the Hanzo IAM user directory. They have no local password, no MFA
+// challenges, no OTP issuance, and no external-auth provider link
+// tracking — those flows live in IAM. The only collection-scoped
+// state that survives here is the OAuth2 provider discovery list
+// (used by the auth-methods endpoint), the verification/email-change
+// templates, and the token secrets that sign JWTs minted by Base.
 type collectionAuthOptions struct {
 	// AuthRule could be used to specify additional record constraints
 	// applied after record authentication and right before returning the
@@ -109,40 +93,26 @@ type collectionAuthOptions struct {
 	AuthRule *string `form:"authRule" json:"authRule"`
 
 	// ManageRule gives admin-like permissions to allow fully managing
-	// the auth record(s), eg. changing the password without requiring
-	// to enter the old one, directly updating the verified state and email, etc.
+	// the auth record(s), eg. directly updating the verified state and
+	// email without requiring an end-user action.
 	//
 	// This rule is executed in addition to the Create and Update API rules.
 	ManageRule *string `form:"manageRule" json:"manageRule"`
-
-	// AuthAlert defines options related to the auth alerts on new device login.
-	AuthAlert AuthAlertConfig `form:"authAlert" json:"authAlert"`
 
 	// OAuth2 specifies whether OAuth2 auth is enabled for the collection
 	// and which OAuth2 providers are allowed.
 	OAuth2 OAuth2Config `form:"oauth2" json:"oauth2"`
 
-	// PasswordAuth defines options related to the collection password authentication.
-	PasswordAuth PasswordAuthConfig `form:"passwordAuth" json:"passwordAuth"`
-
-	// MFA defines options related to the Multi-factor authentication (MFA).
-	MFA MFAConfig `form:"mfa" json:"mfa"`
-
-	// OTP defines options related to the One-time password authentication (OTP).
-	OTP OTPConfig `form:"otp" json:"otp"`
-
 	// Various token configurations
 	// ---
-	AuthToken          TokenConfig `form:"authToken" json:"authToken"`
-	PasswordResetToken TokenConfig `form:"passwordResetToken" json:"passwordResetToken"`
-	EmailChangeToken   TokenConfig `form:"emailChangeToken" json:"emailChangeToken"`
-	VerificationToken  TokenConfig `form:"verificationToken" json:"verificationToken"`
-	FileToken          TokenConfig `form:"fileToken" json:"fileToken"`
+	AuthToken         TokenConfig `form:"authToken" json:"authToken"`
+	EmailChangeToken  TokenConfig `form:"emailChangeToken" json:"emailChangeToken"`
+	VerificationToken TokenConfig `form:"verificationToken" json:"verificationToken"`
+	FileToken         TokenConfig `form:"fileToken" json:"fileToken"`
 
 	// Default email templates
 	// ---
 	VerificationTemplate       EmailTemplate `form:"verificationTemplate" json:"verificationTemplate"`
-	ResetPasswordTemplate      EmailTemplate `form:"resetPasswordTemplate" json:"resetPasswordTemplate"`
 	ConfirmEmailChangeTemplate EmailTemplate `form:"confirmEmailChangeTemplate" json:"confirmEmailChangeTemplate"`
 }
 
@@ -159,76 +129,16 @@ func (o *collectionAuthOptions) validate(cv *collectionValidator) error {
 			validation.By(cv.checkRule),
 			validation.By(cv.ensureNoSystemRuleChange(cv.original.ManageRule)),
 		),
-		validation.Field(&o.AuthAlert),
-		validation.Field(&o.PasswordAuth),
 		validation.Field(&o.OAuth2),
-		validation.Field(&o.OTP),
-		validation.Field(&o.MFA),
 		validation.Field(&o.AuthToken),
-		validation.Field(&o.PasswordResetToken),
 		validation.Field(&o.EmailChangeToken),
 		validation.Field(&o.VerificationToken),
 		validation.Field(&o.FileToken),
 		validation.Field(&o.VerificationTemplate, validation.Required),
-		validation.Field(&o.ResetPasswordTemplate, validation.Required),
 		validation.Field(&o.ConfirmEmailChangeTemplate, validation.Required),
 	)
 	if err != nil {
 		return err
-	}
-
-	if o.MFA.Enabled {
-		// if MFA is enabled require at least 2 auth methods
-		//
-		// @todo maybe consider disabling the check because if custom auth methods
-		// are registered it may fail since we don't have mechanism to detect them at the moment
-		authsEnabled := 0
-		if o.PasswordAuth.Enabled {
-			authsEnabled++
-		}
-		if o.OAuth2.Enabled {
-			authsEnabled++
-		}
-		if o.OTP.Enabled {
-			authsEnabled++
-		}
-		if authsEnabled < 2 {
-			return validation.Errors{
-				"mfa": validation.Errors{
-					"enabled": validation.NewError("validation_mfa_not_enough_auths", "MFA requires at least 2 auth methods to be enabled."),
-				},
-			}
-		}
-
-		if o.MFA.Rule != "" {
-			mfaRuleValidators := []validation.RuleFunc{
-				cv.checkRule,
-				cv.ensureNoSystemRuleChange(&cv.original.MFA.Rule),
-			}
-
-			for _, validator := range mfaRuleValidators {
-				err := validator(&o.MFA.Rule)
-				if err != nil {
-					return validation.Errors{
-						"mfa": validation.Errors{
-							"rule": err,
-						},
-					}
-				}
-			}
-		}
-	}
-
-	// extra check to ensure that only unique identity fields are used
-	if o.PasswordAuth.Enabled {
-		err = validation.Validate(o.PasswordAuth.IdentityFields, validation.By(cv.checkFieldsForUniqueIndex))
-		if err != nil {
-			return validation.Errors{
-				"passwordAuth": validation.Errors{
-					"identityFields": err,
-				},
-			}
-		}
 	}
 
 	return nil
@@ -270,22 +180,6 @@ func (t EmailTemplate) Resolve(placeholders map[string]any) (subject, body strin
 
 // -------------------------------------------------------------------
 
-type AuthAlertConfig struct {
-	Enabled       bool          `form:"enabled" json:"enabled"`
-	EmailTemplate EmailTemplate `form:"emailTemplate" json:"emailTemplate"`
-}
-
-// Validate makes AuthAlertConfig validatable by implementing [validation.Validatable] interface.
-func (c AuthAlertConfig) Validate() error {
-	return validation.ValidateStruct(&c,
-		// note: for now always run the email template validations even
-		// if not enabled since it could be used separately
-		validation.Field(&c.EmailTemplate),
-	)
-}
-
-// -------------------------------------------------------------------
-
 type TokenConfig struct {
 	Secret string `form:"secret" json:"secret,omitempty"`
 
@@ -304,92 +198,6 @@ func (c TokenConfig) Validate() error {
 // DurationTime returns the current Duration as [time.Duration].
 func (c TokenConfig) DurationTime() time.Duration {
 	return time.Duration(c.Duration) * time.Second
-}
-
-// -------------------------------------------------------------------
-
-type OTPConfig struct {
-	Enabled bool `form:"enabled" json:"enabled"`
-
-	// Duration specifies how long the OTP to be valid (in seconds)
-	Duration int64 `form:"duration" json:"duration"`
-
-	// Length specifies the auto generated password length.
-	Length int `form:"length" json:"length"`
-
-	// EmailTemplate is the default OTP email template that will be send to the auth record.
-	//
-	// In addition to the system placeholders you can also make use of
-	// [core.EmailPlaceholderOTPId] and [core.EmailPlaceholderOTP].
-	EmailTemplate EmailTemplate `form:"emailTemplate" json:"emailTemplate"`
-}
-
-// Validate makes OTPConfig validatable by implementing [validation.Validatable] interface.
-func (c OTPConfig) Validate() error {
-	return validation.ValidateStruct(&c,
-		validation.Field(&c.Duration, validation.When(c.Enabled, validation.Required, validation.Min(10), validation.Max(86400))),
-		validation.Field(&c.Length, validation.When(c.Enabled, validation.Required, validation.Min(4))),
-		// note: for now always run the email template validations even
-		// if not enabled since it could be used separately
-		validation.Field(&c.EmailTemplate),
-	)
-}
-
-// DurationTime returns the current Duration as [time.Duration].
-func (c OTPConfig) DurationTime() time.Duration {
-	return time.Duration(c.Duration) * time.Second
-}
-
-// -------------------------------------------------------------------
-
-type MFAConfig struct {
-	Enabled bool `form:"enabled" json:"enabled"`
-
-	// Duration specifies how long an issued MFA to be valid (in seconds)
-	Duration int64 `form:"duration" json:"duration"`
-
-	// Rule is an optional field to restrict MFA only for the records that satisfy the rule.
-	//
-	// Leave it empty to enable MFA for everyone.
-	Rule string `form:"rule" json:"rule"`
-}
-
-// Validate makes MFAConfig validatable by implementing [validation.Validatable] interface.
-func (c MFAConfig) Validate() error {
-	return validation.ValidateStruct(&c,
-		validation.Field(&c.Duration, validation.When(c.Enabled, validation.Required, validation.Min(10), validation.Max(86400))),
-	)
-}
-
-// DurationTime returns the current Duration as [time.Duration].
-func (c MFAConfig) DurationTime() time.Duration {
-	return time.Duration(c.Duration) * time.Second
-}
-
-// -------------------------------------------------------------------
-
-type PasswordAuthConfig struct {
-	Enabled bool `form:"enabled" json:"enabled"`
-
-	// IdentityFields is a list of field names that could be used as
-	// identity during password authentication.
-	//
-	// Usually only fields that has single column UNIQUE index are accepted as values.
-	IdentityFields []string `form:"identityFields" json:"identityFields"`
-}
-
-// Validate makes PasswordAuthConfig validatable by implementing [validation.Validatable] interface.
-func (c PasswordAuthConfig) Validate() error {
-	// strip duplicated values
-	c.IdentityFields = list.ToUniqueStringSlice(c.IdentityFields)
-
-	if !c.Enabled {
-		return nil // no need to validate
-	}
-
-	return validation.ValidateStruct(&c,
-		validation.Field(&c.IdentityFields, validation.Required),
-	)
 }
 
 // -------------------------------------------------------------------

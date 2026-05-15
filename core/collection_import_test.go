@@ -168,14 +168,13 @@ func TestImportCollections(t *testing.T) {
 			expectCollectionsCount: totalCollections + 1,
 			afterTestFunc: func(testApp *tests.TestApp, resultCollections []*core.Collection) {
 				expectedCollectionFields := map[string]int{
-					core.CollectionNameAuthOrigins: 6,
-					"nologin":                      10,
-					"demo1":                        19,
-					"demo2":                        5,
-					"demo3":                        5,
-					"demo4":                        16,
-					"demo5":                        9,
-					"new_import":                   2,
+					"nologin":    9,
+					"demo1":      19,
+					"demo2":      5,
+					"demo3":      5,
+					"demo4":      16,
+					"demo5":      9,
+					"new_import": 2,
 				}
 				for name, expectedCount := range expectedCollectionFields {
 					collection, err := testApp.FindCollectionByNameOrId(name)
