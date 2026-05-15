@@ -555,56 +555,85 @@ func TestRequireSameCollectionContextAuth(t *testing.T) {
 	}
 }
 
+// TestExternalAuthGuard verifies that every retired Base auth surface is
+// gone from the router (404) regardless of collection or external-only
+// mode, and that auth-methods serves the generic IAM provider entry when
+// external-only mode is active.
+//
+// The original handlers (auth-with-password, auth-with-oauth2,
+// auth-with-otp, oauth2-redirect, all request/confirm flows, impersonate)
+// were deleted in the IAM-native rip. The externalAuthGuard helper
+// remains in apis for callers who want to attach the 410-Gone-with-
+// Location behavior to their own routes, but nothing in core Base
+// binds it any more.
 func TestExternalAuthGuard(t *testing.T) {
 	t.Parallel()
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "blocks users auth-with-password when external auth is on",
+			Name:   "auth-with-password is gone (router 404) for users",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/auth-with-password",
 			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  410,
-			ExpectedContent: []string{`This endpoint is retired`},
-			ExpectedEvents:  map[string]int{"*": 0},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
 		},
 		{
-			// _superusers no longer has a local-auth exemption — the admin
-			// panel logs in via the IAM PKCE flow proxied at
-			// /api/iam/oauth/authorize. Every collection's legacy local
-			// auth surface is 410 Gone in external-only mode.
-			Name:   "blocks _superusers auth-with-password when external auth is on",
+			// _superusers used to be the last collection with a local-
+			// auth carve-out. It is no longer: the admin panel logs in
+			// via the IAM PKCE flow proxied at /api/iam/oauth/authorize.
+			Name:   "auth-with-password is gone (router 404) for _superusers",
 			Method: http.MethodPost,
 			URL:    "/api/collections/_superusers/auth-with-password",
 			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 			},
-			ExpectedStatus:  410,
-			ExpectedContent: []string{`This endpoint is retired`},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
+		},
+		{
+			Name:   "auth-with-oauth2 is gone (router 404)",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/auth-with-oauth2",
+			Body:   strings.NewReader(`{"provider":"google","code":"x","redirectURL":"http://localhost"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
+		},
+		{
+			Name:   "auth-with-otp is gone (router 404)",
+			Method: http.MethodPost,
+			URL:    "/api/collections/users/auth-with-otp",
+			Body:   strings.NewReader(`{"otpId":"x","password":"y"}`),
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:     404,
+			NotExpectedContent: []string{`This endpoint is retired`},
+			ExpectedEvents:     map[string]int{"*": 0},
+		},
+		{
+			Name:   "oauth2-redirect is gone (router 404)",
+			Method: http.MethodGet,
+			URL:    "/api/oauth2-redirect?state=x&code=y",
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			},
+			ExpectedStatus:  404,
+			ExpectedContent: []string{`"status":404`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:   "allows users auth-with-password when external auth is off",
-			Method: http.MethodPost,
-			URL:    "/api/collections/users/auth-with-password",
-			Body:   strings.NewReader(`{"identity":"test@example.com","password":"1234567890"}`),
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// external auth is NOT set (default off)
-			},
-			// Should NOT get 410 from the guard. Will fail on auth (wrong password).
-			ExpectedStatus:     401,
-			NotExpectedContent: []string{`This endpoint is retired`},
-		},
-		{
-			// request-otp was deleted entirely in the IAM-native rip; the
-			// router serves a 404. Asserting the absence of the guard's
-			// 410 message confirms the route binding is gone (not just
-			// guarded).
-			Name:   "request-otp is gone (router 404) when external auth is on",
+			Name:   "request-otp is gone (router 404)",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/request-otp",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
@@ -616,9 +645,7 @@ func TestExternalAuthGuard(t *testing.T) {
 			ExpectedEvents:     map[string]int{"*": 0},
 		},
 		{
-			// request-password-reset was deleted entirely in the IAM-
-			// native rip. IAM owns password recovery.
-			Name:   "request-password-reset is gone (router 404) when external auth is on",
+			Name:   "request-password-reset is gone (router 404)",
 			Method: http.MethodPost,
 			URL:    "/api/collections/users/request-password-reset",
 			Body:   strings.NewReader(`{"email":"test@example.com"}`),
