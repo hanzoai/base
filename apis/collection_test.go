@@ -1169,7 +1169,7 @@ func TestCollectionUpdate(t *testing.T) {
 			Method: http.MethodPatch,
 			URL:    "/api/collections/users",
 			Body: strings.NewReader(`{
-				"passwordAuth":{"identityFields": ["missing"]}
+				"oauth2":{"enabled":true,"providers":[{"name":"missing"}]}
 			}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -1177,7 +1177,7 @@ func TestCollectionUpdate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{`,
-				`"passwordAuth":{"identityFields":{"code":"validation_missing_field"`,
+				`"oauth2":{`,
 			},
 			ExpectedEvents: map[string]int{
 				"*":                            0,
