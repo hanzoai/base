@@ -72,7 +72,7 @@ func init() {
 
 				// it shouldn't be possible but for just in case if there is an edge case the regex doesn't cover
 				if missingSQL == "" {
-					return fmt.Errorf("failed to build sqlite_master index: %v", missingSQL)
+					return fmt.Errorf("failed to build sqlite_master index: %v", missing)
 				}
 
 				// drop the missing index to recreate later
