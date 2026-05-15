@@ -2,10 +2,10 @@ package zap
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
+	luxlog "github.com/luxfi/log"
 	zaplib "github.com/luxfi/zap"
 )
 
@@ -50,19 +50,18 @@ type plugin struct {
 	app     core.App
 	config  Config
 	node    *zaplib.Node
-	logger  *slog.Logger
+	logger  luxlog.Logger
 	handler *handler
 }
 
 func (p *plugin) start() {
-	p.logger = slog.Default().With("component", "zap")
+	p.logger = luxlog.New("component", "zap")
 	p.logger.Info("starting ZAP transport", "port", p.config.Port, "nodeID", p.config.NodeID)
 
 	p.node = zaplib.NewNode(zaplib.NodeConfig{
 		NodeID:      p.config.NodeID,
 		Port:        p.config.Port,
 		ServiceType: p.config.ServiceType,
-		Logger:      p.logger,
 	})
 
 	p.handler = newHandler(p.app, p.logger)

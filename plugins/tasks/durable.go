@@ -3,12 +3,12 @@ package tasks
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"regexp"
 	"sync"
 	"time"
 
+	"github.com/hanzoai/base/tools/logger"
 	"github.com/hanzoai/tasks/pkg/sdk/client"
 	"github.com/hanzoai/tasks/pkg/sdk/temporal"
 )
@@ -394,9 +394,9 @@ func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID
 }
 
 // logDurableError logs a durable store error without failing the operation.
-func logDurableError(logger *slog.Logger, op string, taskID string, err error) {
-	if logger != nil {
-		logger.Warn("tasks: durable "+op+" failed, SQLite state is authoritative",
+func logDurableError(log logger.Logger, op string, taskID string, err error) {
+	if log != nil {
+		log.Warn("tasks: durable "+op+" failed, SQLite state is authoritative",
 			"task_id", taskID,
 			"error", err.Error(),
 		)
