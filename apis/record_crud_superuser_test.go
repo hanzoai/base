@@ -148,12 +148,12 @@ func TestRecordCrudSuperuserDelete(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*":                          0,
 				"OnRecordDeleteRequest":      1,
-				"OnModelDelete":              4, // + 3 AuthOrigins
-				"OnModelDeleteExecute":       4,
-				"OnModelAfterDeleteSuccess":  4,
-				"OnRecordDelete":             4,
-				"OnRecordDeleteExecute":      4,
-				"OnRecordAfterDeleteSuccess": 4,
+				"OnModelDelete":              1,
+				"OnModelDeleteExecute":       1,
+				"OnModelAfterDeleteSuccess":  1,
+				"OnRecordDelete":             1,
+				"OnRecordDeleteExecute":      1,
+				"OnRecordAfterDeleteSuccess": 1,
 			},
 		},
 		{
