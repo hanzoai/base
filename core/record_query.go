@@ -520,8 +520,6 @@ func (app *BaseApp) FindAuthRecordByToken(token string, validTypes ...string) (*
 		baseTokenKey = record.Collection().FileToken.Secret
 	case TokenTypeVerification:
 		baseTokenKey = record.Collection().VerificationToken.Secret
-	case TokenTypePasswordReset:
-		baseTokenKey = record.Collection().PasswordResetToken.Secret
 	case TokenTypeEmailChange:
 		baseTokenKey = record.Collection().EmailChangeToken.Secret
 	default:

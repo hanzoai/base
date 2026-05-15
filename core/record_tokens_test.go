@@ -91,14 +91,6 @@ func TestNewVerificationToken(t *testing.T) {
 	}, nil)
 }
 
-func TestNewPasswordResetToken(t *testing.T) {
-	t.Parallel()
-
-	testRecordToken(t, core.TokenTypePasswordReset, func(record *core.Record) (string, error) {
-		return record.NewPasswordResetToken()
-	}, nil)
-}
-
 func TestNewEmailChangeToken(t *testing.T) {
 	t.Parallel()
 

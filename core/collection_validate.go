@@ -124,7 +124,6 @@ func (validator *collectionValidator) run() error {
 				validation.By(validator.ensureNoSystemFieldsChange),
 				validation.By(validator.ensureNoFieldsTypeChange),
 			),
-			validation.When(validator.new.IsAuth(), validation.By(validator.checkReservedAuthKeys)),
 			validation.By(validator.checkFieldValidators),
 		),
 		validation.Field(
@@ -324,36 +323,6 @@ func (cv *collectionValidator) checkViewQuery(value any) error {
 	return nil
 }
 
-var reservedAuthKeys = []string{"passwordConfirm", "oldPassword"}
-
-func (cv *collectionValidator) checkReservedAuthKeys(value any) error {
-	fields, ok := value.(FieldsList)
-	if !ok {
-		return validators.ErrUnsupportedValueType
-	}
-
-	if !cv.new.IsAuth() {
-		return nil // not an auth collection
-	}
-
-	errs := validation.Errors{}
-	for i, field := range fields {
-		if list.ExistInSlice(field.GetName(), reservedAuthKeys) {
-			errs[strconv.Itoa(i)] = validation.Errors{
-				"name": validation.NewError(
-					"validation_reserved_field_name",
-					"The field name is reserved and cannot be used.",
-				),
-			}
-		}
-	}
-	if len(errs) > 0 {
-		return errs
-	}
-
-	return nil
-}
-
 func (cv *collectionValidator) checkMinFields(value any) error {
 	fields, ok := value.(FieldsList)
 	if !ok {
@@ -372,14 +341,6 @@ func (cv *collectionValidator) checkMinFields(value any) error {
 
 	switch cv.new.Type {
 	case CollectionTypeAuth:
-		passwordField, _ := fields.GetByName(FieldNamePassword).(*PasswordField)
-		if passwordField == nil {
-			return validation.NewError("validation_missing_password_field", `System "password" field is required.`)
-		}
-		if !passwordField.Hidden || !passwordField.System {
-			return validation.Errors{FieldNamePassword: ErrMustBeSystemAndHidden}
-		}
-
 		tokenKeyField, _ := fields.GetByName(FieldNameTokenKey).(*TextField)
 		if tokenKeyField == nil {
 			return validation.NewError("validation_missing_tokenKey_field", `System "tokenKey" field is required.`)

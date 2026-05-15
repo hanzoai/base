@@ -1,13 +1,13 @@
 package core
 
-// Common settings placeholder tokens
+// Common email-template placeholder tokens used by the auth-record
+// mailer entry points that survived the IAM-native rip. Placeholders
+// for retired flows (OTP, password reset, login alerts) have been
+// removed.
 const (
-	EmailPlaceholderAppName   string = "{APP_NAME}"
-	EmailPlaceholderAppURL    string = "{APP_URL}"
-	EmailPlaceholderToken     string = "{TOKEN}"
-	EmailPlaceholderOTP       string = "{OTP}"
-	EmailPlaceholderOTPId     string = "{OTP_ID}"
-	EmailPlaceholderAlertInfo string = "{ALERT_INFO}"
+	EmailPlaceholderAppName string = "{APP_NAME}"
+	EmailPlaceholderAppURL  string = "{APP_URL}"
+	EmailPlaceholderToken   string = "{TOKEN}"
 )
 
 var defaultVerificationTemplate = EmailTemplate{
@@ -24,20 +24,6 @@ var defaultVerificationTemplate = EmailTemplate{
 </p>`,
 }
 
-var defaultResetPasswordTemplate = EmailTemplate{
-	Subject: "Reset your " + EmailPlaceholderAppName + " password",
-	Body: `<p>Hello,</p>
-<p>Click on the button below to reset your password.</p>
-<p>
-  <a class="btn" href="` + EmailPlaceholderAppURL + "/_/#/auth/confirm-password-reset/" + EmailPlaceholderToken + `" target="_blank" rel="noopener">Reset password</a>
-</p>
-<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>
-<p>
-  Thanks,<br/>
-  ` + EmailPlaceholderAppName + ` team
-</p>`,
-}
-
 var defaultConfirmEmailChangeTemplate = EmailTemplate{
 	Subject: "Confirm your " + EmailPlaceholderAppName + " new email address",
 	Body: `<p>Hello,</p>
@@ -46,30 +32,6 @@ var defaultConfirmEmailChangeTemplate = EmailTemplate{
   <a class="btn" href="` + EmailPlaceholderAppURL + "/_/#/auth/confirm-email-change/" + EmailPlaceholderToken + `" target="_blank" rel="noopener">Confirm new email</a>
 </p>
 <p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>
-<p>
-  Thanks,<br/>
-  ` + EmailPlaceholderAppName + ` team
-</p>`,
-}
-
-var defaultOTPTemplate = EmailTemplate{
-	Subject: "OTP for " + EmailPlaceholderAppName,
-	Body: `<p>Hello,</p>
-<p>Your one-time password is: <strong>` + EmailPlaceholderOTP + `</strong></p>
-<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>
-<p>
-  Thanks,<br/>
-  ` + EmailPlaceholderAppName + ` team
-</p>`,
-}
-
-var defaultAuthAlertTemplate = EmailTemplate{
-	Subject: "Login from a new location",
-	Body: `<p>Hello,</p>
-<p>We noticed a login to your ` + EmailPlaceholderAppName + ` account from a new location:</p>
-<p><em>` + EmailPlaceholderAlertInfo + `</em></p>
-<p><strong>If this wasn't you, you should immediately change your ` + EmailPlaceholderAppName + ` account password to revoke access from all other locations.</strong></p>
-<p>If this was you, you may disregard this email.</p>
 <p>
   Thanks,<br/>
   ` + EmailPlaceholderAppName + ` team
