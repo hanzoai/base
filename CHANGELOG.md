@@ -1,3 +1,95 @@
+## v1.0.0 — IAM-native
+
+Hanzo Base v1.0.0 is the IAM-native 1.0 line. Local-password / OTP / MFA /
+external-auth-link surfaces have been ripped from the runtime. Authentication is
+delegated to Hanzo IAM (or any RFC-compliant OIDC IdP) over `/api/iam/*`, or to
+an in-process OIDC provider via `IAM_MODE=embedded` for single-tenant single-binary
+deployments.
+
+The changelog below follows Keep a Changelog.
+
+### Added
+
+- `IAM_MODE=embedded`: in-process OIDC provider mounted at `/api/iam/*`. Implements
+  OIDC discovery, JWKS (RSA-2048, key at `${DataDir}/iam.key`, 0600), authorize/login/token/userinfo.
+  RS256-signed JWTs, 1h TTL. Users live in `_iam_users` (email + bcrypt-cost-12 password).
+- `./base iam-user create <email>` CLI subcommand for bootstrapping embedded-mode users.
+  Honors `EMBEDDED_IAM_ROOT_EMAIL` / `EMBEDDED_IAM_ROOT_PASSWORD` on first boot.
+- Platform plugin mounts `/api/iam/*` as a transparent proxy to the configured `IAM_URL`,
+  collapsing the legacy `@hanzo/iam/browser` PKCE contract to one path.
+- `/api/collections/<c>/auth-methods` now returns a generic `iam` provider when external
+  auth is on (no brand string in responses).
+- Migration `1747094400_drop_legacy_auth_artifacts.go` drops legacy auth tables on
+  `./base migrate up`.
+- `sdk/go`: canonical `Client` interface declared for cross-binary consumers.
+- `tools/logger`: `github.com/luxfi/log` compatibility shim. `App.Logger()` now returns
+  the `logger.Logger` interface; `App.SlogLogger()` is the escape hatch for code still
+  on `*slog.Logger`.
+
+### Changed
+
+- Platform plugin makes IAM **mandatory** — there is no local-auth fallback.
+- Logger surface swept from `log/slog.Logger` to `github.com/luxfi/log` via the
+  `tools/logger` shim. Attribute helpers are now variadic positional pairs.
+- Legacy auth surfaces (`auth-with-password`, `request-otp`, `oauth2`, `oauth2-redirect`,
+  password-reset, email-change, verification, impersonate) return **410 Gone** (previously
+  403 Forbidden).
+- `_superusers` exemption removed from the external-auth guard — superusers go through IAM too.
+- Renamed `JWKS_URL` → `IAM_KEYS_URL` and `IAM_ENDPOINT` → `IAM_URL` to align with the
+  Hanzo header convention.
+- Go directive bumped to **1.26.3** (security advisory).
+- Bumped `luxfi/crypto` to v1.19.0 (pulls in `crypto/ipa/banderwagon` transitively).
+- Full fork from upstream PocketBase: the `pocketbase` npm dep is dropped; remaining
+  `pocketbase` mentions in JSDoc comments scrubbed.
+
+### Removed
+
+- 16 legacy local-auth handlers (and their tests): `auth-with-password`, `request-otp`,
+  `auth-with-otp`, `request-password-reset`, `confirm-password-reset`, `request-verification`,
+  `confirm-verification`, `request-email-change`, `confirm-email-change`,
+  `oauth2`, `oauth2-redirect`, `impersonate`, and friends.
+- Core models / queries / hooks for: `AuthOrigin`, `ExternalAuth`, `MFA`, `OTP`, and
+  the `password` field type itself.
+- Mail senders and hooks for retired local-auth flows.
+- `__hzMFACleanup__` / `__hzOTPCleanup__` cron jobs.
+- Local-password superuser CLI flow (`./base superuser ...` for password setup is gone —
+  use IAM, or embedded mode + `iam-user create`).
+- Deprecated `StoreKeyIAM*` aliases.
+
+### Security
+
+- Auth is one-way only: tokens issued by IAM (or embedded mode) are verified in-process;
+  the runtime has no path that hashes/stores a password directly on a regular user.
+- Embedded mode uses bcrypt-cost-12 for `_iam_users` passwords (no plaintext, ever).
+- Embedded-mode signing key is generated 0600 and never logged.
+
+### Migration
+
+**From v0.52.x:**
+
+1. Deploy v1.0.0 with `IAM_URL=<your IAM origin>` and `IAM_KEYS_URL=<jwks url>` pointed
+   at Hanzo IAM (or another RFC 6749 / OIDC IdP). The platform plugin will refuse to
+   start without an IAM endpoint.
+2. Or, for a single-tenant single-binary deployment, set `IAM_MODE=embedded` and
+   bootstrap a root user with either env (`EMBEDDED_IAM_ROOT_EMAIL` +
+   `EMBEDDED_IAM_ROOT_PASSWORD`) or `./base iam-user create <email>`.
+3. Run `./base migrate up`. Migration `1747094400_drop_legacy_auth_artifacts` will
+   drop legacy auth tables and indexes.
+4. Consumers that depended on `app.Logger() *slog.Logger`: switch to
+   `app.Logger() logger.Logger` (interface) — or call `app.SlogLogger()` for the
+   `*slog.Logger` escape hatch.
+
+**Companion:** `hanzoai/team-go` is the canonical reference implementation of the
+single-Go-binary-on-`@hanzo/base` pattern on the new IAM-native runtime.
+
+### Compatibility
+
+- Go 1.26.3
+- SQLite (modernc.org) and PostgreSQL
+- Identity provider: hanzo.id, or any RFC 6749 / OIDC IdP, or in-process embedded OIDC
+- Platforms: linux/amd64 (arm64 paused — see hanzo monorepo notes)
+
+
 ## v0.36.7
 
 - Fixed high memory usage with large file uploads ([#7572](https://github.com/pocketbase/pocketbase/discussions/7572)).
