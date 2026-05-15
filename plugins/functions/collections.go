@@ -1,8 +1,6 @@
 package functions
 
 import (
-	"log/slog"
-
 	"github.com/hanzoai/base/core"
 )
 
@@ -35,6 +33,6 @@ func (p *plugin) ensureCollections() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating functions system collection", slog.String("name", collectionFunctions))
+	p.app.Logger().Info("creating functions system collection", "name", collectionFunctions)
 	return p.app.Save(c)
 }

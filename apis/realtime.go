@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -73,7 +72,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 			e.App.SubscriptionsBroker().Unregister(ce.Client.Id())
 		}()
 
-		ce.App.Logger().Debug("Realtime connection established.", slog.String("clientId", ce.Client.Id()))
+		ce.App.Logger().Debug("Realtime connection established.", "clientId", ce.Client.Id())
 
 		// signalize established connection (aka. fire "connect" message)
 		connectData := []byte(`{"clientId":"` + ce.Client.Id() + `"}`)
@@ -95,8 +94,8 @@ func realtimeConnect(e *core.RequestEvent) error {
 		if connectMsgErr != nil {
 			ce.App.Logger().Debug(
 				"Realtime connection closed (failed to deliver CONNECT)",
-				slog.String("clientId", ce.Client.Id()),
-				slog.String("error", connectMsgErr.Error()),
+				"clientId", ce.Client.Id(),
+				"error", connectMsgErr.Error(),
 			)
 			return nil
 		}
@@ -114,7 +113,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 					// channel is closed
 					ce.App.Logger().Debug(
 						"Realtime connection closed (closed channel)",
-						slog.String("clientId", ce.Client.Id()),
+						"clientId", ce.Client.Id(),
 					)
 					return nil
 				}
@@ -133,8 +132,8 @@ func realtimeConnect(e *core.RequestEvent) error {
 				if msgErr != nil {
 					ce.App.Logger().Debug(
 						"Realtime connection closed (failed to deliver message)",
-						slog.String("clientId", ce.Client.Id()),
-						slog.String("error", msgErr.Error()),
+						"clientId", ce.Client.Id(),
+						"error", msgErr.Error(),
 					)
 					return nil
 				}
@@ -145,7 +144,7 @@ func realtimeConnect(e *core.RequestEvent) error {
 				// connection is closed
 				ce.App.Logger().Debug(
 					"Realtime connection closed (cancelled request)",
-					slog.String("clientId", ce.Client.Id()),
+					"clientId", ce.Client.Id(),
 				)
 				return nil
 			}
@@ -211,8 +210,8 @@ func realtimeSetSubscriptions(e *core.RequestEvent) error {
 
 		e.App.Logger().Debug(
 			"Realtime subscriptions updated.",
-			slog.String("clientId", e.Client.Id()),
-			slog.Any("subscriptions", e.Subscriptions),
+			"clientId", e.Client.Id(),
+			"subscriptions", e.Subscriptions,
 		)
 
 		return execAfterSuccessTx(true, e.App, func() error {
@@ -278,9 +277,9 @@ func bindRealtimeEvents(app core.App) {
 				if err := realtimeUpdateClientsAuth(e.App, authRecord); err != nil {
 					app.Logger().Warn(
 						"Failed to update client(s) associated to the updated auth record",
-						slog.Any("id", authRecord.Id),
-						slog.String("collectionName", authRecord.Collection().Name),
-						slog.String("error", err.Error()),
+						"id", authRecord.Id,
+						"collectionName", authRecord.Collection().Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -299,9 +298,9 @@ func bindRealtimeEvents(app core.App) {
 				if err := realtimeUnsetClientsAuthState(e.App, e.Model); err != nil {
 					app.Logger().Warn(
 						"Failed to remove client(s) associated to the deleted auth model",
-						slog.Any("id", e.Model.PK()),
-						slog.String("collectionName", e.Model.TableName()),
-						slog.String("error", err.Error()),
+						"id", e.Model.PK(),
+						"collectionName", e.Model.TableName(),
+						"error", err.Error(),
 					)
 				}
 			}
@@ -319,9 +318,9 @@ func bindRealtimeEvents(app core.App) {
 				if err != nil {
 					app.Logger().Debug(
 						"Failed to broadcast record create",
-						slog.String("id", record.Id),
-						slog.String("collectionName", record.Collection().Name),
-						slog.String("error", err.Error()),
+						"id", record.Id,
+						"collectionName", record.Collection().Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -339,9 +338,9 @@ func bindRealtimeEvents(app core.App) {
 				if err != nil {
 					app.Logger().Debug(
 						"Failed to broadcast record update",
-						slog.String("id", record.Id),
-						slog.String("collectionName", record.Collection().Name),
-						slog.String("error", err.Error()),
+						"id", record.Id,
+						"collectionName", record.Collection().Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -363,9 +362,9 @@ func bindRealtimeEvents(app core.App) {
 				if err != nil {
 					app.Logger().Debug(
 						"Failed to dry cache record delete",
-						slog.String("id", record.Id),
-						slog.String("collectionName", record.Collection().Name),
-						slog.String("error", err.Error()),
+						"id", record.Id,
+						"collectionName", record.Collection().Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -387,9 +386,9 @@ func bindRealtimeEvents(app core.App) {
 				if err != nil {
 					app.Logger().Debug(
 						"Failed to broadcast record delete",
-						slog.Any("id", e.Model.PK()),
-						slog.String("collectionName", collection.Name),
-						slog.String("error", err.Error()),
+						"id", e.Model.PK(),
+						"collectionName", collection.Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -408,9 +407,9 @@ func bindRealtimeEvents(app core.App) {
 				if err != nil {
 					app.Logger().Debug(
 						"Failed to cleanup after broadcast record delete failure",
-						slog.String("id", record.Id),
-						slog.String("collectionName", record.Collection().Name),
-						slog.String("error", err.Error()),
+						"id", record.Id,
+						"collectionName", record.Collection().Name,
+						"error", err.Error(),
 					)
 				}
 			}
@@ -559,11 +558,11 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 								if len(expandErrs) > 0 {
 									app.Logger().Debug(
 										"[broadcastRecord] expand errors",
-										slog.String("id", cleanRecord.Id),
-										slog.String("collectionName", cleanRecord.Collection().Name),
-										slog.String("sub", sub),
-										slog.String("expand", rawExpand),
-										slog.Any("errors", expandErrs),
+										"id", cleanRecord.Id,
+										"collectionName", cleanRecord.Collection().Name,
+										"sub", sub,
+										"expand", rawExpand,
+										"errors", expandErrs,
 									)
 								}
 							}
@@ -582,10 +581,10 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 						if enrichErr != nil {
 							app.Logger().Debug(
 								"[broadcastRecord] record enrich error",
-								slog.String("id", cleanRecord.Id),
-								slog.String("collectionName", cleanRecord.Collection().Name),
-								slog.String("sub", sub),
-								slog.Any("error", enrichErr),
+								"id", cleanRecord.Id,
+								"collectionName", cleanRecord.Collection().Name,
+								"sub", sub,
+								"error", enrichErr,
 							)
 							continue
 						}
@@ -604,11 +603,11 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 							} else {
 								app.Logger().Debug(
 									"[broadcastRecord] pick fields error",
-									slog.String("id", cleanRecord.Id),
-									slog.String("collectionName", cleanRecord.Collection().Name),
-									slog.String("sub", sub),
-									slog.String("fields", rawFields),
-									slog.String("error", err.Error()),
+									"id", cleanRecord.Id,
+									"collectionName", cleanRecord.Collection().Name,
+									"sub", sub,
+									"fields", rawFields,
+									"error", err.Error(),
 								)
 							}
 						}
@@ -617,9 +616,9 @@ func realtimeBroadcastRecord(app core.App, action string, record *core.Record, d
 						if err != nil {
 							app.Logger().Debug(
 								"[broadcastRecord] data marshal error",
-								slog.String("id", cleanRecord.Id),
-								slog.String("collectionName", cleanRecord.Collection().Name),
-								slog.String("error", err.Error()),
+								"id", cleanRecord.Id,
+								"collectionName", cleanRecord.Collection().Name,
+								"error", err.Error(),
 							)
 							continue
 						}
