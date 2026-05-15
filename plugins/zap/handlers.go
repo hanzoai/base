@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"sync"
 
 	"github.com/hanzoai/base/core"
+	luxlog "github.com/luxfi/log"
 	zaplib "github.com/luxfi/zap"
 )
 
@@ -30,7 +30,7 @@ const (
 // handler wraps a Base app to handle ZAP messages.
 type handler struct {
 	app    core.App
-	logger *slog.Logger
+	logger luxlog.Logger
 	node   *zaplib.Node
 
 	// Realtime subscriptions: peer -> set of collection IDs/names
@@ -38,7 +38,7 @@ type handler struct {
 	subs   map[string]map[string]struct{}
 }
 
-func newHandler(app core.App, logger *slog.Logger) *handler {
+func newHandler(app core.App, logger luxlog.Logger) *handler {
 	return &handler{
 		app:    app,
 		logger: logger,
