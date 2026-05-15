@@ -10,7 +10,7 @@ import (
 	"github.com/hanzoai/dbx"
 )
 
-// handleDeployFunction handles POST /api/functions
+// handleDeployFunction handles POST /v1/functions
 func (p *plugin) handleDeployFunction(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)
@@ -92,7 +92,7 @@ func (p *plugin) handleDeployFunction(e *core.RequestEvent) error {
 	})
 }
 
-// handleListFunctions handles GET /api/functions
+// handleListFunctions handles GET /v1/functions
 func (p *plugin) handleListFunctions(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)
@@ -126,7 +126,7 @@ func (p *plugin) handleListFunctions(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, result)
 }
 
-// handleGetFunction handles GET /api/functions/{name}
+// handleGetFunction handles GET /v1/functions/{name}
 func (p *plugin) handleGetFunction(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)
@@ -160,7 +160,7 @@ func (p *plugin) handleGetFunction(e *core.RequestEvent) error {
 	})
 }
 
-// handleDeleteFunction handles DELETE /api/functions/{name}
+// handleDeleteFunction handles DELETE /v1/functions/{name}
 func (p *plugin) handleDeleteFunction(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)
@@ -194,7 +194,7 @@ func (p *plugin) handleDeleteFunction(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]string{"status": "deleted"})
 }
 
-// handleInvokeFunction handles POST /api/functions/{name}/invoke
+// handleInvokeFunction handles POST /v1/functions/{name}/invoke
 func (p *plugin) handleInvokeFunction(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)
@@ -230,7 +230,7 @@ func (p *plugin) handleInvokeFunction(e *core.RequestEvent) error {
 	return nil
 }
 
-// handleGetLogs handles GET /api/functions/{name}/logs
+// handleGetLogs handles GET /v1/functions/{name}/logs
 func (p *plugin) handleGetLogs(e *core.RequestEvent) error {
 	if e.Auth == nil {
 		return e.UnauthorizedError("authentication required", nil)

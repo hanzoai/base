@@ -143,7 +143,7 @@ export function useCRDTCounter(doc: CRDTDocument, field: string): number {
 function deriveCrdtWsUrl(httpUrl: string): string {
   const url = httpUrl.replace(/\/$/, '')
   if (url.startsWith('https://')) {
-    return url.replace('https://', 'wss://') + '/api/crdt'
+    return url.replace('https://', 'wss://') + '/v1/crdt'
   }
-  return url.replace('http://', 'ws://') + '/api/crdt'
+  return url.replace('http://', 'ws://') + '/v1/crdt'
 }
