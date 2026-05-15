@@ -1,21 +1,15 @@
 package apis
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/mails"
 	"github.com/hanzoai/base/tools/router"
-	"github.com/hanzoai/base/tools/routine"
 	"github.com/hanzoai/base/tools/search"
-	"github.com/hanzoai/base/tools/security"
-	"github.com/hanzoai/base/tools/types"
 )
 
 const (
@@ -23,16 +17,13 @@ const (
 	fieldsQueryParam = "fields"
 )
 
-var ErrMFA = errors.New("mfa required")
-
 // RecordAuthResponse writes standardized json record auth response
 // into the specified request context.
 //
-// The authMethod argument specify the name of the current authentication method (eg. password, oauth2, etc.)
-// that it is used primarily as an auth identifier during MFA and for login alerts.
-//
-// Set authMethod to empty string if you want to ignore the MFA checks and the login alerts
-// (can be also adjusted additionally via the OnRecordAuthRequest hook).
+// The authMethod argument specifies the name of the current authentication
+// method (e.g. oauth2) and is forwarded to the OnRecordAuthRequest hook so
+// callers can observe it. Hanzo IAM is the only auth source — Base no
+// longer issues credentials or runs MFA/OTP/login-alert flows itself.
 func RecordAuthResponse(e *core.RequestEvent, authRecord *core.Record, authMethod string, meta any) error {
 	token, tokenErr := authRecord.NewAuthToken()
 	if tokenErr != nil {
@@ -66,24 +57,6 @@ func recordAuthResponse(e *core.RequestEvent, authRecord *core.Record, token str
 			return nil
 		}
 
-		// MFA
-		// ---
-		mfaId, err := checkMFA(e.RequestEvent, e.Record, e.AuthMethod)
-		if err != nil {
-			return err
-		}
-
-		// require additional authentication
-		if mfaId != "" {
-			// eagerly write the mfa response and return an err so that
-			// external middlewars are aware that the auth response requires an extra step
-			e.JSON(http.StatusUnauthorized, map[string]string{
-				"mfaId": mfaId,
-			})
-			return ErrMFA
-		}
-		// ---
-
 		// create a shallow copy of the cached request data and adjust it to the current auth record
 		requestInfo := *originalRequestInfo
 		requestInfo.Auth = e.Record
@@ -111,12 +84,6 @@ func recordAuthResponse(e *core.RequestEvent, authRecord *core.Record, token str
 			return err
 		}
 
-		if e.AuthMethod != "" && authRecord.Collection().AuthAlert.Enabled {
-			if err = authAlert(e.RequestEvent, e.Record); err != nil {
-				e.App.Logger().Warn("[recordAuthResponse] Failed to send login alert", "error", err)
-			}
-		}
-
 		result := struct {
 			Meta   any          `json:"meta,omitempty"`
 			Record *core.Record `json:"record"`
@@ -134,118 +101,6 @@ func recordAuthResponse(e *core.RequestEvent, authRecord *core.Record, token str
 			return e.JSON(http.StatusOK, result)
 		})
 	})
-}
-
-// wantsMFA checks whether to enable MFA for the specified auth record based on its MFA rule
-// (note: returns true even in case of an error as a safer default).
-func wantsMFA(e *core.RequestEvent, record *core.Record) (bool, error) {
-	rule := record.Collection().MFA.Rule
-	if rule == "" {
-		return true, nil
-	}
-
-	requestInfo, err := e.RequestInfo()
-	if err != nil {
-		return true, err
-	}
-
-	var exists int
-
-	query := e.App.RecordQuery(record.Collection()).
-		Select("(1)").
-		AndWhere(dbx.HashExp{record.Collection().Name + ".id": record.Id})
-
-	// parse and apply the access rule filter
-	resolver := core.NewRecordFieldResolver(e.App, record.Collection(), requestInfo, true)
-	expr, err := search.FilterData(rule).BuildExpr(resolver)
-	if err != nil {
-		return true, err
-	}
-
-	err = resolver.UpdateQuery(query)
-	if err != nil {
-		return true, err
-	}
-
-	err = query.AndWhere(expr).Limit(1).Row(&exists)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return true, err
-	}
-
-	return exists > 0, nil
-}
-
-// checkMFA handles any MFA auth checks that needs to be performed for the specified request event.
-// Returns the mfaId that needs to be written as response to the user.
-//
-// (note: all auth methods are treated as equal and there is no requirement for "pairing").
-func checkMFA(e *core.RequestEvent, authRecord *core.Record, currentAuthMethod string) (string, error) {
-	if !authRecord.Collection().MFA.Enabled || currentAuthMethod == "" {
-		return "", nil
-	}
-
-	ok, err := wantsMFA(e, authRecord)
-	if err != nil {
-		return "", e.BadRequestError("Failed to authenticate.", fmt.Errorf("MFA rule failure: %w", err))
-	}
-	if !ok {
-		return "", nil // no mfa needed for this auth record
-	}
-
-	// read the mfaId either from the qyery params or request body
-	mfaId := e.Request.URL.Query().Get("mfaId")
-	if mfaId == "" {
-		// check the body
-		data := struct {
-			MfaId string `form:"mfaId" json:"mfaId" xml:"mfaId"`
-		}{}
-		if err := e.BindBody(&data); err != nil {
-			return "", firstApiError(err, e.BadRequestError("Failed to read MFA Id", err))
-		}
-		mfaId = data.MfaId
-	}
-
-	// first-time auth
-	// ---
-	if mfaId == "" {
-		mfa := core.NewMFA(e.App)
-		mfa.SetCollectionRef(authRecord.Collection().Id)
-		mfa.SetRecordRef(authRecord.Id)
-		mfa.SetMethod(currentAuthMethod)
-		if err := e.App.Save(mfa); err != nil {
-			return "", firstApiError(err, e.InternalServerError("Failed to create MFA record", err))
-		}
-
-		return mfa.Id, nil
-	}
-
-	// second-time auth
-	// ---
-	mfa, err := e.App.FindMFAById(mfaId)
-	deleteMFA := func() {
-		// try to delete the expired mfa
-		if mfa != nil {
-			if deleteErr := e.App.Delete(mfa); deleteErr != nil {
-				e.App.Logger().Warn("Failed to delete expired MFA record", "error", deleteErr, "mfaId", mfa.Id)
-			}
-		}
-	}
-	if err != nil || mfa.HasExpired(authRecord.Collection().MFA.DurationTime()) {
-		deleteMFA()
-		return "", e.BadRequestError("Invalid or expired MFA session.", err)
-	}
-
-	if mfa.RecordRef() != authRecord.Id || mfa.CollectionRef() != authRecord.Collection().Id {
-		return "", e.BadRequestError("Invalid MFA session.", nil)
-	}
-
-	if mfa.Method() == currentAuthMethod {
-		return "", e.BadRequestError("A different authentication method is required.", nil)
-	}
-
-	deleteMFA()
-
-	return "", nil
 }
 
 // EnrichRecord parses the request context and enrich the provided record:
@@ -575,83 +430,3 @@ func execAfterSuccessTx(checkTx bool, app core.App, fn func() error) error {
 	return fn()
 }
 
-// -------------------------------------------------------------------
-
-const maxAuthOrigins = 5
-
-func authAlert(e *core.RequestEvent, authRecord *core.Record) error {
-	// generate fingerprint
-	// ---
-	ip := e.RealIP()
-
-	userAgent := e.Request.UserAgent()
-	if len(userAgent) > 200 {
-		userAgent = userAgent[:200] + "..."
-	}
-
-	fingerprint := security.MD5(ip + userAgent)
-	alertInfo := fmt.Sprintf("%s - %s %s", types.NowDateTime().String(), ip, userAgent)
-	// ---
-
-	origins, err := e.App.FindAllAuthOriginsByRecord(authRecord)
-	if err != nil {
-		return err
-	}
-
-	isFirstLogin := len(origins) == 0
-
-	var currentOrigin *core.AuthOrigin
-	for _, origin := range origins {
-		if origin.Fingerprint() == fingerprint {
-			currentOrigin = origin
-			break
-		}
-	}
-	if currentOrigin == nil {
-		currentOrigin = core.NewAuthOrigin(e.App)
-		currentOrigin.SetCollectionRef(authRecord.Collection().Id)
-		currentOrigin.SetRecordRef(authRecord.Id)
-		currentOrigin.SetFingerprint(fingerprint)
-	}
-
-	// send email alert for the new origin auth (skip first login)
-	//
-	// Note: The "fake" timeout is a temp solution to avoid blocking
-	//       for too long when the SMTP server is not accessible, due
-	//       to the lack of context cancellation support in the underlying
-	//       mailer and net/smtp package.
-	//       The goroutine technically "leaks" but we assume that the OS will
-	//       terminate the connection after some time (usually after 3-4 mins).
-	if !isFirstLogin && currentOrigin.IsNew() && authRecord.Email() != "" {
-		mailSent := make(chan error, 1)
-
-		timer := time.AfterFunc(15*time.Second, func() {
-			mailSent <- errors.New("auth alert mail send wait timeout reached")
-		})
-
-		routine.FireAndForget(func() {
-			err := mails.SendRecordAuthAlert(e.App, authRecord, alertInfo)
-			timer.Stop()
-			mailSent <- err
-		})
-
-		err = <-mailSent
-		if err != nil {
-			return err
-		}
-	}
-
-	// try to keep only up to maxAuthOrigins
-	// (pop the last used ones; it is not executed in a transaction to avoid unnecessary locks)
-	if currentOrigin.IsNew() && len(origins) >= maxAuthOrigins {
-		for i := len(origins) - 1; i >= maxAuthOrigins-1; i-- {
-			if err := e.App.Delete(origins[i]); err != nil {
-				// treat as non-critical error, just log for now
-				e.App.Logger().Warn("Failed to delete old AuthOrigin record", "error", err, "authOriginId", origins[i].Id)
-			}
-		}
-	}
-
-	// create/update the origin fingerprint
-	return e.App.Save(currentOrigin)
-}
