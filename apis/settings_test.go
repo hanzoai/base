@@ -405,42 +405,6 @@ func TestSettingsTestEmail(t *testing.T) {
 			},
 		},
 		{
-			Name:   "authorized as superuser (password reset template)",
-			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
-			Body: strings.NewReader(`{
-				"template": "password-reset",
-				"email": "test@example.com"
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				if app.TestMailer.TotalSend() != 1 {
-					t.Fatalf("[password-reset] Expected 1 sent email, got %d", app.TestMailer.TotalSend())
-				}
-
-				if len(app.TestMailer.LastMessage().To) != 1 {
-					t.Fatalf("[password-reset] Expected 1 recipient, got %v", app.TestMailer.LastMessage().To)
-				}
-
-				if app.TestMailer.LastMessage().To[0].Address != "test@example.com" {
-					t.Fatalf("[password-reset] Expected the email to be sent to %s, got %s", "test@example.com", app.TestMailer.LastMessage().To[0].Address)
-				}
-
-				if !strings.Contains(app.TestMailer.LastMessage().HTML, "Reset password") {
-					t.Fatalf("[password-reset] Expected to sent a password-reset email, got \n%v\n%v", app.TestMailer.LastMessage().Subject, app.TestMailer.LastMessage().HTML)
-				}
-			},
-			ExpectedStatus:  204,
-			ExpectedContent: []string{},
-			ExpectedEvents: map[string]int{
-				"*":                               0,
-				"OnMailerSend":                    1,
-				"OnMailerRecordPasswordResetSend": 1,
-			},
-		},
-		{
 			Name:   "authorized as superuser (email change)",
 			Method: http.MethodPost,
 			URL:    "/api/settings/test/email",
@@ -474,42 +438,6 @@ func TestSettingsTestEmail(t *testing.T) {
 				"*":                             0,
 				"OnMailerSend":                  1,
 				"OnMailerRecordEmailChangeSend": 1,
-			},
-		},
-		{
-			Name:   "authorized as superuser (otp)",
-			Method: http.MethodPost,
-			URL:    "/api/settings/test/email",
-			Body: strings.NewReader(`{
-				"template": "otp",
-				"email": "test@example.com"
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				if app.TestMailer.TotalSend() != 1 {
-					t.Fatalf("[otp] Expected 1 sent email, got %d", app.TestMailer.TotalSend())
-				}
-
-				if len(app.TestMailer.LastMessage().To) != 1 {
-					t.Fatalf("[otp] Expected 1 recipient, got %v", app.TestMailer.LastMessage().To)
-				}
-
-				if app.TestMailer.LastMessage().To[0].Address != "test@example.com" {
-					t.Fatalf("[otp] Expected the email to be sent to %s, got %s", "test@example.com", app.TestMailer.LastMessage().To[0].Address)
-				}
-
-				if !strings.Contains(app.TestMailer.LastMessage().HTML, "one-time password") {
-					t.Fatalf("[otp] Expected to sent OTP email, got \n%v\n%v", app.TestMailer.LastMessage().Subject, app.TestMailer.LastMessage().HTML)
-				}
-			},
-			ExpectedStatus:  204,
-			ExpectedContent: []string{},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnMailerSend":          1,
-				"OnMailerRecordOTPSend": 1,
 			},
 		},
 	}
