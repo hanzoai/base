@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	luxlog "github.com/luxfi/log"
 )
 
 // StaticWriter always routes writes to a fixed URL.
@@ -142,7 +143,7 @@ func (w *QuasarWriter) loop() {
 
 			w.mu.Lock()
 			if target != w.target {
-				slog.Info("ha: writer changed", "from", w.target, "to", target, "writer", writerID)
+				luxlog.Info("ha: writer changed", "from", w.target, "to", target, "writer", writerID)
 			}
 			w.target = target
 			w.mu.Unlock()
