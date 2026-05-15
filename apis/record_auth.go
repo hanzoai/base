@@ -12,10 +12,12 @@ import (
 // bindRecordAuthApi registers the auth record api endpoints and
 // the corresponding handlers.
 //
-// When StoreKeyExternalAuthOnly is true (set by the platform plugin), all
-// built-in auth endpoints except auth-methods, auth-refresh, impersonate, and
-// oauth2-redirect are blocked for non-superuser collections. Users must
-// authenticate via the configured identity provider instead.
+// When StoreKeyExternalAuthOnly is true (set by the platform plugin),
+// every built-in auth endpoint except auth-methods, auth-refresh, and
+// oauth2-redirect is blocked for every collection — including
+// _superusers. The admin panel logs in via the IAM PKCE flow proxied
+// through /api/iam/oauth/authorize, and regular users authenticate
+// via the configured identity provider too.
 func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	// global oauth2 subscription redirect handler (always allowed — needed for OAuth2 flow)
 	rg.GET("/oauth2-redirect", oauth2SubscriptionRedirect).Bind(
@@ -38,7 +40,12 @@ func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 		RequireSameCollectionContextAuth(""),
 	)
 
-	// Built-in auth endpoints — blocked in external-auth-only mode (except for _superusers).
+	// Built-in auth endpoints — blocked for every collection in
+	// external-auth-only mode (the only mode the platform plugin
+	// allows). Kept bound so the guard can return a 410 Gone with
+	// the IAM replacement URL in the Location header. Once
+	// EXTERNAL_AUTH_ONLY becomes unconditional these route bindings
+	// and their handlers go away entirely.
 	sub.POST("/auth-with-password", recordAuthWithPassword).Bind(
 		externalAuthGuard(),
 		collectionPathRateLimit("", "authWithPassword", "auth"),
@@ -49,9 +56,6 @@ func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 		collectionPathRateLimit("", "authWithOAuth2", "auth"),
 	)
 
-	// auth-with-otp is the OTP-completion endpoint (challenge already
-	// issued elsewhere). Kept ONLY for the _superusers admin login
-	// transition path; the guard 410s it for every other collection.
 	sub.POST("/auth-with-otp", recordAuthWithOTP).Bind(
 		externalAuthGuard(),
 		collectionPathRateLimit("", "authWithOTP", "auth"),
@@ -85,10 +89,10 @@ func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
 // platform plugin allows. There is no "local password / OTP / MFA"
 // path anymore: Hanzo IAM is the only auth source.
 //
-// The _superusers collection is still exempt here because the admin
-// panel UI hasn't been switched to the IAM-redirect login flow yet
-// (tracked: admin-panel IAM login follow-up). Once that lands, this
-// exemption + the whole legacy apis/record_auth_* group goes away.
+// No collection is exempt. The admin panel UI uses the IAM PKCE flow
+// against /api/iam/oauth/authorize (transparent proxy mounted by the
+// platform plugin), so _superusers no longer needs a built-in auth
+// surface either.
 //
 // 410 Gone (not 403) is intentional — it signals the endpoint is
 // permanently retired, not temporarily forbidden, and lets clients
@@ -100,13 +104,6 @@ func externalAuthGuard() *hook.Handler[*core.RequestEvent] {
 		Func: func(e *core.RequestEvent) error {
 			externalOnly, _ := e.App.Store().Get(StoreKeyExternalAuthOnly).(bool)
 			if !externalOnly {
-				return e.Next()
-			}
-
-			// Allow _superusers — admin panel login still uses built-in
-			// OAuth2 redirects until we cut admin to IAM-only login.
-			collectionName := e.Request.PathValue("collection")
-			if collectionName == core.CollectionNameSuperusers {
 				return e.Next()
 			}
 
