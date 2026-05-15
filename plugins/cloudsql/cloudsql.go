@@ -213,7 +213,7 @@ func (p *plugin) ensureCollections() error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/api/cloud-sql")
+	api := r.Group("/v1/cloud-sql")
 
 	api.POST("/databases", p.handleCreateDatabase)
 	api.GET("/databases", p.handleListDatabases)
@@ -225,7 +225,7 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	api.GET("/databases/{id}/branches", p.handleListBranches)
 
 	// Register specific methods to avoid conflict with the static catch-all GET /{path...}
-	meta := r.Group("/api/meta")
+	meta := r.Group("/v1/meta")
 	meta.GET("/{path...}", p.handleMetaProxy)
 	meta.POST("/{path...}", p.handleMetaProxy)
 	meta.PUT("/{path...}", p.handleMetaProxy)
