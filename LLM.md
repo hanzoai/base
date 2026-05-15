@@ -186,6 +186,46 @@ The platform plugin (`plugins/platform/`) sets these same store keys automatical
 
 Store keys: `StoreKeyExternalAuthOnly`, `StoreKeyJWKSURL`, `StoreKeyAuthUsersCollection`.
 
+## Embedded IAM Mode (`IAM_MODE=embedded`)
+
+Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider
+at `/api/iam/*` instead of reverse-proxying to an external Hanzo IAM
+(Casdoor). Same `@hanzo/iam/browser` PKCE contract from the client's
+perspective — the path doesn't change, only the implementation.
+
+Surface (minimal viable, NOT a full Casdoor):
+
+- `GET /api/iam/.well-known/openid-configuration` — OIDC discovery (issuer derived from request Host)
+- `GET /api/iam/.well-known/jwks` — public RSA JWK
+- `GET /api/iam/oauth/authorize` — plain HTML login form
+- `POST /api/iam/oauth/login` — verifies email+password, redirects to `redirect_uri?code=...&state=...`
+- `POST /api/iam/oauth/token` — exchanges single-use code for RS256-signed JWT (1h TTL)
+- `GET /api/iam/oauth/userinfo` — bearer-validated user record
+
+Signing key: `${DataDir}/iam.key` (RSA-2048 PEM, 0600). Generated on
+first boot; back it up alongside the SQLite database — losing it
+invalidates every outstanding JWT.
+
+Users: `_iam_users` system collection (email + bcrypt-cost-12 password
++ name). Bootstrap via either:
+
+- env: `EMBEDDED_IAM_ROOT_EMAIL=z@example.com EMBEDDED_IAM_ROOT_PASSWORD=...`
+  on first boot (no-op if `_iam_users` already has rows)
+- CLI: `./base iam-user create z@example.com` (prompts for password
+  via stdin, or honor `IAM_USER_PASSWORD`)
+
+Token validation runs in-process via the `platformEmbeddedAuth`
+middleware bound at `DefaultLoadAuthTokenMiddlewarePriority - 1`. The
+JWT is verified against the local signer (NOT the JWKS-over-HTTP path
+external mode uses) and `re.Auth` is set to the matching `_iam_users`
+record, so the standard identity-header pipeline keeps working
+unchanged.
+
+Out of scope (boot against an external Casdoor at `IAM_ENDPOINT` if
+you need any of these): multi-tenant orgs, social federation
+(Google/GitHub/SAML), MFA/OTP, password reset, refresh tokens, fancy
+login UI.
+
 ## Network (Quasar replication) — singleton collapse (v0.48.1)
 
 `BASE_NETWORK=quasar` only engages the Quasar cross-pod plane when at least
