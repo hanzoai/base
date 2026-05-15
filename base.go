@@ -184,6 +184,7 @@ func (base *Base) Start() error {
 	// register system commands
 	base.RootCmd.AddCommand(cmd.NewServeCommand(base, !base.hideStartBanner))
 	base.RootCmd.AddCommand(cmd.NewCLICommand())
+	base.RootCmd.AddCommand(cmd.NewIAMUserCommand(base))
 
 	return base.Execute()
 }
