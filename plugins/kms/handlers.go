@@ -13,7 +13,7 @@ import (
 
 // registerRoutes registers the KMS REST API routes.
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/api/kms")
+	api := r.Group("/v1/kms")
 
 	api.POST("/secrets", p.handleCreateSecret)
 	api.GET("/secrets/{key}", p.handleGetSecret)
@@ -42,7 +42,7 @@ type createSecretRequest struct {
 }
 
 // handleCreateSecret encrypts and stores a secret via the MPC cluster.
-// POST /api/kms/secrets
+// POST /v1/kms/secrets
 func (p *plugin) handleCreateSecret(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -69,7 +69,7 @@ func (p *plugin) handleCreateSecret(e *core.RequestEvent) error {
 }
 
 // handleGetSecret retrieves and decrypts a secret from the MPC cluster.
-// GET /api/kms/secrets/{key}
+// GET /v1/kms/secrets/{key}
 func (p *plugin) handleGetSecret(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -92,7 +92,7 @@ func (p *plugin) handleGetSecret(e *core.RequestEvent) error {
 }
 
 // handleDeleteSecret removes a secret from all MPC nodes.
-// DELETE /api/kms/secrets/{key}
+// DELETE /v1/kms/secrets/{key}
 func (p *plugin) handleDeleteSecret(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -116,7 +116,7 @@ func (p *plugin) handleDeleteSecret(e *core.RequestEvent) error {
 }
 
 // handleListSecrets returns the decrypted names of all secrets.
-// GET /api/kms/secrets
+// GET /v1/kms/secrets
 func (p *plugin) handleListSecrets(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -141,7 +141,7 @@ type unlockRequest struct {
 }
 
 // handleUnlock derives the CEK from a passphrase and stores it in memory.
-// POST /api/kms/unlock
+// POST /v1/kms/unlock
 func (p *plugin) handleUnlock(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -164,7 +164,7 @@ func (p *plugin) handleUnlock(e *core.RequestEvent) error {
 }
 
 // handleLock zeros the CEK from memory.
-// POST /api/kms/lock
+// POST /v1/kms/lock
 func (p *plugin) handleLock(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -183,7 +183,7 @@ type inviteRequest struct {
 }
 
 // handleInvite wraps the CEK for a new member's HPKE public key.
-// POST /api/kms/invite
+// POST /v1/kms/invite
 func (p *plugin) handleInvite(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -211,7 +211,7 @@ func (p *plugin) handleInvite(e *core.RequestEvent) error {
 // --- Sync ---
 
 // handleSync triggers CRDT sync across all MPC nodes.
-// POST /api/kms/sync
+// POST /v1/kms/sync
 func (p *plugin) handleSync(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err
@@ -227,7 +227,7 @@ func (p *plugin) handleSync(e *core.RequestEvent) error {
 // --- Status ---
 
 // handleStatus returns the health status of all MPC nodes.
-// GET /api/kms/status
+// GET /v1/kms/status
 func (p *plugin) handleStatus(e *core.RequestEvent) error {
 	if err := p.requireSuperuser(e); err != nil {
 		return err

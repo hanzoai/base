@@ -19,7 +19,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:            "unauthorized",
 			Method:          http.MethodPut,
-			URL:             "/api/collections/import",
+			URL:             "/v1/collections/import",
 			ExpectedStatus:  401,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -27,7 +27,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as regular user",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo",
 			},
@@ -38,7 +38,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as superuser + empty collections",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body:   strings.NewReader(`{"collections":[]}`),
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
@@ -63,7 +63,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as superuser + collections validator failure",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body: strings.NewReader(`{
 				"collections":[
 					{"name": "import1"},
@@ -114,7 +114,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as superuser + non-validator failure",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body: strings.NewReader(`{
 				"collections":[
 					{
@@ -179,7 +179,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as superuser + successful collections create",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body: strings.NewReader(`{
 				"collections":[
 					{
@@ -245,7 +245,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "authorized as superuser + create/update/delete",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body: strings.NewReader(`{
 				"deleteMissing": true,
 				"collections":[
@@ -316,7 +316,7 @@ func TestCollectionsImport(t *testing.T) {
 		{
 			Name:   "OnCollectionsImportRequest tx body write check",
 			Method: http.MethodPut,
-			URL:    "/api/collections/import",
+			URL:    "/v1/collections/import",
 			Body: strings.NewReader(`{
 				"deleteMissing": true,
 				"collections":[

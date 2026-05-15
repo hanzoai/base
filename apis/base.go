@@ -59,11 +59,9 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 		)
 	}
 
-	apiPrefix := os.Getenv("BASE_API_PREFIX")
-	if apiPrefix == "" {
-		apiPrefix = "/api"
-	}
-	apiGroup := baseRouter.Group(apiPrefix)
+	// One path: /v1. Not /api — that's Casdoor. Base mounts every API
+	// endpoint under /v1/* regardless of how it's deployed.
+	apiGroup := baseRouter.Group("/v1")
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
