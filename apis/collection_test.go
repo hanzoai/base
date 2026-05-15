@@ -81,9 +81,8 @@ func TestCollectionsList(t *testing.T) {
 			ExpectedContent: []string{
 				`"page":2`,
 				`"perPage":2`,
-				`"totalItems":16`,
+				`"totalItems":12`,
 				`"items":[{`,
-				`"name":"` + core.CollectionNameMFAs + `"`,
 			},
 			ExpectedEvents: map[string]int{
 				"*":                        0,
@@ -351,7 +350,7 @@ func TestCollectionDelete(t *testing.T) {
 		{
 			Name:   "authorized as superuser + trying to delete a system collection",
 			Method: http.MethodDelete,
-			URL:    "/api/collections/" + core.CollectionNameMFAs,
+			URL:    "/api/collections/" + core.CollectionNameSuperusers,
 			Headers: map[string]string{
 				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
 			},
@@ -569,13 +568,11 @@ func TestCollectionCreate(t *testing.T) {
 				`"name":"new"`,
 				`"type":"auth"`,
 				`"system":false`,
-				`"passwordAuth":{"enabled":true,"identityFields":["email"]}`,
 				`"authRule":""`,
 				`"manageRule":null`,
 				`"name":"test"`,
 				`"name":"id"`,
 				`"name":"tokenKey"`,
-				`"name":"password"`,
 				`"name":"email"`,
 				`"name":"emailVisibility"`,
 				`"name":"verified"`,
@@ -665,38 +662,6 @@ func TestCollectionCreate(t *testing.T) {
 				`"1":{"name":{"code":"validation_not_in_invalid`,
 				`"2":{"name":{"code":"validation_not_in_invalid`,
 				`"3":{"name":{"code":"validation_not_in_invalid`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                            0,
-				"OnCollectionCreateRequest":    1,
-				"OnCollectionCreate":           1,
-				"OnCollectionAfterCreateError": 1,
-				"OnCollectionValidate":         1,
-				"OnModelCreate":                1,
-				"OnModelAfterCreateError":      1,
-				"OnModelValidate":              1,
-			},
-		},
-		{
-			Name:   "trying to create auth collection with reserved auth fields",
-			Method: http.MethodPost,
-			URL:    "/api/collections",
-			Body: strings.NewReader(`{
-				"name":"new",
-				"type":"auth",
-				"fields":[
-					{"type":"text","name":"oldPassword"},
-					{"type":"text","name":"passwordConfirm"}
-				]
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"fields":{`,
-				`"1":{"name":{"code":"validation_reserved_field_name`,
-				`"2":{"name":{"code":"validation_reserved_field_name`,
 			},
 			ExpectedEvents: map[string]int{
 				"*":                            0,

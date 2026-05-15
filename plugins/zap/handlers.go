@@ -181,50 +181,20 @@ func (h *handler) handleRecords(ctx context.Context, from string, msg *zaplib.Me
 }
 
 // handleAuth handles auth operations via ZAP.
+//
+// The legacy /identity local-password path is retired — Hanzo IAM is
+// the only credential issuer. The ZAP transport mirrors the HTTP
+// surface and returns 410 Gone for that path so callers stop retrying;
+// see apis.externalAuthGuard for the HTTP equivalent.
 func (h *handler) handleAuth(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
 	root := msg.Root()
 	path := root.Text(fieldPath)
-	body := root.Bytes(fieldBody)
 
 	h.logger.Debug("zap: auth", "path", path, "from", from)
 
-	var req map[string]interface{}
-	if len(body) > 0 {
-		json.Unmarshal(body, &req)
-	}
-
 	switch path {
 	case "/identity":
-		identity, _ := req["identity"].(string)
-		password, _ := req["password"].(string)
-		collection, _ := req["collection"].(string)
-		if collection == "" {
-			collection = core.CollectionNameSuperusers
-		}
-
-		col, err := h.app.FindCollectionByNameOrId(collection)
-		if err != nil {
-			return h.errorResponse(404, "auth collection not found")
-		}
-
-		record, err := h.app.FindAuthRecordByEmail(col, identity)
-		if err != nil {
-			return h.errorResponse(401, "invalid credentials")
-		}
-
-		if !record.ValidatePassword(password) {
-			return h.errorResponse(401, "invalid credentials")
-		}
-
-		token, err := record.NewAuthToken()
-		if err != nil {
-			return h.errorResponse(500, "token generation failed")
-		}
-
-		return h.jsonResponse(200, map[string]interface{}{
-			"token":  token,
-			"record": record,
-		})
+		return h.errorResponse(410, "local-password auth is retired — use the IAM PKCE flow")
 
 	default:
 		return h.errorResponse(400, fmt.Sprintf("unknown auth path: %s", path))

@@ -402,7 +402,6 @@ func init() {
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
 			collection.EmailChangeToken.Secret = testSecret
-			collection.PasswordResetToken.Secret = testSecret
 			collection.VerificationToken.Secret = testSecret
 
 			// save the newly created dummy collection (with mock request event)
@@ -1222,7 +1221,6 @@ func init() {
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
 			collection.EmailChangeToken.Secret = testSecret
-			collection.PasswordResetToken.Secret = testSecret
 			collection.VerificationToken.Secret = testSecret
 
 			// save the changes and trigger automigrate (with mock request event)
@@ -1313,7 +1311,6 @@ func TestAutomigrateCollectionNoChanges(t *testing.T) {
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
 			collection.EmailChangeToken.Secret = testSecret
-			collection.PasswordResetToken.Secret = testSecret
 			collection.VerificationToken.Secret = testSecret
 
 			// resave without other changes and trigger automigrate (with mock request event)
