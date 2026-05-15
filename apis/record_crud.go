@@ -239,16 +239,6 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			return firstApiError(err, e.BadRequestError("Failed to read the submitted data.", err))
 		}
 
-		// set a random password for the OAuth2 ignoring its plain password validators
-		var skipPlainPasswordRecordValidators bool
-		if requestInfo.Context == core.RequestInfoContextOAuth2 {
-			if _, ok := data[core.FieldNamePassword]; !ok {
-				data[core.FieldNamePassword] = security.RandomString(30)
-				data[core.FieldNamePassword+"Confirm"] = data[core.FieldNamePassword]
-				skipPlainPasswordRecordValidators = true
-			}
-		}
-
 		// replace modifiers fields so that the resolved value is always
 		// available when accessing requestInfo.Body
 		requestInfo.Body = data
@@ -258,13 +248,6 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			form.GrantSuperuserAccess()
 		}
 		form.Load(data)
-
-		if skipPlainPasswordRecordValidators {
-			// unset the plain value to skip the plain password field validators
-			if raw, ok := record.GetRaw(core.FieldNamePassword).(*core.PasswordFieldValue); ok {
-				raw.Plain = ""
-			}
-		}
 
 		// check the request and record data against the create and manage rules
 		if !hasSuperuserAuth && collection.CreateRule != nil {
@@ -668,17 +651,10 @@ func recordDataFromRequest(e *core.RequestEvent, record *core.Record) (map[strin
 		result = record.ReplaceModifiers(result)
 	}
 
-	isAuth := record.Collection().IsAuth()
-
 	// unset hidden fields for non-superusers
 	if !info.HasSuperuserAuth() {
 		for _, f := range record.Collection().Fields {
 			if f.GetHidden() {
-				// exception for the auth collection "password" field
-				if isAuth && f.GetName() == core.FieldNamePassword {
-					continue
-				}
-
 				delete(result, f.GetName())
 			}
 		}
