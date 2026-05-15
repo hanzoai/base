@@ -3,7 +3,6 @@ package platform
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -45,8 +44,8 @@ func (p *plugin) proxyToIAM(e *core.RequestEvent, method, path string, body []by
 	req, err := http.NewRequestWithContext(e.Request.Context(), method, url, reqBody)
 	if err != nil {
 		p.app.Logger().Error("auth proxy: failed to build request",
-			slog.String("path", path),
-			slog.String("error", err.Error()),
+			"path", path,
+			"error", err.Error(),
 		)
 		return e.JSON(http.StatusBadGateway, map[string]any{"message": "proxy error"})
 	}
@@ -60,8 +59,8 @@ func (p *plugin) proxyToIAM(e *core.RequestEvent, method, path string, body []by
 	resp, err := client.Do(req)
 	if err != nil {
 		p.app.Logger().Warn("auth proxy: IAM request failed",
-			slog.String("path", path),
-			slog.String("error", err.Error()),
+			"path", path,
+			"error", err.Error(),
 		)
 		return e.JSON(http.StatusBadGateway, map[string]any{"message": "IAM unavailable"})
 	}

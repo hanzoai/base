@@ -1445,8 +1445,8 @@ func (app *BaseApp) registerBaseHooks() {
 				if err != nil {
 					app.Logger().Error(
 						"Failed to delete storage prefix (couldn't acquire a worker)",
-						slog.String("prefix", prefix),
-						slog.String("error", err.Error()),
+						"prefix", prefix,
+						"error", err.Error(),
 					)
 				} else {
 					// run in the background for "optimistic" delete to avoid blocking the delete transaction
@@ -1456,8 +1456,8 @@ func (app *BaseApp) registerBaseHooks() {
 						if err := deletePrefix(prefix); err != nil {
 							app.Logger().Error(
 								"Failed to delete storage prefix (non critical error; usually could happen because of S3 api limits)",
-								slog.String("prefix", prefix),
-								slog.String("error", err.Error()),
+								"prefix", prefix,
+								"error", err.Error(),
 							)
 						}
 					})
@@ -1497,17 +1497,17 @@ func (app *BaseApp) registerBaseHooks() {
 	app.Cron().Add("__hzDBOptimize__", "0 0 * * *", func() {
 		_, execErr := app.NonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
 		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the main DB", slog.String("error", execErr.Error()))
+			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the main DB", "error", execErr.Error())
 		}
 
 		_, execErr = app.AuxNonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
 		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the auxiliary DB", slog.String("error", execErr.Error()))
+			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the auxiliary DB", "error", execErr.Error())
 		}
 
 		_, execErr = app.NonconcurrentDB().NewQuery("PRAGMA optimize").Execute()
 		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA optimize", slog.String("error", execErr.Error()))
+			app.Logger().Warn("Failed to run periodic PRAGMA optimize", "error", execErr.Error())
 		}
 	})
 
