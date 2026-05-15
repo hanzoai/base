@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -104,15 +103,15 @@ func registerNATSHooks(app *BaseApp) {
 		return
 	}
 
-	app.Logger().Info("NATS event publisher enabled", slog.String("url", pub.url))
+	app.Logger().Info("NATS event publisher enabled", "url", pub.url)
 
 	publishEvent := func(e *ModelEvent, action string) {
 		table := e.Model.TableName()
 		id := fmt.Sprintf("%v", e.Model.PK())
 		if err := pub.Publish(e.Context, table, action, id); err != nil {
 			app.Logger().Warn("NATS publish failed",
-				slog.String("subject", fmt.Sprintf("base.%s.%s", table, action)),
-				slog.String("error", err.Error()),
+				"subject", fmt.Sprintf("base.%s.%s", table, action),
+				"error", err.Error(),
 			)
 		}
 	}
