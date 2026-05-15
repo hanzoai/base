@@ -182,7 +182,14 @@ func loadOrGenerateRSAKey(path string) (*rsa.PrivateKey, error) {
 // ensureUsersCollection creates the _iam_users system collection if
 // it does not already exist. Idempotent.
 func (p *plugin) ensureUsersCollection() error {
-	if _, err := p.app.FindCollectionByNameOrId(collectionIAMUsers); err == nil {
+	return EnsureIAMUsersCollection(p.app)
+}
+
+// EnsureIAMUsersCollection creates the _iam_users system collection if
+// missing. Idempotent; safe to call from CLI subcommands that boot
+// the app without going through the platform OnBootstrap path.
+func EnsureIAMUsersCollection(app core.App) error {
+	if _, err := app.FindCollectionByNameOrId(collectionIAMUsers); err == nil {
 		return nil
 	}
 
@@ -196,8 +203,8 @@ func (p *plugin) ensureUsersCollection() error {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 
-	p.app.Logger().Info("creating embedded IAM collection", "name", collectionIAMUsers)
-	return p.app.Save(c)
+	app.Logger().Info("creating embedded IAM collection", "name", collectionIAMUsers)
+	return app.Save(c)
 }
 
 // bootstrapRootUser seeds the root user from EMBEDDED_IAM_ROOT_EMAIL +
@@ -225,6 +232,16 @@ func (p *plugin) bootstrapRootUser() error {
 // createIAMUser inserts a user with a bcrypt-hashed password into the
 // _iam_users collection. Used by bootstrap and the CLI subcommand.
 func (p *plugin) createIAMUser(email, password, name string) (*core.Record, error) {
+	return CreateEmbeddedIAMUser(p.app, email, password, name)
+}
+
+// CreateEmbeddedIAMUser is the public entry point that the iam-user
+// CLI subcommand uses to seed a user against the _iam_users
+// collection. The collection must already exist (it does once the
+// platform plugin has bootstrapped against IAM_MODE=embedded). The
+// password is bcrypted at cost 12 before persisting; the plaintext
+// never reaches disk.
+func CreateEmbeddedIAMUser(app core.App, email, password, name string) (*core.Record, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
 	if email == "" || password == "" {
 		return nil, fmt.Errorf("email and password are required")
@@ -235,16 +252,16 @@ func (p *plugin) createIAMUser(email, password, name string) (*core.Record, erro
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
-	col, err := p.app.FindCollectionByNameOrId(collectionIAMUsers)
+	col, err := app.FindCollectionByNameOrId(collectionIAMUsers)
 	if err != nil {
-		return nil, fmt.Errorf("collection %s not found: %w", collectionIAMUsers, err)
+		return nil, fmt.Errorf("collection %s not found (is IAM_MODE=embedded?): %w", collectionIAMUsers, err)
 	}
 
 	rec := core.NewRecord(col)
 	rec.Set("email", email)
 	rec.Set("password", string(hash))
 	rec.Set("name", name)
-	if err := p.app.Save(rec); err != nil {
+	if err := app.Save(rec); err != nil {
 		return nil, fmt.Errorf("save user: %w", err)
 	}
 	return rec, nil
@@ -254,8 +271,17 @@ func (p *plugin) createIAMUser(email, password, name string) (*core.Record, erro
 // returns the matching record. Errors are intentionally generic so we
 // don't leak which half (email vs password) was wrong.
 func (p *plugin) authenticateIAMUser(email, password string) (*core.Record, error) {
+	return AuthenticateEmbeddedIAMUser(p.app, email, password)
+}
+
+// AuthenticateEmbeddedIAMUser is the public verifier used by the OIDC
+// /oauth/login handler AND by tests. It looks up the user by email
+// (case-insensitive), then bcrypt-compares the supplied password
+// against the stored hash. Returns a generic "invalid credentials"
+// error on any failure to avoid leaking which half was wrong.
+func AuthenticateEmbeddedIAMUser(app core.App, email, password string) (*core.Record, error) {
 	email = strings.TrimSpace(strings.ToLower(email))
-	rec, err := p.app.FindFirstRecordByData(collectionIAMUsers, "email", email)
+	rec, err := app.FindFirstRecordByData(collectionIAMUsers, "email", email)
 	if err != nil || rec == nil {
 		return nil, fmt.Errorf("invalid credentials")
 	}
