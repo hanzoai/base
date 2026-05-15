@@ -9,28 +9,26 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// bindRecordAuthApi registers the auth record api endpoints and
-// the corresponding handlers.
+// bindRecordAuthApi registers the read-only auth record endpoints.
 //
-// When StoreKeyExternalAuthOnly is true (set by the platform plugin),
-// every built-in auth endpoint except auth-methods, auth-refresh, and
-// oauth2-redirect is blocked for every collection — including
-// _superusers. The admin panel logs in via the IAM PKCE flow proxied
-// through /api/iam/oauth/authorize, and regular users authenticate
-// via the configured identity provider too.
+// The mutating local-auth surface (auth-with-password, auth-with-otp,
+// auth-with-oauth2, oauth2-redirect, request/confirm flows, impersonate)
+// was removed in the IAM-native rip. Hanzo IAM is the only auth source;
+// clients run the PKCE flow against /api/iam/oauth/authorize, which the
+// platform plugin mounts as a transparent proxy to IAM_ENDPOINT.
+//
+// The two endpoints kept here are read-only or refresh existing
+// sessions and do not issue new credentials:
+//
+//   - GET  /api/collections/{c}/auth-methods  — discovery metadata
+//   - POST /api/collections/{c}/auth-refresh  — rotate an existing JWT
+//
+// Any client that hits a stale local-auth URL gets a generic 404 from
+// the router, which is the correct signal for a permanently-removed
+// endpoint that no longer has even a deprecated handler bound.
 func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
-	// global oauth2 subscription redirect handler (always allowed — needed for OAuth2 flow)
-	rg.GET("/oauth2-redirect", oauth2SubscriptionRedirect).Bind(
-		SkipSuccessActivityLog(), // skip success log as it could contain sensitive information in the url
-	)
-	// add again as POST in case of response_mode=form_post
-	rg.POST("/oauth2-redirect", oauth2SubscriptionRedirect).Bind(
-		SkipSuccessActivityLog(), // skip success log as it could contain sensitive information in the url
-	)
-
 	sub := rg.Group("/collections/{collection}")
 
-	// These endpoints are always available (read-only or refresh existing sessions).
 	sub.GET("/auth-methods", recordAuthMethods).Bind(
 		collectionPathRateLimit("", "listAuthMethods"),
 	)
@@ -39,38 +37,6 @@ func bindRecordAuthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 		collectionPathRateLimit("", "authRefresh"),
 		RequireSameCollectionContextAuth(""),
 	)
-
-	// Built-in auth endpoints — blocked for every collection in
-	// external-auth-only mode (the only mode the platform plugin
-	// allows). Kept bound so the guard can return a 410 Gone with
-	// the IAM replacement URL in the Location header. Once
-	// EXTERNAL_AUTH_ONLY becomes unconditional these route bindings
-	// and their handlers go away entirely.
-	sub.POST("/auth-with-password", recordAuthWithPassword).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "authWithPassword", "auth"),
-	)
-
-	sub.POST("/auth-with-oauth2", recordAuthWithOAuth2).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "authWithOAuth2", "auth"),
-	)
-
-	sub.POST("/auth-with-otp", recordAuthWithOTP).Bind(
-		externalAuthGuard(),
-		collectionPathRateLimit("", "authWithOTP", "auth"),
-	)
-
-	// The legacy local-only request/confirm flows
-	//   /request-otp /request-password-reset /confirm-password-reset
-	//   /request-email-change /confirm-email-change
-	//   /request-verification /confirm-verification
-	//   /impersonate/{id}
-	// were removed in the IAM-native rip. IAM owns password recovery,
-	// email change, MFA/OTP issuance, and impersonation. Clients that
-	// hit a stale URL get a generic 404 from the router — which is
-	// the correct signal for a permanently-removed endpoint that no
-	// longer has even a deprecated handler bound.
 }
 
 func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
@@ -83,16 +49,21 @@ func findAuthCollection(e *core.RequestEvent) (*core.Collection, error) {
 	return collection, nil
 }
 
-// externalAuthGuard returns a middleware that returns 410 Gone for the
-// legacy built-in auth endpoints when external-only mode is active
-// (StoreKeyExternalAuthOnly == true) — which is the only mode the
-// platform plugin allows. There is no "local password / OTP / MFA"
-// path anymore: Hanzo IAM is the only auth source.
+// externalAuthGuard returns a middleware that returns 410 Gone for any
+// retired Base auth surface when external-only mode is active
+// (StoreKeyExternalAuthOnly == true — the only mode the platform plugin
+// allows). Hanzo IAM is the only auth source; there is no local
+// password / OTP / MFA path.
 //
 // No collection is exempt. The admin panel UI uses the IAM PKCE flow
 // against /api/iam/oauth/authorize (transparent proxy mounted by the
-// platform plugin), so _superusers no longer needs a built-in auth
+// platform plugin), so _superusers does not need a built-in auth
 // surface either.
+//
+// The handler is kept (rather than deleted alongside the route
+// bindings) so callers attaching their own legacy-style routes via
+// e.Router can still opt in to the 410-Gone-with-Location behavior
+// without re-implementing the lookup. It is currently unbound.
 //
 // 410 Gone (not 403) is intentional — it signals the endpoint is
 // permanently retired, not temporarily forbidden, and lets clients
@@ -148,7 +119,8 @@ func iamReplacementURL(reqPath, jwksURL string) string {
 		strings.HasSuffix(reqPath, "/auth-with-otp"):
 		// IAM owns MFA; no public OTP request endpoint.
 		return ""
-	case strings.HasSuffix(reqPath, "/auth-with-password"):
+	case strings.HasSuffix(reqPath, "/auth-with-password"),
+		strings.HasSuffix(reqPath, "/auth-with-oauth2"):
 		return base + "/oauth/authorize"
 	}
 	return ""
