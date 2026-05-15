@@ -4,11 +4,10 @@
 package kms
 
 import (
-	"log/slog"
-
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
 	sdk "github.com/hanzoai/kms/sdk/go"
+	luxlog "github.com/luxfi/log"
 )
 
 // MustRegister registers the KMS plugin with a Base app and panics on error.
@@ -58,7 +57,7 @@ func Register(app core.App, config Config) error {
 		app:    app,
 		config: config,
 		client: client,
-		logger: slog.Default().With("component", "kms"),
+		logger: luxlog.New("component", "kms"),
 	}
 
 	// Build lookup maps for fast hook checks.
@@ -134,7 +133,7 @@ type plugin struct {
 	app    core.App
 	config Config
 	client *sdk.Client
-	logger *slog.Logger
+	logger luxlog.Logger
 
 	// Pre-computed field sets for O(1) lookup in hooks.
 	encFieldSet map[string]map[string]struct{} // collection -> field -> struct{}
