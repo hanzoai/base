@@ -509,22 +509,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 		Priority: -99999,
 	})
 
-	t.OnMailerRecordAuthAlertSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
-		Func: func(e *core.MailerRecordEvent) error {
-			t.registerEventCall("OnMailerRecordAuthAlertSend")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnMailerRecordPasswordResetSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
-		Func: func(e *core.MailerRecordEvent) error {
-			t.registerEventCall("OnMailerRecordPasswordResetSend")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
 	t.OnMailerRecordVerificationSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
 		Func: func(e *core.MailerRecordEvent) error {
 			t.registerEventCall("OnMailerRecordVerificationSend")
@@ -536,14 +520,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 	t.OnMailerRecordEmailChangeSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
 		Func: func(e *core.MailerRecordEvent) error {
 			t.registerEventCall("OnMailerRecordEmailChangeSend")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnMailerRecordOTPSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
-		Func: func(e *core.MailerRecordEvent) error {
-			t.registerEventCall("OnMailerRecordOTPSend")
 			return e.Next()
 		},
 		Priority: -99999,
@@ -621,14 +597,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 		Priority: -99999,
 	})
 
-	t.OnRecordAuthWithPasswordRequest().Bind(&hook.Handler[*core.RecordAuthWithPasswordRequestEvent]{
-		Func: func(e *core.RecordAuthWithPasswordRequestEvent) error {
-			t.registerEventCall("OnRecordAuthWithPasswordRequest")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
 	t.OnRecordAuthWithOAuth2Request().Bind(&hook.Handler[*core.RecordAuthWithOAuth2RequestEvent]{
 		Func: func(e *core.RecordAuthWithOAuth2RequestEvent) error {
 			t.registerEventCall("OnRecordAuthWithOAuth2Request")
@@ -640,22 +608,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 	t.OnRecordAuthRefreshRequest().Bind(&hook.Handler[*core.RecordAuthRefreshRequestEvent]{
 		Func: func(e *core.RecordAuthRefreshRequestEvent) error {
 			t.registerEventCall("OnRecordAuthRefreshRequest")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnRecordRequestPasswordResetRequest().Bind(&hook.Handler[*core.RecordRequestPasswordResetRequestEvent]{
-		Func: func(e *core.RecordRequestPasswordResetRequestEvent) error {
-			t.registerEventCall("OnRecordRequestPasswordResetRequest")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnRecordConfirmPasswordResetRequest().Bind(&hook.Handler[*core.RecordConfirmPasswordResetRequestEvent]{
-		Func: func(e *core.RecordConfirmPasswordResetRequestEvent) error {
-			t.registerEventCall("OnRecordConfirmPasswordResetRequest")
 			return e.Next()
 		},
 		Priority: -99999,
@@ -688,22 +640,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 	t.OnRecordConfirmEmailChangeRequest().Bind(&hook.Handler[*core.RecordConfirmEmailChangeRequestEvent]{
 		Func: func(e *core.RecordConfirmEmailChangeRequestEvent) error {
 			t.registerEventCall("OnRecordConfirmEmailChangeRequest")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnRecordRequestOTPRequest().Bind(&hook.Handler[*core.RecordCreateOTPRequestEvent]{
-		Func: func(e *core.RecordCreateOTPRequestEvent) error {
-			t.registerEventCall("OnRecordRequestOTPRequest")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnRecordAuthWithOTPRequest().Bind(&hook.Handler[*core.RecordAuthWithOTPRequestEvent]{
-		Func: func(e *core.RecordAuthWithOTPRequestEvent) error {
-			t.registerEventCall("OnRecordAuthWithOTPRequest")
 			return e.Next()
 		},
 		Priority: -99999,
