@@ -25,7 +25,6 @@ const (
 	FieldNameEmailVisibility = "emailVisibility"
 	FieldNameVerified        = "verified"
 	FieldNameTokenKey        = "tokenKey"
-	FieldNamePassword        = "password"
 )
 
 // SystemFields returns special internal field names that are usually readonly.
