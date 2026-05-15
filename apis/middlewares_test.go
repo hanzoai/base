@@ -585,7 +585,7 @@ func TestExternalAuthGuard(t *testing.T) {
 		{
 			// _superusers used to be the last collection with a local-
 			// auth carve-out. It is no longer: the admin panel logs in
-			// via the IAM PKCE flow proxied at /api/iam/oauth/authorize.
+			// via the IAM PKCE flow proxied at /v1/iam/oauth/authorize.
 			Name:   "auth-with-password is gone (router 404) for _superusers",
 			Method: http.MethodPost,
 			URL:    "/api/collections/_superusers/auth-with-password",
