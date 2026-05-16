@@ -342,6 +342,12 @@ func (p *plugin) registerEmbeddedIAM(r *router.Router[*core.RequestEvent]) {
 	// Dev convenience: "Sign in as root" button. Strictly opt-in via
 	// IAM_DEV_AUTOLOGIN=true so prod can't accidentally enable it.
 	p.registerEmbeddedDevRoutes(r)
+
+	// IDV adapter discovery: SPAs probe /v1/iam/idv/status to detect
+	// which identity-verification provider (Securegate / OnyxPlus /
+	// Persona / Jumio / custom / none) is wired and route the
+	// biometric step accordingly.
+	p.registerEmbeddedIDVRoutes(r)
 }
 
 // requestOrigin returns the scheme://host the embedded IAM should
