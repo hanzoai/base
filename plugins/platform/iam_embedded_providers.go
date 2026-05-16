@@ -99,8 +99,58 @@ func emailOTPEnabled() bool {
 	return os.Getenv("SMTP_HOST") != "" || os.Getenv("EMAIL_OTP_ENABLED") == "true"
 }
 
+func smsOTPEnabled() bool {
+	// Twilio is the canonical SMS adapter. Custom adapters can set
+	// SMS_OTP_ENABLED=true + their own delivery wiring.
+	if os.Getenv("TWILIO_ACCOUNT_SID") != "" && os.Getenv("TWILIO_AUTH_TOKEN") != "" {
+		return true
+	}
+	return os.Getenv("SMS_OTP_ENABLED") == "true"
+}
+
 func walletLoginEnabled() bool {
 	return os.Getenv("WALLET_LOGIN_ENABLED") == "true"
+}
+
+// requireSecondFactor returns true when the operator wants every
+// primary authentication followed by an OTP step. Per-user opt-in is
+// the next iteration — for now this is a tenant-wide knob.
+func requireSecondFactor() bool {
+	return os.Getenv("IAM_REQUIRE_2FA") == "true"
+}
+
+// AuthMethod is the contract the SPA reads from /v1/iam/auth/methods
+// to render only the buttons that are actually enabled server-side.
+// One source of truth: the server emits what's wired, the client
+// renders exactly that. No client-side guessing, no env mismatch.
+type AuthMethod struct {
+	Kind        string `json:"kind"`        // "password" | "social" | "wallet" | "email_otp" | "sms_otp"
+	Provider    string `json:"provider,omitempty"` // "google" | "github" | "apple" (when kind=social)
+	Label       string `json:"label"`
+	IsPrimary   bool   `json:"is_primary"`  // true = can start a login; false = 2FA step only
+	IsSecondary bool   `json:"is_secondary"`// true = available as 2FA step
+}
+
+// EnabledAuthMethods returns the full live list of enabled methods.
+// Wallet first (per UX directive: most distinct method), then social,
+// then email-OTP/SMS-OTP if configured, finally password (always on
+// as the universal fallback).
+func EnabledAuthMethods() []AuthMethod {
+	out := []AuthMethod{}
+	if walletLoginEnabled() {
+		out = append(out, AuthMethod{Kind: "wallet", Label: "Connect Wallet", IsPrimary: true})
+	}
+	for _, p := range enabledSocialProviders() {
+		out = append(out, AuthMethod{Kind: "social", Provider: p.Key, Label: "Continue with " + p.Name, IsPrimary: true})
+	}
+	if emailOTPEnabled() {
+		out = append(out, AuthMethod{Kind: "email_otp", Label: "Email code", IsPrimary: true, IsSecondary: true})
+	}
+	if smsOTPEnabled() {
+		out = append(out, AuthMethod{Kind: "sms_otp", Label: "SMS code", IsPrimary: false, IsSecondary: true})
+	}
+	out = append(out, AuthMethod{Kind: "password", Label: "Email + password", IsPrimary: true})
+	return out
 }
 
 // pendingFlow holds the OIDC PKCE params from the original /authorize
