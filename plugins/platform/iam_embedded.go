@@ -333,6 +333,15 @@ func (p *plugin) registerEmbeddedIAM(r *router.Router[*core.RequestEvent]) {
 	// Social (Google / GitHub / Apple) + wallet (SIWE). Each provider
 	// is opt-in via env, so this is a no-op if nothing is configured.
 	p.registerEmbeddedSocialRoutes(r)
+
+	// OTP (email + SMS) + /v1/iam/auth/methods discovery. SPAs read
+	// the methods endpoint to render only the buttons whose backends
+	// are actually wired — one source of truth, server-emitted.
+	p.registerEmbeddedOTPRoutes(r)
+
+	// Dev convenience: "Sign in as root" button. Strictly opt-in via
+	// IAM_DEV_AUTOLOGIN=true so prod can't accidentally enable it.
+	p.registerEmbeddedDevRoutes(r)
 }
 
 // requestOrigin returns the scheme://host the embedded IAM should
@@ -472,6 +481,21 @@ button[type=submit]:active{transform:translateY(1px);background:#e5e5e5}
   background:#1a1a1a;color:#f5f5f5;
   border:1px solid #404040;border-radius:8px;
 }
+.dev-banner{
+  margin-bottom:16px;padding:8px 10px;font-size:11px;line-height:1.3;
+  background:#1f1611;color:#fbbf24;border:1px solid #7c2d12;border-radius:8px;
+  display:flex;flex-direction:column;gap:6px;
+}
+.dev-banner .label{
+  text-transform:uppercase;letter-spacing:.12em;font-weight:600;color:#fb923c;
+}
+.dev-banner a{
+  display:flex;align-items:center;justify-content:center;
+  padding:8px 12px;font-size:12px;font-weight:600;
+  background:#7c2d12;color:#fff;border:0;border-radius:6px;
+  text-decoration:none;cursor:pointer;
+}
+.dev-banner a:hover{background:#9a3412}
 </style>
 </head>
 <body>
@@ -495,10 +519,25 @@ button[type=submit]:active{transform:translateY(1px);background:#e5e5e5}
   <h1>Sign in</h1>
   <p class="hint">Continue with your {{.BrandName}} account.</p>
 
+  {{if .DevAutoLogin}}
+  <div class="dev-banner">
+    <span class="label">Dev mode</span>
+    <a href="/v1/iam/oauth/dev-login?client_id={{.ClientID}}&redirect_uri={{.RedirectURI}}&state={{.State}}">
+      Sign in as root (dev)
+    </a>
+  </div>
+  {{end}}
+
   {{if .Error}}<div class="error" role="alert">{{.Error}}</div>{{end}}
 
-  {{if or .Providers .WalletEnabled}}
+  {{if or .Providers .WalletEnabled .EmailOTPEnabled .SMSOTPEnabled}}
   <div class="providers">
+    {{if .WalletEnabled}}
+    <button type="button" id="connect-wallet">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M19 7H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm0 10H5V9h14v8zm-3-4c0-.83.67-1.5 1.5-1.5S19 12.17 19 13s-.67 1.5-1.5 1.5S16 13.83 16 13zM3 6V5c0-1.1.9-2 2-2h12v2H5v1H3z"/></svg>
+      Connect Wallet
+    </button>
+    {{end}}
     {{range .Providers}}
     <a href="/v1/iam/oauth/social/{{.Key}}?client_id={{$.ClientID}}&redirect_uri={{$.RedirectURI}}&state={{$.State}}">
       {{if eq .Key "google"}}<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M21.35 11.1h-9.17v2.93h5.27c-.23 1.24-1.6 3.64-5.27 3.64-3.17 0-5.76-2.62-5.76-5.86s2.59-5.86 5.76-5.86c1.8 0 3.01.77 3.7 1.43l2.53-2.43C16.74 3.36 14.7 2.4 12.18 2.4 6.96 2.4 2.78 6.58 2.78 11.8s4.18 9.4 9.4 9.4c5.43 0 9.02-3.81 9.02-9.18 0-.62-.07-1.09-.17-1.55l-7.85-.37z"/></svg>{{end}}
@@ -507,14 +546,20 @@ button[type=submit]:active{transform:translateY(1px);background:#e5e5e5}
       Continue with {{.Name}}
     </a>
     {{end}}
-    {{if .WalletEnabled}}
-    <button type="button" id="connect-wallet">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M19 7H5c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zm0 10H5V9h14v8zm-3-4c0-.83.67-1.5 1.5-1.5S19 12.17 19 13s-.67 1.5-1.5 1.5S16 13.83 16 13zM3 6V5c0-1.1.9-2 2-2h12v2H5v1H3z"/></svg>
-      Connect Wallet
+    {{if .EmailOTPEnabled}}
+    <button type="button" id="email-otp" data-channel="email">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      Email me a code
+    </button>
+    {{end}}
+    {{if .SMSOTPEnabled}}
+    <button type="button" id="sms-otp" data-channel="sms">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM9 11H7V9h2v2zm4 0h-2V9h2v2zm4 0h-2V9h2v2z"/></svg>
+      Text me a code
     </button>
     {{end}}
   </div>
-  <div class="divider">or continue with email</div>
+  <div class="divider">or continue with password</div>
   {{end}}
 
   <form method="POST" action="/v1/iam/oauth/login" novalidate>
@@ -559,6 +604,34 @@ document.getElementById('connect-wallet').addEventListener('click', async () => 
 })
 </script>
 {{end}}
+
+{{if or .EmailOTPEnabled .SMSOTPEnabled}}
+<script>
+async function startOTP(channel, promptLabel) {
+  const dest = window.prompt(promptLabel)
+  if (!dest) return
+  try {
+    const startResp = await fetch('/v1/iam/oauth/otp/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel, destination: dest, client_id: {{.ClientIDJSON}}, redirect_uri: {{.RedirectURIJSON}}, state: {{.StateJSON}} })
+    })
+    if (!startResp.ok) { alert('Failed to send code: ' + (await startResp.text())); return }
+    const { challenge_id, dest_hint } = await startResp.json()
+    const code = window.prompt('Code sent to ' + dest_hint + '. Enter the 6-digit code:')
+    if (!code) return
+    const verifyResp = await fetch('/v1/iam/oauth/otp/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challenge_id, code })
+    })
+    if (!verifyResp.ok) { alert('Invalid code: ' + (await verifyResp.text())); return }
+    const { redirect } = await verifyResp.json()
+    window.location.href = redirect
+  } catch (e) { alert(String(e && e.message || e)) }
+}
+{{if .EmailOTPEnabled}}document.getElementById('email-otp').addEventListener('click', () => startOTP('email', 'Email address:')){{end}}
+{{if .SMSOTPEnabled}}document.getElementById('sms-otp').addEventListener('click', () => startOTP('sms', 'Phone number (E.164, e.g. +14155550100):')){{end}}
+</script>
+{{end}}
 </body>
 </html>`
 
@@ -596,6 +669,9 @@ type authorizeView struct {
 	BrandSubtitle   string
 	Providers       []providerView
 	WalletEnabled   bool
+	EmailOTPEnabled bool
+	SMSOTPEnabled   bool
+	DevAutoLogin    bool
 	ClientIDJSON    template.JS
 	RedirectURIJSON template.JS
 	StateJSON       template.JS
@@ -624,6 +700,9 @@ func (p *plugin) renderAuthorize(e *core.RequestEvent, clientID, redirectURI, st
 		BrandSubtitle:   subtitle,
 		Providers:       provs,
 		WalletEnabled:   walletLoginEnabled(),
+		EmailOTPEnabled: emailOTPEnabled(),
+		SMSOTPEnabled:   smsOTPEnabled(),
+		DevAutoLogin:    devAutoLoginEnabled(),
 		ClientIDJSON:    jsString(clientID),
 		RedirectURIJSON: jsString(redirectURI),
 		StateJSON:       jsString(state),
