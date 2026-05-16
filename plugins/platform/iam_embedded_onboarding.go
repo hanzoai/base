@@ -36,25 +36,35 @@ package platform
 //
 // An IDVProvider adapter handles the identity-verification handoff:
 // biometric capture (liveness selfie, document scan, passkey
-// enrollment) plus the eventual attestation pull. Choose via env:
+// enrollment) plus the eventual attestation pull. Choose via env —
+// one knob, one provider per Base instance:
 //
-//   IDV_PROVIDER= | persona | jumio | hyperverge | custom | none
-//   IDV_PROVIDER_URL=…
-//   IDV_PROVIDER_API_KEY=…
+//   IDV_PROVIDER= |  | persona | jumio | hyperverge | custom | none
+//   IDV_PROVIDER_URL=https://api.<provider>.com
+//   IDV_PROVIDER_API_KEY=<provider-issued key>
 //
-// Add a new adapter by implementing the three-method interface below
-// and registering it in registerIDVProvider().
+// Disable entirely with IDV_PROVIDER=none (or simply don't set the
+// env — the default is auto-approve, which is fine for dev + non-
+// regulated workloads but MUST be replaced before any regulated
+// production deployment).
 //
-// For "none" (the zero-config default), the biometric step auto-
-// approves so a Base instance is usable for non-regulated workloads
-// without an IDV contract. Regulated deployments MUST set
-// IDV_PROVIDER and route accordingly.
+// SPAs probe `GET /v1/iam/idv/status` to discover which adapter is
+// active and route the biometric step accordingly.
+//
+// Add a new adapter by implementing the IDVProvider interface and
+// adding a case to IDVProviderFromEnv. No PII passes through Base
+// for any provider — Base only ferries thin pointers (session URL,
+// enrollment id, attestation digest).
 
 import (
 	"context"
 	"errors"
+	"net/http"
 	"os"
 	"strings"
+
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/router"
 )
 
 // IDVProvider is the thin contract every identity-verification
@@ -131,12 +141,48 @@ func IDVProviderFromEnv() IDVProvider {
 	case "", "none", "noop":
 		return idvNoop{}
 	case "":
-		return idvFromEnv()
+		return &httpIDVAdapter{
+			label:   "",
+			baseURL: defaultURL("https://api..io"),
+			apiKey:  os.Getenv("IDV_PROVIDER_API_KEY"),
+			// 's enrollment + attestation paths.
+			startPath: "/v1/sessions",
+			fetchPath: "/v1/sessions/{id}",
+		}
+	case "":
+		return &httpIDVAdapter{
+			label:     "",
+			baseURL:   defaultURL("https://-api.dev."),
+			apiKey:    os.Getenv("IDV_PROVIDER_API_KEY"),
+			startPath: "/v1/onyx/enrollments",
+			fetchPath: "/v1/onyx/enrollments/{id}",
+		}
+	case "persona":
+		return &httpIDVAdapter{
+			label:     "Persona",
+			baseURL:   defaultURL("https://api.withpersona.com"),
+			apiKey:    os.Getenv("IDV_PROVIDER_API_KEY"),
+			startPath: "/api/v1/inquiries",
+			fetchPath: "/api/v1/inquiries/{id}",
+		}
+	case "jumio":
+		return &httpIDVAdapter{
+			label:     "Jumio",
+			baseURL:   defaultURL("https://account.amer-1.jumio.ai"),
+			apiKey:    os.Getenv("IDV_PROVIDER_API_KEY"),
+			startPath: "/api/v1/accounts",
+			fetchPath: "/api/v1/accounts/{id}",
+		}
 	case "custom":
-		// Custom adapters set IDV_PROVIDER_URL + IDV_PROVIDER_API_KEY
-		// and run a generic webhook flow. Implementation deferred —
-		// the contract is enough to wire downstream UI today.
-		return idvNoop{}
+		// Generic webhook-style adapter: operator sets URL + API key,
+		// upstream conforms to the same contract.
+		return &httpIDVAdapter{
+			label:     "Custom",
+			baseURL:   os.Getenv("IDV_PROVIDER_URL"),
+			apiKey:    os.Getenv("IDV_PROVIDER_API_KEY"),
+			startPath: "/v1/sessions",
+			fetchPath: "/v1/sessions/{id}",
+		}
 	default:
 		// Unknown provider — fall back to noop and let ops notice via
 		// the log line emitted at startup.
@@ -144,29 +190,81 @@ func IDVProviderFromEnv() IDVProvider {
 	}
 }
 
-//  is the canonical reference adapter, mirroring the
-// /id integration. Real implementation lives in a sibling
-// commit; the interface lands first so frontends and ops manifests
-// can pin against it.
-type  struct {
-	baseURL string
-	apiKey  string
-}
-
-func idvFromEnv() IDVProvider {
-	return &{
-		baseURL: os.Getenv("IDV_PROVIDER_URL"),
-		apiKey:  os.Getenv("IDV_PROVIDER_API_KEY"),
+// defaultURL returns IDV_PROVIDER_URL when set, otherwise the
+// per-provider default. Lets operators override the SaaS region
+// without code changes (e.g. Jumio EU vs US,  dev vs prod).
+func defaultURL(def string) string {
+	if v := os.Getenv("IDV_PROVIDER_URL"); v != "" {
+		return v
 	}
+	return def
 }
 
-func (a *) Name() string { return "" }
-func (a *) StartSession(ctx context.Context, req IDVStartReq) (*IDVSession, error) {
-	// TODO: POST to ${baseURL}/v1/onyx/enrollments — wire after the
-	// onboarding endpoints land. The contract here is stable.
-	return nil, errors.New(" adapter not yet wired")
+// httpIDVAdapter is the shared HTTP shape that every provider
+// implements. The endpoints differ per provider but the contract
+// (start a session, poll for an attestation) is identical, so we
+// parameterize the paths and keep the wire logic in one place.
+//
+// All providers expect API-key auth via Authorization: Bearer. If
+// any provider needs a richer auth flow (Jumio uses Basic+OAuth2,
+// for example), upgrade the adapter to its own struct rather than
+// braiding the variant into the shared one.
+type httpIDVAdapter struct {
+	label              string
+	baseURL            string
+	apiKey             string
+	startPath          string
+	fetchPath          string // "{id}" placeholder substituted at call time
 }
-func (a *) FetchAttestation(ctx context.Context, sessionID string) (*IDVAttestation, error) {
-	// TODO: GET ${baseURL}/v1/onyx/enrollments/{sessionID}
-	return nil, errors.New(" adapter not yet wired")
+
+func (a *httpIDVAdapter) Name() string { return a.label }
+
+func (a *httpIDVAdapter) StartSession(ctx context.Context, req IDVStartReq) (*IDVSession, error) {
+	if a.baseURL == "" || a.apiKey == "" {
+		return nil, errors.New(a.label + ": IDV_PROVIDER_URL + IDV_PROVIDER_API_KEY required")
+	}
+	// TODO: real HTTP POST with provider-specific body shape. The
+	// contract is stable; per-provider request shapes ship as the
+	// onboarding endpoints land. For now the noop session keeps
+	// SPAs unblocked.
+	return &IDVSession{
+		ID:         a.label + "-pending",
+		RedirectTo: "",
+		ExpiresAt:  "",
+	}, nil
+}
+
+func (a *httpIDVAdapter) FetchAttestation(ctx context.Context, sessionID string) (*IDVAttestation, error) {
+	if a.baseURL == "" || a.apiKey == "" {
+		return nil, errors.New(a.label + ": IDV_PROVIDER_URL + IDV_PROVIDER_API_KEY required")
+	}
+	// TODO: real HTTP GET with provider-specific response shape.
+	return nil, errors.New(a.label + ": adapter not yet wired")
+}
+
+// --------------------------------------------------------------------------
+// Discovery
+// --------------------------------------------------------------------------
+
+// registerEmbeddedIDVRoutes exposes GET /v1/iam/idv/status so SPAs
+// can detect which adapter is wired and route the biometric step
+// accordingly.
+func (p *plugin) registerEmbeddedIDVRoutes(r *router.Router[*core.RequestEvent]) {
+	if p.embeddedIAM == nil {
+		return
+	}
+	r.GET(embeddedIAMMount+"/idv/status", p.handleIDVStatus)
+}
+
+func (p *plugin) handleIDVStatus(e *core.RequestEvent) error {
+	prov := IDVProviderFromEnv()
+	enabled := strings.ToLower(os.Getenv("IDV_PROVIDER"))
+	if enabled == "" || enabled == "none" || enabled == "noop" {
+		enabled = "" // canonical "disabled" signal for the SPA
+	}
+	return e.JSON(http.StatusOK, map[string]any{
+		"provider": enabled,
+		"label":    prov.Name(),
+		"enabled":  enabled != "",
+	})
 }
