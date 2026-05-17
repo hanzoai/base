@@ -343,11 +343,10 @@ func (p *plugin) registerEmbeddedIAM(r *router.Router[*core.RequestEvent]) {
 	// IAM_DEV_AUTOLOGIN=true so prod can't accidentally enable it.
 	p.registerEmbeddedDevRoutes(r)
 
-	// IDV adapter discovery: SPAs probe /v1/iam/idv/status to detect
-	// which identity-verification provider ( /  /
-	// Persona / Jumio / custom / none) is wired and route the
-	// biometric step accordingly.
-	p.registerEmbeddedIDVRoutes(r)
+	// IDV proxy mount lives at /v1/idv (sibling, not nested) and is
+	// registered unconditionally in platform.go — not here. Keeping
+	// the call out of this embedded-only block so /v1/idv/* works
+	// in external IAM mode too.
 }
 
 // requestOrigin returns the scheme://host the embedded IAM should
