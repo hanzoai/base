@@ -100,15 +100,15 @@ type idvStatusResp struct {
 	Label    string `json:"label"`
 }
 
-func (p *plugin) registerEmbeddedIDVRoutes(r *router.Router[*core.RequestEvent]) {
-	// IDV mount is unconditional — even with IDV_ENDPOINT unset the
-	// /v1/idv/status endpoint must respond {enabled:false} so SPAs
-	// can render the "IDV not configured" state. Other paths return
-	// 503 in that case.
+// registerIDVProxy mounts /v1/idv/* — sibling of /v1/iam, unconditional
+// (does NOT depend on embedded IAM mode). With IDV_ENDPOINT unset,
+// /v1/idv/status returns {enabled:false} and the rest return 503.
+//
+// Renamed from registerEmbeddedIDVRoutes — the name was misleading
+// because IDV is independent of the IAM mode toggle. base proxies
+// to whatever's at IDV_ENDPOINT regardless of where IAM lives.
+func (p *plugin) registerIDVProxy(r *router.Router[*core.RequestEvent]) {
 	r.GET(idvMount+"/status", p.handleIDVStatus)
-	// Generic proxy for the rest of /v1/idv/*. One handler bound per
-	// method (the router rejects `Any` when other patterns share the
-	// prefix).
 	r.GET(idvMount+"/{path...}", p.handleIDVProxy)
 	r.POST(idvMount+"/{path...}", p.handleIDVProxy)
 	r.PUT(idvMount+"/{path...}", p.handleIDVProxy)

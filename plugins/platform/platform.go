@@ -439,6 +439,13 @@ func Register(app core.App, config PlatformConfig) error {
 			p.registerIAMProxy(e.Router)
 		}
 
+		// /v1/idv mount: thin reverse proxy to the standalone hanzoai/idv
+		// service via IDV_ENDPOINT. Registered regardless of IAM mode —
+		// IDV is its own service domain, not a child of IAM. With
+		// IDV_ENDPOINT unset, /v1/idv/status returns {enabled:false}
+		// and the rest return 503.
+		p.registerIDVProxy(e.Router)
+
 		return e.Next()
 	})
 
