@@ -91,6 +91,15 @@ func validate(_ context.Context, payload []byte) ([]byte, error) {
 	return json.Marshal(okOut{OK: true, Email: normalized, Age: age})
 }
 
+// Validate is the exported alias of the unexported validate fn. It exists
+// so other test packages (e.g. extbench scale_test.go) can register the
+// same handler under additional extension names without re-implementing
+// the logic. The init() registration below is the only call site we ship
+// for production use.
+func Validate(ctx context.Context, payload []byte) ([]byte, error) {
+	return validate(ctx, payload)
+}
+
 func init() {
 	extruntime.RegisterNative("validate-email", "validate", validate)
 }
