@@ -1,0 +1,6 @@
+{
+  "name": "validate-email",
+  "runtime": "pyvm",
+  "module": "validate.py",
+  "exports": ["validate"]
+}

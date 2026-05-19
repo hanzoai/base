@@ -1,0 +1,141 @@
+=== default tags ===
+--- TestMemory (count=1) ---
+=== RUN   TestMemory_Native
+MEMORY	native	iters=1000	total_alloc_delta=1449592	num_gc_delta=0	bytes_per_invoke=1449.6
+--- PASS: TestMemory_Native (0.00s)
+=== RUN   TestMemory_Goja
+MEMORY	goja	iters=1000	total_alloc_delta=3432872	num_gc_delta=1	bytes_per_invoke=3432.9
+--- PASS: TestMemory_Goja (0.01s)
+=== RUN   TestMemory_Wazero_AS
+MEMORY	wazero-as	iters=1000	total_alloc_delta=44425304	num_gc_delta=13	bytes_per_invoke=44425.3
+--- PASS: TestMemory_Wazero_AS (0.02s)
+=== RUN   TestMemory_Wazero_Javy
+    memory_test.go:91: wazero-javy: load: wasmvm: read /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-javy/validate.wasm: open /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-javy/validate.wasm: no such file or directory
+--- SKIP: TestMemory_Wazero_Javy (0.00s)
+=== RUN   TestMemory_V8go
+    memory_test.go:96: v8go not built (use -tags v8vm)
+--- SKIP: TestMemory_V8go (0.00s)
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	0.366s
+?   	github.com/hanzoai/base/plugins/extbench/fixtures/native-go	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/all	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/goja	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/native	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/v8	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/wazero	[no test files]
+--- Benchmarks (count=3, benchtime=2s) ---
+goos: darwin
+goarch: arm64
+pkg: github.com/hanzoai/base/plugins/extbench
+cpu: Apple M1 Max
+BenchmarkNative_Serial-10            	 2038605	      1197 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Serial-10            	 2013564	      1197 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Serial-10            	 1953955	      1197 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3475885	       693.7 ns/op	    1449 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3519000	       680.9 ns/op	    1449 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3516549	       724.8 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkGoja_Serial-10              	  486218	      4593 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Serial-10              	  490258	      4495 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Serial-10              	  535057	      4513 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Parallel-10            	 1434543	      1640 ns/op	    3631 B/op	      70 allocs/op
+BenchmarkGoja_Parallel-10            	 1445884	      1739 ns/op	    3600 B/op	      70 allocs/op
+BenchmarkGoja_Parallel-10            	 1357254	      1652 ns/op	    3620 B/op	      70 allocs/op
+BenchmarkWazero_AS_Serial-10         	  225584	     10130 ns/op	   45283 B/op	      17 allocs/op
+BenchmarkWazero_AS_Serial-10         	  216746	      9847 ns/op	   45692 B/op	      17 allocs/op
+BenchmarkWazero_AS_Serial-10         	  218665	      9956 ns/op	   45600 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  734875	      3139 ns/op	   41273 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  774141	      3271 ns/op	   40968 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  730594	      3495 ns/op	   41308 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  144361	     17061 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  151502	     16847 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  149388	     16183 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Goja-10           	   29871	     79833 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Goja-10           	   30236	     76134 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Goja-10           	   30897	     78282 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     603	   3930185 ns/op	 1541613 B/op	    2999 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     625	   3936863 ns/op	 1541624 B/op	    2999 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     606	   3970491 ns/op	 1541619 B/op	    2999 allocs/op
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	85.126s
+?   	github.com/hanzoai/base/plugins/extbench/fixtures/native-go	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/all	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/goja	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/native	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/v8	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/wazero	[no test files]
+
+=== with v8vm ===
+--- TestMemory (count=1) ---
+=== RUN   TestMemory_Native
+MEMORY	native	iters=1000	total_alloc_delta=1449416	num_gc_delta=0	bytes_per_invoke=1449.4
+--- PASS: TestMemory_Native (0.00s)
+=== RUN   TestMemory_Goja
+MEMORY	goja	iters=1000	total_alloc_delta=3440080	num_gc_delta=1	bytes_per_invoke=3440.1
+--- PASS: TestMemory_Goja (0.01s)
+=== RUN   TestMemory_Wazero_AS
+MEMORY	wazero-as	iters=1000	total_alloc_delta=44419456	num_gc_delta=13	bytes_per_invoke=44419.5
+--- PASS: TestMemory_Wazero_AS (0.02s)
+=== RUN   TestMemory_Wazero_Javy
+    memory_test.go:91: wazero-javy: load: wasmvm: read /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-javy/validate.wasm: open /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-javy/validate.wasm: no such file or directory
+--- SKIP: TestMemory_Wazero_Javy (0.00s)
+=== RUN   TestMemory_V8go
+MEMORY	v8go	iters=1000	total_alloc_delta=672560	num_gc_delta=0	bytes_per_invoke=672.6
+--- PASS: TestMemory_V8go (0.02s)
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	0.721s
+?   	github.com/hanzoai/base/plugins/extbench/fixtures/native-go	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/all	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/goja	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/native	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/v8	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/wazero	[no test files]
+--- Benchmarks (count=3, benchtime=2s) ---
+goos: darwin
+goarch: arm64
+pkg: github.com/hanzoai/base/plugins/extbench
+cpu: Apple M1 Max
+BenchmarkNative_Serial-10            	 1992626	      1210 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Serial-10            	 1998685	      1199 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Serial-10            	 1984416	      1204 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3445639	       697.0 ns/op	    1449 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3748722	       730.6 ns/op	    1449 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10          	 3325345	       748.0 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkGoja_Serial-10              	  519702	      4596 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Serial-10              	  523059	      4560 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Serial-10              	  523141	      4508 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Parallel-10            	 1455342	      1851 ns/op	    3554 B/op	      69 allocs/op
+BenchmarkGoja_Parallel-10            	 1343576	      1791 ns/op	    3583 B/op	      69 allocs/op
+BenchmarkGoja_Parallel-10            	 1259041	      1796 ns/op	    3559 B/op	      69 allocs/op
+BenchmarkWazero_AS_Serial-10         	  212671	      9823 ns/op	   40701 B/op	      17 allocs/op
+BenchmarkWazero_AS_Serial-10         	  210411	      9732 ns/op	   40759 B/op	      17 allocs/op
+BenchmarkWazero_AS_Serial-10         	  217436	     10038 ns/op	   45659 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  695667	      3153 ns/op	   41612 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  707589	      3294 ns/op	   41505 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10       	  742496	      3161 ns/op	   41211 B/op	      17 allocs/op
+BenchmarkV8go_Serial-10              	  213724	     11081 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Serial-10              	  217880	     11895 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Serial-10              	  194964	     12062 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Parallel-10            	  177992	     12944 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Parallel-10            	  184676	     12667 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Parallel-10            	  190274	     12210 ns/op	     672 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  151369	     16024 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  149998	     16572 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Native-10         	  141246	     17259 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Goja-10           	   29934	     82369 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Goja-10           	   28918	     79871 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Goja-10           	   30312	     79204 ns/op	   47400 B/op	     569 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     592	   4177821 ns/op	 1541591 B/op	    2999 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     582	   4204478 ns/op	 1541612 B/op	    2999 allocs/op
+BenchmarkColdstart_Wazero_AS-10      	     579	   4100112 ns/op	 1541602 B/op	    2999 allocs/op
+BenchmarkColdstart_V8go-10           	    2829	    906033 ns/op	    3968 B/op	      32 allocs/op
+BenchmarkColdstart_V8go-10           	    3086	    913569 ns/op	    3968 B/op	      32 allocs/op
+BenchmarkColdstart_V8go-10           	    2740	    871649 ns/op	    3968 B/op	      32 allocs/op
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	109.275s
+?   	github.com/hanzoai/base/plugins/extbench/fixtures/native-go	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/all	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/goja	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/native	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/v8	[no test files]
+?   	github.com/hanzoai/base/plugins/extbench/internal/sizetest/wazero	[no test files]
+
