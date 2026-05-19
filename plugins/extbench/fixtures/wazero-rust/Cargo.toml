@@ -1,0 +1,31 @@
+[package]
+name = "validate-rust"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+# Stand-alone — don't get pulled into ~/work/hanzo/Cargo.toml's workspace.
+# This fixture must build with `cargo build` from its own directory and
+# carry zero Hanzo-internal deps.
+[workspace]
+
+# Pure-Rust validate fixture for the Base extbench harness. No Hanzo-internal
+# deps, no zip-rs dep — hand-rolls the HIP-0105 pointer/length ABI directly.
+# Sibling agent is building the zip-rs crate separately; this fixture
+# stays self-contained so the bench has zero toolchain coupling beyond
+# the standard wasm32 target.
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+# Smallest stable wasm. opt-level=z minimizes code size at the cost of a
+# few % of runtime perf; the validate body is so small the loss is in
+# the noise. lto=true gives whole-module DCE so the final wasm only
+# carries the symbols we export.
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
