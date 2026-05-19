@@ -22,6 +22,7 @@ import (
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/pyvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 
@@ -248,6 +249,51 @@ func v8Available() bool {
 	rt := v8vm.NewRuntime()
 	defer rt.Close()
 	dir := fixtureDir("v8go-js")
+	if dir == "" {
+		return false
+	}
+	mod, err := rt.Load(context.Background(), dir)
+	if err != nil {
+		return false
+	}
+	_ = mod.Close()
+	return true
+}
+
+// ---------- pyvm (CPython 3.13, build tag) ----------
+
+func BenchmarkPyvm_Serial(b *testing.B) {
+	b.StopTimer()
+	rt := pyvm.NewRuntime()
+	if rt.Capabilities().Cgo && !pyAvailable() {
+		b.Skip("pyvm not built (use -tags pyvm)")
+	}
+	mod, teardown := loadFixture(b, rt, "pyvm-py")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runSerial(b, mod)
+}
+
+func BenchmarkPyvm_Parallel(b *testing.B) {
+	b.StopTimer()
+	rt := pyvm.NewRuntime()
+	if rt.Capabilities().Cgo && !pyAvailable() {
+		b.Skip("pyvm not built (use -tags pyvm)")
+	}
+	mod, teardown := loadFixture(b, rt, "pyvm-py")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runParallel(b, mod)
+}
+
+// pyAvailable probes whether the pyvm package was compiled with the
+// real engine or the stub.
+func pyAvailable() bool {
+	rt := pyvm.NewRuntime()
+	defer rt.Close()
+	dir := fixtureDir("pyvm-py")
 	if dir == "" {
 		return false
 	}
