@@ -4,7 +4,7 @@
 //
 // Wire shape:
 //
-//	import _ "github.com/hanzoai/base/pkg/base"  // init() registers
+//	import _ "github.com/hanzoai/base"  // init() registers
 //
 // The init() function below calls cloud.Register("base", 60, …). At
 // startup the cloud binary iterates the registry and calls Mount() for
@@ -29,7 +29,6 @@ import (
 	"os"
 	"strings"
 
-	rootbase "github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/cloud/pkg/cloud"
 	"github.com/hanzoai/zip"
@@ -89,7 +88,7 @@ func Mount(app *zip.App, deps cloud.Deps) error {
 	// scope Base to /v1/base under the unified binary.
 	_ = os.Setenv("BASE_API_PREFIX", "/v1/base")
 
-	b := rootbase.NewWithConfig(rootbase.Config{
+	b := NewWithConfig(Config{
 		DefaultDataDir:  dataDir,
 		HideStartBanner: true,
 	})
@@ -107,7 +106,7 @@ func Mount(app *zip.App, deps cloud.Deps) error {
 	}
 
 	mountedHandle = b
-	logger.Info("base mounted", "data_dir", dataDir, "version", rootbase.Version)
+	logger.Info("base mounted", "data_dir", dataDir, "version", Version)
 
 	// The Base router registers routes under BASE_API_PREFIX (/v1/base)
 	// plus root-level /healthz. Mounting at root captures both. The
@@ -124,7 +123,7 @@ func Mount(app *zip.App, deps cloud.Deps) error {
 // Mount(), non-nil after. cmd/cloud reaches in via Shutdown() to drain.
 // Package-global because cloud.MountAll has no per-subsystem teardown
 // handle today; registering one is a separate PR. nil-safe.
-var mountedHandle *rootbase.Base
+var mountedHandle *Base
 
 // Shutdown drains the in-process Base app. Idempotent. Safe to call
 // when Mount was never invoked.
