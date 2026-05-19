@@ -209,6 +209,83 @@ func BenchmarkWazero_AS_Parallel(b *testing.B) {
 	runParallel(b, mod)
 }
 
+// ---------- wazero (Rust / wasm32-unknown-unknown) ----------
+//
+// Pure-Rust validate compiled to wasm32-unknown-unknown. Implements the
+// HIP-0105 pointer/length ABI directly (no zip-rs, no Hanzo deps).
+// Compares directly to the AssemblyScript fixture above — same ABI,
+// same payload, different source language.
+
+func BenchmarkWazero_Rust_Serial(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-rust")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runSerial(b, mod)
+}
+
+func BenchmarkWazero_Rust_Parallel(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-rust")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runParallel(b, mod)
+}
+
+// ---------- wazero (CPython 3.13 WASI) ----------
+//
+// CPython-WASI is a command module (stdin/stdout). Without a shim that
+// wraps it under the pointer ABI it can't load through wasmvm; the
+// fixture is intentionally a documented deferral, mirroring
+// wazero-javy. The benchmark skips with a clear message via the
+// loadFixture "module not built" branch (no python.wasm committed).
+
+func BenchmarkWazero_CPythonWASI_Serial(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-cpython-wasi")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runSerial(b, mod)
+}
+
+func BenchmarkWazero_CPythonWASI_Parallel(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-cpython-wasi")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runParallel(b, mod)
+}
+
+// ---------- wazero (RustPython, wasm32-wasi) ----------
+
+func BenchmarkWazero_RustPython_Serial(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-rustpython")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runSerial(b, mod)
+}
+
+func BenchmarkWazero_RustPython_Parallel(b *testing.B) {
+	b.StopTimer()
+	rt := wasmvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "wazero-rustpython")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runParallel(b, mod)
+}
+
 // ---------- wazero (Javy / JS-on-wasm) ----------
 //
 // Javy emits a WASI command module (stdin/stdout JSON), which doesn't
