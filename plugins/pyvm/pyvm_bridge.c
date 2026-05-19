@@ -180,11 +180,59 @@ err:
 // loaded module instance.
 //
 // Concurrency safety:
-//   - PyGILState_Ensure attaches the calling OS thread to the global
-//     interpreter. On free-threaded builds, multiple threads can hold
-//     a GIL state simultaneously.
-//   - We never call Py_NewInterpreter in this path — there's exactly
-//     ONE interpreter, and N OS threads attach to it.
+//   - We DO NOT use PyGILState_Ensure here. PyGILState_* relies on an
+//     autoTSSkey that, when sub-interpreters exist in the same process,
+//     can attach a thread to the wrong interpreter (whichever sub-
+//     interp last touched this OS thread). The result is a fatal
+//     "_PyThreadState_Attach: non-NULL old thread state" or worse.
+//   - Instead, every threaded-mode call:
+//       a. Allocates a fresh PyThreadState in the MAIN interpreter
+//          via PyThreadState_New(main_interp).
+//       b. PyEval_AcquireThread(ts) — swaps in + (on default-GIL)
+//          waits for the GIL.
+//       c. Does the work.
+//       d. PyEval_ReleaseThread(ts).
+//       e. PyThreadState_Clear + PyThreadState_Delete to drop the ts.
+//   - On a free-threaded build, AcquireThread doesn't block; multiple
+//     OS threads can each own a thread state in the main interpreter
+//     simultaneously and execute bytecode in true parallel.
+//
+// Helper:
+
+// threaded_attach allocates a fresh PyThreadState in the MAIN
+// interpreter, swaps it in, and (on default-GIL) waits for the GIL.
+// Returns the new thread state, or NULL on failure with err_out
+// populated.
+//
+// Caller MUST pair with threaded_detach. Caller MUST hold an OS
+// thread via runtime.LockOSThread on the Go side.
+static PyThreadState *threaded_attach(char **err_out) {
+    if (gMainState == NULL) {
+        if (err_out) *err_out = strdup("pyvm not initialised");
+        return NULL;
+    }
+    PyInterpreterState *interp = gMainState->interp;
+    if (interp == NULL) {
+        if (err_out) *err_out = strdup("no main interpreter");
+        return NULL;
+    }
+    PyThreadState *ts = PyThreadState_New(interp);
+    if (ts == NULL) {
+        if (err_out) *err_out = strdup("PyThreadState_New failed");
+        return NULL;
+    }
+    PyEval_AcquireThread(ts); // swap in + (default-GIL) wait for GIL
+    return ts;
+}
+
+// threaded_detach releases the GIL/thread-state and tears down the
+// per-call PyThreadState allocated by threaded_attach.
+static void threaded_detach(PyThreadState *ts) {
+    if (ts == NULL) return;
+    PyThreadState_Clear(ts);
+    PyEval_ReleaseThread(ts);
+    PyThreadState_Delete(ts);
+}
 
 // Helper: build a fresh module namespace and exec(src) into it.
 // Returns a new strong reference to the populated dict on success,
@@ -233,11 +281,12 @@ int pyvm_threaded_load(const char *prefix, const char *src,
         if (err_out) *err_out = strdup("nil prefix/src");
         return -1;
     }
-    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyThreadState *ts = threaded_attach(err_out);
+    if (ts == NULL) return -1;
 
     PyObject *mod_globals = threaded_exec_into_fresh_dict(src, err_out);
     if (mod_globals == NULL) {
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return -1;
     }
 
@@ -245,14 +294,14 @@ int pyvm_threaded_load(const char *prefix, const char *src,
     if (mainMod == NULL) {
         Py_DECREF(mod_globals);
         if (err_out) *err_out = strdup("PyImport_AddModule(__main__) failed");
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return -1;
     }
     PyObject *mainGlobals = PyModule_GetDict(mainMod); // borrowed
     if (mainGlobals == NULL) {
         Py_DECREF(mod_globals);
         if (err_out) *err_out = strdup("PyModule_GetDict(__main__) failed");
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return -1;
     }
 
@@ -263,14 +312,14 @@ int pyvm_threaded_load(const char *prefix, const char *src,
         if (json == NULL) {
             Py_DECREF(mod_globals);
             if (err_out) *err_out = strdup("import json failed");
-            PyGILState_Release(gstate);
+            threaded_detach(ts);
             return -1;
         }
         if (PyDict_SetItemString(mainGlobals, "_pyvm_json", json) < 0) {
             Py_DECREF(json);
             Py_DECREF(mod_globals);
             if (err_out) *err_out = strdup("publish _pyvm_json failed");
-            PyGILState_Release(gstate);
+            threaded_detach(ts);
             return -1;
         }
         Py_DECREF(json);
@@ -282,7 +331,7 @@ int pyvm_threaded_load(const char *prefix, const char *src,
     if (keys == NULL) {
         Py_DECREF(mod_globals);
         if (err_out) *err_out = strdup("PyDict_Keys(mod_globals) failed");
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return -1;
     }
     Py_ssize_t n = PyList_Size(keys);
@@ -302,7 +351,7 @@ int pyvm_threaded_load(const char *prefix, const char *src,
             Py_DECREF(keys);
             Py_DECREF(mod_globals);
             if (err_out) *err_out = strdup("publish mangled name failed");
-            PyGILState_Release(gstate);
+            threaded_detach(ts);
             return -1;
         }
     }
@@ -312,7 +361,7 @@ int pyvm_threaded_load(const char *prefix, const char *src,
     // their closure references alive.
     Py_DECREF(mod_globals);
 
-    PyGILState_Release(gstate);
+    threaded_detach(ts);
     return 0;
 }
 
@@ -320,7 +369,8 @@ char* pyvm_threaded_invoke(const char *mangled_fn,
                            const char *payload_json,
                            int *was_unknown, char **err_out) {
     if (was_unknown != NULL) *was_unknown = 0;
-    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyThreadState *ts = threaded_attach(err_out);
+    if (ts == NULL) return NULL;
 
     PyObject *mainMod = PyImport_AddModule("__main__"); // borrowed
     if (mainMod == NULL) goto err;
@@ -330,7 +380,7 @@ char* pyvm_threaded_invoke(const char *mangled_fn,
     if (fnObj == NULL || !PyCallable_Check(fnObj)) {
         if (was_unknown != NULL) *was_unknown = 1;
         if (err_out) *err_out = strdup("function not found");
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return NULL;
     }
     PyObject *jsonMod = PyDict_GetItemString(globals, "_pyvm_json"); // borrowed
@@ -356,7 +406,7 @@ char* pyvm_threaded_invoke(const char *mangled_fn,
     if (cstr == NULL) { Py_DECREF(resultStr); goto err; }
     char *out = strdup(cstr);
     Py_DECREF(resultStr);
-    PyGILState_Release(gstate);
+    threaded_detach(ts);
     return out;
 err:
     if (err_out) {
@@ -371,30 +421,31 @@ err:
         Py_XDECREF(tb);
         PyErr_Clear();
     }
-    PyGILState_Release(gstate);
+    threaded_detach(ts);
     return NULL;
 }
 
 void pyvm_threaded_unload(const char *prefix) {
     if (prefix == NULL) return;
-    PyGILState_STATE gstate = PyGILState_Ensure();
+    PyThreadState *ts = threaded_attach(NULL);
+    if (ts == NULL) return;
     PyObject *mainMod = PyImport_AddModule("__main__");
     if (mainMod == NULL) {
         PyErr_Clear();
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return;
     }
     PyObject *globals = PyModule_GetDict(mainMod);
     if (globals == NULL) {
         PyErr_Clear();
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return;
     }
     // Walk a snapshot of keys; mutate dict from the snapshot list.
     PyObject *keys = PyDict_Keys(globals);
     if (keys == NULL) {
         PyErr_Clear();
-        PyGILState_Release(gstate);
+        threaded_detach(ts);
         return;
     }
     size_t plen = strlen(prefix);
@@ -412,6 +463,6 @@ void pyvm_threaded_unload(const char *prefix) {
     }
     Py_DECREF(keys);
     PyErr_Clear();
-    PyGILState_Release(gstate);
+    threaded_detach(ts);
 }
 
