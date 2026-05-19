@@ -1,0 +1,88 @@
+=== default tags (no v8vm, no pyvm) ===
+goos: darwin
+goarch: arm64
+pkg: github.com/hanzoai/base/plugins/extbench
+cpu: Apple M1 Max
+BenchmarkNative_Serial-10           	 1000000	      2543 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10         	 1000000	      2024 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkGoja_Serial-10             	  274372	      9032 ns/op	    3330 B/op	      67 allocs/op
+BenchmarkGoja_Parallel-10           	  520120	      4394 ns/op	    3630 B/op	      70 allocs/op
+BenchmarkStarkvm_Serial-10          	  446306	      5956 ns/op	    3585 B/op	      72 allocs/op
+BenchmarkStarkvm_Parallel-10        	  652239	      4321 ns/op	    3585 B/op	      72 allocs/op
+BenchmarkWazero_AS_Serial-10        	  157168	     13308 ns/op	   42621 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10      	  422524	      6159 ns/op	   41889 B/op	      17 allocs/op
+BenchmarkWazero_Rust_Serial-10      	  290742	      8176 ns/op	   35264 B/op	      17 allocs/op
+BenchmarkWazero_Rust_Parallel-10    	  376407	      6237 ns/op	   35264 B/op	      17 allocs/op
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	28.764s
+
+=== with v8vm + pyvm tags ===
+goos: darwin
+goarch: arm64
+pkg: github.com/hanzoai/base/plugins/extbench
+cpu: Apple M1 Max
+BenchmarkNative_Serial-10           	 1000000	      2006 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkNative_Parallel-10         	 1937072	      3083 ns/op	    1448 B/op	      20 allocs/op
+BenchmarkGoja_Serial-10             	   95248	     24572 ns/op	    3334 B/op	      67 allocs/op
+BenchmarkGoja_Parallel-10           	  207795	     10975 ns/op	    3788 B/op	      72 allocs/op
+BenchmarkStarkvm_Serial-10          	  111159	     20981 ns/op	    3585 B/op	      72 allocs/op
+BenchmarkStarkvm_Parallel-10        	  122253	     17599 ns/op	    3584 B/op	      72 allocs/op
+BenchmarkWazero_AS_Serial-10        	  206311	     15823 ns/op	   40869 B/op	      17 allocs/op
+BenchmarkWazero_AS_Parallel-10      	  242787	      8882 ns/op	   44005 B/op	      17 allocs/op
+BenchmarkWazero_Rust_Serial-10      	  197989	     14583 ns/op	   35264 B/op	      17 allocs/op
+BenchmarkWazero_Rust_Parallel-10    	  315355	     11948 ns/op	   35264 B/op	      17 allocs/op
+BenchmarkV8go_Serial-10             	  192012	     35677 ns/op	     672 B/op	      17 allocs/op
+BenchmarkV8go_Parallel-10           	   98191	     20878 ns/op	     672 B/op	      17 allocs/op
+BenchmarkPyvm_Serial-10             	  391542	      6873 ns/op	     496 B/op	      10 allocs/op
+BenchmarkPyvm_Parallel-10           	  181213	     18891 ns/op	     496 B/op	      10 allocs/op
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	56.996s
+
+=== TestMemory -tags 'v8vm pyvm' ===
+=== RUN   TestMemory_Native
+MEMORY	native	iters=1000	total_alloc_delta=1449592	num_gc_delta=0	bytes_per_invoke=1449.6
+--- PASS: TestMemory_Native (0.01s)
+=== RUN   TestMemory_Goja
+MEMORY	goja	iters=1000	total_alloc_delta=3541824	num_gc_delta=1	bytes_per_invoke=3541.8
+--- PASS: TestMemory_Goja (0.02s)
+=== RUN   TestMemory_Starkvm
+MEMORY	starlark	iters=1000	total_alloc_delta=3696816	num_gc_delta=1	bytes_per_invoke=3696.8
+--- PASS: TestMemory_Starkvm (0.01s)
+=== RUN   TestMemory_Wazero_AS
+MEMORY	wazero-as	iters=1000	total_alloc_delta=44376768	num_gc_delta=10	bytes_per_invoke=44376.8
+--- PASS: TestMemory_Wazero_AS (0.07s)
+=== RUN   TestMemory_Wazero_Rust
+MEMORY	wazero-rust	iters=1000	total_alloc_delta=35264336	num_gc_delta=3	bytes_per_invoke=35264.3
+--- PASS: TestMemory_Wazero_Rust (0.03s)
+=== RUN   TestMemory_Wazero_Javy
+    memory_test.go:115: wazero-javy: module validate.wasm not built (stat /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-javy/validate.wasm: no such file or directory)
+--- SKIP: TestMemory_Wazero_Javy (0.00s)
+=== RUN   TestMemory_Wazero_CPythonWASI
+    memory_test.go:119: wazero-cpython-wasi: module python.wasm not built (stat /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-cpython-wasi/python.wasm: no such file or directory)
+--- SKIP: TestMemory_Wazero_CPythonWASI (0.00s)
+=== RUN   TestMemory_Wazero_RustPython
+    memory_test.go:123: wazero-rustpython: module rustpython.wasm not built (stat /Users/z/work/hanzo/base/plugins/extbench/fixtures/wazero-rustpython/rustpython.wasm: no such file or directory)
+--- SKIP: TestMemory_Wazero_RustPython (0.00s)
+=== RUN   TestMemory_V8go
+MEMORY	v8go	iters=1000	total_alloc_delta=675840	num_gc_delta=0	bytes_per_invoke=675.8
+--- PASS: TestMemory_V8go (0.18s)
+=== RUN   TestMemory_Pyvm
+MEMORY	pyvm	iters=1000	total_alloc_delta=496000	num_gc_delta=0	bytes_per_invoke=496.0
+--- PASS: TestMemory_Pyvm (0.35s)
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	1.380s
+
+=== Coldstart -tags 'v8vm pyvm' ===
+goos: darwin
+goarch: arm64
+pkg: github.com/hanzoai/base/plugins/extbench
+cpu: Apple M1 Max
+BenchmarkColdstart_Native-10                	   33289	     33688 ns/op	    1424 B/op	      17 allocs/op
+BenchmarkColdstart_Goja-10                  	   10000	    135810 ns/op	   47402 B/op	     569 allocs/op
+BenchmarkColdstart_Starkvm-10               	   10000	    111034 ns/op	   36764 B/op	     599 allocs/op
+BenchmarkColdstart_Wazero_AS-10             	     230	   6339298 ns/op	 1542328 B/op	    3002 allocs/op
+BenchmarkColdstart_Wazero_Rust-10           	     147	   7839805 ns/op	10655758 B/op	    4304 allocs/op
+BenchmarkColdstart_V8go-10                  	     568	   2109933 ns/op	    3968 B/op	      32 allocs/op
+BenchmarkColdstart_Pyvm-10                  	      51	  34308027 ns/op	    4056 B/op	      29 allocs/op
+PASS
+ok  	github.com/hanzoai/base/plugins/extbench	12.170s
