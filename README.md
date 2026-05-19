@@ -1,5 +1,48 @@
 # base
 
+Per-tenant SQLite + extension runtimes (HIP-0105). The storage substrate of the unified Hanzo cloud binary.
+
+[![Status](https://img.shields.io/badge/status-beta-blue)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
+
+## Quick start
+
+```bash
+go install github.com/hanzoai/base/cmd/base@latest
+base serve
+```
+
+## What this is
+
+`base` is the multi-tenant backend substrate every Hanzo Go service builds on. Each org gets its own per-tenant data file with a per-org KMS-derived DEK; replicate streams the WAL to age-encrypted object storage. Per-record validators, computed fields, and access rules run inside the same process via in-process extension runtimes (goja, wazero, pyvm, starkvm).
+
+## Specs
+
+Implements:
+- HIP-0105 In-Process Extension Runtime Standard
+- HIP-0107 Streaming Replication over VFS
+- HIP-0302 Encrypted SQLite + ZapDB Durability
+
+Used as the storage backend by every multi-tenant subsystem in HIP-0106.
+
+## Architecture
+
+```
+   http request  ->  zip.App  ->  base.App
+                                     |
+                  per-tenant data/{orgSlug}.db (SQLite or ZapDB)
+                                     |
+                  KMS-derived DEK   replicate -> S3/GCS (age-encrypted)
+                                     |
+                  in-process extension runtime (HIP-0105):
+                    goja (JS) | wazero (WASM) | pyvm (Python) | starkvm (Starlark)
+```
+
+
+---
+
+# base
+
 [Base](https://hanzo.ai/base) is an open source Go backend that includes:
 
 - embedded in-memory, SQL and vector databases with **realtime subscriptions**
