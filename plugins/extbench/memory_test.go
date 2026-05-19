@@ -3,11 +3,14 @@ package extbench
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/pyvm"
 	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
@@ -30,11 +33,23 @@ const memoryIters = 1000
 
 func runMemory(t *testing.T, factory func() extruntime.Runtime, fixture string, name string) {
 	t.Helper()
-	if fixtureDir(fixture) == "" {
+	dir := fixtureDir(fixture)
+	if dir == "" {
 		t.Skipf("fixture %s missing", fixture)
 	}
+	// Deferred fixtures keep extension.json + README but don't ship a
+	// compiled artifact. Surface as Skip rather than fail so the bench
+	// + memory writeup stays clean.
+	man, err := extruntime.LoadManifest(dir)
+	if err != nil {
+		t.Skipf("%s: manifest: %v", name, err)
+	}
+	if man.Module != "" {
+		if _, err := os.Stat(filepath.Join(dir, man.Module)); err != nil {
+			t.Skipf("%s: module %s not built (%v)", name, man.Module, err)
+		}
+	}
 	rt := factory()
-	dir := fixtureDir(fixture)
 	mod, err := rt.Load(context.Background(), dir)
 	if err != nil {
 		t.Skipf("%s: load: %v", name, err)
@@ -92,8 +107,20 @@ func TestMemory_Wazero_AS(t *testing.T) {
 	runMemory(t, wasmvm.NewRuntime, "wazero-as", "wazero-as")
 }
 
+func TestMemory_Wazero_Rust(t *testing.T) {
+	runMemory(t, wasmvm.NewRuntime, "wazero-rust", "wazero-rust")
+}
+
 func TestMemory_Wazero_Javy(t *testing.T) {
 	runMemory(t, wasmvm.NewRuntime, "wazero-javy", "wazero-javy")
+}
+
+func TestMemory_Wazero_CPythonWASI(t *testing.T) {
+	runMemory(t, wasmvm.NewRuntime, "wazero-cpython-wasi", "wazero-cpython-wasi")
+}
+
+func TestMemory_Wazero_RustPython(t *testing.T) {
+	runMemory(t, wasmvm.NewRuntime, "wazero-rustpython", "wazero-rustpython")
 }
 
 func TestMemory_V8go(t *testing.T) {
@@ -101,4 +128,11 @@ func TestMemory_V8go(t *testing.T) {
 		t.Skip("v8go not built (use -tags v8vm)")
 	}
 	runMemory(t, v8vm.NewRuntime, "v8go-js", "v8go")
+}
+
+func TestMemory_Pyvm(t *testing.T) {
+	if !pyAvailable() {
+		t.Skip("pyvm not built (use -tags pyvm)")
+	}
+	runMemory(t, pyvm.NewRuntime, "pyvm-py", "pyvm")
 }
