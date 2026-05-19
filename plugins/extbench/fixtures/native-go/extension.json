@@ -1,0 +1,5 @@
+{
+  "name": "validate-email",
+  "runtime": "native",
+  "exports": ["validate"]
+}
