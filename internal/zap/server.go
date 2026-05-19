@@ -26,10 +26,14 @@ import (
 )
 
 // HIP-0110 message-type IDs. Mirror github.com/hanzoai/gateway/zap_wire.go.
+// zap.FinishWithFlags expects the type in the upper byte of a uint16
+// (`type << 8`), so types must fit in uint8. Picked in the 0x80+ range
+// so they don't collide with base/plugins/zap's lower-byte IDs
+// (Collections=100, Records=101, Auth=102, Realtime=103).
 const (
-	MsgTypeForward   uint16 = 0x1010
-	MsgTypePush      uint16 = 0x1020
-	MsgTypeSubscribe uint16 = 0x1030
+	MsgTypeForward   uint16 = 0x80
+	MsgTypePush      uint16 = 0x81
+	MsgTypeSubscribe uint16 = 0x82
 )
 
 // Field offsets — same layout as the gateway side.
