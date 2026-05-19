@@ -8,6 +8,7 @@ import (
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 )
@@ -81,6 +82,10 @@ func TestMemory_Native(t *testing.T) {
 
 func TestMemory_Goja(t *testing.T) {
 	runMemory(t, gojavm.NewRuntime, "goja-js", "goja")
+}
+
+func TestMemory_Starkvm(t *testing.T) {
+	runMemory(t, starkvm.NewRuntime, "starkvm-star", "starlark")
 }
 
 func TestMemory_Wazero_AS(t *testing.T) {

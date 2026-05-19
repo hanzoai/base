@@ -6,6 +6,7 @@ import (
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 )
@@ -51,6 +52,10 @@ func BenchmarkColdstart_Native(b *testing.B) {
 
 func BenchmarkColdstart_Goja(b *testing.B) {
 	benchColdstart(b, gojavm.NewRuntime, "goja-js")
+}
+
+func BenchmarkColdstart_Starkvm(b *testing.B) {
+	benchColdstart(b, starkvm.NewRuntime, "starkvm-star")
 }
 
 func BenchmarkColdstart_Wazero_AS(b *testing.B) {
