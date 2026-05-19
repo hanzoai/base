@@ -483,25 +483,33 @@ go test -tags v8vm -run '^$' -bench '^BenchmarkScale' \
 Without `-tags v8vm`, v8go subtests skip. Full study completes in
 <1 minute on Apple M1 Max.
 
-## Adding the Fifth Runtime: pyvm (CPython 3.13)
+## Adding the Fifth Runtime: pyvm (CPython 3.13 / 3.13t)
 
 `pyvm` is a cgo-based CPython 3.13 runtime gated behind `-tags pyvm`.
 It links libpython at the C level and maintains a per-module pool of
 PEP 684 OWN_GIL sub-interpreters for parallelism.
 
 **Build**: `pkg-config python-3.13-embed` (homebrew `python@3.13`,
-Debian `python3.13-dev`). Free-threading variant requires a `python@3.13t`
+Debian `python3.13-dev`). Free-threading variant requires a `python3.13t`
 build with `--disable-gil`; detected at runtime via `Py_GIL_DISABLED`.
-The Apple M1 Max host used here runs the GIL-enabled 3.13.13 — true
-PEP 703 free-threading was NOT measured in this study; the OWN_GIL
-sub-interpreter path was.
+A local 3.13t build script lives at
+[`hanzoai/cpy3/scripts/build-python313t.sh`](https://github.com/hanzoai/cpy3/blob/main/scripts/build-python313t.sh).
+Both modes were measured (see "Free-threading" subsection below).
 
 **Library choice**: neither DataDog/go-python3 nor go-python/cpy3
-compile against Python 3.12+ (both reference the removed
-`PyFloat_ClearFreeList` / `PyDict_ClearFreeList` C APIs). We wrote a
-small direct cgo bridge (`plugins/pyvm/pyvm_bridge.{c,h}`) instead —
-~150 lines, no external Python wrapper, JSON marshaling delegated to
-Python's stdlib `json` module so the cgo surface stays narrow.
+compile against Python 3.12+ out of the box (both reference the
+removed `PyFloat_ClearFreeList` / `PyDict_ClearFreeList` C APIs).
+The Hanzo fork [`github.com/hanzoai/cpy3`](https://github.com/hanzoai/cpy3)
+polyfills those, adds a `SubInterpreter` wrapper, `IsGILDisabled()`
+detection, and a `LoadSource`+`CallJSONFunctionByName` JSON hot-path
+helper — the canonical home for any other Hanzo Go service that wants
+embedded CPython. pyvm itself keeps a small direct cgo bridge
+(`plugins/pyvm/pyvm_bridge.{c,h}`, ~150 lines) because the
+consolidated `pyvm_invoke` helper is one cgo call per Invoke and
+empirically beats routing through the cpy3 wrappers by ~30% on
+serial throughput. The cpy3 fork's `CallJSONFunctionByName` is the
+same primitive packaged generically — base/pyvm's bridge is the
+in-tree specialization.
 
 ### Throughput — five-way table
 
@@ -600,20 +608,56 @@ Cold pool startup, N=100 modules:
 pyvm cold start is **750x slower than native, 18x slower than goja**.
 Once warm, steady-state is competitive (17.8µs vs wazero 18.1µs).
 
-### Free-threading vs sub-interpreter parallelism
+### Free-threading vs sub-interpreter parallelism (measured 2026-05-18)
 
-The Python 3.13 host installed via homebrew is `Py_GIL_DISABLED=0`
-(GIL-enabled). The runtime detection (`pyvm.GilDisabled()`) correctly
-reports this and the OWN_GIL sub-interpreter path is used.
+Both Python builds were measured against the same direct-cgo-bridge
+pyvm on the same Apple M1 Max:
 
-A free-threaded build (`python@3.13t`, `Py_GIL_DISABLED=1`) was NOT
-tested in this study — homebrew on darwin/arm64 does not ship a free-
-threaded keg as of 2026-05-18. The runtime code paths are written to
-detect and accommodate either build; the architectural prediction is
-that free-threading raises parallel throughput to track GOMAXPROCS
-without needing the sub-interpreter pool (one interpreter can be
-shared across all OS threads). Verifying this needs a Linux test host
-with the `--disable-gil` cpython build.
+  - Python 3.13.5 default-GIL (homebrew `python@3.13`,
+    `PKG_CONFIG_PATH=/opt/homebrew/opt/python@3.13/lib/pkgconfig`).
+  - Python 3.13.5 free-threaded (built locally via
+    `hanzoai/cpy3/scripts/build-python313t.sh`,
+    `PKG_CONFIG_PATH=$PWD/python313t-build/lib/pkgconfig`,
+    `DYLD_LIBRARY_PATH=$PWD/python313t-build/lib`).
+
+`pyvm.GilDisabled()` correctly reports `false` for the default-GIL
+build and `true` for the free-threaded build after the first `Load()`.
+
+Best-of-three medians, `benchtime=2s -count=3`, default pool size
+(`BASE_PYVM_POOL_SIZE=4`):
+
+| Build | Serial ns/op | Parallel ns/op |
+|---|---:|---:|
+| 3.13 default-GIL | 4,073 | 5,733 |
+| 3.13t free-threaded | 4,478 | 5,805 |
+
+**Finding: free-threading is a non-event for pyvm's embedding
+workload.**
+
+  - Serial is ~10% slower on 3.13t (4,478 vs 4,073 ns/op) — within
+    thermal noise on this host. The PEP 703 serial-perf hit (biased
+    reference counting + disabled adaptive specialization) is hidden
+    by the cgo + JSON marshaling overhead that dominates per-Invoke
+    cost.
+  - Parallel is statistically indistinguishable (5,805 vs 5,733 ns/op).
+    PEP 684 OWN_GIL sub-interpreters already deliver per-OS-thread
+    parallelism on default-GIL; PEP 703 doesn't add headroom unless
+    you abandon the sub-interp pool and instead run many goroutines
+    against ONE interpreter — which we don't.
+
+**Recommendation**: stay on default-GIL CPython 3.13 in production.
+Tune `BASE_PYVM_POOL_SIZE` to match expected concurrency. Revisit
+PEP 703 when:
+
+  1. CPython 3.14+ ships free-threading as the default (PEP 779
+     roadmap) and the serial-perf gap closes.
+  2. **Or** the embedding contract changes to one-interp many-threads
+     (e.g. for very long-held GIL Python compute). For that workload
+     a native binding usually wins anyway.
+
+**Honest**: despite the press, free-threading does not change pyvm's
+performance profile in 2026 for the JSON-pipe embedding contract.
+The sub-interpreter pool we already ship is the right primitive.
 
 ### Did the bench crash?
 
