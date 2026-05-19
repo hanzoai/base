@@ -1,0 +1,6 @@
+{
+  "name": "validate-email",
+  "runtime": "wazero",
+  "module": "python.wasm",
+  "exports": ["validate"]
+}
