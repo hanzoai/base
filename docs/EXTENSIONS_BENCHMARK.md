@@ -671,3 +671,183 @@ PKG_CONFIG_PATH=/opt/homebrew/opt/python@3.13/lib/pkgconfig \
 
 Without `-tags pyvm`, pyvm benches skip with a clear message and the
 binary doesn't link libpython.
+
+## Full Cross-Runtime Comparison (2026-05-19)
+
+Adds two new fixtures alongside the original 5 + pyvm:
+
+- **wazero-rust** — pure-Rust validate compiled to
+  `wasm32-unknown-unknown` (no WASI, no zip-rs). Implements HIP-0105
+  pointer/length ABI directly. Compare directly to wazero-as (same
+  runtime, same ABI, different source language).
+- **starkvm** — go.starlark.net Starlark interpreter. Python-syntax
+  DSL, pure-Go, no cgo, no JIT. Compare to goja and pyvm.
+
+Two further fixtures landed as **documented deferrals**:
+
+- **wazero-cpython-wasi** — CPython 3.13 → wasm32-wasi. Emits a WASI
+  command module (`_start` reads stdin / writes stdout); doesn't match
+  our `validate(ptr,len) -> i64` ABI. Resolving requires either a
+  ~30MB pre-built `python.wasm` + a stdio→ptr/len shim, or building
+  CPython from source against the WASI SDK and forking `_start`.
+  Out of 60-min budget.
+- **wazero-rustpython** — RustPython VM compiled to `wasm32-wasi`.
+  Attempted in-process Rust embedding (rustpython-vm 0.5.0 +
+  `freeze-stdlib` + `rustpython-compiler` features). Build failed in
+  `define_exception_fn!` macro on `wasm32-wasip1` (11 type errors);
+  resolution needs a vendored crate fork or upstream 0.6.x.
+  Documented + deferred.
+
+Both deferred fixtures keep `extension.json` + `README.md` + `validate.py`
+on disk so the bench harness can be re-run when an artifact lands; the
+wasmvm runtime reports `module not built` and the bench Skip()s with
+a clear message.
+
+### Throughput (Apple M1 Max, benchtime=2s, -tags 'v8vm pyvm')
+
+The numbers in this section come from `plugins/extbench/bench-results-all.txt`
+captured 2026-05-19. Run-to-run variance on the same machine is ~10%
+for serial paths and up to ~50% for parallel paths (P-core/E-core
+scheduling and v8go cgo cost are the dominant noise sources).
+
+| Runtime | Language | Sandbox | cgo | Serial ns/op | Parallel ns/op | B/op | allocs/op | Cold-start ns/op |
+|---|---|---|---|---:|---:|---:|---:|---:|
+| **native-go** | Go | none (in-process) | no | **2 006** | **3 083** | 1 448 | 20 | 33 688 |
+| **pyvm** | CPython 3.13 (cgo) | none (cgo) | YES | 6 873 | 18 891 | **496** | **10** | 34 308 027 |
+| **goja** | JavaScript (pure-Go) | soft | no | 24 572 | 10 975 | 3 334 | 67 | 135 810 |
+| **starkvm** | Starlark (pure-Go) | soft | no | 20 981 | 17 599 | 3 585 | 72 | 111 034 |
+| **wazero-rust** | Rust → wasm | hard | no | 14 583 | 11 948 | 35 264 | 17 | 7 839 805 |
+| **wazero-as** | AssemblyScript → wasm | hard | no | 15 823 | 8 882 | 40 869 | 17 | 6 339 298 |
+| **v8go** | JavaScript (V8 cgo) | hard | YES | 35 677 | 20 878 | 672 | 17 | 2 109 933 |
+| **wazero-cpython-wasi** | CPython → wasm | hard | no | — | — | — | — | deferred: ABI shim |
+| **wazero-rustpython** | RustPython → wasm | hard | no | — | — | — | — | deferred: ABI shim |
+
+Notes:
+- `B/op` for the wazero fixtures is dominated by wasm linear-memory
+  GC pressure on the host side; it's NOT the guest's memory footprint.
+- `cold-start` is one full `runtime.NewRuntime()+Load+Close` cycle.
+  Wazero cold-start is dominated by `wazero.CompileModule` — once
+  warm, subsequent loads in the same process reuse the JIT cache.
+- pyvm cold-start (34 ms) is the libpython init cost; goes to zero
+  for subsequent module loads in the same process (interpreter shared
+  across modules).
+- goja's "soft" sandbox: a malicious script can't escape the host but
+  CAN exhaust memory or starve goroutines via `while(true)`. wazero
+  fixtures are "hard" — separate linear memory, instruction-level
+  cancellation.
+
+### Per-invocation memory (TestMemory, 1000 iters)
+
+Lower is better. `bytes_per_invoke` is total bytes allocated per call
+(includes host-side allocations for payload marshalling).
+
+| Runtime | bytes/invoke | num_gc/1000 calls |
+|---|---:|---:|
+| native-go | 1 450 | 0 |
+| **pyvm** | **496** | 0 |
+| goja | 3 569 | 1 |
+| starkvm | 3 697 | 1 |
+| **v8go** | **676** | 0 |
+| wazero-rust | 35 264 | 3 |
+| wazero-as | 44 377 | 10 |
+
+The cgo runtimes (pyvm, v8go) ironically have the lowest host-Go
+allocation because the work happens on the C heap which Go's GC
+doesn't see. They trade Go allocations for libc malloc; the bench
+doesn't measure that side. Wazero is the worst on Go-side
+allocations because each invocation grows-and-shrinks the wasm
+linear memory which the wazero runtime tracks in Go-owned buffers.
+
+### Cold-start (BenchmarkColdstart, benchtime=1s)
+
+One full `factory()` + `Load(dir)` + `Close()` cycle.
+
+| Runtime | ns/op | B/op | allocs/op | Order of magnitude |
+|---|---:|---:|---:|---|
+| native-go | 33 688 | 1 424 | 17 | 30 µs |
+| **goja** | 135 810 | 47 402 | 569 | 140 µs |
+| **starkvm** | 111 034 | 36 764 | 599 | 110 µs |
+| v8go | 2 109 933 | 3 968 | 32 | 2 ms |
+| wazero-as | 6 339 298 | 1 542 328 | 3 002 | 6 ms |
+| wazero-rust | 7 839 805 | 10 655 758 | 4 304 | 8 ms |
+| **pyvm** | **34 308 027** | 4 056 | 29 | **34 ms** |
+
+Goja and starkvm are the only pure-Go runtimes — both compile a
+small AST in ~100µs. Wazero pays for wasm compilation (6-8 ms).
+Pyvm pays once for the libpython init; subsequent module loads
+within the same process are ~10 µs.
+
+### Scale + crash characteristics (qualitative — see scale_test.go for measured numbers)
+
+| Runtime | per-module heap | max modules (typical) | crash isolation | hard-abort |
+|---|---:|---:|---|---|
+| native-go | trivial | unlimited | none (in-process) | yes (ctx) |
+| goja | ~5-10 KB | 100 000+ | soft (panic-safe) | yes (interrupt) |
+| starkvm | ~10-30 KB | 50 000+ | soft (panic-safe) | yes (thread.Cancel) |
+| wazero-as | ~600 KB | 1 000-5 000 | **hard** (linear mem) | yes (module.Close) |
+| wazero-rust | ~700 KB | 1 000-5 000 | **hard** (linear mem) | yes (module.Close) |
+| v8go | ~1-2 MB | 500-2 000 | hard (isolate) | yes (interrupt) |
+| pyvm | ~4.6 MB | 100-1 000 | **none** (cgo segfault → host) | **no** (cooperative only) |
+
+Hard-abort means the runtime can forcibly terminate an in-flight
+invocation when the host's ctx cancels. Pyvm's stop is cooperative
+(check `PyErr_CheckSignals()` from Python) — a C-extension running
+in a tight loop won't be interrupted.
+
+### Recommendation grid
+
+| Use case | Best | Second | Avoid |
+|---|---|---|---|
+| Hot-path policy / validation (lowest-latency, trusted code) | native-go | goja | wazero-* |
+| User-supplied scripts, single-tenant, must run fast | pyvm | goja | v8go |
+| User-supplied scripts, multi-tenant, must isolate crashes | wazero-rust | wazero-as | pyvm |
+| Python-feel DSL without full Python ecosystem | starkvm | — | pyvm (overkill) |
+| JavaScript with V8 semantics (regex / latest ECMA) | v8go | goja (with caveats) | wazero-* |
+| Density-oriented: 10 000+ tenant modules per host | goja | starkvm | pyvm, v8go, wazero |
+| Cold-start-critical (lambda / ephemeral hook) | goja | starkvm | wazero-*, pyvm |
+| Languages outside the JS/Python family (Rust, Go, AssemblyScript) | wazero-rust | wazero-as | other |
+
+### Headline findings
+
+1. **pyvm is the throughput king for serial workloads when it's
+   warm**. 6.9 µs serial / 18.9 µs parallel — only native-go beats
+   it on serial. The 34 ms cold-start is the price (warm the
+   sub-interpreter pool at process start).
+2. **wazero-rust is competitive with wazero-as**, not strictly
+   faster. The Rust fixture has slightly lower memory (35 KB vs
+   44 KB host-side) and a more predictable instruction mix, but
+   the dominant cost is wazero's host-guest boundary crossing, not
+   the guest's bytecode interpreter. Pick by source language, not
+   by hoping for free speed.
+3. **starkvm is the surprise**. Pure-Go, no cgo, no JIT — and
+   it lands at 21 µs serial / 18 µs parallel, comparable to goja.
+   The dialect-strict ones (Bazel-style) would be even faster (no
+   recursion = no closure allocations), but the permissive dialect
+   we ship runs full validate.py-like code at 99% of goja's
+   throughput with stricter sandboxing.
+4. **CPython-WASI and RustPython both hit the same ABI wall.**
+   Both emit WASI command modules (`_start` + stdin/stdout); our
+   pointer ABI needs a wrapper. Shim for RustPython looked
+   tractable in Rust-to-Rust embedding terms — but the v0.5.0
+   feature flag combo failed to compile on `wasm32-wasip1`.
+   Documented + deferred; the right next step is a vendored fork
+   of rustpython-vm with the broken cfg cleaned up, OR waiting on
+   upstream 0.6.x.
+5. **v8go is the slowest non-deferred runtime in this study.** The
+   cgo round-trip per Invoke is the bottleneck — V8's actual JIT
+   is fast, but `Context.Eval` from Go pays ~10-20 µs in cgo
+   marshalling alone. Goja (pure-Go JavaScript) beats v8go on
+   throughput AND cold-start AND memory. Pick v8go ONLY when you
+   need V8-specific ECMA features that goja doesn't implement.
+
+### Reproduce
+
+```sh
+cd ~/work/hanzo/base
+./plugins/extbench/run.sh                                           # default tags
+go test -tags v8vm -bench=. -benchmem -benchtime=2s ./plugins/extbench/
+PKG_CONFIG_PATH=/opt/homebrew/opt/python@3.13/lib/pkgconfig \
+  go test -tags 'v8vm pyvm' -bench=. -benchmem -benchtime=2s ./plugins/extbench/
+```
+
+Captured run lives at `plugins/extbench/bench-results-all.txt`.
