@@ -1,0 +1,6 @@
+{
+  "name": "validate-email",
+  "runtime": "wazero",
+  "module": "rustpython.wasm",
+  "exports": ["validate"]
+}
