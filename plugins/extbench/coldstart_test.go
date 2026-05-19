@@ -6,6 +6,7 @@ import (
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/pyvm"
 	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
@@ -62,8 +63,20 @@ func BenchmarkColdstart_Wazero_AS(b *testing.B) {
 	benchColdstart(b, wasmvm.NewRuntime, "wazero-as")
 }
 
+func BenchmarkColdstart_Wazero_Rust(b *testing.B) {
+	benchColdstart(b, wasmvm.NewRuntime, "wazero-rust")
+}
+
 func BenchmarkColdstart_Wazero_Javy(b *testing.B) {
 	benchColdstart(b, wasmvm.NewRuntime, "wazero-javy")
+}
+
+func BenchmarkColdstart_Wazero_CPythonWASI(b *testing.B) {
+	benchColdstart(b, wasmvm.NewRuntime, "wazero-cpython-wasi")
+}
+
+func BenchmarkColdstart_Wazero_RustPython(b *testing.B) {
+	benchColdstart(b, wasmvm.NewRuntime, "wazero-rustpython")
 }
 
 func BenchmarkColdstart_V8go(b *testing.B) {
@@ -71,4 +84,11 @@ func BenchmarkColdstart_V8go(b *testing.B) {
 		b.Skip("v8go not built (use -tags v8vm)")
 	}
 	benchColdstart(b, v8vm.NewRuntime, "v8go-js")
+}
+
+func BenchmarkColdstart_Pyvm(b *testing.B) {
+	if !pyAvailable() {
+		b.Skip("pyvm not built (use -tags pyvm)")
+	}
+	benchColdstart(b, pyvm.NewRuntime, "pyvm-py")
 }
