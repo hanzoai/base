@@ -37,6 +37,7 @@ import (
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
 	"github.com/hanzoai/base/plugins/pyvm"
+	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 
@@ -112,6 +113,17 @@ func runtimeSpecs() []rtSpec {
 			fixture:      "goja-js",
 			modulePoints: modScalePointsLarge,
 			available:    func() bool { return true },
+		},
+		{
+			// starlark: pure-Go, no JIT, no cgo. Per-module cost is
+			// the compiled *Program plus a small thread pool (8 by
+			// default, mostly empty until used). Scales as well as
+			// goja in our expectation.
+			name:         "starlark",
+			factory:      starkvm.NewRuntime,
+			fixture:      "starkvm-star",
+			modulePoints: modScalePointsLarge,
+			available:    func() bool { return fixtureDir("starkvm-star") != "" },
 		},
 		{
 			name:         "wazero",
@@ -730,6 +742,8 @@ func setPoolEnv(rtName string, size int) (key, prev string) {
 		key = "BASE_V8VM_POOL_SIZE"
 	case "pyvm":
 		key = "BASE_PYVM_POOL_SIZE"
+	case "starlark":
+		key = "BASE_STARKVM_POOL_SIZE"
 	default:
 		return "", ""
 	}
@@ -750,6 +764,8 @@ func restorePoolEnv(rtName, prev string) {
 		key = "BASE_V8VM_POOL_SIZE"
 	case "pyvm":
 		key = "BASE_PYVM_POOL_SIZE"
+	case "starlark":
+		key = "BASE_STARKVM_POOL_SIZE"
 	default:
 		return
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
 	"github.com/hanzoai/base/plugins/pyvm"
+	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 
@@ -158,6 +159,28 @@ func BenchmarkGoja_Parallel(b *testing.B) {
 	b.StopTimer()
 	rt := gojavm.NewRuntime()
 	mod, teardown := loadFixture(b, rt, "goja-js")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runParallel(b, mod)
+}
+
+// ---------- starlark (pure Go, Python-syntax DSL) ----------
+
+func BenchmarkStarkvm_Serial(b *testing.B) {
+	b.StopTimer()
+	rt := starkvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "starkvm-star")
+	defer teardown()
+	sanityCheck(b, mod)
+	b.StartTimer()
+	runSerial(b, mod)
+}
+
+func BenchmarkStarkvm_Parallel(b *testing.B) {
+	b.StopTimer()
+	rt := starkvm.NewRuntime()
+	mod, teardown := loadFixture(b, rt, "starkvm-star")
 	defer teardown()
 	sanityCheck(b, mod)
 	b.StartTimer()

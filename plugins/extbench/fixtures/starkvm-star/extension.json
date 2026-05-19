@@ -1,0 +1,6 @@
+{
+  "name": "validate-email",
+  "runtime": "starlark",
+  "module": "validate.star",
+  "exports": ["validate"]
+}
