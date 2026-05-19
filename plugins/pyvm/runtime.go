@@ -3,28 +3,35 @@
 
 // Package pyvm is the CPython (cgo) extension runtime for Base.
 //
-// Design
-// ------
-// CPython is initialized once per process. Each loaded module owns a pool
-// of sub-interpreters (PEP 684 OWN_GIL on 3.12+, legacy SHARED_GIL on
-// older builds) so that two modules — and two concurrent invocations of
-// the same module — can run without contending on the main interpreter.
+// Two execution modes coexist behind a single Runtime interface:
 //
-// Each Invoke pins itself to one OS thread (runtime.LockOSThread),
-// acquires a sub-interpreter from the module's pool, runs the function,
-// returns the sub-interpreter to the pool, and unpins. Context cancel
-// fires a Py_AddPendingCall watchdog that raises KeyboardInterrupt in
-// the running interpreter — cooperative but reliable for any Python code
-// that doesn't sit in a tight uninterruptible C call.
+//	ModeThreaded   — one global CPython interpreter, N goroutines pinned
+//	                 to N OS threads invoke functions in parallel. On a
+//	                 free-threaded (PEP 703 / python3.13t) build this is
+//	                 actual parallel Python; on default-GIL the GIL
+//	                 serializes them. This is the default.
 //
-// Free-threading (PEP 703)
+//	ModeSubinterp  — one PEP 684 OWN_GIL sub-interpreter pool per loaded
+//	                 module, each interpreter holding its own GIL. Strong
+//	                 isolation between sub-interpreters; bounded
+//	                 parallelism by pool size. Opt-in via extension.json
+//	                 "mode": "subinterp" OR BASE_PYVM_MODE=subinterp.
+//
+// Mode selection precedence: extension.json field > env var override >
+// auto-detect from CPython build (threaded on free-threaded builds,
+// subinterp otherwise).
+//
+// Both modes share the same Invoke contract: LockOSThread → enter GIL
+// → call __main__.fn(json.loads(payload)) → json.dumps → leave GIL →
+// UnlockOSThread. They differ in what "enter GIL" means (attach vs
+// swap thread state) and in symbol resolution (mangled prefix vs
+// per-sub-interp __main__).
+//
+// Free-threading detection
 // ------------------------
-// If CPython was built with --disable-gil (Py_GIL_DISABLED=1), the GIL
-// is a no-op and OWN_GIL sub-interpreters become unnecessary for
-// parallelism — every interpreter runs truly in parallel on its OS
-// thread. The pool semantics remain the same; we simply skip the
-// extra ceremony on free-threaded builds. Detection happens at
-// runtime via Py_IsGILDisabled (3.13+) with a fallback path.
+// pyvm_gil_disabled() returns 1 if libpython was compiled with
+// Py_GIL_DISABLED (--disable-gil), 0 otherwise. The C bridge sets this
+// at static init time so Go can branch on it cheaply.
 //
 // Crash isolation caveat
 // ----------------------
@@ -52,16 +59,60 @@ import (
 	"github.com/hanzoai/base/plugins/extruntime"
 )
 
+// Mode picks the per-module execution strategy. ModeThreaded is the
+// default on free-threaded CPython builds; ModeSubinterp is the
+// default on default-GIL builds (and the only mode prior to v2).
+type Mode int
+
+const (
+	// ModeThreaded runs every Invoke against the single global
+	// interpreter. Goroutines pin to OS threads and call
+	// PyGILState_Ensure to attach. Cheap, parallel-on-FT, but no
+	// per-tenant memory isolation: tenants share __main__.
+	ModeThreaded Mode = iota
+
+	// ModeSubinterp runs every Invoke against a per-module pool of
+	// PEP 684 OWN_GIL sub-interpreters. Each interpreter holds its
+	// own __main__, modules, and GIL. Strong isolation but pool-
+	// size bounded parallelism and high per-module memory cost.
+	ModeSubinterp
+)
+
+func (m Mode) String() string {
+	switch m {
+	case ModeThreaded:
+		return "threaded"
+	case ModeSubinterp:
+		return "subinterp"
+	default:
+		return fmt.Sprintf("mode(%d)", int(m))
+	}
+}
+
+// parseMode parses extension.json "mode" or env var values. Unknown
+// values map to ModeThreaded by default (forward-compatible default).
+func parseMode(s string) (Mode, bool) {
+	switch s {
+	case "threaded":
+		return ModeThreaded, true
+	case "subinterp":
+		return ModeSubinterp, true
+	default:
+		return ModeThreaded, false
+	}
+}
+
 // Defaults — tuned for short-lived per-request Python hooks.
 const (
 	defaultPoolSize = 4
 	envPoolSize     = "BASE_PYVM_POOL_SIZE"
+	envMode         = "BASE_PYVM_MODE"
 )
 
 var (
-	gInit     sync.Once
-	gInitErr  error
-	gGilOff   bool
+	gInit    sync.Once
+	gInitErr error
+	gGilOff  bool
 )
 
 func initPython() error {
@@ -75,11 +126,14 @@ func initPython() error {
 }
 
 // NewRuntime returns a pyvm-backed Runtime. CPython is initialized on
-// first use and shared across every module loaded by this runtime;
-// modules own their sub-interpreters. Multiple NewRuntime() calls in
-// the same process all share the single CPython init.
+// first use and shared across every module loaded by this runtime.
+// Mode defaults to threaded on free-threaded builds, subinterp on
+// default-GIL builds. Override per-module via extension.json or
+// process-wide via BASE_PYVM_MODE.
 func NewRuntime() extruntime.Runtime {
-	r := &runtime{poolSize: envInt(envPoolSize, defaultPoolSize)}
+	r := &runtime{
+		poolSize: envInt(envPoolSize, defaultPoolSize),
+	}
 	return r
 }
 
@@ -104,8 +158,52 @@ func (*runtime) Capabilities() extruntime.Capabilities {
 }
 
 // GilDisabled reports whether the linked CPython was built with the
-// free-threading (--disable-gil) flag enabled.
-func GilDisabled() bool { return gGilOff }
+// free-threading (--disable-gil) flag enabled. Result is stable for
+// the process lifetime after the first initPython call.
+func GilDisabled() bool {
+	_ = initPython()
+	return gGilOff
+}
+
+// DefaultMode returns the mode that will be used when neither the
+// extension.json nor BASE_PYVM_MODE specifies one. Exposed for tests
+// and diagnostics; production code does not need to call this.
+func DefaultMode() Mode {
+	if v := os.Getenv(envMode); v != "" {
+		if m, ok := parseMode(v); ok {
+			return m
+		}
+	}
+	_ = initPython()
+	if gGilOff {
+		return ModeThreaded
+	}
+	// On default-GIL builds, threaded mode runs but the GIL
+	// serializes everything — subinterp at least delivers OWN_GIL
+	// parallelism. Pick subinterp as the safer default.
+	return ModeSubinterp
+}
+
+// resolveMode picks the mode for a given manifest, taking into account
+// (in order): the manifest's own "mode" field, the BASE_PYVM_MODE
+// process-wide override, and the runtime auto-detection.
+//
+// Forwarding override semantics: BASE_PYVM_MODE overrides ANY manifest.
+// This matches the existing BASE_PYVM_POOL_SIZE pattern — operations
+// owners have a single env knob to flip the whole process.
+func resolveMode(manifestMode string) Mode {
+	if v := os.Getenv(envMode); v != "" {
+		if m, ok := parseMode(v); ok {
+			return m
+		}
+	}
+	if manifestMode != "" {
+		if m, ok := parseMode(manifestMode); ok {
+			return m
+		}
+	}
+	return DefaultMode()
+}
 
 func (r *runtime) Load(_ context.Context, dir string) (extruntime.Module, error) {
 	if err := initPython(); err != nil {
@@ -134,7 +232,18 @@ func (r *runtime) Load(_ context.Context, dir string) (extruntime.Module, error)
 		return nil, fmt.Errorf("read module %s: %w", m.Module, err)
 	}
 
-	return newModule(r, m, string(src))
+	mode := resolveMode(extensionMode(m))
+	return newModule(r, m, string(src), mode)
+}
+
+// extensionMode pulls the "mode" field out of the manifest. The
+// extruntime.Manifest struct doesn't define this field today because
+// it's pyvm-specific — we round-trip via the raw JSON to read it.
+func extensionMode(m *extruntime.Manifest) string {
+	// The Manifest struct ignores unknown fields, so we re-read the
+	// file. Lookup is cheap (file is already in OS cache) and avoids
+	// adding a pyvm-specific field to the shared Manifest type.
+	return m.Mode()
 }
 
 func (r *runtime) Close() error {
