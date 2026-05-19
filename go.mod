@@ -29,6 +29,8 @@ require (
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
+	github.com/tetratelabs/wazero v1.11.0
+	go.starlark.net v0.0.0-20260326113308-fadfc96def35
 	golang.org/x/crypto v0.49.0
 	golang.org/x/image v0.38.0
 	golang.org/x/net v0.52.0
@@ -36,6 +38,7 @@ require (
 	golang.org/x/sync v0.20.0
 	google.golang.org/api v0.224.0
 	modernc.org/sqlite v1.48.1
+	rogchap.com/v8go v0.9.0
 )
 
 require (
@@ -102,7 +105,6 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/superfly/ltx v0.5.1 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
-	github.com/tetratelabs/wazero v1.2.1 // indirect
 	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
