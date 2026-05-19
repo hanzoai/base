@@ -1,0 +1,6 @@
+{
+  "name": "validate-email",
+  "runtime": "v8go",
+  "module": "validate.js",
+  "exports": ["validate"]
+}
