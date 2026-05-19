@@ -1,0 +1,13 @@
+{
+  "name": "extbench-wazero-as",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AssemblyScript fixture for the Base extension benchmark harness",
+  "scripts": {
+    "asbuild": "asc src/assembly/index.ts --target release --outFile validate.wasm --exportRuntime --runtime minimal --use abort=",
+    "asbuild:debug": "asc src/assembly/index.ts --target debug --outFile validate.debug.wasm --exportRuntime --runtime minimal --use abort="
+  },
+  "devDependencies": {
+    "assemblyscript": "0.27.37"
+  }
+}
