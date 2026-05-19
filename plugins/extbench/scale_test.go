@@ -36,6 +36,7 @@ import (
 
 	"github.com/hanzoai/base/plugins/extruntime"
 	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/base/plugins/pyvm"
 	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/base/plugins/wasmvm"
 
@@ -57,6 +58,11 @@ var (
 	modScalePoints      = []int{1, 10, 100, 1000}
 	modScalePointsLarge = []int{1, 10, 100, 1000, 10000} // native, goja only
 	modScalePointsV8    = []int{1, 10, 100, 500}         // v8go cap
+	// pyvm cap: each module owns a sub-interpreter pool (default 4
+	// entries). Sub-interp creation costs ~50ms each, so 1000 modules
+	// holds 4000 interpreters = ~3 GB RSS. Cap at 100 for the study;
+	// the marginal-memory section reports the per-module cost there.
+	modScalePointsPy = []int{1, 10, 100}
 
 	tenantPoints     = []int{10, 100, 1000}
 	concurrencyPts   = []int{10, 100, 1000, 10000}
@@ -120,6 +126,13 @@ func runtimeSpecs() []rtSpec {
 			fixture:      "v8go-js",
 			modulePoints: modScalePointsV8,
 			available:    v8Available,
+		},
+		{
+			name:         "pyvm",
+			factory:      pyvm.NewRuntime,
+			fixture:      "pyvm-py",
+			modulePoints: modScalePointsPy,
+			available:    pyAvailable,
 		},
 	}
 	return specs
@@ -715,6 +728,8 @@ func setPoolEnv(rtName string, size int) (key, prev string) {
 		key = "BASE_WASMVM_POOL_SIZE"
 	case "v8go":
 		key = "BASE_V8VM_POOL_SIZE"
+	case "pyvm":
+		key = "BASE_PYVM_POOL_SIZE"
 	default:
 		return "", ""
 	}
@@ -733,6 +748,8 @@ func restorePoolEnv(rtName, prev string) {
 		key = "BASE_WASMVM_POOL_SIZE"
 	case "v8go":
 		key = "BASE_V8VM_POOL_SIZE"
+	case "pyvm":
+		key = "BASE_PYVM_POOL_SIZE"
 	default:
 		return
 	}
