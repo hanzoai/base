@@ -192,11 +192,6 @@ require (
 // Pinned to v0.0.0 + local replace until cloud and zip publish stable tags;
 // matches the kms / vfs convention (see hanzoai/kms go.mod).
 require (
-	github.com/hanzoai/cloud v0.0.0-00010101000000-000000000000
-	github.com/hanzoai/zip v0.1.0
-)
-
-replace (
-	github.com/hanzoai/cloud => ../cloud
-	github.com/hanzoai/zip => ../zip
+	github.com/hanzoai/cloud v0.1.0
+	github.com/hanzoai/zip v0.2.0
 )
