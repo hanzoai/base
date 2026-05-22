@@ -30,7 +30,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.2.1
-	go.starlark.net v0.0.0-20260326113308-fadfc96def35
+	go.starlark.net v0.0.0-20260521175807-f5d928020cb8
 	golang.org/x/crypto v0.50.0
 	golang.org/x/image v0.38.0
 	golang.org/x/net v0.53.0
