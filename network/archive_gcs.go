@@ -1,3 +1,5 @@
+//go:build gcs
+
 package network
 
 import (
