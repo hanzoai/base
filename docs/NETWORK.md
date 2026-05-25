@@ -95,7 +95,7 @@ physical files plus a fixed logical consensus grouping:
 |--------------------------|-----------------------------------------------|-------|
 | `BASE_VSHARDS`           | `256` default, power-of-two                   | fixed at deploy; resharding is a separate tool. |
 | `BASE_ENCRYPT`           | `sqlcipher` \| `off` (default)                | opt-in page encryption. |
-| `BASE_KMS_URL`           | `https://kms.<env>.`              | for KEK fetch/wrap. |
+| `BASE_KMS_URL`           | `https://kms.<env>.<your-domain>`              | for KEK fetch/wrap. |
 | `BASE_KEK_SCOPE`         | `platform` \| `org` (default)                 | grain of the KEK. |
 | `BASE_DEK_CACHE_SIZE`    | `4096` default                                | LRU cap for unwrapped DEKs in RAM. |
 
