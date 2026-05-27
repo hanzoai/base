@@ -25,6 +25,13 @@ type Key = platform.IAMKey
 // Config is the platform configuration required by ValidateToken / ExchangeOAuth2.
 type Config = platform.PlatformConfig
 
+// AdminCreds are the service-level IAM application credentials used by
+// server-to-server methods (LookupByAttribute, EnsureUser).
+type AdminCreds = platform.AdminCreds
+
+// EnsureUserSpec describes a user to provision idempotently via EnsureUser.
+type EnsureUserSpec = platform.EnsureUserSpec
+
 // NewClient constructs a Client pointed at the given IAM base URL.
 // Empty baseURL defaults to https://hanzo.id. Trailing slashes are trimmed.
 var NewClient = platform.NewIAMClient
