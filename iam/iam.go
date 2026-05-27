@@ -36,6 +36,11 @@ type EnsureUserSpec = platform.EnsureUserSpec
 // Empty baseURL defaults to https://hanzo.id. Trailing slashes are trimmed.
 var NewClient = platform.NewIAMClient
 
+// NewClientWithCache constructs a Client with a custom cache capacity.
+// Use this when the default 10,000-entry cache is the wrong size — large
+// gateways or low-memory edge nodes.
+var NewClientWithCache = platform.NewIAMClientWithCache
+
 // ValidateToken validates a bearer token against IAM userinfo without caching.
 // Prefer Client.ValidateToken for production use.
 var ValidateToken = platform.ValidateIAMToken
