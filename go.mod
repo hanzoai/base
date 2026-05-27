@@ -19,6 +19,7 @@ require (
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.40.0
 	github.com/hanzoai/tygoja v0.0.2
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.5.0
 	github.com/luxfi/cache v1.2.1
@@ -76,7 +77,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
