@@ -15,52 +15,132 @@ import (
 	"fmt"
 	gort "runtime"
 	"sync"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 )
 
-// module is one loaded Python extension. It owns a pool of
-// sub-interpreters and the parsed source. The pool exists for
-// concurrency: with PEP 684 OWN_GIL each sub-interpreter has its own
-// GIL, so two goroutines invoking the same module can run truly in
-// parallel as long as they grab different pool entries.
+// module is one loaded Python extension. Behavior depends on m.mode:
 //
-// Pool semantics: at most poolSize sub-interpreters are kept alive.
-// On first Invoke we lazily create one. On subsequent Invokes we reuse
-// an idle entry; if none is idle and we're under the cap we create
-// another. The pool is closed when the module is closed.
+//   ModeThreaded:
+//     - No per-module sub-interpreters; m.pool stays nil.
+//     - The module's source is loaded once into the SINGLE global
+//       interpreter at construction time, with each exported function
+//       published under a mangled symbol in __main__ so concurrent
+//       callers don't collide on the global namespace.
+//     - Invoke pins to OS thread, attaches via PyGILState_Ensure,
+//       calls the mangled symbol, releases, unpins.
+//
+//   ModeSubinterp:
+//     - Per-module pool of PEP 684 OWN_GIL sub-interpreters.
+//     - On first Invoke we lazily create one; subsequent Invokes
+//       reuse idle entries up to the cap (BASE_PYVM_POOL_SIZE).
+//     - Each sub-interpreter has its own __main__ + the module source
+//       loaded directly under the canonical export names.
+//
+// Pool semantics (subinterp only): at most poolSize sub-interpreters
+// are kept alive. The pool is closed when the module is closed.
 type module struct {
 	rt      *runtime
 	name    string
 	exports []string
 	src     string
+	mode    Mode
 
+	// threaded mode state
+	manglePrefix string // unique per module instance, no trailing __
+
+	// subinterp mode state
 	mu      sync.Mutex
 	pool    []*C.PyThreadState // idle sub-interpreters
 	created int                // total ever created (for cap)
 	closed  bool
 }
 
-func newModule(rt *runtime, m *extruntime.Manifest, src string) (*module, error) {
+// moduleSeq generates unique mangle-prefix suffixes so two
+// concurrent Load()s of the same logical extension name don't share
+// global symbols in threaded mode. Process-wide atomic.
+var moduleSeq atomic.Uint64
+
+func newModule(rt *runtime, m *extruntime.Manifest, src string, mode Mode) (*module, error) {
 	mod := &module{
 		rt:      rt,
 		name:    m.Name,
 		exports: append([]string(nil), m.Exports...),
 		src:     src,
+		mode:    mode,
 	}
-	// Eagerly create one sub-interpreter at load time so the cost is
-	// amortized — same shape as v8vm's CompileUnboundScript at Load.
-	ts, err := mod.newSub()
-	if err != nil {
-		return nil, err
+
+	switch mode {
+	case ModeThreaded:
+		mod.manglePrefix = manglePrefix(m.Name, moduleSeq.Add(1))
+		if err := mod.loadThreaded(); err != nil {
+			return nil, err
+		}
+		return mod, nil
+
+	case ModeSubinterp:
+		// Eagerly create one sub-interpreter at load time so the cost
+		// is amortized — same shape as v8vm's CompileUnboundScript at
+		// Load.
+		ts, err := mod.newSub()
+		if err != nil {
+			return nil, err
+		}
+		mod.pool = append(mod.pool, ts)
+		mod.created = 1
+		return mod, nil
+
+	default:
+		return nil, fmt.Errorf("pyvm: unknown mode %v", mode)
 	}
-	mod.pool = append(mod.pool, ts)
-	mod.created = 1
-	return mod, nil
+}
+
+// manglePrefix derives a stable prefix for a module's exported
+// functions in threaded mode. Format: "__pyvm_<sanitized-name>_<seq>".
+// Caller guarantees the seq is unique within the process.
+func manglePrefix(name string, seq uint64) string {
+	// Replace anything that isn't a Python identifier char with '_'.
+	// Python identifiers: letter | '_' followed by letter | digit | '_'.
+	// Our use is just for the mangled global symbol — we don't have to
+	// emit a syntactically valid identifier, but we want the symbol
+	// to be unambiguous when grepped, so stick to [A-Za-z0-9_].
+	b := make([]byte, 0, 8+len(name)+16)
+	b = append(b, "__pyvm_"...)
+	for i := 0; i < len(name); i++ {
+		c := name[i]
+		switch {
+		case c >= 'a' && c <= 'z',
+			c >= 'A' && c <= 'Z',
+			c >= '0' && c <= '9',
+			c == '_':
+			b = append(b, c)
+		default:
+			b = append(b, '_')
+		}
+	}
+	b = append(b, '_')
+	// uint64 in base-10 — keeps the prefix readable; max 20 digits.
+	var seqBuf [20]byte
+	si := len(seqBuf)
+	x := seq
+	if x == 0 {
+		si--
+		seqBuf[si] = '0'
+	} else {
+		for x > 0 {
+			si--
+			seqBuf[si] = byte('0' + x%10)
+			x /= 10
+		}
+	}
+	b = append(b, seqBuf[si:]...)
+	return string(b)
 }
 
 func (m *module) Name() string      { return m.name }
+func (m *module) Mode() Mode        { return m.mode }
 func (*module) Runtime() string     { return "pyvm" }
 func (m *module) Exports() []string { return append([]string(nil), m.exports...) }
 
@@ -69,11 +149,12 @@ func (m *module) Exports() []string { return append([]string(nil), m.exports...)
 // json.dumps result. Pure-stdlib on the Python side; the host stays
 // out of the marshaling business.
 //
-// Context cancel: a watchdog goroutine schedules KeyboardInterrupt via
-// Py_AddPendingCall. CPython runs pending calls between bytecodes, so
-// any Python code that loops in pure Python will see the exception
-// promptly. Code blocked inside a C extension (numpy MKL, time.sleep)
-// will NOT respect this until it returns to bytecode dispatch.
+// Context cancel: a pre-check at the top fires ctx.Err() before any
+// Python work. Once inside CPython we cannot reliably abort the
+// running interpreter from another OS thread (Py_AddPendingCall
+// routes to the main interpreter only, PyThreadState_SetAsyncExc
+// requires the target's GIL). Callers needing hard abort must use
+// wazero + RustPython.
 func (m *module) Invoke(ctx context.Context, fn string, payload []byte) ([]byte, error) {
 	m.mu.Lock()
 	if m.closed {
@@ -90,15 +171,49 @@ func (m *module) Invoke(ctx context.Context, fn string, payload []byte) ([]byte,
 	}
 
 	// Pre-check ctx — if already cancelled before we acquire an
-	// interpreter, bail without doing any work. Once inside CPython
-	// we cannot reliably abort the running interpreter from another
-	// OS thread (Py_AddPendingCall routes to the main interpreter
-	// only, PyThreadState_SetAsyncExc requires the target's GIL).
-	// Callers needing hard abort must use wazero + RustPython.
+	// interpreter, bail without doing any work.
 	if cerr := ctx.Err(); cerr != nil {
 		return nil, cerr
 	}
 
+	switch m.mode {
+	case ModeThreaded:
+		return m.invokeThreaded(ctx, fn, payload)
+	case ModeSubinterp:
+		return m.invokeSubinterp(ctx, fn, payload)
+	default:
+		return nil, fmt.Errorf("pyvm: unknown mode %v", m.mode)
+	}
+}
+
+// invokeThreaded calls into the global interpreter via
+// PyGILState_Ensure. On a free-threaded build, N goroutines on N OS
+// threads execute Python bytecode truly in parallel.
+func (m *module) invokeThreaded(ctx context.Context, fn string, payload []byte) ([]byte, error) {
+	// LockOSThread is required even on free-threaded builds: PyGILState_*
+	// attaches CPython's thread state to the calling OS thread.
+	// Migrating the goroutine to a different OS thread between Ensure
+	// and Release would stomp on someone else's state.
+	gort.LockOSThread()
+	defer gort.UnlockOSThread()
+
+	mangled := m.manglePrefix + "__" + fn
+	cFn := C.CString(mangled)
+	cPayload := C.CString(string(payload))
+	var wasUnknown C.int
+	var cErr *C.char
+	cOut := C.pyvm_threaded_invoke(cFn, cPayload, &wasUnknown, &cErr)
+	C.free(unsafe.Pointer(cFn))
+	C.free(unsafe.Pointer(cPayload))
+
+	return m.finishInvoke(ctx, fn, cOut, wasUnknown, cErr)
+}
+
+// invokeSubinterp acquires a sub-interpreter from the per-module pool
+// and runs the function against its private __main__. This is the
+// legacy execution path; opt in via extension.json "mode":"subinterp"
+// or BASE_PYVM_MODE=subinterp.
+func (m *module) invokeSubinterp(ctx context.Context, fn string, payload []byte) ([]byte, error) {
 	ts, err := m.acquire()
 	if err != nil {
 		return nil, err
@@ -128,6 +243,13 @@ func (m *module) Invoke(ctx context.Context, fn string, payload []byte) ([]byte,
 	m.release(ts)
 	gort.UnlockOSThread()
 
+	return m.finishInvoke(ctx, fn, cOut, wasUnknown, cErr)
+}
+
+// finishInvoke is the common tail: error mapping, ctx re-check, JSON
+// validation. Both modes hand it the same C-side return shape so the
+// post-processing stays in one place.
+func (m *module) finishInvoke(ctx context.Context, fn string, cOut *C.char, wasUnknown C.int, cErr *C.char) ([]byte, error) {
 	if cOut == nil {
 		if cerr := ctx.Err(); cerr != nil {
 			if cErr != nil {
@@ -165,15 +287,51 @@ func (m *module) Close() error {
 	m.closed = true
 	pool := m.pool
 	m.pool = nil
+	mode := m.mode
+	prefix := m.manglePrefix
 	m.mu.Unlock()
 
-	// End all sub-interpreters. Each end requires the caller thread
-	// not hold any other GIL; we pin to OS thread and tear them down
-	// one at a time. The C helper handles the swap+restore.
-	gort.LockOSThread()
-	defer gort.UnlockOSThread()
-	for _, ts := range pool {
-		C.pyvm_end_sub(ts)
+	switch mode {
+	case ModeThreaded:
+		if prefix != "" {
+			cPrefix := C.CString(prefix)
+			C.pyvm_threaded_unload(cPrefix)
+			C.free(unsafe.Pointer(cPrefix))
+		}
+		return nil
+
+	case ModeSubinterp:
+		// End all sub-interpreters. Each end requires the caller
+		// thread not hold any other GIL; we pin to OS thread and
+		// tear them down one at a time. The C helper handles the
+		// swap+restore.
+		gort.LockOSThread()
+		defer gort.UnlockOSThread()
+		for _, ts := range pool {
+			C.pyvm_end_sub(ts)
+		}
+		return nil
+
+	default:
+		return nil
+	}
+}
+
+// loadThreaded calls the C bridge to exec the module source under a
+// mangled prefix in the global interpreter. Idempotent across re-load
+// because each Load() bumps moduleSeq and gets a new prefix.
+func (m *module) loadThreaded() error {
+	cPrefix := C.CString(m.manglePrefix)
+	cSrc := C.CString(m.src)
+	var cErr *C.char
+	rc := C.pyvm_threaded_load(cPrefix, cSrc, &cErr)
+	C.free(unsafe.Pointer(cPrefix))
+	C.free(unsafe.Pointer(cSrc))
+	if rc != 0 {
+		return goErrorAndFree(cErr, "pyvm: load threaded "+m.name)
+	}
+	if cErr != nil {
+		C.free(unsafe.Pointer(cErr))
 	}
 	return nil
 }
