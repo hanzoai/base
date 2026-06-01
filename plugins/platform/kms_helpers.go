@@ -77,11 +77,24 @@ func (c *closableReader) Close() error                { return nil }
 
 func newClosableReader(r *strings.Reader) *closableReader { return &closableReader{r: r} }
 
-// nodeIDFromEnv reads $KMS_NODE_ID, defaulting to fallback. The
-// returned NodeID is what the ZAP-mode kmsclient advertises at
-// handshake and what the kmsd ACL matches.
+// nodeIDFromEnv reads $KMS_NODE_ID, defaulting to fallback. Used as
+// the ZAP transport label (mDNS / peer-table entry). NOT the auth
+// identity — the auth identity is mnemonic-derived and lives in
+// servicePathFromEnv.
 func nodeIDFromEnv(fallback string) string {
 	if v := strings.TrimSpace(os.Getenv("KMS_NODE_ID")); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// servicePathFromEnv reads $KMS_SERVICE_PATH, defaulting to fallback.
+// The mnemonic-derived identity is built under this path; same path
+// across pods → same NodeID byte-for-byte. The kms-operator's
+// consensus-authority snapshot enumerates the NodeIDs for every
+// service path.
+func servicePathFromEnv(fallback string) string {
+	if v := strings.TrimSpace(os.Getenv("KMS_SERVICE_PATH")); v != "" {
 		return v
 	}
 	return fallback
