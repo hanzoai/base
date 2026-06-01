@@ -1,6 +1,8 @@
 package platform
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +11,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/golang-lru/v2/expirable"
+	"golang.org/x/sync/singleflight"
 )
 
 // IAMUser represents an authenticated user from Hanzo IAM.
@@ -19,13 +24,14 @@ type IAMUser struct {
 	OrgIDs []string `json:"orgIds"`
 }
 
-// tokenCacheEntry holds a cached IAM validation result.
-type tokenCacheEntry struct {
-	user    *IAMUser
-	expires time.Time
-}
-
-const tokenCacheTTL = 5 * time.Minute
+// Cache parameters. The 5-minute TTL matches the original map+TTL design;
+// 10K is a safe default for the per-tenant fleet sizes Hanzo runs (each
+// service has its own IAMClient instance and a single token is shared
+// across many requests, so the working set stays well under cap).
+const (
+	tokenCacheTTL     = 5 * time.Minute
+	defaultCacheSize  = 10_000
+)
 
 // ValidateIAMToken validates a bearer token against the IAM userinfo endpoint
 // at config.IAMEndpoint/api/userinfo.
@@ -109,61 +115,88 @@ func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (acces
 // --------------------------------------------------------------------------
 
 // IAMClient handles authentication against Hanzo IAM with token caching.
+//
+// Cache: TTL-expirable LRU (hashicorp/golang-lru/v2) shared between
+// ValidateToken (JWT bearer tokens) and ResolveAPIKey (pk-/sk-/hk- API
+// keys). Entries expire after tokenCacheTTL; LRU evicts the oldest entry
+// when the cache is full. No O(n) eviction scans.
+//
+// Singleflight: golang.org/x/sync/singleflight coalesces concurrent
+// validation requests for the same token into a single upstream IAM
+// call. Under load (N goroutines validating the same JWT simultaneously),
+// only one HTTP request hits IAM; the remaining N-1 wait and reuse the
+// result.
 type IAMClient struct {
 	baseURL    string
 	httpClient *http.Client
 
+	cache *expirable.LRU[string, *IAMUser]
+	sf    singleflight.Group
+
 	mu    sync.RWMutex
-	cache map[string]*tokenCacheEntry
+	admin AdminCreds
 }
 
-// NewIAMClient creates a new IAM client pointed at the given base URL.
+// NewIAMClient creates a new IAM client pointed at the given base URL with
+// the default cache capacity (10,000 entries).
 func NewIAMClient(baseURL string) *IAMClient {
+	return NewIAMClientWithCache(baseURL, defaultCacheSize)
+}
+
+// NewIAMClientWithCache creates a new IAM client with a custom cache capacity.
+// cacheSize must be > 0; values <= 0 fall back to defaultCacheSize.
+func NewIAMClientWithCache(baseURL string, cacheSize int) *IAMClient {
 	if baseURL == "" {
 		baseURL = "https://hanzo.id"
 	}
 	// Trim trailing slash.
 	baseURL = strings.TrimRight(baseURL, "/")
+	if cacheSize <= 0 {
+		cacheSize = defaultCacheSize
+	}
 
 	return &IAMClient{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		cache: make(map[string]*tokenCacheEntry),
+		// Single shared cache for JWTs and API keys. Cache key namespacing
+		// is unnecessary: JWT bearer tokens and pk-/sk-/hk- prefixed API
+		// keys live in disjoint string spaces, so collisions are impossible.
+		cache: expirable.NewLRU[string, *IAMUser](cacheSize, nil, tokenCacheTTL),
 	}
 }
 
 // ValidateToken validates a Bearer token against IAM userinfo. Results are
-// cached for 5 minutes.
+// cached for tokenCacheTTL (5 minutes). Concurrent validations of the same
+// token are coalesced into a single upstream call via singleflight.
 func (c *IAMClient) ValidateToken(token string) (*IAMUser, error) {
-	c.mu.RLock()
-	entry, ok := c.cache[token]
-	c.mu.RUnlock()
-
-	if ok && time.Now().Before(entry.expires) {
-		return entry.user, nil
+	if user, ok := c.cache.Get(token); ok {
+		return user, nil
 	}
-
-	user, err := c.fetchUserInfo(token)
+	// Singleflight key namespace: prefix "v:" so a token cannot collide with
+	// the ResolveAPIKey namespace ("k:"). Without prefixes, a token whose
+	// literal value happened to match an access key would share the same
+	// inflight slot and one method's result could be returned by the other.
+	v, err, _ := c.sf.Do("v:"+token, func() (any, error) {
+		// Re-check cache after acquiring the singleflight slot: a concurrent
+		// caller may have populated it while we were waiting.
+		if user, ok := c.cache.Get(token); ok {
+			return user, nil
+		}
+		user, err := c.fetchUserInfo(token)
+		if err != nil {
+			return nil, err
+		}
+		c.cache.Add(token, user)
+		return user, nil
+	})
 	if err != nil {
-		c.mu.Lock()
-		delete(c.cache, token)
-		c.mu.Unlock()
+		// Ensure no stale entry persists for this token after a failed fetch.
+		c.cache.Remove(token)
 		return nil, err
 	}
-
-	c.mu.Lock()
-	c.cache[token] = &tokenCacheEntry{
-		user:    user,
-		expires: time.Now().Add(tokenCacheTTL),
-	}
-	if len(c.cache) > 1000 {
-		c.evictExpiredLocked()
-	}
-	c.mu.Unlock()
-
-	return user, nil
+	return v.(*IAMUser), nil
 }
 
 func (c *IAMClient) fetchUserInfo(token string) (*IAMUser, error) {
@@ -195,20 +228,10 @@ func (c *IAMClient) fetchUserInfo(token string) (*IAMUser, error) {
 	return &user, nil
 }
 
-func (c *IAMClient) evictExpiredLocked() {
-	now := time.Now()
-	for k, v := range c.cache {
-		if now.After(v.expires) {
-			delete(c.cache, k)
-		}
-	}
-}
-
-// InvalidateToken removes a token from the cache.
+// InvalidateToken removes a token (or API key) from the cache. Safe to call
+// for either JWT bearer tokens or pk-/sk-/hk- API keys — the cache is shared.
 func (c *IAMClient) InvalidateToken(token string) {
-	c.mu.Lock()
-	delete(c.cache, token)
-	c.mu.Unlock()
+	c.cache.Remove(token)
 }
 
 // ── API Key Resolution (pk-/sk-/hk- keys managed by IAM) ────────────────
@@ -265,36 +288,30 @@ func IsWidgetKey(token string) bool {
 }
 
 // ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
-// Uses IAM's GET /api/get-user?accessKey= endpoint. Results cached 5 minutes.
+// Uses IAM's GET /api/get-user?accessKey= endpoint. Results are cached for
+// tokenCacheTTL; concurrent resolves of the same key are coalesced via
+// singleflight.
 func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
-	// Check cache (same cache as JWT tokens)
-	c.mu.RLock()
-	entry, ok := c.cache[accessKey]
-	c.mu.RUnlock()
-
-	if ok && time.Now().Before(entry.expires) {
-		return entry.user, nil
+	if user, ok := c.cache.Get(accessKey); ok {
+		return user, nil
 	}
-
-	user, err := c.fetchUserByKey(accessKey)
+	v, err, _ := c.sf.Do("k:"+accessKey, func() (any, error) {
+		// Re-check cache after acquiring the singleflight slot.
+		if user, ok := c.cache.Get(accessKey); ok {
+			return user, nil
+		}
+		user, err := c.fetchUserByKey(accessKey)
+		if err != nil {
+			return nil, err
+		}
+		c.cache.Add(accessKey, user)
+		return user, nil
+	})
 	if err != nil {
-		c.mu.Lock()
-		delete(c.cache, accessKey)
-		c.mu.Unlock()
+		c.cache.Remove(accessKey)
 		return nil, err
 	}
-
-	c.mu.Lock()
-	c.cache[accessKey] = &tokenCacheEntry{
-		user:    user,
-		expires: time.Now().Add(tokenCacheTTL),
-	}
-	if len(c.cache) > 1000 {
-		c.evictExpiredLocked()
-	}
-	c.mu.Unlock()
-
-	return user, nil
+	return v.(*IAMUser), nil
 }
 
 func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
@@ -338,4 +355,361 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 		Email:  result.Data.Email,
 		OrgIDs: []string{result.Data.Owner},
 	}, nil
+}
+
+// ── Server-to-Server User Operations ────────────────────────────────────
+//
+// These methods authenticate using clientId + clientSecret (IAM application
+// credentials) and bypass session auth. They're for service-to-service flows
+// where a downstream service needs to look up or provision IAM users
+// (onboarding, KYC reconciliation, deduplication).
+//
+// The clientId/clientSecret used here are the *service*'s own IAM application
+// credentials (e.g., the BD service's IAM client). They authorize reads against
+// the configured org. They do NOT grant superuser scope.
+
+// AdminCreds holds the service's IAM application credentials. Pass these to
+// the client via SetAdminCreds before invoking server-to-server methods.
+type AdminCreds struct {
+	ClientID     string
+	ClientSecret string
+	Owner        string // default org for lookups when caller doesn't specify
+}
+
+// SetAdminCreds installs the service-level credentials used by LookupByAttribute,
+// EnsureUser, and other server-to-server methods. Safe to call once at startup.
+func (c *IAMClient) SetAdminCreds(creds AdminCreds) {
+	c.mu.Lock()
+	c.admin = creds
+	c.mu.Unlock()
+}
+
+// EnsureUserSpec describes a user to provision idempotently via EnsureUser.
+type EnsureUserSpec struct {
+	Owner       string // org slug (defaults to client's admin Owner if empty)
+	Email       string // primary lookup key for existing users
+	Name        string // username; auto-generated by IAM if empty
+	DisplayName string
+	Phone       string
+	Type        string // IAM user type, e.g. "normal-user"
+}
+
+// normalizePhoneCandidates returns the set of phone shapes IAM might have
+// stored. IAM/Casdoor inconsistently persists phones — some rows include the
+// leading "+", some are raw digits, US numbers sometimes omit the +1 country
+// code. We probe all three shapes to catch either persistence path.
+func normalizePhoneCandidates(phone string) []string {
+	if phone == "" {
+		return nil
+	}
+	out := []string{phone}
+	if strings.HasPrefix(phone, "+") {
+		stripped := strings.TrimPrefix(phone, "+")
+		if stripped != "" {
+			out = append(out, stripped)
+		}
+		// US: drop +1 country code to match a raw 10-digit national number.
+		if strings.HasPrefix(stripped, "1") {
+			noUS := strings.TrimPrefix(stripped, "1")
+			if noUS != "" {
+				out = append(out, noUS)
+			}
+		}
+	}
+	// Deduplicate while preserving order.
+	seen := make(map[string]struct{}, len(out))
+	deduped := out[:0]
+	for _, v := range out {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		deduped = append(deduped, v)
+	}
+	return deduped
+}
+
+// adminCreds returns a snapshot of the configured admin credentials.
+func (c *IAMClient) adminCreds() AdminCreds {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.admin
+}
+
+// LookupByAttribute performs a server-to-server lookup of users matching
+// attr=value within org. attr is an IAM user field name ("phone", "email",
+// "name", etc.). org defaults to the client's admin Owner if empty.
+// maxResults caps the page size; values <= 0 default to 10.
+//
+// For attr=="phone", LookupByAttribute probes multiple phone normalizations
+// (raw, with leading "+", US +1 stripped) since IAM stores phones in
+// inconsistent shapes depending on the signup path.
+//
+// Returns ([], nil) when no user matches — never an error for empty results.
+// Errors are returned only for transport / decoding / IAM-side error responses.
+func (c *IAMClient) LookupByAttribute(ctx context.Context, attr, value, org string, maxResults int) ([]IAMUser, error) {
+	if attr == "" {
+		return nil, fmt.Errorf("iam: LookupByAttribute: attr is required")
+	}
+	if value == "" {
+		return nil, fmt.Errorf("iam: LookupByAttribute: value is required")
+	}
+	creds := c.adminCreds()
+	if creds.ClientID == "" || creds.ClientSecret == "" {
+		return nil, fmt.Errorf("iam: LookupByAttribute: admin credentials not configured (call SetAdminCreds)")
+	}
+	if org == "" {
+		org = creds.Owner
+	}
+	if org == "" {
+		return nil, fmt.Errorf("iam: LookupByAttribute: org is required (no default Owner configured)")
+	}
+	if maxResults <= 0 {
+		maxResults = 10
+	}
+
+	// Build candidate values. Phone gets multiple normalizations; everything
+	// else uses the value verbatim.
+	candidates := []string{value}
+	if attr == "phone" {
+		candidates = normalizePhoneCandidates(value)
+	}
+
+	var matches []IAMUser
+	seenIDs := make(map[string]struct{})
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		q := url.Values{}
+		q.Set("owner", org)
+		q.Set("clientId", creds.ClientID)
+		q.Set("clientSecret", creds.ClientSecret)
+		q.Set("pageSize", fmt.Sprintf("%d", maxResults))
+		q.Set("p", "1")
+		q.Set("field", attr)
+		q.Set("value", candidate)
+
+		req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/get-users?"+q.Encode(), nil)
+		if err != nil {
+			return nil, fmt.Errorf("iam: LookupByAttribute build request: %w", err)
+		}
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("iam: LookupByAttribute request: %w", err)
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("iam: LookupByAttribute returned %d: %s", resp.StatusCode, truncate(string(body), 256))
+		}
+		var envelope struct {
+			Status string `json:"status"`
+			Msg    string `json:"msg"`
+			Data   []struct {
+				ID    string `json:"id"`
+				Name  string `json:"name"`
+				Email string `json:"email"`
+				Owner string `json:"owner"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(body, &envelope); err != nil {
+			return nil, fmt.Errorf("iam: LookupByAttribute decode: %w", err)
+		}
+		if envelope.Status == "error" {
+			return nil, fmt.Errorf("iam: LookupByAttribute: %s", envelope.Msg)
+		}
+		for _, u := range envelope.Data {
+			if u.ID == "" {
+				continue
+			}
+			if _, ok := seenIDs[u.ID]; ok {
+				continue
+			}
+			seenIDs[u.ID] = struct{}{}
+			matches = append(matches, IAMUser{
+				ID:     u.ID,
+				Name:   u.Name,
+				Email:  u.Email,
+				OrgIDs: []string{u.Owner},
+			})
+			if len(matches) >= maxResults {
+				return matches, nil
+			}
+		}
+	}
+	return matches, nil
+}
+
+// EnsureUser idempotently provisions an IAM user matching spec. If the user
+// already exists (matched by email within spec.Owner), the existing user is
+// returned without modification. Otherwise the user is created via
+// POST /api/add-user and the new user is fetched and returned.
+//
+// EnsureUser treats both HTTP 409 and IAM's status:"error" + "already exists"
+// envelope as the idempotent-replay path — IAM responds with HTTP 200 in
+// either case depending on version, and both shapes mean "this user is
+// already there, fetch it".
+//
+// spec.Email is required (used as the dedup key). spec.Owner defaults to the
+// client's admin Owner if empty.
+func (c *IAMClient) EnsureUser(ctx context.Context, spec EnsureUserSpec) (*IAMUser, error) {
+	if spec.Email == "" {
+		return nil, fmt.Errorf("iam: EnsureUser: email is required")
+	}
+	creds := c.adminCreds()
+	if creds.ClientID == "" || creds.ClientSecret == "" {
+		return nil, fmt.Errorf("iam: EnsureUser: admin credentials not configured (call SetAdminCreds)")
+	}
+	owner := spec.Owner
+	if owner == "" {
+		owner = creds.Owner
+	}
+	if owner == "" {
+		return nil, fmt.Errorf("iam: EnsureUser: owner is required (no default Owner configured)")
+	}
+	name := spec.Name
+	if name == "" {
+		// Fall back to local-part of email; IAM regenerates on collision.
+		if i := strings.Index(spec.Email, "@"); i > 0 {
+			name = spec.Email[:i]
+		}
+	}
+
+	payload := map[string]any{
+		"owner":        owner,
+		"name":         name,
+		"email":        spec.Email,
+		"displayName":  spec.DisplayName,
+		"phone":        spec.Phone,
+		"type":         spec.Type,
+		"organization": owner,
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("iam: EnsureUser marshal: %w", err)
+	}
+
+	q := url.Values{}
+	q.Set("clientId", creds.ClientID)
+	q.Set("clientSecret", creds.ClientSecret)
+	// IAM's add-user uses `id` (owner/name) for routing; include both for
+	// safety against handlers that read either shape.
+	q.Set("id", owner+"/"+name)
+
+	req, err := http.NewRequestWithContext(ctx, "POST",
+		c.baseURL+"/api/add-user?"+q.Encode(), bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("iam: EnsureUser build request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("iam: EnsureUser request: %w", err)
+	}
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close()
+
+	// HTTP 409 → already exists, fetch and return.
+	if resp.StatusCode == http.StatusConflict {
+		return c.fetchUserByEmail(ctx, owner, spec.Email)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("iam: EnsureUser returned %d: %s",
+			resp.StatusCode, truncate(string(respBody), 256))
+	}
+
+	// HTTP 200 — could be success (status:ok) or IAM-style error envelope.
+	var envelope struct {
+		Status string `json:"status"`
+		Msg    string `json:"msg"`
+		Data   any    `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &envelope); err != nil {
+		return nil, fmt.Errorf("iam: EnsureUser decode: %w", err)
+	}
+	if envelope.Status == "error" {
+		// IAM's idempotent-replay signal: "X already exists". Could be
+		// username, email, or phone — any of them means the user is in IAM
+		// already and we should resolve it by email.
+		if isAlreadyExistsMsg(envelope.Msg) {
+			return c.fetchUserByEmail(ctx, owner, spec.Email)
+		}
+		return nil, fmt.Errorf("iam: EnsureUser: %s", envelope.Msg)
+	}
+	// Success — fetch the freshly-created user to get its IAM-assigned ID.
+	return c.fetchUserByEmail(ctx, owner, spec.Email)
+}
+
+// fetchUserByEmail does a server-to-server lookup of a user by email within
+// the given org. Used by EnsureUser to resolve both new and already-existing
+// users to a canonical *IAMUser.
+func (c *IAMClient) fetchUserByEmail(ctx context.Context, owner, email string) (*IAMUser, error) {
+	creds := c.adminCreds()
+	q := url.Values{}
+	q.Set("owner", owner)
+	q.Set("email", email)
+	q.Set("clientId", creds.ClientID)
+	q.Set("clientSecret", creds.ClientSecret)
+
+	req, err := http.NewRequestWithContext(ctx, "GET",
+		c.baseURL+"/api/get-user?"+q.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("iam: fetchUserByEmail build request: %w", err)
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("iam: fetchUserByEmail request: %w", err)
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("iam: fetchUserByEmail returned %d: %s",
+			resp.StatusCode, truncate(string(body), 256))
+	}
+	var envelope struct {
+		Status string `json:"status"`
+		Msg    string `json:"msg"`
+		Data   struct {
+			ID    string `json:"id"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+			Owner string `json:"owner"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("iam: fetchUserByEmail decode: %w", err)
+	}
+	if envelope.Status == "error" {
+		return nil, fmt.Errorf("iam: fetchUserByEmail: %s", envelope.Msg)
+	}
+	if envelope.Data.ID == "" {
+		return nil, fmt.Errorf("iam: fetchUserByEmail: no user found for email=%s in owner=%s", email, owner)
+	}
+	return &IAMUser{
+		ID:     envelope.Data.ID,
+		Name:   envelope.Data.Name,
+		Email:  envelope.Data.Email,
+		OrgIDs: []string{envelope.Data.Owner},
+	}, nil
+}
+
+// isAlreadyExistsMsg recognizes IAM's various "X already exists" error messages
+// emitted by add-user when the username/email/phone collides.
+func isAlreadyExistsMsg(msg string) bool {
+	if msg == "" {
+		return false
+	}
+	low := strings.ToLower(msg)
+	return strings.Contains(low, "already exists")
+}
+
+// truncate clips s to at most n runes, appending "…" if truncated. Used for
+// safe inclusion of IAM error bodies in returned error messages.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }

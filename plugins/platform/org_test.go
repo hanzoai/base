@@ -68,9 +68,11 @@ func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		// Only api_key returns a value.
-		if r.URL.Path == "/api/v1/secrets/org-1/commerce/api_key" {
-			json.NewEncoder(w).Encode(map[string]any{
+		// Canonical KMS surface: /v1/kms/orgs/{org}/secrets/{path}/{name}.
+		// orgId=org-1, provider=commerce, name=api_key → path=commerce,
+		// last segment=api_key.
+		if r.URL.Path == "/v1/kms/orgs/org-1/secrets/commerce/api_key" {
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"secret": map[string]string{"value": "kms-key-abc"},
 			})
 			return
