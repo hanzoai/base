@@ -58,6 +58,7 @@ require (
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20260311194731-d5b7577c683d // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/bits-and-blooms/bitset v1.24.4 // indirect
+	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20251210132809-ee656c7534f5 // indirect
 	github.com/consensys/gnark-crypto v0.20.1 // indirect
@@ -78,22 +79,33 @@ require (
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
+	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
 	github.com/luxfi/accel v1.0.7 // indirect
+	github.com/luxfi/address v1.0.1 // indirect
+	github.com/luxfi/codec v1.1.4 // indirect
 	github.com/luxfi/compress v0.0.5 // indirect
 	github.com/luxfi/concurrent v0.0.3 // indirect
 	github.com/luxfi/constants v1.5.0 // indirect
 	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/crypto/ipa v1.2.4 // indirect
 	github.com/luxfi/database v1.18.1 // indirect
+	github.com/luxfi/formatting v1.0.1 // indirect
+	github.com/luxfi/geth v1.16.79 // indirect
+	github.com/luxfi/go-bip32 v1.0.2 // indirect
+	github.com/luxfi/go-bip39 v1.1.2 // indirect
+	github.com/luxfi/keys v1.0.9 // indirect
 	github.com/luxfi/kms v1.9.13 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
+	github.com/luxfi/proto v1.0.0 // indirect
 	github.com/luxfi/ringtail v0.2.0 // indirect
 	github.com/luxfi/sampler v1.0.0 // indirect
+	github.com/luxfi/tls v1.0.3 // indirect
+	github.com/luxfi/vm v1.0.40 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
@@ -152,8 +164,8 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/luxfi/crypto v1.19.0
-	github.com/luxfi/ids v1.2.9 // indirect
-	github.com/luxfi/math v1.2.4 // indirect
+	github.com/luxfi/ids v1.2.13 // indirect
+	github.com/luxfi/math v1.4.0 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.1.0 // indirect
 	github.com/luxfi/metric v1.5.1 // indirect
@@ -199,3 +211,11 @@ require (
 )
 
 replace github.com/hanzoai/kms => ../kms
+
+// luxfi/keys + luxfi/kms drive consensus-native ZAP envelopes.
+// Local replaces while the surface lands upstream; drop once both
+// publish tagged releases carrying ServiceIdentity / envelope.
+replace (
+	github.com/luxfi/keys => ../../lux/keys
+	github.com/luxfi/kms => ../../lux/kms
+)
