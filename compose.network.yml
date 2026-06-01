@@ -1,0 +1,111 @@
+# compose.network.yml — Base Network local HA dev stack.
+#
+# Three Base nodes in a quasar quorum (N=3, k=2) plus a gateway out front
+# doing shard-aware routing. This is the developer entry point for the
+# base/network feature; same code path as prod, no mocks.
+#
+# Quick start:
+#
+#   docker compose -f compose.network.yml up -d
+#   # wait a few seconds for members to register, then:
+#   curl -H 'X-User-Id: alice' -XPOST localhost:18080/api/collections/_pbc/records -d '{}'
+#   curl -H 'X-User-Id: alice'         localhost:18080/api/collections/_pbc/records/last
+#
+# Simulate a node failure:
+#
+#   docker compose -f compose.network.yml kill base-b
+#   # writes and reads continue; quasar quorum = 2 of 3 survivors.
+#
+# Tear down:
+#
+#   docker compose -f compose.network.yml down -v
+#
+# Ports:
+#   18080 — gateway (front door; routes shards to correct pod)
+#   18090 — base-a direct (debug only)
+#   18091 — base-b direct (debug only)
+#   18092 — base-c direct (debug only)
+
+services:
+  base-a: &base-node
+    image: ghcr.io/hanzoai/base:dev
+    environment:
+      BASE_NETWORK: quasar
+      BASE_SHARD_KEY: user_id
+      BASE_REPLICATION: "3"
+      BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
+      BASE_ARCHIVE: "off"
+      BASE_LISTEN_HTTP: :8090
+      BASE_LISTEN_P2P: :9651
+      BASE_NODE_ROLE: validator
+      HOSTNAME: base-a
+    ports:
+      - "18090:8090"
+    volumes:
+      - base-a-data:/data
+    healthcheck:
+      # Soft probe: any response (incl. 404 before Agent #1's /-/base/members
+      # lands) counts as "up". Real quorum health is surfaced by the gateway.
+      test: ["CMD-SHELL", "curl -sfo /dev/null http://localhost:8090/ || curl -sfo /dev/null http://localhost:8090/api/health || [ $? -lt 22 ]"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+    restart: unless-stopped
+
+  base-b:
+    <<: *base-node
+    environment:
+      BASE_NETWORK: quasar
+      BASE_SHARD_KEY: user_id
+      BASE_REPLICATION: "3"
+      BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
+      BASE_ARCHIVE: "off"
+      BASE_LISTEN_HTTP: :8090
+      BASE_LISTEN_P2P: :9651
+      BASE_NODE_ROLE: validator
+      HOSTNAME: base-b
+    ports:
+      - "18091:8090"
+    volumes:
+      - base-b-data:/data
+
+  base-c:
+    <<: *base-node
+    environment:
+      BASE_NETWORK: quasar
+      BASE_SHARD_KEY: user_id
+      BASE_REPLICATION: "3"
+      BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
+      BASE_ARCHIVE: "off"
+      BASE_LISTEN_HTTP: :8090
+      BASE_LISTEN_P2P: :9651
+      BASE_NODE_ROLE: validator
+      HOSTNAME: base-c
+    ports:
+      - "18092:8090"
+    volumes:
+      - base-c-data:/data
+
+  gateway:
+    image: ghcr.io/hanzoai/gateway:latest
+    depends_on:
+      base-a:
+        condition: service_healthy
+      base-b:
+        condition: service_healthy
+      base-c:
+        condition: service_healthy
+    environment:
+      AUTH_ENABLED: "false" # dev-only; prod uses JWT via hanzo.id
+      BILLING_ENABLED: "false"
+    ports:
+      - "18080:8080"
+    volumes:
+      - ./hack/gateway.network.json:/etc/gateway/gateway.json:ro
+    command: ["run", "-c", "/etc/gateway/gateway.json"]
+    restart: unless-stopped
+
+volumes:
+  base-a-data:
+  base-b-data:
+  base-c-data:
