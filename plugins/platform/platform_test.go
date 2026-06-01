@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -144,7 +145,13 @@ func TestIAMClientValidateToken(t *testing.T) {
 }
 
 func TestKMSClientGetSetDelete(t *testing.T) {
-	secrets := make(map[string]string)
+	// Canonical KMS surface: /v1/kms/orgs/{org}/secrets/{path}/{name}
+	// with Authorization: Bearer test-kms-token. The base/platform
+	// kms bridge short-circuits the IAM token exchange when a static
+	// authToken is passed, so the test fixture only needs to validate
+	// the bearer on the secret routes.
+	type stored struct{ value string }
+	secrets := make(map[string]stored)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
@@ -153,37 +160,57 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 			return
 		}
 
-		path := r.URL.Path
-		prefix := "/api/v1/secrets/"
-		if len(path) <= len(prefix) {
+		const orgsPrefix = "/v1/kms/orgs/"
+		if !strings.HasPrefix(r.URL.Path, orgsPrefix) {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		rest := path[len(prefix):]
-
+		rest := strings.TrimPrefix(r.URL.Path, orgsPrefix)
+		// rest = "{org}/secrets[/{path}/{name}]"
+		segs := strings.SplitN(rest, "/", 3)
+		if len(segs) < 2 || segs[1] != "secrets" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		org := segs[0]
 		switch r.Method {
-		case "GET":
-			if val, ok := secrets[rest]; ok {
-				json.NewEncoder(w).Encode(map[string]any{
-					"secret": map[string]string{"value": val},
+		case http.MethodGet:
+			if len(segs) < 3 {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			key := org + "/" + segs[2]
+			if v, ok := secrets[key]; ok {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"secret": map[string]string{"value": v.value},
 				})
 				return
 			}
-			json.NewEncoder(w).Encode(map[string]any{
-				"secrets": []SecretMetadata{},
-			})
+			w.WriteHeader(http.StatusNotFound)
 
-		case "POST":
+		case http.MethodPost:
 			var body struct {
+				Path  string `json:"path"`
+				Name  string `json:"name"`
 				Value string `json:"value"`
 			}
-			json.NewDecoder(r.Body).Decode(&body)
-			secrets[rest] = body.Value
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			key := org + "/" + body.Path + "/" + body.Name
+			if body.Path == "" {
+				key = org + "/" + body.Name
+			}
+			secrets[key] = stored{value: body.Value}
 			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"ok": true})
 
-		case "DELETE":
-			delete(secrets, rest)
-			w.WriteHeader(http.StatusNoContent)
+		case http.MethodDelete:
+			if len(segs) < 3 {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			key := org + "/" + segs[2]
+			delete(secrets, key)
+			w.WriteHeader(http.StatusOK)
 
 		default:
 			w.WriteHeader(http.StatusMethodNotAllowed)
@@ -207,7 +234,7 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 		t.Errorf("expected s3cret, got %s", val)
 	}
 
-	// Cached get.
+	// Cached get — no server hop.
 	val2, err := client.GetSecret("org1", "db-password")
 	if err != nil {
 		t.Fatalf("cached GetSecret: %v", err)
@@ -220,12 +247,6 @@ func TestKMSClientGetSetDelete(t *testing.T) {
 	if err := client.DeleteSecret("org1", "db-password"); err != nil {
 		t.Fatalf("DeleteSecret: %v", err)
 	}
-}
-
-// SecretMetadata is used in tests but defined in kms.go for the KMS list endpoint.
-type SecretMetadata struct {
-	Path    string `json:"path"`
-	Version int    `json:"version"`
 }
 
 func TestKMSClientNoConfig(t *testing.T) {
