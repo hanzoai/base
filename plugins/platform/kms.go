@@ -106,17 +106,25 @@ func (c *KMSClient) init() error {
 		low := strings.ToLower(c.baseURL)
 		switch {
 		case strings.HasPrefix(low, "zap://") || strings.HasPrefix(low, "zap+mdns://"):
-			// ZAP transport. NodeID is the principal — sourced from
-			// $KMS_NODE_ID, defaulting to "hanzo-base" so the kmsd
-			// ACL can register one well-known caller.
-			cfg := kmsclient.Config{
-				Endpoint: c.baseURL,
-				Org:      "hanzo", // overridden per-call via orgId arg
-				Env:      "prod",
-				NodeID:   nodeIDFromEnv("hanzo-base"),
+			// ZAP transport. Identity is mnemonic-derived: the
+			// LUX_MNEMONIC env var (set by the kms-operator-managed
+			// Secret) feeds NewIdentity together with the service
+			// path. Same (mnemonic, path) tuple → same NodeID on
+			// every replica.
+			ident, err := kmsclient.IdentityFromEnv(servicePathFromEnv("hanzo/base"))
+			if err != nil {
+				c.initErr = fmt.Errorf("kms: zap identity: %w", err)
+				return
 			}
-			cli, err := kmsclient.New(cfg)
-			c.cli, c.initErr = cli, err
+			cfg := kmsclient.Config{
+				Endpoint:        c.baseURL,
+				Org:             "hanzo", // overridden per-call via orgId arg
+				Env:             "prod",
+				Identity:        ident,
+				TransportNodeID: nodeIDFromEnv("hanzo-base"),
+			}
+			cli, kerr := kmsclient.New(cfg)
+			c.cli, c.initErr = cli, kerr
 		default:
 			// HTTP transport. authToken non-empty → wrap the http.Client
 			// transport so every outbound request carries the same
@@ -179,11 +187,16 @@ func (c *KMSClient) orgClient(orgId string) (*kmsclient.Client, error) {
 	// same transport choice and the target orgId.
 	low := strings.ToLower(c.baseURL)
 	if strings.HasPrefix(low, "zap://") || strings.HasPrefix(low, "zap+mdns://") {
+		ident, err := kmsclient.IdentityFromEnv(servicePathFromEnv("hanzo/base"))
+		if err != nil {
+			return nil, fmt.Errorf("kms: zap identity: %w", err)
+		}
 		return kmsclient.New(kmsclient.Config{
-			Endpoint: c.baseURL,
-			Org:      orgId,
-			Env:      "prod",
-			NodeID:   nodeIDFromEnv("hanzo-base"),
+			Endpoint:        c.baseURL,
+			Org:             orgId,
+			Env:             "prod",
+			Identity:        ident,
+			TransportNodeID: nodeIDFromEnv("hanzo-base"),
 		})
 	}
 	cfg := kmsclient.Config{
