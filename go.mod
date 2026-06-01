@@ -15,6 +15,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hanzoai/dbx v1.16.0
+	github.com/hanzoai/kms v1.0.7
 	github.com/hanzoai/kms/sdk/go v1.0.0
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.40.0
@@ -65,7 +66,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/gofiber/fiber/v3 v3.2.0 // indirect
@@ -89,6 +90,7 @@ require (
 	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/crypto/ipa v1.2.4 // indirect
 	github.com/luxfi/database v1.18.1 // indirect
+	github.com/luxfi/kms v1.9.13 // indirect
 	github.com/luxfi/lattice/v7 v7.0.0 // indirect
 	github.com/luxfi/ringtail v0.2.0 // indirect
 	github.com/luxfi/sampler v1.0.0 // indirect
@@ -192,6 +194,8 @@ require (
 // Pinned to v0.0.0 + local replace until cloud and zip publish stable tags;
 // matches the kms / vfs convention (see hanzoai/kms go.mod).
 require (
-	github.com/hanzoai/cloud v0.1.0
+	github.com/hanzoai/cloud v0.1.1-0.20260519183759-098489930d01
 	github.com/hanzoai/zip v0.2.0
 )
+
+replace github.com/hanzoai/kms => ../kms
