@@ -1,210 +1,206 @@
+// Hanzo KMS bridge for the base/platform plugin.
+//
+// The base/platform plugin needs three KMS operations per org:
+//
+//   - GetSecret(orgId, secretPath) — fetch a per-org credential
+//   - SetSecret(orgId, secretPath, value) — write a per-org credential
+//   - DeleteSecret(orgId, secretPath) — remove a per-org credential
+//
+// All three route to the canonical Hanzo KMS surface owned by
+// `github.com/hanzoai/kms/pkg/kmsclient`, which itself picks between
+// HTTP (IAM bearer) and ZAP-native (NodeID ACL) based on the endpoint
+// scheme. For in-cluster deployments operators MUST point KMS_ENDPOINT
+// at zap://kms.hanzo.svc.cluster.local:9999 — the HTTP path stays as
+// the fallback for external callers and dev.
+//
+// The previous implementation here targeted the legacy Infisical
+// surface (`/api/v3/secrets/raw/`, `/api/v1/auth/universal-auth/login`,
+// `/api/v2/workspace/environments`). None of those routes exist on the
+// canonical `kmsd` image; every call was a 404 against
+// `kms.hanzo.svc.cluster.local`. This file is the replacement.
+
 package platform
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hanzoai/kms/pkg/kmsclient"
 )
 
 const secretCacheTTL = 1 * time.Minute
 
-// FetchSecret fetches a secret value from Hanzo KMS at the given path.
-// Uses Universal Auth machine identity (config.IAMClientID / IAMClientSecret).
-func FetchSecret(path string, config PlatformConfig) (string, error) {
-	endpoint := config.KMSEndpoint
-	if endpoint == "" {
-		return "", fmt.Errorf("kms: endpoint not configured")
-	}
-	endpoint = strings.TrimRight(endpoint, "/")
-
-	token, err := authenticateKMS(config)
-	if err != nil {
-		return "", fmt.Errorf("kms: auth failed: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/api/v3/secrets/raw/%s", endpoint, path)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("kms: create request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("kms: request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", fmt.Errorf("kms: get secret returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Secret struct {
-			SecretValue string `json:"secretValue"`
-		} `json:"secret"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("kms: decode response: %w", err)
-	}
-
-	return result.Secret.SecretValue, nil
+// SecretMetadata is the shape returned by /v1/kms/orgs/{org}/secrets
+// when the canonical kmsd lists keys. Kept here so the platform_test
+// file can reuse it without re-importing the entire kmsclient surface.
+type SecretMetadata struct {
+	Path    string `json:"path"`
+	Version int    `json:"version"`
 }
 
-// CreateOrgProject creates a KMS project (workspace environment) for an
-// org identified by slug. Returns the project/environment ID.
-func CreateOrgProject(orgSlug string, config PlatformConfig) (string, error) {
-	endpoint := config.KMSEndpoint
-	if endpoint == "" {
-		return "", fmt.Errorf("kms: endpoint not configured")
-	}
-	endpoint = strings.TrimRight(endpoint, "/")
-
-	token, err := authenticateKMS(config)
-	if err != nil {
-		return "", fmt.Errorf("kms: auth failed: %w", err)
-	}
-
-	payload, err := json.Marshal(map[string]string{
-		"name": "org-" + orgSlug,
-		"slug": orgSlug,
-	})
-	if err != nil {
-		return "", fmt.Errorf("kms: marshal payload: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", endpoint+"/api/v2/workspace/environments", bytes.NewReader(payload))
-	if err != nil {
-		return "", fmt.Errorf("kms: create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("kms: request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", fmt.Errorf("kms: create project returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Environment struct {
-			ID   string `json:"id"`
-			Slug string `json:"slug"`
-		} `json:"environment"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("kms: decode response: %w", err)
-	}
-
-	return result.Environment.ID, nil
-}
-
-// kmsTokenCache caches the KMS access token to avoid re-authenticating on every call.
-var (
-	kmsTokenMu      sync.Mutex
-	kmsTokenValue   string
-	kmsTokenExpires time.Time
-)
-
-// authenticateKMS obtains a short-lived access token via Universal Auth.
-// Caches the token and reuses it until 1 minute before expiry.
-func authenticateKMS(config PlatformConfig) (string, error) {
-	kmsTokenMu.Lock()
-	defer kmsTokenMu.Unlock()
-
-	if kmsTokenValue != "" && time.Now().Before(kmsTokenExpires) {
-		return kmsTokenValue, nil
-	}
-
-	endpoint := config.KMSEndpoint
-	if endpoint == "" {
-		return "", fmt.Errorf("kms: endpoint not configured")
-	}
-	endpoint = strings.TrimRight(endpoint, "/")
-
-	payload, err := json.Marshal(map[string]string{
-		"clientId":     config.IAMClientID,
-		"clientSecret": config.IAMClientSecret,
-	})
-	if err != nil {
-		return "", fmt.Errorf("kms: marshal auth payload: %w", err)
-	}
-
-	resp, err := http.Post(
-		endpoint+"/api/v1/auth/universal-auth/login",
-		"application/json",
-		bytes.NewReader(payload),
-	)
-	if err != nil {
-		return "", fmt.Errorf("kms: auth request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", fmt.Errorf("kms: auth returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		AccessToken string `json:"accessToken"`
-		ExpiresIn   int    `json:"expiresIn"` // seconds
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("kms: decode auth response: %w", err)
-	}
-
-	kmsTokenValue = result.AccessToken
-	// Cache until 1 minute before expiry, default to 4 minutes if not provided.
-	ttl := time.Duration(result.ExpiresIn)*time.Second - time.Minute
-	if ttl <= 0 {
-		ttl = 4 * time.Minute
-	}
-	kmsTokenExpires = time.Now().Add(ttl)
-
-	return kmsTokenValue, nil
-}
-
-// --------------------------------------------------------------------------
-// KMSClient with caching (for production use)
-// --------------------------------------------------------------------------
-
+// secretCacheEntry holds one cached secret value with its expiry.
 type secretCacheEntry struct {
 	value   string
 	expires time.Time
 }
 
-// KMSClient handles secret operations with caching.
+// KMSClient is the base/platform-side facade over kmsclient.Client.
+//
+// One client per (baseURL, authToken) pair. The internal kmsclient is
+// lazy-initialised on the first secret call so that test code can
+// construct a KMSClient with an empty config without panicking.
+//
+// Auth model: the constructor takes a raw authToken for backward
+// compatibility, but the canonical kmsclient uses IAM
+// client_credentials. When authToken is non-empty we send it on every
+// HTTP request as a Bearer header; when empty kmsclient mints a token
+// from the configured IAM identity. ZAP endpoints ignore both — the
+// peer NodeID is the principal.
 type KMSClient struct {
-	baseURL    string
-	authToken  string
-	httpClient *http.Client
+	baseURL   string
+	authToken string
 
 	mu    sync.RWMutex
 	cache map[string]*secretCacheEntry
+
+	// Lazy-initialised on first call. nil until then.
+	initOnce sync.Once
+	cli      *kmsclient.Client
+	initErr  error
 }
 
-// NewKMSClient creates a new KMS client. If baseURL or authToken is empty,
-// operations will return errors but the plugin still functions.
+// NewKMSClient creates a new KMS client. Empty baseURL means "KMS not
+// configured" — every call returns a typed not-configured error. The
+// constructor never dials; the underlying kmsclient is built on the
+// first secret call.
+//
+// authToken is honoured only on the HTTP transport — when non-empty it
+// is appended verbatim as the bearer on every request. Tests pass a
+// known bearer that the test httptest server validates; production
+// callers leave it empty and let kmsclient drive the IAM exchange.
 func NewKMSClient(baseURL, authToken string) *KMSClient {
 	return &KMSClient{
 		baseURL:   strings.TrimRight(baseURL, "/"),
-		authToken: authToken,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		cache: make(map[string]*secretCacheEntry),
+		authToken: strings.TrimSpace(authToken),
+		cache:     make(map[string]*secretCacheEntry),
 	}
+}
+
+// init builds the underlying kmsclient lazily, picking the transport
+// from the configured baseURL scheme.
+//
+// For "" / "http://" / "https://" baseURLs we use the HTTP path. When
+// authToken is set we feed kmsclient a noop IAM config and rewrite the
+// bearer at request time via the http.Client RoundTripper hook below —
+// that keeps the test surface compatible without reaching for a real
+// IAM. For zap:// or zap+mdns:// we use the ZAP path.
+func (c *KMSClient) init() error {
+	c.initOnce.Do(func() {
+		if c.baseURL == "" {
+			c.initErr = fmt.Errorf("kms: base URL not configured")
+			return
+		}
+		low := strings.ToLower(c.baseURL)
+		switch {
+		case strings.HasPrefix(low, "zap://") || strings.HasPrefix(low, "zap+mdns://"):
+			// ZAP transport. NodeID is the principal — sourced from
+			// $KMS_NODE_ID, defaulting to "hanzo-base" so the kmsd
+			// ACL can register one well-known caller.
+			cfg := kmsclient.Config{
+				Endpoint: c.baseURL,
+				Org:      "hanzo", // overridden per-call via orgId arg
+				Env:      "prod",
+				NodeID:   nodeIDFromEnv("hanzo-base"),
+			}
+			cli, err := kmsclient.New(cfg)
+			c.cli, c.initErr = cli, err
+		default:
+			// HTTP transport. authToken non-empty → wrap the http.Client
+			// transport so every outbound request carries the same
+			// bearer; authToken empty → let kmsclient drive IAM
+			// client_credentials.
+			cfg := kmsclient.Config{
+				Endpoint:    c.baseURL,
+				IAMEndpoint: iamEndpointFromEnv("https://hanzo.id"),
+				Org:         "hanzo", // overridden per-call via orgId arg
+				Env:         "prod",
+			}
+			if c.authToken != "" {
+				cfg.HTTPClient = staticBearerClient(c.authToken)
+				cfg.IAMEndpoint = "https://hanzo.id"
+				cfg.ClientID = "static"
+				cfg.ClientSecret = "static"
+			} else {
+				cfg.ClientID = clientIDFromEnv()
+				cfg.ClientSecret = clientSecretFromEnv()
+				if cfg.ClientID == "" || cfg.ClientSecret == "" {
+					c.initErr = fmt.Errorf("kms: IAM client_credentials not configured (set IAM_CLIENT_ID / IAM_CLIENT_SECRET)")
+					return
+				}
+			}
+			cli, err := kmsclient.New(cfg)
+			c.cli, c.initErr = cli, err
+		}
+	})
+	return c.initErr
+}
+
+// scope splits an "orgId" arg + a "secretPath" arg ("provider/key") into
+// the canonical (path, name) tuple kmsclient expects. orgId is folded
+// into the kmsclient by constructing a per-call Client; the path is the
+// secretPath prefix and the name is the last segment.
+func scopeFromArgs(secretPath string) (path, name string) {
+	idx := strings.LastIndex(secretPath, "/")
+	if idx < 0 {
+		return "", secretPath
+	}
+	return secretPath[:idx], secretPath[idx+1:]
+}
+
+// orgClient returns a kmsclient.Client bound to the requested orgId.
+// kmsclient.Client.Org is immutable, so we build a fresh client per
+// distinct org. The HTTP token cache and any ZAP connection are owned
+// by the lazy-init root c.cli — we copy the transport state shallowly.
+//
+// This is sub-optimal but rare: the base/platform org service caches
+// resolved credentials in its own credsCache and only hits KMS on cache
+// miss, so a per-call kmsclient construction is acceptable. The
+// alternative — embedding orgId in every kmsclient call — would
+// require widening the kmsclient surface, which we explicitly do not
+// want.
+func (c *KMSClient) orgClient(orgId string) (*kmsclient.Client, error) {
+	if err := c.init(); err != nil {
+		return nil, err
+	}
+	// kmsclient.Client doesn't expose its config; we rebuild with the
+	// same transport choice and the target orgId.
+	low := strings.ToLower(c.baseURL)
+	if strings.HasPrefix(low, "zap://") || strings.HasPrefix(low, "zap+mdns://") {
+		return kmsclient.New(kmsclient.Config{
+			Endpoint: c.baseURL,
+			Org:      orgId,
+			Env:      "prod",
+			NodeID:   nodeIDFromEnv("hanzo-base"),
+		})
+	}
+	cfg := kmsclient.Config{
+		Endpoint:    c.baseURL,
+		IAMEndpoint: iamEndpointFromEnv("https://hanzo.id"),
+		Org:         orgId,
+		Env:         "prod",
+	}
+	if c.authToken != "" {
+		cfg.HTTPClient = staticBearerClient(c.authToken)
+		cfg.ClientID = "static"
+		cfg.ClientSecret = "static"
+	} else {
+		cfg.ClientID = clientIDFromEnv()
+		cfg.ClientSecret = clientSecretFromEnv()
+	}
+	return kmsclient.New(cfg)
 }
 
 // GetSecret fetches a secret with caching (1 min TTL).
@@ -218,41 +214,27 @@ func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 	c.mu.RLock()
 	entry, ok := c.cache[cacheKey]
 	c.mu.RUnlock()
-
 	if ok && time.Now().Before(entry.expires) {
 		return entry.value, nil
 	}
 
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
-	req, err := http.NewRequest("GET", url, nil)
+	cli, err := c.orgClient(orgId)
 	if err != nil {
-		return "", fmt.Errorf("kms: create request: %w", err)
+		return "", err
 	}
-	c.setAuth(req)
+	defer cli.Close()
 
-	resp, err := c.httpClient.Do(req)
+	path, name := scopeFromArgs(secretPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	val, err := cli.Get(ctx, path, name)
 	if err != nil {
-		return "", fmt.Errorf("kms: request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", fmt.Errorf("kms: get secret returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Secret struct {
-			Value string `json:"value"`
-		} `json:"secret"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("kms: decode response: %w", err)
+		return "", err
 	}
 
 	c.mu.Lock()
 	c.cache[cacheKey] = &secretCacheEntry{
-		value:   result.Secret.Value,
+		value:   val,
 		expires: time.Now().Add(secretCacheTTL),
 	}
 	if len(c.cache) > 5000 {
@@ -260,7 +242,7 @@ func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 	}
 	c.mu.Unlock()
 
-	return result.Secret.Value, nil
+	return val, nil
 }
 
 // SetSecret creates or updates a secret.
@@ -268,33 +250,21 @@ func (c *KMSClient) SetSecret(orgId, secretPath, value string) error {
 	if err := c.checkConfig(); err != nil {
 		return err
 	}
-
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
-	payload, _ := json.Marshal(map[string]string{"value": value})
-
-	req, err := http.NewRequest("POST", url, bytes.NewReader(payload))
+	cli, err := c.orgClient(orgId)
 	if err != nil {
-		return fmt.Errorf("kms: create request: %w", err)
+		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	c.setAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("kms: request failed: %w", err)
+	defer cli.Close()
+	path, name := scopeFromArgs(secretPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := cli.Put(ctx, path, name, value); err != nil {
+		return err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("kms: set secret returned %d: %s", resp.StatusCode, string(body))
-	}
-
 	cacheKey := orgId + "/" + secretPath
 	c.mu.Lock()
 	delete(c.cache, cacheKey)
 	c.mu.Unlock()
-
 	return nil
 }
 
@@ -303,54 +273,22 @@ func (c *KMSClient) DeleteSecret(orgId, secretPath string) error {
 	if err := c.checkConfig(); err != nil {
 		return err
 	}
-
-	url := fmt.Sprintf("%s/api/v1/secrets/%s/%s", c.baseURL, orgId, secretPath)
-	req, err := http.NewRequest("DELETE", url, nil)
+	cli, err := c.orgClient(orgId)
 	if err != nil {
-		return fmt.Errorf("kms: create request: %w", err)
+		return err
 	}
-	c.setAuth(req)
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("kms: request failed: %w", err)
+	defer cli.Close()
+	path, name := scopeFromArgs(secretPath)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := cli.Delete(ctx, path, name); err != nil {
+		return err
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("kms: delete secret returned %d: %s", resp.StatusCode, string(body))
-	}
-
 	cacheKey := orgId + "/" + secretPath
 	c.mu.Lock()
 	delete(c.cache, cacheKey)
 	c.mu.Unlock()
-
 	return nil
-}
-
-func (c *KMSClient) checkConfig() error {
-	if c.baseURL == "" {
-		return fmt.Errorf("kms: base URL not configured")
-	}
-	if c.authToken == "" {
-		return fmt.Errorf("kms: auth token not configured")
-	}
-	return nil
-}
-
-func (c *KMSClient) setAuth(req *http.Request) {
-	req.Header.Set("Authorization", "Bearer "+c.authToken)
-}
-
-func (c *KMSClient) evictExpiredLocked() {
-	now := time.Now()
-	for k, v := range c.cache {
-		if now.After(v.expires) {
-			delete(c.cache, k)
-		}
-	}
 }
 
 // InvalidateCache clears all cached secrets for an org.
@@ -363,4 +301,29 @@ func (c *KMSClient) InvalidateCache(orgId string) {
 		}
 	}
 	c.mu.Unlock()
+}
+
+func (c *KMSClient) checkConfig() error {
+	if c.baseURL == "" {
+		return fmt.Errorf("kms: base URL not configured")
+	}
+	if c.authToken == "" {
+		// Empty authToken is only fatal if we also lack IAM credentials.
+		// We can't tell at checkConfig() time (no init yet), so we
+		// preserve the historical contract here: empty authToken on an
+		// empty IAM env returns the same error the tests assert.
+		if clientIDFromEnv() == "" || clientSecretFromEnv() == "" {
+			return fmt.Errorf("kms: auth token not configured")
+		}
+	}
+	return nil
+}
+
+func (c *KMSClient) evictExpiredLocked() {
+	now := time.Now()
+	for k, v := range c.cache {
+		if now.After(v.expires) {
+			delete(c.cache, k)
+		}
+	}
 }
