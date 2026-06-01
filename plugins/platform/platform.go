@@ -594,19 +594,13 @@ func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
 		return e.BadRequestError("slug already in use", nil)
 	}
 
-	// Create KMS project for org (best-effort).
+	// The canonical Hanzo KMS surface (`/v1/kms/orgs/{org}/secrets/...`)
+	// does not require a per-org bootstrap call — the URL segment IS
+	// the org. The Infisical-era CreateOrgProject() that lived here
+	// targeted the dead `/api/v2/workspace/environments` route. Drop
+	// the call; orgs come into existence the moment a secret is
+	// written under their path.
 	var kmsProjectId string
-	if p.config.IAMClientID != "" && p.config.KMSEndpoint != "" {
-		pid, kmsErr := CreateOrgProject(body.Slug, p.config)
-		if kmsErr != nil {
-			p.app.Logger().Warn("failed to create KMS project",
-				"slug", body.Slug,
-				"error", kmsErr.Error(),
-			)
-		} else {
-			kmsProjectId = pid
-		}
-	}
 
 	// Create org record.
 	col, err := p.app.FindCollectionByNameOrId(collectionOrgs)
