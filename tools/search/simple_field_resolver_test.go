@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/search"
 )
 
@@ -25,7 +25,7 @@ func TestSimpleFieldResolverUpdateQuery(t *testing.T) {
 
 	for i, s := range scenarios {
 		t.Run(fmt.Sprintf("%d_%s", i, s.fieldName), func(t *testing.T) {
-			db := dbx.NewFromDB(nil, "")
+			db := query.NewFromDB(nil, "")
 			query := db.Select("id").From("test")
 
 			r.Resolve(s.fieldName)

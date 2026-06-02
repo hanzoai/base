@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
 	"golang.org/x/sync/errgroup"
@@ -63,7 +63,7 @@ type Result struct {
 // Provider represents a single configured search provider instance.
 type Provider struct {
 	fieldResolver      FieldResolver
-	query              *dbx.SelectQuery
+	query              *query.SelectQuery
 	countCol           string
 	sort               []SortField
 	filter             []FilterData
@@ -113,7 +113,7 @@ func (s *Provider) MaxSortExprLimit(max int) *Provider {
 }
 
 // Query sets the base query that will be used to fetch the search items.
-func (s *Provider) Query(query *dbx.SelectQuery) *Provider {
+func (s *Provider) Query(query *query.SelectQuery) *Provider {
 	s.query = query
 	return s
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 )
 
 var TokenFunctions = map[string]func(
@@ -140,7 +140,7 @@ var TokenFunctions = map[string]func(
 		// -----------------------------------------------------------
 		result := &ResolverResult{
 			NullFallback: NullFallbackEnforced,
-			Params:       dbx.Params{},
+			Params:       query.Params{},
 		}
 
 		identifiers := make([]string, 0, totalArgs)
@@ -181,7 +181,7 @@ var TokenFunctions = map[string]func(
 	},
 }
 
-func concatUniqueParams(destParams, newParams dbx.Params) error {
+func concatUniqueParams(destParams, newParams query.Params) error {
 	for k, v := range newParams {
 		found, ok := destParams[k]
 		if ok && v != found {

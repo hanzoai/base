@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/search"
 )
 
@@ -160,9 +160,9 @@ func TestFilterDataBuildExpr(t *testing.T) {
 				return
 			}
 
-			dummyDB := &dbx.DB{}
+			dummyDB := &query.DB{}
 
-			rawSql := expr.Build(dummyDB, dbx.Params{})
+			rawSql := expr.Build(dummyDB, query.Params{})
 
 			// replace TEST placeholder with .+ regex pattern
 			expectPattern := strings.ReplaceAll(
@@ -185,7 +185,7 @@ func TestFilterDataBuildExprWithParams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db := dbx.NewFromDB(sqlDB, "sqlite")
+	db := query.NewFromDB(sqlDB, "sqlite")
 
 	calledQueries := []string{}
 	db.QueryLogFunc = func(ctx context.Context, t time.Duration, sql string, rows *sql.Rows, err error) {
@@ -218,7 +218,7 @@ func TestFilterDataBuildExprWithParams(t *testing.T) {
 		test12 = {:test12}
 	`)
 
-	replacements := []dbx.Params{
+	replacements := []query.Params{
 		{"test1": true},
 		{"test2": false},
 		{"test3": 123.456},
@@ -281,7 +281,7 @@ func TestLikeParamsWrapping(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db := dbx.NewFromDB(sqlDB, "sqlite")
+	db := query.NewFromDB(sqlDB, "sqlite")
 
 	calledQueries := []string{}
 	db.QueryLogFunc = func(ctx context.Context, t time.Duration, sql string, rows *sql.Rows, err error) {
@@ -308,7 +308,7 @@ func TestLikeParamsWrapping(t *testing.T) {
 		test12 ~ {:p12}
 	`)
 
-	replacements := []dbx.Params{
+	replacements := []query.Params{
 		{"p1": `abc`},
 		{"p2": `ab%c`},
 		{"p3": `ab\%c`},
