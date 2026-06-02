@@ -26,19 +26,19 @@ require (
 	github.com/luxfi/consensus v1.22.85
 	github.com/luxfi/fhe v1.7.9
 	github.com/luxfi/log v1.4.3
-	github.com/luxfi/zap v0.3.1
+	github.com/luxfi/zap v0.2.1
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
-	github.com/tetratelabs/wazero v1.2.1
+	github.com/tetratelabs/wazero v1.11.0
 	go.starlark.net v0.0.0-20260326113308-fadfc96def35
 	golang.org/x/crypto v0.50.0
 	golang.org/x/image v0.38.0
 	golang.org/x/net v0.53.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.20.0
-	google.golang.org/api v0.267.0
-	modernc.org/sqlite v1.50.0
+	google.golang.org/api v0.224.0
+	modernc.org/sqlite v1.48.1
 	rogchap.com/v8go v0.9.0
 )
 
@@ -185,7 +185,14 @@ require (
 )
 
 // HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
+// Pinned to v0.0.0 + local replace until cloud and zip publish stable tags;
+// matches the kms / vfs convention (see hanzoai/kms go.mod).
 require (
-	github.com/hanzoai/cloud v0.1.1-0.20260519183759-098489930d01
-	github.com/hanzoai/zip v0.2.0
+	github.com/hanzoai/cloud v0.0.0
+	github.com/hanzoai/zip v0.0.0
+)
+
+replace (
+	github.com/hanzoai/cloud => ../cloud
+	github.com/hanzoai/zip => ../zip
 )
