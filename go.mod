@@ -200,9 +200,7 @@ require (
 )
 
 // HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
-// Pinned to v0.0.0 + local replace until cloud and zip publish stable tags;
-// matches the kms / vfs convention (see hanzoai/kms go.mod).
 require (
-	github.com/hanzoai/cloud v0.1.1-0.20260519183759-098489930d01
+	github.com/hanzoai/cloud v0.1.0
 	github.com/hanzoai/zip v0.2.0
 )

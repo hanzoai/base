@@ -249,8 +249,8 @@ github.com/hablullah/go-hijri v1.0.2 h1:drT/MZpSZJQXo7jftf5fthArShcaMtsal0Zf/dnm
 github.com/hablullah/go-hijri v1.0.2/go.mod h1:OS5qyYLDjORXzK4O1adFw9Q5WfhOcMdAKglDkcTxgWQ=
 github.com/hablullah/go-juliandays v1.0.0 h1:A8YM7wIj16SzlKT0SRJc9CD29iiaUzpBLzh5hr0/5p0=
 github.com/hablullah/go-juliandays v1.0.0/go.mod h1:0JOYq4oFOuDja+oospuc61YoX+uNEn7Z6uHYTbBzdGc=
-github.com/hanzoai/cloud v0.1.1-0.20260519183759-098489930d01 h1:AWIk1ieMiuzoSoEmEciRxNYz/+616u4tkYQ2dg51Qp4=
-github.com/hanzoai/cloud v0.1.1-0.20260519183759-098489930d01/go.mod h1:A+v/YkYFtBNKDs0x6HxRIhvQT0I4XRAtRtGEnf/T1i0=
+github.com/hanzoai/cloud v0.1.0 h1:SLN0oTzKukHEObfXP9KI0ko2/1BmGCh9Bfn19LG9Jwc=
+github.com/hanzoai/cloud v0.1.0/go.mod h1:M9Zle5oc6OD5KsylaDmksH6asjhAT2o0P8vNI3TgbY0=
 github.com/hanzoai/dbx v1.16.0 h1:C8wsb9BIiit4nYnXizpcB4SyzVaepPkQFwq5i9fxAV0=
 github.com/hanzoai/dbx v1.16.0/go.mod h1:ynP6HSiDDoFZ8M3DC+XvSglBPFRygfTd/gjTWabh4yA=
 github.com/hanzoai/kms/sdk/go v1.0.0 h1:rY7LDkRvjPotwJ4ydqDfRkQ+2Ob4QW3ptRydAa52x9g=
