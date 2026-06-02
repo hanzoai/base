@@ -286,8 +286,8 @@ base cli crons list
 Any Base-backed daemon can expose these subcommands without duplicating code.
 For example, in `~/work/liquidity/ats/main.go`:
 
-```go
-package main
+    import (
+        "log"
 
 import (
     "log"
@@ -311,7 +311,45 @@ func main() {
     if err := app.Execute(); err != nil {
         log.Fatal(err)
     }
-}
+    ```
+
+2. To init the dependencies, run `go mod init myapp && go mod tidy`.
+
+3. To start the application, run `go run main.go serve`.
+
+4. To build a statically linked executable, you can run `CGO_ENABLED=0 go build` and then start the created executable with `./myapp serve`.
+
+_For more details please refer to [Extend with Go](https://pocketbase.io/docs/go-overview/)._
+
+### Building and running the repo main.go example
+
+To build the minimal standalone executable, like the prebuilt ones in the releases page, you can simply run `go build` inside the `examples/base` directory:
+
+0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
+1. Clone/download the repo
+2. Navigate to `examples/base`
+3. Run `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`
+   (_https://go.dev/doc/install/source#environment_)
+4. Start the created executable by running `./base serve`.
+
+Note that the supported build targets by the pure Go SQLite driver at the moment are:
+
+```
+darwin  amd64
+darwin  arm64
+freebsd amd64
+freebsd arm64
+linux   386
+linux   amd64
+linux   arm
+linux   arm64
+linux   loong64
+linux   ppc64le
+linux   riscv64
+linux   s390x
+windows 386
+windows amd64
+windows arm64
 ```
 
 Then operate the running ATS:

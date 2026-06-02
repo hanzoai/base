@@ -28,6 +28,8 @@ func NewProviderByName(name string) (Provider, error) {
 	return factory(), nil
 }
 
+// @todo refactor and consider replace with a plain struct
+//
 // Provider defines a common interface for an OAuth2 client.
 type Provider interface {
 	// Context returns the context associated with the provider (if any).

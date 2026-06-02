@@ -85,6 +85,7 @@ func (p *Github) FetchAuthUser(token *oauth2.Token) (*AuthUser, error) {
 		}
 		user.Email = email
 	}
+	user.Email = email
 
 	return user, nil
 }
