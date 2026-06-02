@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/list"
 	_ "modernc.org/sqlite"
 )
@@ -71,7 +71,7 @@ func TestMaxSortExprLimit(t *testing.T) {
 }
 
 func TestProviderQuery(t *testing.T) {
-	db := dbx.NewFromDB(nil, "")
+	db := query.NewFromDB(nil, "")
 	query := db.Select("id").From("test")
 	querySql := query.Build().SQL()
 
@@ -278,7 +278,7 @@ func TestProviderExecNonEmptyQuery(t *testing.T) {
 
 	query := testDB.Select("*").
 		From("test").
-		Where(dbx.Not(dbx.HashExp{"test1": nil})).
+		Where(query.Not(query.HashExp{"test1": nil})).
 		OrderBy("test1 ASC")
 
 	scenarios := []struct {
@@ -480,7 +480,7 @@ func TestProviderFilterAndSortLimits(t *testing.T) {
 
 	query := testDB.Select("*").
 		From("test").
-		Where(dbx.Not(dbx.HashExp{"test1": nil})).
+		Where(query.Not(query.HashExp{"test1": nil})).
 		OrderBy("test1 ASC")
 
 	scenarios := []struct {
@@ -615,7 +615,7 @@ func TestProviderParseAndExec(t *testing.T) {
 
 	query := testDB.Select("*").
 		From("test").
-		Where(dbx.Not(dbx.HashExp{"test1": nil})).
+		Where(query.Not(query.HashExp{"test1": nil})).
 		OrderBy("test1 ASC")
 
 	scenarios := []struct {
@@ -741,7 +741,7 @@ type testTableStruct struct {
 }
 
 type testDB struct {
-	*dbx.DB
+	*query.DB
 	mu            sync.Mutex
 	CalledQueries []string
 }
@@ -755,7 +755,7 @@ func createTestDB() (*testDB, error) {
 		return nil, err
 	}
 
-	db := testDB{DB: dbx.NewFromDB(sqlDB, "sqlite")}
+	db := testDB{DB: query.NewFromDB(sqlDB, "sqlite")}
 	db.CreateTable("test", map[string]string{
 		"id":                                    "int default 0",
 		"test1":                                 "int default 0",
@@ -764,8 +764,8 @@ func createTestDB() (*testDB, error) {
 		strings.Repeat("a", MaxSortFieldLength): "text default ''",
 		strings.Repeat("b", MaxSortFieldLength+1): "text default ''",
 	}).Execute()
-	db.Insert("test", dbx.Params{"id": 1, "test1": 1, "test2": "test2.1"}).Execute()
-	db.Insert("test", dbx.Params{"id": 2, "test1": 2, "test2": "test2.2"}).Execute()
+	db.Insert("test", query.Params{"id": 1, "test1": 1, "test2": "test2.1"}).Execute()
+	db.Insert("test", query.Params{"id": 2, "test1": 2, "test2": "test2.2"}).Execute()
 	db.QueryLogFunc = func(ctx context.Context, t time.Duration, sql string, rows *sql.Rows, err error) {
 		db.mu.Lock()
 		defer db.mu.Unlock()
@@ -782,7 +782,7 @@ type testFieldResolver struct {
 	ResolveCalls     int
 }
 
-func (t *testFieldResolver) UpdateQuery(query *dbx.SelectQuery) error {
+func (t *testFieldResolver) UpdateQuery(query *query.SelectQuery) error {
 	t.UpdateQueryCalls++
 	return nil
 }
