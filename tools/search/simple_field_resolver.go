@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/list"
 )
@@ -33,7 +33,7 @@ type ResolverResult struct {
 
 	// Params is a map with db placeholder->value pairs that will be added
 	// to the query when building both resolved operands/sides in a single expression.
-	Params dbx.Params
+	Params query.Params
 
 	// MultiMatchSubQuery is an optional sub query expression that will be added
 	// in addition to the combined ResolverResult expression during build.
@@ -41,7 +41,7 @@ type ResolverResult struct {
 
 	// AfterBuild is an optional function that will be called after building
 	// and combining the result of both resolved operands/sides in a single expression.
-	AfterBuild func(expr dbx.Expression) dbx.Expression
+	AfterBuild func(expr query.Expression) query.Expression
 }
 
 // FieldResolver defines an interface for managing search fields.
@@ -50,7 +50,7 @@ type FieldResolver interface {
 	// resolved search fields (eg. adding joins aliases, etc.).
 	//
 	// Called internally by `search.Provider` before executing the search request.
-	UpdateQuery(query *dbx.SelectQuery) error
+	UpdateQuery(query *query.SelectQuery) error
 
 	// Resolve parses the provided field and returns a properly
 	// formatted db identifier (eg. NULL, quoted column, placeholder parameter, etc.).
@@ -77,7 +77,7 @@ type SimpleFieldResolver struct {
 }
 
 // UpdateQuery implements `search.UpdateQuery` interface.
-func (r *SimpleFieldResolver) UpdateQuery(query *dbx.SelectQuery) error {
+func (r *SimpleFieldResolver) UpdateQuery(query *query.SelectQuery) error {
 	// nothing to update...
 	return nil
 }
