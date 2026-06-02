@@ -105,26 +105,10 @@ var (
 )
 
 // Manifest is the parsed extension.json contents.
-//
-// Runtime-specific options live under the per-runtime field at the
-// top level (`ModeRaw` for pyvm), so generic loaders don't need to
-// know what each runtime cares about. Callers use the helper
-// accessor methods (Mode() etc.) so the wire field name stays an
-// implementation detail.
 type Manifest struct {
 	Name    string   `json:"name"`
 	Version string   `json:"version"`
 	Runtime string   `json:"runtime"`
 	Module  string   `json:"module"`
 	Exports []string `json:"exports"`
-
-	// ModeRaw is the per-extension runtime mode. Used by pyvm to pick
-	// between "threaded" (default on free-threaded builds) and
-	// "subinterp" (opt-in PEP 684 pool). Other runtimes may grow
-	// their own values; unknown values fall back to runtime default.
-	ModeRaw string `json:"mode,omitempty"`
 }
-
-// Mode returns the manifest's "mode" string, or "" if unset. The
-// runtime is responsible for interpreting the value.
-func (m *Manifest) Mode() string { return m.ModeRaw }
