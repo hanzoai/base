@@ -42,7 +42,7 @@ func main() {
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `Nodes` | `[]string` | Yes | MPC node gRPC addresses |
+| `Nodes` | `[]string` | Yes | MPC node ZAP wire addresses |
 | `OrgSlug` | `string` | Yes | Organization identifier for key derivation |
 | `Threshold` | `int` | Yes | Shamir threshold (t-of-n) |
 | `Enabled` | `bool` | No | Enable/disable plugin (default: true) |
@@ -138,7 +138,7 @@ Enterprise features are configured on the MPC node (`EnterpriseConfig`):
 │  │  • record hooks      │                                     │
 │  └────────┬────────────┘                                      │
 └───────────┼──────────────────────────────────────────────────┘
-            │ gRPC (TLS + HPKE)
+            │ ZAP envelope (TLS + HPKE)
             ▼
 ┌───────────────────────────────────────────────────────────────┐
 │  TFHE-KMS MPC Cluster (t-of-n Shamir)                           │
@@ -159,7 +159,7 @@ Enterprise features are configured on the MPC node (`EnterpriseConfig`):
 
 ## Chain-Agnostic Design
 
-The KMS is chain-agnostic. Any application — Lux L1/L2, exchange platforms, or standard web services — connects via the standard gRPC/REST API. There is no chain-specific configuration.
+The KMS is chain-agnostic. Any application — Lux L1/L2, exchange platforms, or standard web services — connects via the standard ZAP envelope and REST APIs. There is no chain-specific configuration.
 
 Use cases across different deployments:
 - **Blockchain nodes**: validator keys, staking credentials
