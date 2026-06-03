@@ -335,7 +335,7 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 
 **Changes:**
 - Per-org SQLite databases: `{dataDir}/{orgId}/data.db`
-- Org ID from JWT `owner` claim or `X-Hanzo-Org-Id` header
+- Org ID from JWT `owner` claim or `X-Org-Id` header
 - Integrate `hanzoai/sqlite` for per-principal CEK encryption
 - Master key from `BASE_MASTER_KEY` env or KMS fetch
 
