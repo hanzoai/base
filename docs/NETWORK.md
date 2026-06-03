@@ -212,8 +212,8 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
   default) so `BASE_PEERS` pod-ordinal DNS resolves. Deployment is
   permitted only at `replicas == 1`.
 - **R5 (mTLS on p2p)**: `TLSConfig` wires Ed25519/EC mTLS with SAN
-  pinning against the BASE_PEERS list. Transport wire-format (QUIC/
-  gRPC) is Phase-2; `TLSConfig.ServerConfig() / ClientConfig()` land
+  pinning against the BASE_PEERS list. Transport wire-format is ZAP
+  (LP-200) over QUIC; `TLSConfig.ServerConfig() / ClientConfig()` land
   the crypto surface.
 - **R6 (backlog caps)**: per-shard cap 64 MiB / 100 k segments,
   drop-oldest with `base_shard_backlog_drops_total` metric.
