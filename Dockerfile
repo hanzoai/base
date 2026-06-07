@@ -6,7 +6,7 @@
 # binary at compile time (ui-react/embed.go uses //go:embed all:dist).
 # The committed ui-react/dist is the source of truth for CI builds —
 # rebuild it locally with `pnpm --dir ui-react build` before tagging.
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26.4-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
 COPY go.mod go.sum ./
