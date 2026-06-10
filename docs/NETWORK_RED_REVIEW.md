@@ -332,7 +332,7 @@ Skip taxonomy:
   `DeletedDEKReadAttempt`, `CrossOrgKEKLeak`) — needs `BASE_ENCRYPT`
   plumbing and `base/plugins/kms` wire-up.
 - Operator CRD (`HPAWrongKindSilent`, `BasePeersDNSResolvable`) — needs
-  WorkloadMeta.Kind threading in `~/work/liquidity/operator/controller.rs`.
+  WorkloadMeta.Kind threading in `~/work/hanzo/operator/controller.rs`.
 - Gateway-owned (`ShardKeySpoofingViaHeader`,
   `ShardKeyMissingHTTPFallback`, `GatewayMembershipPoisoning`,
   `PITRReplayCrossShard`, `ArchiveBucketPermissionLeak`) — defence lives

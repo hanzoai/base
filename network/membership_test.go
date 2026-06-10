@@ -42,11 +42,11 @@ func (h *hostNotFound) Error() string { return "no such host: " + h.host }
 
 // TestDNSMembershipSingleton: BASE_PEERS empty → Members() = [self].
 func TestDNSMembershipSingleton(t *testing.T) {
-	m := newDNSMembership(context.Background(), "-0", nil, &fakeResolver{}, time.Hour)
+	m := newDNSMembership(context.Background(), "base-bd-0", nil, &fakeResolver{}, time.Hour)
 	defer m.Close()
 	got := m.Members()
-	if len(got) != 1 || got[0] != "-0" {
-		t.Errorf("singleton: Members() = %v, want [-0]", got)
+	if len(got) != 1 || got[0] != "base-bd-0" {
+		t.Errorf("singleton: Members() = %v, want [base-bd-0]", got)
 	}
 }
 
@@ -54,11 +54,11 @@ func TestDNSMembershipSingleton(t *testing.T) {
 // to multiple IPs → one member per IP.
 func TestDNSMembershipHeadless(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd.liquidity.svc.cluster.local", []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"})
+	r.Set("bd.hanzo.svc.cluster.local", []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"})
 	m := newDNSMembership(
 		context.Background(),
-		"-0",
-		[]string{"bd.liquidity.svc.cluster.local:9999"},
+		"base-bd-0",
+		[]string{"bd.hanzo.svc.cluster.local:9999"},
 		r,
 		time.Hour,
 	)
@@ -70,7 +70,7 @@ func TestDNSMembershipHeadless(t *testing.T) {
 	}
 	// Port must be carried onto resolved addresses.
 	for _, id := range got {
-		if id == "-0" {
+		if id == "base-bd-0" {
 			continue
 		}
 		if !stringsHasSuffix(string(id), ":9999") {
@@ -110,7 +110,7 @@ func TestDNSMembershipScaleUp(t *testing.T) {
 
 	m := newDNSMembership(
 		context.Background(),
-		"-0",
+		"base-bd-0",
 		[]string{"bd.svc:9999"},
 		r,
 		10*time.Millisecond,
@@ -145,7 +145,7 @@ func TestDNSMembershipScaleDown(t *testing.T) {
 
 	m := newDNSMembership(
 		context.Background(),
-		"-0",
+		"base-bd-0",
 		[]string{"bd.svc:9999"},
 		r,
 		10*time.Millisecond,
