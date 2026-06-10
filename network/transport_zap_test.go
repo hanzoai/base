@@ -11,14 +11,14 @@ import "testing"
 //
 // Regression: operator emits
 //
-//	BASE_PEERS=liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9999,...
-//	BASE_NODE_ID=liquid-bd-0
+//	BASE_PEERS=base-bd-0.base-network.hanzo.svc.cluster.local:9999,...
+//	BASE_NODE_ID=base-bd-0
 //
 // Plain equality failed to skip self → transport dialed its own pod →
 // luxfi/zap detected dup NodeID and closed → 3s reconnect loop burned
 // CPU and logs without ever replicating a frame.
 func TestIsSelfPeer(t *testing.T) {
-	z := &zapTransport{self: "liquid-bd-0"}
+	z := &zapTransport{self: "base-bd-0"}
 
 	cases := []struct {
 		peer string
@@ -26,17 +26,17 @@ func TestIsSelfPeer(t *testing.T) {
 	}{
 		// Empty / exact match — trivially self.
 		{"", true},
-		{"liquid-bd-0", true},
+		{"base-bd-0", true},
 
 		// FQDN + port — the operator-emitted shape.
-		{"liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9999", true},
+		{"base-bd-0.base-network.hanzo.svc.cluster.local:9999", true},
 
 		// Short hostname + port, no domain — also self.
-		{"liquid-bd-0:9999", true},
+		{"base-bd-0:9999", true},
 
 		// Different ordinal — not self.
-		{"liquid-bd-1.liquid-bd-network.liquidity.svc.cluster.local:9999", false},
-		{"liquid-bd-2:9999", false},
+		{"base-bd-1.base-network.hanzo.svc.cluster.local:9999", false},
+		{"base-bd-2:9999", false},
 
 		// Completely different name — not self.
 		{"some-other-pod.some-other.svc:9999", false},

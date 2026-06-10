@@ -199,8 +199,8 @@ func (z *zapTransport) handle(_ context.Context, from string, msg *zap.Message) 
 // isSelfPeer returns true when the BASE_PEERS entry refers to this pod.
 //
 // Operator-emitted BASE_PEERS carries per-ordinal DNS names such as
-// "liquid-bd-0.liquid-bd-network.liquidity.svc.cluster.local:9999" while
-// BASE_NODE_ID is the bare hostname ("liquid-bd-0"). Plain equality misses
+// "<svc>-0.<svc>-network.<ns>.svc.cluster.local:9999" while
+// BASE_NODE_ID is the bare hostname ("<svc>-0"). Plain equality misses
 // the match and the transport dials itself — luxfi/zap's handshake then
 // detects duplicate NodeID and closes, producing a 3s reconnect loop.
 //
