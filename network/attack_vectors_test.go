@@ -1319,7 +1319,7 @@ func operatorControllerPath(t *testing.T) string {
 	t.Helper()
 	candidates := []string{
 		os.Getenv("BASE_OPERATOR_CONTROLLER_PATH"),
-		filepath.Join(os.Getenv("HOME"), "work", "liquidity", "operator", "src", "controller.rs"),
+		filepath.Join(os.Getenv("HOME"), "work", "hanzo", "operator", "src", "controller.rs"),
 	}
 	for _, p := range candidates {
 		if p == "" {

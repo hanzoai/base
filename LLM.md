@@ -102,12 +102,12 @@ go test ./cmd/            # integration tests (collection, record, login, superu
 
 ## CLI Surface (2026-04-13)
 
-Every Base-derived daemon (ats, bd, ta) uses `cmd.AddCLISubcommands(root)` to get:
+Every Base-derived daemon uses `cmd.AddCLISubcommands(root)` to get:
 
 | Command | Purpose | Lux CLI Equivalent |
 |---------|---------|-------------------|
 | `cluster init/start/stop/status/leader/replicate/failover` | Manage base-ha HA groups | `lux network start/stop/status` |
-| `operator apply/status/describe/upgrade/logs` | Manage Liquidity K8s operator CRDs | `lux chain deploy` |
+| `operator apply/status/describe/upgrade/logs` | Manage K8s operator CRDs | `lux chain deploy` |
 | `config show/set-env/set-org/init` | CLI config (~/.config/base/config.json) | `lux config` |
 | `status` | Daemon health + cluster state | `lux status` |
 | `self version/doctor` | Binary management | `lux self` |
@@ -116,7 +116,7 @@ Every Base-derived daemon (ats, bd, ta) uses `cmd.AddCLISubcommands(root)` to ge
 ### Network Flags
 
 All commands accept `--mainnet/-m`, `--testnet/-t`, `--devnet/-d`, `--dev`. Exactly one may be set.
-Fallback: `$LIQUIDITY_ENV` -> `$BASE_ENV` -> default `local`.
+Fallback: `$BASE_ENV` -> default `local`.
 
 ### Config File
 
@@ -130,10 +130,10 @@ Consensus: `--consensus lux` (default) or `--consensus pubsub`.
 
 ### Operator (K8s CRDs)
 
-Wraps kubectl against `liquid.network/v1alpha1` CRDs. Context map:
-- devnet: `gke_liquidity-devnet_us-central1_dev`
-- testnet: `gke_liquidity-testnet_us-central1_test`
-- mainnet: `gke_liquidity-mainnet_us-central1_main`
+Wraps kubectl against `hanzo.ai/v1alpha1` CRDs. Context map per env:
+- devnet: `gke_<project>-devnet_us-central1_dev`
+- testnet: `gke_<project>-testnet_us-central1_test`
+- mainnet: `gke_<project>-mainnet_us-central1_main`
 
 ## FHE Position
 
@@ -278,6 +278,6 @@ Env matrix:
 | `quasar`     | a,b,...    | true    | full Quasar quorum over ZAP |
 
 `BASE_PEERS` entries may be the operator-emitted pod FQDN
-(`-0.-network.<ns>.svc.cluster.local:9999`) while
+(`<svc>-0.<svc>-network.<ns>.svc.cluster.local:9999`) while
 `BASE_NODE_ID` is the bare hostname; `isSelfPeer` matches on the first DNS
 label so the transport never dials itself.
