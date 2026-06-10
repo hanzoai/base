@@ -15,14 +15,14 @@ import (
 const DefaultOperatorNetworkDir = "k8s/networks"
 
 // NewOperatorCommand returns the `operator` subcommand tree for managing
-// Base K8s operator CRDs (liquid.network/v1alpha1).
+// Base K8s operator CRDs (hanzo.ai/v1alpha1).
 func NewOperatorCommand(nf *NetworkFlags) *cobra.Command {
 	var operatorDir string
 
 	cmd := &cobra.Command{
 		Use:   "operator",
 		Short: "Manage Base K8s operator CRDs",
-		Long: `Manage the Base Kubernetes operator (liquid.network/v1alpha1).
+		Long: `Manage the Base Kubernetes operator (hanzo.ai/v1alpha1).
 
 Wraps kubectl to apply, inspect, and upgrade CRDs managed by the
 Base operator. Respects --mainnet/--testnet/--devnet flags for
@@ -105,8 +105,8 @@ func operatorStatusCmd(nf *NetworkFlags, daemonName string) *cobra.Command {
 			ctx := env.K8sContext()
 			ns := env.K8sNamespace()
 
-			// Get all liquid.network CRDs in the namespace.
-			resources := "liquidnetwork,liquidchain,liquidindexer,liquidexplorer,liquidats,liquidbd,liquidta,liquidiam,liquidkms,liquidgateway"
+			// Get all Base operator CRDs in the namespace.
+			resources := "services.hanzo.ai,iams.hanzo.ai,kmses.hanzo.ai,gateways.hanzo.ai"
 			kubectlArgs := []string{"--context", ctx, "-n", ns, "get", resources}
 
 			fmt.Fprintf(os.Stdout, "kubectl %s\n\n", strings.Join(kubectlArgs, " "))
@@ -123,7 +123,7 @@ func operatorDescribeCmd(nf *NetworkFlags) *cobra.Command {
 	return &cobra.Command{
 		Use:          "describe <resource-type> <name>",
 		Short:        "Describe a specific operator-managed resource",
-		Example:      "ats operator describe liquidnetwork liquidd --testnet",
+		Example:      "base operator describe service mysvc --testnet",
 		Args:         cobra.ExactArgs(2),
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -172,7 +172,7 @@ func operatorUpgradeCmd(nf *NetworkFlags, daemonName string) *cobra.Command {
 			patchJSON := fmt.Sprintf(`{"spec":{"image":{"tag":"%s"}}}`, tag)
 			kubectlArgs := []string{
 				"--context", ctx, "-n", ns,
-				"patch", "liquidnetwork", "liquidd",
+				"patch", "service", "default",
 				"--type", "merge", "-p", patchJSON,
 			}
 
