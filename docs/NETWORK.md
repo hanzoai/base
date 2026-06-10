@@ -309,8 +309,8 @@ pub struct Autoscale {
 }
 ```
 
-Added to: `LiquidBDSpec`, `LiquidATSSpec`, `LiquidTASpec`,
-`LiquidIAMSpec`, `LiquidKMSSpec`, `LiquidAMLSpec`.
+Added to: `ServiceSpec`, `IAMSpec`, `KMSSpec`, and any other downstream
+Base-backed CRDs.
 
 New `controller.rs` helper:
 
@@ -340,7 +340,7 @@ spec:
     enabled: true
     shardKey: user_id
     replication: 3
-    archive: gs://liquidity-base-wal/bd
+    archive: gs://hanzo-base-wal/svc
     autoscale:
       min: 3
       max: 7
@@ -366,9 +366,9 @@ Config example:
 
 ```yaml
 upstreams:
-  - name: liquid-bd
+  - name: my-svc
     type: base-network
-    service: liquid-bd.liquidity.svc:8090
+    service: my-svc.hanzo.svc:8090
     shardKey: user_id
     shardKeySource: jwt.sub
 ```

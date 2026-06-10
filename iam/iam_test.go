@@ -86,16 +86,16 @@ func TestLookupByAttribute_Hit(t *testing.T) {
 		if got := r.URL.Query().Get("value"); !validProbes[got] {
 			t.Errorf("value: got %q want one of {+16125551234, 16125551234, 6125551234}", got)
 		}
-		if got := r.URL.Query().Get("owner"); got != "liquidity" {
-			t.Errorf("owner: got %q want liquidity", got)
+		if got := r.URL.Query().Get("owner"); got != "hanzo" {
+			t.Errorf("owner: got %q want hanzo", got)
 		}
 		writeOK(w, []map[string]any{
-			{"id": "u-1", "name": "alice", "email": "alice@x.com", "owner": "liquidity"},
+			{"id": "u-1", "name": "alice", "email": "alice@x.com", "owner": "hanzo"},
 		})
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	out, err := c.LookupByAttribute(context.Background(), "phone", "+16125551234", "", 10)
 	if err != nil {
@@ -113,7 +113,7 @@ func TestLookupByAttribute_Miss(t *testing.T) {
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	out, err := c.LookupByAttribute(context.Background(), "email", "ghost@x.com", "", 10)
 	if err != nil {
@@ -133,7 +133,7 @@ func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
 		switch r.URL.Query().Get("value") {
 		case "6125551234":
 			writeOK(w, []map[string]any{
-				{"id": "u-7", "name": "bob", "email": "bob@x.com", "owner": "liquidity"},
+				{"id": "u-7", "name": "bob", "email": "bob@x.com", "owner": "hanzo"},
 			})
 		default:
 			writeOK(w, []map[string]any{})
@@ -141,7 +141,7 @@ func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	out, err := c.LookupByAttribute(context.Background(), "phone", "+16125551234", "", 10)
 	if err != nil {
@@ -157,7 +157,7 @@ func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
 
 func TestLookupByAttribute_RequiresAdminCreds(t *testing.T) {
 	c := iam.NewClient("http://unused.invalid")
-	_, err := c.LookupByAttribute(context.Background(), "email", "x@y.com", "liquidity", 10)
+	_, err := c.LookupByAttribute(context.Background(), "email", "x@y.com", "hanzo", 10)
 	if err == nil || !strings.Contains(err.Error(), "admin credentials not configured") {
 		t.Fatalf("want admin-credentials error, got %v", err)
 	}
@@ -170,7 +170,7 @@ func TestLookupByAttribute_IAMErrorPropagates(t *testing.T) {
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	_, err := c.LookupByAttribute(context.Background(), "bogus", "x", "", 10)
 	if err == nil || !strings.Contains(err.Error(), "field not supported") {
@@ -193,8 +193,8 @@ func TestEnsureUser_Create(t *testing.T) {
 		if payload["email"] != "new@x.com" {
 			t.Errorf("email: got %v want new@x.com", payload["email"])
 		}
-		if payload["owner"] != "liquidity" {
-			t.Errorf("owner: got %v want liquidity", payload["owner"])
+		if payload["owner"] != "hanzo" {
+			t.Errorf("owner: got %v want hanzo", payload["owner"])
 		}
 		writeOK(w, "Affected")
 	})
@@ -204,12 +204,12 @@ func TestEnsureUser_Create(t *testing.T) {
 			"id":    "new-id",
 			"name":  "new",
 			"email": "new@x.com",
-			"owner": "liquidity",
+			"owner": "hanzo",
 		})
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{
 		Email: "new@x.com",
@@ -249,12 +249,12 @@ func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
 			"id":    "existing-id",
 			"name":  "dup",
 			"email": "dup@x.com",
-			"owner": "liquidity",
+			"owner": "hanzo",
 		})
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "dup@x.com", Name: "dup"})
 	if err != nil {
@@ -278,12 +278,12 @@ func TestEnsureUser_Idempotent_HTTP409(t *testing.T) {
 			"id":    "existing-id",
 			"name":  "dup",
 			"email": "dup@x.com",
-			"owner": "liquidity",
+			"owner": "hanzo",
 		})
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "dup@x.com"})
 	if err != nil {
@@ -303,7 +303,7 @@ func TestEnsureUser_PropagatesNonExistsError(t *testing.T) {
 	})
 
 	c := iam.NewClient(f.server.URL)
-	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "liquidity"})
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
 	_, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "x@y.com"})
 	if err == nil || !strings.Contains(err.Error(), "organization not found") {

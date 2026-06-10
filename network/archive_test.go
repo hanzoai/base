@@ -147,10 +147,10 @@ func TestSegmentOutOfOrderAppend(t *testing.T) {
 }
 
 func TestObjectKeyLayout(t *testing.T) {
-	got := objectKey("liquid-bd", "shard-123", 4_200_000, 0)
+	got := objectKey("base-bd", "shard-123", 4_200_000, 0)
 	// seq 4_200_000 / 1_000_000 = 4 → padded to 16 digits; seq → 20 digits
 	// and a 20-digit zero nanos suffix.
-	want := "liquid-bd/shard-123/0000000000000004/00000000000004200000-00000000000000000000.lbn"
+	want := "base-bd/shard-123/0000000000000004/00000000000004200000-00000000000000000000.lbn"
 	if got != want {
 		t.Fatalf("\nwant %s\ngot  %s", want, got)
 	}
