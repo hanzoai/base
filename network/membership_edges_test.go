@@ -103,7 +103,7 @@ func TestMixedSeeds(t *testing.T) {
 
 	m := newDNSMembership(
 		context.Background(),
-		"-0",
+		"base-bd-0",
 		[]string{
 			"bd.svc:9999",
 			"legacy-bd-primary:9999",
@@ -126,15 +126,15 @@ func TestMixedSeeds(t *testing.T) {
 // dedupe so Members() doesn't list self twice.
 func TestSelfInSeedList(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("-0.bd-network.ns.svc", []string{"10.60.1.1"})
-	r.Set("-1.bd-network.ns.svc", []string{"10.60.1.2"})
+	r.Set("base-bd-0.bd-network.ns.svc", []string{"10.60.1.1"})
+	r.Set("base-bd-1.bd-network.ns.svc", []string{"10.60.1.2"})
 
 	m := newDNSMembership(
 		context.Background(),
-		"-0",
+		"base-bd-0",
 		[]string{
-			"-0.bd-network.ns.svc:9999", // self
-			"-1.bd-network.ns.svc:9999",
+			"base-bd-0.bd-network.ns.svc:9999", // self
+			"base-bd-1.bd-network.ns.svc:9999",
 		},
 		r,
 		time.Hour,
@@ -143,7 +143,7 @@ func TestSelfInSeedList(t *testing.T) {
 
 	got := m.Members()
 	// self + IP of self (different string) + IP of bd-1 = at most 3
-	// but with sane dedup the "-0" symbolic name matches the
+	// but with sane dedup the "base-bd-0" symbolic name matches the
 	// IP via isSelfPeer at the transport layer. Here we just assert
 	// no duplicate NodeID strings.
 	seen := map[NodeID]int{}

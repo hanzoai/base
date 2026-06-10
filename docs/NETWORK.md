@@ -3,7 +3,7 @@
 Seamless, PQ-native, consensus-replicated HA for every Base app.
 One mechanism. One env flag. Replica count `N ∈ {1,2,3,…}` works
 identically on a laptop (`docker compose`) and on k8s (via
-`~/work/liquidity/operator`). No FUSE, no LiteFS, no Consul.
+`~/work/hanzo/operator`). No FUSE, no LiteFS, no Consul.
 
 Durability and replication come from `luxfi/consensus/protocol/quasar`
 — the same DAG consensus that runs Lux validators — applied to SQLite
@@ -287,7 +287,7 @@ if net := network.FromEnv(); net.Enabled() {
 
 That is all the coupling. Rest of Base code is unchanged.
 
-### `~/work/liquidity/operator/`  (reconciler update)
+### `~/work/hanzo/operator/`  (reconciler update)
 
 Add `BaseNetworkSpec` struct reused across Base-ish CRDs:
 
@@ -309,8 +309,8 @@ pub struct Autoscale {
 }
 ```
 
-Added to: `LiquidBDSpec`, `LiquidATSSpec`, `LiquidTASpec`,
-`LiquidIAMSpec`, `LiquidKMSSpec`, `LiquidAMLSpec`.
+Added to: `ServiceSpec`, `IAMSpec`, `KMSSpec`, and any other downstream
+Base-backed CRDs.
 
 New `controller.rs` helper:
 
@@ -340,7 +340,7 @@ spec:
     enabled: true
     shardKey: user_id
     replication: 3
-    archive: gs://liquidity-base-wal/bd
+    archive: gs://hanzo-base-wal/svc
     autoscale:
       min: 3
       max: 7
@@ -366,9 +366,9 @@ Config example:
 
 ```yaml
 upstreams:
-  - name: 
+  - name: my-svc
     type: base-network
-    service: .liquidity.svc:8090
+    service: my-svc.hanzo.svc:8090
     shardKey: user_id
     shardKeySource: jwt.sub
 ```
