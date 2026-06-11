@@ -20,7 +20,7 @@ const (
 	// note: this usually should be configurable similar to the jsvm plugin,
 	// but for simplicity is static as users can easily change the
 	// reference path if they use custom dirs structure
-	jsTypesDirective = `/// <reference path="../hz_data/types.d.ts" />` + "\n"
+	jsTypesDirective = `/// <reference path="../data/types.d.ts" />` + "\n"
 )
 
 var ErrEmptyTemplate = errors.New("empty template")
@@ -48,8 +48,8 @@ func (p *plugin) jsSnapshotTemplate(collections []*core.Collection) (string, err
 		if err != nil {
 			return "", fmt.Errorf("failed to serialize %q into a map: %w", c.Name, err)
 		}
-		delete(data, "created")
-		delete(data, "updated")
+		delete(data, "createdAt")
+		delete(data, "updatedAt")
 		deleteNestedMapKey(data, "oauth2", "providers")
 		collectionsData[i] = data
 	}
@@ -77,8 +77,8 @@ func (p *plugin) jsCreateTemplate(collection *core.Collection) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	delete(collectionData, "created")
-	delete(collectionData, "updated")
+	delete(collectionData, "createdAt")
+	delete(collectionData, "updatedAt")
 	deleteNestedMapKey(collectionData, "oauth2", "providers")
 
 	jsonData, err := marhshalWithoutEscape(collectionData, "  ", "  ")
@@ -106,8 +106,8 @@ func (p *plugin) jsDeleteTemplate(collection *core.Collection) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	delete(collectionData, "created")
-	delete(collectionData, "updated")
+	delete(collectionData, "createdAt")
+	delete(collectionData, "updatedAt")
 	deleteNestedMapKey(collectionData, "oauth2", "providers")
 
 	jsonData, err := marhshalWithoutEscape(collectionData, "  ", "  ")
@@ -159,9 +159,9 @@ func (p *plugin) jsDiffTemplate(new *core.Collection, old *core.Collection) (str
 	// non-fields
 	// -----------------------------------------------------------------
 
-	upDiff := diffMaps(oldMap, newMap, "fields", "created", "updated")
+	upDiff := diffMaps(oldMap, newMap, "fields", "createdAt", "updatedAt")
 	if len(upDiff) > 0 {
-		downDiff := diffMaps(newMap, oldMap, "fields", "created", "updated")
+		downDiff := diffMaps(newMap, oldMap, "fields", "createdAt", "updatedAt")
 
 		rawUpDiff, err := marhshalWithoutEscape(upDiff, "  ", "  ")
 		if err != nil {
@@ -330,8 +330,8 @@ func (p *plugin) goSnapshotTemplate(collections []*core.Collection) (string, err
 		if err != nil {
 			return "", fmt.Errorf("failed to serialize %q into a map: %w", c.Name, err)
 		}
-		delete(data, "created")
-		delete(data, "updated")
+		delete(data, "createdAt")
+		delete(data, "updatedAt")
 		deleteNestedMapKey(data, "oauth2", "providers")
 		collectionsData[i] = data
 	}
@@ -371,8 +371,8 @@ func (p *plugin) goCreateTemplate(collection *core.Collection) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	delete(collectionData, "created")
-	delete(collectionData, "updated")
+	delete(collectionData, "createdAt")
+	delete(collectionData, "updatedAt")
 	deleteNestedMapKey(collectionData, "oauth2", "providers")
 
 	jsonData, err := marhshalWithoutEscape(collectionData, "\t\t", "\t")
@@ -424,8 +424,8 @@ func (p *plugin) goDeleteTemplate(collection *core.Collection) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	delete(collectionData, "created")
-	delete(collectionData, "updated")
+	delete(collectionData, "createdAt")
+	delete(collectionData, "updatedAt")
 	deleteNestedMapKey(collectionData, "oauth2", "providers")
 
 	jsonData, err := marhshalWithoutEscape(collectionData, "\t\t", "\t")
@@ -501,9 +501,9 @@ func (p *plugin) goDiffTemplate(new *core.Collection, old *core.Collection) (str
 	// non-fields
 	// -----------------------------------------------------------------
 
-	upDiff := diffMaps(oldMap, newMap, "fields", "created", "updated")
+	upDiff := diffMaps(oldMap, newMap, "fields", "createdAt", "updatedAt")
 	if len(upDiff) > 0 {
-		downDiff := diffMaps(newMap, oldMap, "fields", "created", "updated")
+		downDiff := diffMaps(newMap, oldMap, "fields", "createdAt", "updatedAt")
 
 		rawUpDiff, err := marhshalWithoutEscape(upDiff, "\t\t", "\t")
 		if err != nil {

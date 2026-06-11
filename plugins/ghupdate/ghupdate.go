@@ -135,7 +135,7 @@ func (p *plugin) updateCmd() *cobra.Command {
 		&withBackup,
 		"backup",
 		true,
-		"Creates a hz_data backup at the end of the update process",
+		"Creates a data backup at the end of the update process",
 	)
 
 	return command
@@ -230,7 +230,7 @@ func (p *plugin) update(withBackup bool) error {
 	}
 
 	if withBackup {
-		color.Yellow("Creating hz_data backup...")
+		color.Yellow("Creating data backup...")
 
 		backupName := fmt.Sprintf("@update_%s.zip", latest.Tag)
 		if err := p.app.CreateBackup(p.config.Context, backupName); err != nil {

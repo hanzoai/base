@@ -1,6 +1,6 @@
 package network
 
-metric "github.com/luxfi/metric"
+import metric "github.com/luxfi/metric"
 
 // Metrics owns every collector the network package exposes. Callers wire
 // it into their own registry; we never touch metric.DefaultRegisterer.
