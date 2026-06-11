@@ -7,7 +7,7 @@
 // replace it. Goja remains the default for .base.js / .base.ts hook files.
 // The other runtimes are opt-in via an `extension.json` manifest:
 //
-//	# hz_hooks/validate-email/extension.json
+//	# hooks/validate-email/extension.json
 //	{
 //	  "name":    "validate-email",
 //	  "version": "0.1.0",

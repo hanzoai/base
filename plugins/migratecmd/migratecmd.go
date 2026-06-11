@@ -8,7 +8,7 @@
 //	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
 //		TemplateLang: migratecmd.TemplateLangJS, // default to migratecmd.TemplateLangGo
 //		Automigrate:  true,
-//		Dir:          "/custom/migrations/dir", // optional template migrations path; default to "hz_migrations" (for JS) and "migrations" (for Go)
+//		Dir:          "/custom/migrations/dir", // optional template migrations path; default to the "migrations" sibling of the data dir
 //	})
 //
 //	Note: To allow running JS migrations you'll need to enable first
@@ -33,8 +33,8 @@ import (
 type Config struct {
 	// Dir specifies the directory with the user defined migrations.
 	//
-	// If not set it fallbacks to a relative "hz_data/../hz_migrations" (for js)
-	// or "hz_data/../migrations" (for go) directory.
+	// If not set it fallbacks to the "migrations" sibling of the data dir
+	// (i.e. base_/migrations).
 	Dir string
 
 	// Automigrate specifies whether to enable automigrations.
@@ -66,11 +66,9 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 	}
 
 	if p.config.Dir == "" {
-		if p.config.TemplateLang == TemplateLangJS {
-			p.config.Dir = filepath.Join(p.app.DataDir(), "../hz_migrations")
-		} else {
-			p.config.Dir = filepath.Join(p.app.DataDir(), "../migrations")
-		}
+		// Both Go and JS migrations live in the one "migrations" sibling of
+		// the data dir (i.e. base_/migrations). One namespace, one path.
+		p.config.Dir = filepath.Join(p.app.DataDir(), "../migrations")
 	}
 
 	// attach the migrate command

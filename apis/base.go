@@ -49,6 +49,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	app.Logger().Info("base: API mount prefix", "prefix", prefix)
 
 	apiGroup := baseRouter.Group(prefix)
+	bindSQLApi(app, apiGroup)
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)

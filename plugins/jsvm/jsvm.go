@@ -68,7 +68,7 @@ type Config struct {
 
 	// HooksDir specifies the JS app hooks directory.
 	//
-	// If not set it fallbacks to a relative "hz_data/../hz_hooks" directory.
+	// If not set it fallbacks to a relative "data/../hooks" directory.
 	HooksDir string
 
 	// HooksFilesPattern specifies a regular expression pattern that
@@ -87,7 +87,7 @@ type Config struct {
 
 	// MigrationsDir specifies the JS migrations directory.
 	//
-	// If not set it fallbacks to a relative "hz_data/../hz_migrations" directory.
+	// If not set it fallbacks to a relative "data/../migrations" directory.
 	MigrationsDir string
 
 	// If not set it fallbacks to `^.*(\.js|\.ts)$`, aka. any MigrationDir file
@@ -97,7 +97,7 @@ type Config struct {
 	// TypesDir specifies the directory where to store the embedded
 	// TypeScript declarations file.
 	//
-	// If not set it fallbacks to "hz_data".
+	// If not set it fallbacks to "data".
 	//
 	// Note: Avoid using the same directory as the HooksDir when HooksWatch is enabled
 	// to prevent unnecessary app restarts when the types file is initially created.
@@ -126,11 +126,11 @@ func Register(app core.App, config Config) error {
 	p := &plugin{app: app, config: config}
 
 	if p.config.HooksDir == "" {
-		p.config.HooksDir = filepath.Join(app.DataDir(), "../hz_hooks")
+		p.config.HooksDir = filepath.Join(app.DataDir(), "../hooks")
 	}
 
 	if p.config.MigrationsDir == "" {
-		p.config.MigrationsDir = filepath.Join(app.DataDir(), "../hz_migrations")
+		p.config.MigrationsDir = filepath.Join(app.DataDir(), "../migrations")
 	}
 
 	if p.config.HooksFilesPattern == "" {
