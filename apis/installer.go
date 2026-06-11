@@ -44,8 +44,8 @@ func loadInstaller(
 ) error {
 	// IAM is the only auth source — once the platform plugin marks the
 	// store as external-only, the local "first superuser" installer is
-	// moot. IAM seeds the superuser via EMBEDDED_IAM_ROOT_EMAIL (embedded
-	// mode) or via the upstream IAM tenant (external mode).
+	// moot. The superuser is whoever IAM issues an admin-claim token to;
+	// Base never seeds one locally.
 	if externalOnly, _ := app.Store().Get(StoreKeyExternalAuthOnly).(bool); externalOnly {
 		return nil
 	}
