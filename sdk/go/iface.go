@@ -15,7 +15,7 @@ import (
 // to a single Base instance (one URL); multi-instance fan-out is the
 // caller's concern.
 type Client interface {
-	// Kind reports the backend identifier (hanzo-base | pocketbase).
+	// Kind reports the backend identifier (e.g. "hanzo-base").
 	Kind() string
 
 	// Authenticate exchanges a user identity for a session token. Empty

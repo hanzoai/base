@@ -43,8 +43,9 @@ const (
 
 	LocalStorageDirName       string = "storage"
 	LocalBackupsDirName       string = "backups"
-	LocalTempDirName          string = ".hz_temp_to_delete" // temp hz_data sub directory that will be deleted on each app.Bootstrap()
+	LocalTempDirName          string = ".temp_to_delete" // temp data sub directory that will be deleted on each app.Bootstrap()
 	LocalAutocertCacheDirName string = ".autocert_cache"
+	LocalNotifyDirName        string = ".notify" // optional watched directory used to synchronize runtime state between multiple instances sharing one data dir
 
 	// @todo consider removing after backups refactoring
 	lostFoundDirName string = "lost+found"
@@ -488,7 +489,7 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
-		// try to cleanup the hz_data temp directory (if any)
+		// try to cleanup the data temp directory (if any)
 		_ = os.RemoveAll(filepath.Join(app.DataDir(), LocalTempDirName))
 
 		return nil
@@ -1528,6 +1529,7 @@ func (app *BaseApp) registerBaseHooks() {
 	app.registerCollectionHooks()
 	app.registerRecordHooks()
 	app.registerSuperuserHooks()
+	app.registerNotifyWatcherHooks()
 }
 
 // getLoggerMinLevel returns the logger min level based on the

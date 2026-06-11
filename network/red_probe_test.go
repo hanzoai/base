@@ -190,28 +190,40 @@ func TestRedProbe_SelfForgedLocalSeqOverflow(t *testing.T) {
 		"txseq cookies while holding stale state.", sh.LocalSeq(), wildSeq)
 }
 
-// TestRedProbe_UnboundedBacklog drives the archive writer with a uploader
-// that always fails. The writer re-buffers every segment forever. Memory
-// grows without bound — no cap on backlog size or lag bytes. A hostile
-// backend (S3 outage, bucket deleted, creds revoked) turns into an OOM.
-func TestRedProbe_UnboundedBacklog(t *testing.T) {
-	fail := &failingUploader{}
-	w := newArchiveWriter(fail, "svc", ArchiveConfig{
+// TestRedProbe_BacklogCapEnforced drives the archive writer with an
+// uploader that always fails, so every segment is re-buffered. The
+// red-team finding this defends against was an unbounded per-shard
+// backlog: a hostile backend (S3 outage, bucket deleted, creds revoked)
+// could grow memory until OOM. The blue fix is the BacklogMaxBytes /
+// BacklogMaxSegments cap in enforceBacklogCapLocked, which sheds the
+// oldest segment (counted on IncDrops) once the cap is crossed.
+//
+// This test pins a deliberately tiny cap, floods 4000 segments at it,
+// and asserts the backlog stays bounded by the cap and that drops were
+// observed. Liveness-over-durability: the process survives a hostile
+// backend by shedding the oldest buffered data, not by OOMing.
+func TestRedProbe_BacklogCapEnforced(t *testing.T) {
+	const capBytes = 8 * 1024 // 8 KiB — small enough to trip well before OOM
+
+	var drops atomic.Uint64
+	w := newArchiveWriter(&failingUploader{}, "svc", ArchiveConfig{
 		SegmentTargetBytes: 64,
 		FlushInterval:      5 * time.Millisecond,
 		RetryDeadline:      50 * time.Millisecond, // short so we don't wait forever
-	}, nil)
+		BacklogMaxBytes:    capBytes,
+	}, &ArchiveMetrics{IncDrops: func() { drops.Add(1) }})
 	t.Cleanup(func() { _ = w.Close() })
 
 	ctx := context.Background()
-	for i := uint64(1); i <= 2000; i++ {
+	for i := uint64(1); i <= 4000; i++ {
 		f := newFrame("shard-A", i, i-1,
 			[]byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
 		if err := w.Append(ctx, "shard-A", i, f.encode()); err != nil {
 			t.Fatalf("append: %v", err)
 		}
 	}
-	// Let the flush loop churn.
+	// Let the flush loop churn so the failing uploader re-buffers and the
+	// cap sheds repeatedly.
 	time.Sleep(1200 * time.Millisecond)
 
 	w.mu.Lock()
@@ -223,39 +235,21 @@ func TestRedProbe_UnboundedBacklog(t *testing.T) {
 	}
 	w.mu.Unlock()
 
-	t.Logf("after 2000 appends against failing uploader: "+
-		"backlog=%d segments, bytes=%d", backlogLen, totalBytes)
-	if backlogLen < 10 {
-		t.Fatalf("backlog did not accumulate as expected (%d) — "+
-			"test needs revisiting", backlogLen)
+	t.Logf("after 4000 appends against a failing uploader: "+
+		"backlog=%d segments, bytes=%d, drops=%d", backlogLen, totalBytes, drops.Load())
+
+	// The defense: backlog bytes stay within the cap (plus at most one
+	// in-flight segment that pushed it over before the shed), never the
+	// ~1 MB an uncapped writer would hold.
+	if totalBytes > capBytes+w.cfg.SegmentTargetBytes {
+		t.Fatalf("backlog exceeded cap: %d bytes > cap %d (+1 segment %d) — "+
+			"enforceBacklogCapLocked is not bounding memory",
+			totalBytes, capBytes, w.cfg.SegmentTargetBytes)
 	}
-	// Demonstrate no cap: even under persistent failure, we can just keep
-	// pushing until RAM runs out.
-	for i := uint64(2001); i <= 4000; i++ {
-		f := newFrame("shard-A", i, i-1,
-			[]byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"))
-		if err := w.Append(ctx, "shard-A", i, f.encode()); err != nil {
-			t.Fatalf("append: %v", err)
-		}
-	}
-	w.mu.Lock()
-	q = w.shards["shard-A"]
-	newLen := len(q.backlog)
-	newBytes := 0
-	for _, b := range q.backlog {
-		newBytes += len(b.data)
-	}
-	w.mu.Unlock()
-	if newBytes <= totalBytes {
-		t.Fatalf("backlog bytes did not grow under continued input: was %d, now %d",
-			totalBytes, newBytes)
-	}
-	t.Logf("UNBOUNDED: after 4000 appends: backlog=%d segments, bytes=%d (no cap enforced)",
-		newLen, newBytes)
-	// Fail loudly so this shows up in the suite output.
-	if newBytes > 10_000 {
-		t.Fatalf("unbounded per-shard backlog (%d bytes). Under a real "+
-			"hostile backend this grows until OOM", newBytes)
+	// And the shed actually fired — otherwise the bound above is vacuous.
+	if drops.Load() == 0 {
+		t.Fatalf("no drops recorded despite flooding past the %d-byte cap — "+
+			"the cap is not being enforced", capBytes)
 	}
 }
 
@@ -320,11 +314,13 @@ func TestRedProbe_ArchiveForgedSegment(t *testing.T) {
 		t.Fatalf("put evil: %v", err)
 	}
 
-	// PITR driver reads frames back and replays them. The .Range iterator
-	// yields the injected frame because the CRC passes (attacker wrote a
-	// well-formed segment) and Frame.Valid() passes (attacker computed
-	// their own payload hash). There is nothing the reader can check
-	// against — the archive has no author-signed manifest.
+	// PITR driver reads frames back and replays them. The CRC-32 footer is
+	// not a MAC and Frame.Valid() only checks the attacker's own payload
+	// hash, so neither stops a forgery. The blue defense is the per-segment
+	// Ed25519 signature: decodeSegment(data, w.verifier) in the Range path
+	// rejects any segment not signed by a trusted key, and the attacker's
+	// key is not in the writer's trust set. The forged seq=5000 must be
+	// skipped; only the legitimate history (1..10) is yielded.
 	it, err := w.Range(ctx, "victim-shard", 1, 6000)
 	if err != nil {
 		t.Fatalf("range: %v", err)
@@ -339,17 +335,15 @@ func TestRedProbe_ArchiveForgedSegment(t *testing.T) {
 		}
 		seen = append(seen, f.Seq)
 	}
-	found5000 := false
 	for _, s := range seen {
 		if s == 5000 {
-			found5000 = true
-			break
+			t.Fatalf("FORGERY ACCEPTED: attacker-signed seq=5000 survived Range "+
+				"verification; segment signature trust set is not being enforced. "+
+				"Seqs returned: %v", seen)
 		}
 	}
-	if !found5000 {
-		t.Fatalf("expected injected seq 5000 in Range output (seen %v)", seen)
+	// Legitimate, writer-signed history must remain fully readable.
+	if len(seen) != 10 {
+		t.Fatalf("expected the 10 legitimate frames (1..10) to verify, got %v", seen)
 	}
-	t.Fatalf("EXPLOIT: forged segment (seq=5000, payload='INJECTED-PITR-ROWS') "+
-		"accepted by Range; PITR restore will write attacker bytes into "+
-		"the reconstructed SQLite. All seqs returned: %v", seen)
 }

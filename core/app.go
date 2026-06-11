@@ -120,7 +120,7 @@ type App interface {
 	// ReloadSettings reinitializes and reloads the stored application settings.
 	ReloadSettings() error
 
-	// CreateBackup creates a new backup of the current app hz_data directory.
+	// CreateBackup creates a new backup of the current app data directory.
 	//
 	// Backups can be stored on S3 if it is configured in app.Settings().Backups.
 	//
@@ -132,7 +132,7 @@ type App interface {
 	// the current running application process.
 	//
 	// The safely perform the restore it is recommended to have free disk space
-	// for at least 2x the size of the restored hz_data backup.
+	// for at least 2x the size of the restored data backup.
 	//
 	// Please refer to the godoc of the specific core.App implementation
 	// for details on the restore procedures.
