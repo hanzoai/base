@@ -24,16 +24,9 @@ func TestAutomigrateCollectionCreate(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../hz_data/types.d.ts" />
+/// <reference path="../data/types.d.ts" />
 migrate((app) => {
   const collection = new Collection({
-    "authAlert": {
-      "emailTemplate": {
-        "body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location:</p>\n<p><em>{ALERT_INFO}</em></p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>If this was you, you may disregard this email.</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-        "subject": "Login from a new location"
-      },
-      "enabled": true
-    },
     "authRule": "",
     "authToken": {
       "duration": 604800
@@ -61,19 +54,6 @@ migrate((app) => {
         "required": true,
         "system": true,
         "type": "text"
-      },
-      {
-        "cost": 0,
-        "hidden": true,
-        "id": "password@TEST_RANDOM",
-        "max": 0,
-        "min": 8,
-        "name": "password",
-        "pattern": "",
-        "presentable": false,
-        "required": true,
-        "system": true,
-        "type": "password"
       },
       {
         "autogeneratePattern": "[a-zA-Z0-9]{50}",
@@ -122,19 +102,14 @@ migrate((app) => {
     "fileToken": {
       "duration": 180
     },
-    "id": "@TEST_RANDOM",
+    "id": "hbc_@TEST_RANDOM",
     "indexes": [
       "create index test on new_name (id)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_@TEST_RANDOM` + "`" + ` ON ` + "`" + `new_name` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_email_@TEST_RANDOM` + "`" + ` ON ` + "`" + `new_name` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
+      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `new_name` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
+      "CREATE UNIQUE INDEX ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `new_name` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
     ],
     "listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "`" + `test' = 0",
     "manageRule": "1 != 2",
-    "mfa": {
-      "duration": 1800,
-      "enabled": false,
-      "rule": ""
-    },
     "name": "new_name",
     "oauth2": {
       "enabled": false,
@@ -144,28 +119,6 @@ migrate((app) => {
         "name": "",
         "username": ""
       }
-    },
-    "otp": {
-      "duration": 180,
-      "emailTemplate": {
-        "body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-        "subject": "OTP for {APP_NAME}"
-      },
-      "enabled": false,
-      "length": 8
-    },
-    "passwordAuth": {
-      "enabled": true,
-      "identityFields": [
-        "email"
-      ]
-    },
-    "passwordResetToken": {
-      "duration": 1800
-    },
-    "resetPasswordTemplate": {
-      "body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-      "subject": "Reset your {APP_NAME} password"
     },
     "system": true,
     "type": "auth",
@@ -182,7 +135,7 @@ migrate((app) => {
 
   return app.save(collection);
 }, (app) => {
-  const collection = app.findCollectionByNameOrId("@TEST_RANDOM");
+  const collection = app.findCollectionByNameOrId("hbc_@TEST_RANDOM");
 
   return app.delete(collection);
 })
@@ -203,13 +156,6 @@ import (
 func init() {
 	m.Register(func(app core.App) error {
 		jsonData := ` + "`" + `{
-			"authAlert": {
-				"emailTemplate": {
-					"body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location:</p>\n<p><em>{ALERT_INFO}</em></p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>If this was you, you may disregard this email.</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-					"subject": "Login from a new location"
-				},
-				"enabled": true
-			},
 			"authRule": "",
 			"authToken": {
 				"duration": 604800
@@ -237,19 +183,6 @@ func init() {
 					"required": true,
 					"system": true,
 					"type": "text"
-				},
-				{
-					"cost": 0,
-					"hidden": true,
-					"id": "password@TEST_RANDOM",
-					"max": 0,
-					"min": 8,
-					"name": "password",
-					"pattern": "",
-					"presentable": false,
-					"required": true,
-					"system": true,
-					"type": "password"
 				},
 				{
 					"autogeneratePattern": "[a-zA-Z0-9]{50}",
@@ -298,19 +231,14 @@ func init() {
 			"fileToken": {
 				"duration": 180
 			},
-			"id": "@TEST_RANDOM",
+			"id": "hbc_@TEST_RANDOM",
 			"indexes": [
 				"create index test on new_name (id)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_tokenKey_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `new_name` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `tokenKey` + "` + \"`\" + `" + `)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_email_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `new_name` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + `) WHERE ` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + ` != ''"
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `new_name` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `tokenKey` + "`" + ` + "` + "`" + `" + ` + "`" + `)",
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `new_name` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + `) WHERE ` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + ` != ''"
 			],
-			"listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "` + \"`\" + `" + `test' = 0",
+			"listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "`" + ` + "` + "`" + `" + ` + "`" + `test' = 0",
 			"manageRule": "1 != 2",
-			"mfa": {
-				"duration": 1800,
-				"enabled": false,
-				"rule": ""
-			},
 			"name": "new_name",
 			"oauth2": {
 				"enabled": false,
@@ -320,28 +248,6 @@ func init() {
 					"name": "",
 					"username": ""
 				}
-			},
-			"otp": {
-				"duration": 180,
-				"emailTemplate": {
-					"body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-					"subject": "OTP for {APP_NAME}"
-				},
-				"enabled": false,
-				"length": 8
-			},
-			"passwordAuth": {
-				"enabled": true,
-				"identityFields": [
-					"email"
-				]
-			},
-			"passwordResetToken": {
-				"duration": 1800
-			},
-			"resetPasswordTemplate": {
-				"body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-				"subject": "Reset your {APP_NAME} password"
 			},
 			"system": true,
 			"type": "auth",
@@ -363,7 +269,7 @@ func init() {
 
 		return app.Save(collection)
 	}, func(app core.App) error {
-		collection, err := app.FindCollectionByNameOrId("@TEST_RANDOM")
+		collection, err := app.FindCollectionByNameOrId("hbc_@TEST_RANDOM")
 		if err != nil {
 			return err
 		}
@@ -460,20 +366,13 @@ func TestAutomigrateCollectionDelete(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../hz_data/types.d.ts" />
+/// <reference path="../data/types.d.ts" />
 migrate((app) => {
-  const collection = app.findCollectionByNameOrId("@TEST_RANDOM");
+  const collection = app.findCollectionByNameOrId("hbc_@TEST_RANDOM");
 
   return app.delete(collection);
 }, (app) => {
   const collection = new Collection({
-    "authAlert": {
-      "emailTemplate": {
-        "body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location:</p>\n<p><em>{ALERT_INFO}</em></p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>If this was you, you may disregard this email.</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-        "subject": "Login from a new location"
-      },
-      "enabled": true
-    },
     "authRule": "",
     "authToken": {
       "duration": 604800
@@ -503,19 +402,6 @@ migrate((app) => {
         "type": "text"
       },
       {
-        "cost": 0,
-        "hidden": true,
-        "id": "password@TEST_RANDOM",
-        "max": 0,
-        "min": 8,
-        "name": "password",
-        "pattern": "",
-        "presentable": false,
-        "required": true,
-        "system": true,
-        "type": "password"
-      },
-      {
         "autogeneratePattern": "[a-zA-Z0-9]{50}",
         "hidden": true,
         "id": "text@TEST_RANDOM",
@@ -532,7 +418,7 @@ migrate((app) => {
       {
         "exceptDomains": null,
         "hidden": false,
-        "id": "email3885137012",
+        "id": "email@TEST_RANDOM",
         "name": "email",
         "onlyDomains": null,
         "presentable": false,
@@ -551,7 +437,7 @@ migrate((app) => {
       },
       {
         "hidden": false,
-        "id": "bool256245529",
+        "id": "bool@TEST_RANDOM",
         "name": "verified",
         "presentable": false,
         "required": false,
@@ -562,19 +448,14 @@ migrate((app) => {
     "fileToken": {
       "duration": 180
     },
-    "id": "@TEST_RANDOM",
+    "id": "hbc_@TEST_RANDOM",
     "indexes": [
       "create index test on test123 (id)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_email_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
+      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
+      "CREATE UNIQUE INDEX ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
     ],
     "listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "`" + `test' = 0",
     "manageRule": "1 != 2",
-    "mfa": {
-      "duration": 1800,
-      "enabled": false,
-      "rule": ""
-    },
     "name": "test123",
     "oauth2": {
       "enabled": false,
@@ -584,28 +465,6 @@ migrate((app) => {
         "name": "",
         "username": ""
       }
-    },
-    "otp": {
-      "duration": 180,
-      "emailTemplate": {
-        "body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-        "subject": "OTP for {APP_NAME}"
-      },
-      "enabled": false,
-      "length": 8
-    },
-    "passwordAuth": {
-      "enabled": true,
-      "identityFields": [
-        "email"
-      ]
-    },
-    "passwordResetToken": {
-      "duration": 1800
-    },
-    "resetPasswordTemplate": {
-      "body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-      "subject": "Reset your {APP_NAME} password"
     },
     "system": false,
     "type": "auth",
@@ -638,7 +497,7 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		collection, err := app.FindCollectionByNameOrId("@TEST_RANDOM")
+		collection, err := app.FindCollectionByNameOrId("hbc_@TEST_RANDOM")
 		if err != nil {
 			return err
 		}
@@ -646,13 +505,6 @@ func init() {
 		return app.Delete(collection)
 	}, func(app core.App) error {
 		jsonData := ` + "`" + `{
-			"authAlert": {
-				"emailTemplate": {
-					"body": "<p>Hello,</p>\n<p>We noticed a login to your {APP_NAME} account from a new location:</p>\n<p><em>{ALERT_INFO}</em></p>\n<p><strong>If this wasn't you, you should immediately change your {APP_NAME} account password to revoke access from all other locations.</strong></p>\n<p>If this was you, you may disregard this email.</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-					"subject": "Login from a new location"
-				},
-				"enabled": true
-			},
 			"authRule": "",
 			"authToken": {
 				"duration": 604800
@@ -682,19 +534,6 @@ func init() {
 					"type": "text"
 				},
 				{
-					"cost": 0,
-					"hidden": true,
-					"id": "password@TEST_RANDOM",
-					"max": 0,
-					"min": 8,
-					"name": "password",
-					"pattern": "",
-					"presentable": false,
-					"required": true,
-					"system": true,
-					"type": "password"
-				},
-				{
 					"autogeneratePattern": "[a-zA-Z0-9]{50}",
 					"hidden": true,
 					"id": "text@TEST_RANDOM",
@@ -711,7 +550,7 @@ func init() {
 				{
 					"exceptDomains": null,
 					"hidden": false,
-					"id": "email3885137012",
+					"id": "email@TEST_RANDOM",
 					"name": "email",
 					"onlyDomains": null,
 					"presentable": false,
@@ -730,7 +569,7 @@ func init() {
 				},
 				{
 					"hidden": false,
-					"id": "bool256245529",
+					"id": "bool@TEST_RANDOM",
 					"name": "verified",
 					"presentable": false,
 					"required": false,
@@ -741,19 +580,14 @@ func init() {
 			"fileToken": {
 				"duration": 180
 			},
-			"id": "@TEST_RANDOM",
+			"id": "hbc_@TEST_RANDOM",
 			"indexes": [
 				"create index test on test123 (id)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_tokenKey_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `tokenKey` + "` + \"`\" + `" + `)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_email_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + `) WHERE ` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + ` != ''"
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `tokenKey` + "`" + ` + "` + "`" + `" + ` + "`" + `)",
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + `) WHERE ` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + ` != ''"
 			],
-			"listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "` + \"`\" + `" + `test' = 0",
+			"listRule": "@request.auth.id != '' && 1 > 0 || 'backtick` + "`" + ` + "` + "`" + `" + ` + "`" + `test' = 0",
 			"manageRule": "1 != 2",
-			"mfa": {
-				"duration": 1800,
-				"enabled": false,
-				"rule": ""
-			},
 			"name": "test123",
 			"oauth2": {
 				"enabled": false,
@@ -763,28 +597,6 @@ func init() {
 					"name": "",
 					"username": ""
 				}
-			},
-			"otp": {
-				"duration": 180,
-				"emailTemplate": {
-					"body": "<p>Hello,</p>\n<p>Your one-time password is: <strong>{OTP}</strong></p>\n<p><i>If you didn't ask for the one-time password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-					"subject": "OTP for {APP_NAME}"
-				},
-				"enabled": false,
-				"length": 8
-			},
-			"passwordAuth": {
-				"enabled": true,
-				"identityFields": [
-					"email"
-				]
-			},
-			"passwordResetToken": {
-				"duration": 1800
-			},
-			"resetPasswordTemplate": {
-				"body": "<p>Hello,</p>\n<p>Click on the button below to reset your password.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-password-reset/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Reset password</a>\n</p>\n<p><i>If you didn't ask to reset your password, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
-				"subject": "Reset your {APP_NAME} password"
 			},
 			"system": false,
 			"type": "auth",
@@ -892,9 +704,9 @@ func TestAutomigrateCollectionUpdate(t *testing.T) {
 		{
 			migratecmd.TemplateLangJS,
 			`
-/// <reference path="../hz_data/types.d.ts" />
+/// <reference path="../data/types.d.ts" />
 migrate((app) => {
-  const collection = app.findCollectionByNameOrId("@TEST_RANDOM")
+  const collection = app.findCollectionByNameOrId("hbc_@TEST_RANDOM")
 
   // update collection data
   unmarshal({
@@ -905,8 +717,8 @@ migrate((app) => {
     },
     "indexes": [
       "create index test1 on test123_update (f1_name)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123_update` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_email_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123_update` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
+      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123_update` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
+      "CREATE UNIQUE INDEX ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123_update` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
     ],
     "listRule": "@request.auth.id != ''",
     "name": "test123_update",
@@ -920,7 +732,7 @@ migrate((app) => {
   collection.fields.removeById("f3_id")
 
   // add field
-  collection.fields.addAt(8, new Field({
+  collection.fields.addAt(7, new Field({
     "autogeneratePattern": "",
     "hidden": false,
     "id": "f4_id",
@@ -936,7 +748,7 @@ migrate((app) => {
   }))
 
   // update field
-  collection.fields.addAt(7, new Field({
+  collection.fields.addAt(6, new Field({
     "hidden": false,
     "id": "f2_id",
     "max": null,
@@ -951,7 +763,7 @@ migrate((app) => {
 
   return app.save(collection)
 }, (app) => {
-  const collection = app.findCollectionByNameOrId("@TEST_RANDOM")
+  const collection = app.findCollectionByNameOrId("hbc_@TEST_RANDOM")
 
   // update collection data
   unmarshal({
@@ -962,8 +774,8 @@ migrate((app) => {
     },
     "indexes": [
       "create index test1 on test123 (f1_name)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
-      "CREATE UNIQUE INDEX ` + "`" + `idx_email_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
+      "CREATE UNIQUE INDEX ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `tokenKey` + "`" + `)",
+      "CREATE UNIQUE INDEX ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` ON ` + "`" + `test123` + "`" + ` (` + "`" + `email` + "`" + `) WHERE ` + "`" + `email` + "`" + ` != ''"
     ],
     "listRule": "@request.auth.id != '' && 1 != 2",
     "name": "test123",
@@ -974,7 +786,7 @@ migrate((app) => {
   }, collection)
 
   // add field
-  collection.fields.addAt(8, new Field({
+  collection.fields.addAt(7, new Field({
     "hidden": false,
     "id": "f3_id",
     "name": "f3_name",
@@ -988,7 +800,7 @@ migrate((app) => {
   collection.fields.removeById("f4_id")
 
   // update field
-  collection.fields.addAt(7, new Field({
+  collection.fields.addAt(6, new Field({
     "hidden": false,
     "id": "f2_id",
     "max": null,
@@ -1003,7 +815,6 @@ migrate((app) => {
 
   return app.save(collection)
 })
-
 `,
 		},
 		{
@@ -1020,7 +831,7 @@ import (
 
 func init() {
 	m.Register(func(app core.App) error {
-		collection, err := app.FindCollectionByNameOrId("@TEST_RANDOM")
+		collection, err := app.FindCollectionByNameOrId("hbc_@TEST_RANDOM")
 		if err != nil {
 			return err
 		}
@@ -1034,8 +845,8 @@ func init() {
 			},
 			"indexes": [
 				"create index test1 on test123_update (f1_name)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_tokenKey_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123_update` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `tokenKey` + "` + \"`\" + `" + `)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_email_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123_update` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + `) WHERE ` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + ` != ''"
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123_update` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `tokenKey` + "`" + ` + "` + "`" + `" + ` + "`" + `)",
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123_update` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + `) WHERE ` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + ` != ''"
 			],
 			"listRule": "@request.auth.id != ''",
 			"name": "test123_update",
@@ -1051,14 +862,14 @@ func init() {
 		collection.Fields.RemoveById("f3_id")
 
 		// add field
-		if err := collection.Fields.AddMarshaledJSONAt(8, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
 			"autogeneratePattern": "",
 			"hidden": false,
 			"id": "f4_id",
 			"max": 0,
 			"min": 0,
 			"name": "f4_name",
-			"pattern": "` + "` + \"`\" + `" + `test backtick` + "` + \"`\" + `" + `123",
+			"pattern": "` + "`" + ` + "` + "`" + `" + ` + "`" + `test backtick` + "`" + ` + "` + "`" + `" + ` + "`" + `123",
 			"presentable": false,
 			"primaryKey": false,
 			"required": false,
@@ -1069,7 +880,7 @@ func init() {
 		}
 
 		// update field
-		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(6, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f2_id",
 			"max": null,
@@ -1086,7 +897,7 @@ func init() {
 
 		return app.Save(collection)
 	}, func(app core.App) error {
-		collection, err := app.FindCollectionByNameOrId("@TEST_RANDOM")
+		collection, err := app.FindCollectionByNameOrId("hbc_@TEST_RANDOM")
 		if err != nil {
 			return err
 		}
@@ -1100,8 +911,8 @@ func init() {
 			},
 			"indexes": [
 				"create index test1 on test123 (f1_name)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_tokenKey_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `tokenKey` + "` + \"`\" + `" + `)",
-				"CREATE UNIQUE INDEX ` + "` + \"`\" + `" + `idx_email_@TEST_RANDOM` + "` + \"`\" + `" + ` ON ` + "` + \"`\" + `" + `test123` + "` + \"`\" + `" + ` (` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + `) WHERE ` + "` + \"`\" + `" + `email` + "` + \"`\" + `" + ` != ''"
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_tokenKey_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `tokenKey` + "`" + ` + "` + "`" + `" + ` + "`" + `)",
+				"CREATE UNIQUE INDEX ` + "`" + ` + "` + "`" + `" + ` + "`" + `idx_email_hbc_@TEST_RANDOM` + "`" + ` + "` + "`" + `" + ` + "`" + ` ON ` + "`" + ` + "` + "`" + `" + ` + "`" + `test123` + "`" + ` + "` + "`" + `" + ` + "`" + ` (` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + `) WHERE ` + "`" + ` + "` + "`" + `" + ` + "`" + `email` + "`" + ` + "` + "`" + `" + ` + "`" + ` != ''"
 			],
 			"listRule": "@request.auth.id != '' && 1 != 2",
 			"name": "test123",
@@ -1114,7 +925,7 @@ func init() {
 		}
 
 		// add field
-		if err := collection.Fields.AddMarshaledJSONAt(8, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f3_id",
 			"name": "f3_name",
@@ -1130,7 +941,7 @@ func init() {
 		collection.Fields.RemoveById("f4_id")
 
 		// update field
-		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(6, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f2_id",
 			"max": null,

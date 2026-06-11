@@ -113,7 +113,6 @@ func createTestSuperusers(app App, total int) error {
 	for i := range total {
 		superuser := NewRecord(superusersCollection)
 		superuser.SetEmail("test" + strconv.Itoa(i+1) + "@example.com")
-		superuser.SetRandomPassword()
 
 		if err := app.Save(superuser); err != nil {
 			return err

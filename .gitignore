@@ -37,3 +37,9 @@ AGENTS.md
 GEMINI.md
 QWEN.md
 *.test
+
+# Base runtime namespace dir (data/migrations/hooks/types) — never committed
+/base_/
+# legacy data dirs (pre base_/ namespace) — never resurrect
+/hz_data/
+/pb_data/

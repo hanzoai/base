@@ -7,7 +7,7 @@
 //   - DeleteSecret(orgId, secretPath) — remove a per-org credential
 //
 // All three route to the canonical Hanzo KMS surface owned by
-// `github.com/hanzoai/kms/pkg/kmsclient`, which itself picks between
+// `github.com/hanzoai/kms/sdk/go/kmsclient`, which itself picks between
 // HTTP (IAM bearer) and ZAP-native (NodeID ACL) based on the endpoint
 // scheme. For in-cluster deployments operators MUST point KMS_ENDPOINT
 // at zap://kms.hanzo.svc.cluster.local:9999 — the HTTP path stays as
@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hanzoai/kms/pkg/kmsclient"
+	"github.com/hanzoai/kms/sdk/go/kmsclient"
 )
 
 const secretCacheTTL = 1 * time.Minute
