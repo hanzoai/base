@@ -94,7 +94,7 @@ require (
 	github.com/luxfi/address v1.0.1 // indirect
 	github.com/luxfi/compress v0.0.5 // indirect
 	github.com/luxfi/concurrent v0.0.3 // indirect
-	github.com/luxfi/constants v1.5.8-0.20260603055356-93c2c2ceb9ca // indirect
+	github.com/luxfi/constants v1.5.8 // indirect
 	github.com/luxfi/container v0.0.4 // indirect
 	github.com/luxfi/corona v0.7.6 // indirect
 	github.com/luxfi/crypto/ipa v1.2.4 // indirect
@@ -123,7 +123,6 @@ require (
 	github.com/nats-io/nkeys v0.4.15 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/philhofer/fwd v1.2.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/psanford/sqlite3vfs v0.0.0-20251127171934-4e34e03a991a // indirect
@@ -131,7 +130,6 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
-	github.com/superfly/ltx v0.5.1 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
@@ -175,7 +173,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/luxfi/crypto v1.19.17
+	github.com/luxfi/crypto v1.19.17 // indirect
 	github.com/luxfi/ids v1.2.15 // indirect
 	github.com/luxfi/math v1.4.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
@@ -189,7 +187,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_model v0.6.2
+	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -214,14 +212,7 @@ require (
 )
 
 // HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
-// Pinned to v0.0.0 + local replace until cloud and zip publish stable tags;
-// matches the kms / vfs convention (see hanzoai/kms go.mod).
 require (
-	github.com/hanzoai/cloud v0.0.0
-	github.com/hanzoai/zip v0.1.0
-)
-
-replace (
-	github.com/hanzoai/cloud => ../cloud
-	github.com/hanzoai/zip => ../zip
+	github.com/hanzoai/cloud v0.1.1
+	github.com/hanzoai/zip v0.2.0
 )
