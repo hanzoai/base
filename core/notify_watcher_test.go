@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/store"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/store"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -18,7 +18,7 @@ func TestNotifyWatcher_SettingsUpdate(t *testing.T) {
 
 	testEvents := store.New[core.App, int](nil)
 
-	tmpDir, err := os.MkdirTemp("", "pb_notify_test*")
+	tmpDir, err := os.MkdirTemp("", "hz_notify_test*")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestNotifyWatcher_SettingsUpdate(t *testing.T) {
 	})
 
 	// updating app1 settings should trigger a reload in app2
-	app1.Settings().SuperuserIPs = []string{"127.0.0.1"}
+	app1.Settings().Meta.AppName = "notify-probe"
 	if err := app1.Save(app1.Settings()); err != nil {
 		t.Fatal(err)
 	}
@@ -77,16 +77,15 @@ func TestNotifyWatcher_SettingsUpdate(t *testing.T) {
 		t.Fatalf("Expected 1 app2 event, got %d", app2Total)
 	}
 
-	app2SuperuserIPs := app2.Settings().SuperuserIPs
-	if len(app2SuperuserIPs) != 1 || app2SuperuserIPs[0] != "127.0.0.1" {
-		t.Fatalf("Expected exactly 127.0.0.1 superuser IP in app2 settings event, got %v", app2SuperuserIPs)
+	if name := app2.Settings().Meta.AppName; name != "notify-probe" {
+		t.Fatalf("Expected app2 settings event to carry AppName %q, got %q", "notify-probe", name)
 	}
 }
 
 func TestNotifyWatcher_CollectionsUpdate(t *testing.T) {
 	t.Parallel()
 
-	tmpDir, err := os.MkdirTemp("", "pb_notify_test*")
+	tmpDir, err := os.MkdirTemp("", "hz_notify_test*")
 	if err != nil {
 		t.Fatal(err)
 	}

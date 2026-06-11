@@ -9,11 +9,18 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/security"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/security"
 )
 
-const systemHookIdNotifyWatcher = "__pbNotifyWatcherSystemHook__"
+const systemHookIdNotifyWatcher = "__hzNotifyWatcherSystemHook__"
+
+// notifyFileTTL is how long a notify file stays on disk before cleanup.
+// kqueue-backed watchers (macOS) detect directory children by rescanning
+// on dir-change events — a file created and unlinked within one scan
+// window is never observed, so the signal file must outlive the watcher
+// latency (event delivery + 50ms debounce).
+const notifyFileTTL = 200 * time.Millisecond
 
 func (app *BaseApp) registerNotifyWatcherHooks() {
 	var notifyWatcher *fsnotify.Watcher
@@ -75,7 +82,7 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 			if err := os.WriteFile(settingsFile, nil, 0644); err != nil {
 				e.App.Logger().Warn("Failed to write watcher file", "error", err, "file", settingsFile)
 			}
-			_ = os.Remove(settingsFile)
+			time.AfterFunc(notifyFileTTL, func() { _ = os.Remove(settingsFile) })
 		}
 
 		return nil
@@ -102,7 +109,7 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 			if err := os.WriteFile(collectionsFile, nil, 0644); err != nil {
 				e.App.Logger().Warn("Failed to write watcher file", "error", err, "file", collectionsFile)
 			}
-			_ = os.Remove(collectionsFile)
+			time.AfterFunc(notifyFileTTL, func() { _ = os.Remove(collectionsFile) })
 		}
 
 		return nil

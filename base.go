@@ -51,7 +51,7 @@ type Config struct {
 
 	// optional default values for the console flags
 	DefaultDev           bool
-	DefaultDataDir       string // if not set, it will fallback to "./data"
+	DefaultDataDir       string // if not set, it will fallback to "./base_/data"
 	DefaultEncryptionEnv string
 	DefaultQueryTimeout  time.Duration // default to core.DefaultQueryTimeout (in seconds)
 
@@ -89,15 +89,16 @@ func New() *Base {
 func NewWithConfig(config Config) *Base {
 	// initialize a default data directory based on the executable baseDir
 	if config.DefaultDataDir == "" {
-		// DATA_DIR env wins over the $CWD/data fallback so operator-managed
+		// DATA_DIR env wins over the $CWD/base_/data fallback so operator-managed
 		// pods with readOnlyRootFilesystem don't panic trying to create the
 		// data dir next to the binary. The --dir CLI flag still wins over
-		// both (explicit > env > default).
+		// both (explicit > env > default). The "base_" namespace dir holds
+		// the app's data/, migrations/ and hooks/ siblings — one place.
 		if env := os.Getenv("DATA_DIR"); env != "" {
 			config.DefaultDataDir = env
 		} else {
 			baseDir, _ := inspectRuntime()
-			config.DefaultDataDir = filepath.Join(baseDir, "data")
+			config.DefaultDataDir = filepath.Join(baseDir, "base_", "data")
 		}
 	}
 
@@ -184,7 +185,6 @@ func (base *Base) Start() error {
 	// register system commands
 	base.RootCmd.AddCommand(cmd.NewServeCommand(base, !base.hideStartBanner))
 	base.RootCmd.AddCommand(cmd.NewCLICommand())
-	base.RootCmd.AddCommand(cmd.NewIAMUserCommand(base))
 
 	return base.Execute()
 }

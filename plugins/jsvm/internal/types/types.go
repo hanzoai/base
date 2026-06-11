@@ -36,7 +36,7 @@ const heading = `
  * })
  * ` + "```" + `
  *
- * _Note that this method is available only in hz_hooks context._
+ * _Note that this method is available only in hooks context._
  *
  * @group Base
  */
@@ -55,7 +55,7 @@ declare function cronAdd(
  * cronRemove("hello")
  * ` + "```" + `
  *
- * _Note that this method is available only in hz_hooks context._
+ * _Note that this method is available only in hooks context._
  *
  * @group Base
  */
@@ -76,7 +76,7 @@ declare function cronRemove(jobId: string): void;
  * }, $apis.requireAuth())
  * ` + "```" + `
  *
- * _Note that this method is available only in hz_hooks context._
+ * _Note that this method is available only in hooks context._
  *
  * @group Base
  */
@@ -100,7 +100,7 @@ declare function routerAdd(
  * })
  * ` + "```" + `
  *
- * _Note that this method is available only in hz_hooks context._
+ * _Note that this method is available only in hooks context._
  *
  * @group Base
  */
@@ -111,7 +111,7 @@ declare function routerUse(...middlewares: Array<string|((e: core.RequestEvent) 
 // -------------------------------------------------------------------
 
 /**
- * Global helper variable that contains the absolute path to the app hz_hooks directory.
+ * Global helper variable that contains the absolute path to the app hooks directory.
  *
  * @group Base
  */
@@ -135,7 +135,7 @@ type Base = excludeHooks<ORIGINAL_HANZOBASE>
  * ` + "`$app`" + ` is the current running Base instance that is globally
  * available in each .base.js file.
  *
- * _Note that this variable is available only in hz_hooks context._
+ * _Note that this variable is available only in hooks context._
  *
  * @namespace
  * @group Base
@@ -1254,7 +1254,7 @@ declare namespace $http {
 /**
  * Migrate defines a single migration upgrade/downgrade action.
  *
- * _Note that this method is available only in hz_migrations context._
+ * _Note that this method is available only in migrations context._
  *
  * @group Base
  */

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	metric "github.com/luxfi/metric"
-	dto "github.com/prometheus/client_model/go"
 )
 
 // memoryHub is a one-process transport mesh. Every node that joins the hub
@@ -233,9 +232,5 @@ func filter(all []string, drop string) []string {
 
 func counterVal(t *testing.T, c metric.Counter) float64 {
 	t.Helper()
-	var m dto.Metric
-	if err := c.Write(&m); err != nil {
-		t.Fatalf("counter Write: %v", err)
-	}
-	return m.GetCounter().GetValue()
+	return c.Get()
 }
