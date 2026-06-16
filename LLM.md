@@ -32,7 +32,34 @@ The server is a relay/index/cache layer, not the owner of truth.
 | zap | plugins/zap/ | ZAP transport (8.7us latency) |
 | platform | plugins/platform/ | Hanzo platform integration |
 | functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
-| jsvm | plugins/jsvm/ | JavaScript plugin VM |
+| jsvm | plugins/jsvm/ | JS hook host (.base.js hook files) — still goja-native |
+| gojavm | plugins/gojavm/ | `runtime: goja` extensions — delegates to zip's JSRuntime |
+
+## JS Runtime — ONE engine, via zip
+
+Per HIP-0106, there is exactly **one** goja engine in the stack:
+`github.com/hanzoai/zip/runtime` (`*runtime.JSRuntime`). base, cloud and
+every zip consumer share it.
+
+- `plugins/extruntime/` is the polyglot extension SPI
+  (`Runtime`/`Module`/`Loader`). zip re-exports `Loader`/`Module` as type
+  aliases of it — it is the seam, not duplication. pyvm/v8vm/wasmvm/
+  starkvm all implement it.
+- `plugins/gojavm/` is the **goja** implementation of that SPI. It no
+  longer carries its own goja pool / VM lifecycle — `NewRuntime()` builds
+  a `zipruntime.JSRuntime`, `Load` registers each extension's
+  (esbuild-bundled) source via `LoadModule`, and `Invoke` runs the fn
+  through `Eval`. gojavm owns only manifest loading, TS/JSX/ESM bundling
+  and the JSON-bytes wire.
+- `plugins/jsvm/` (the `.base.js` hook host) is unchanged — collapsing it
+  onto zip needs base's host-API binds lifted into zip first.
+
+Two thin shims remain in gojavm with `TODO(zip/runtime)` markers (tracked
+on hanzoai/zip PR #9): ctx-aware Eval, and multi-file bundling transpile.
+The HTTP layer stays on base's `tools/router` (PocketBase-native,
+`http.Handler` via `BuildMux`); cloud mounts it under `/v1/base/*` via
+`zip.AdaptNetHTTP` (see `cloud/mounts/base/mount.go`). A native-fiber
+rewrite of the router is a later, separate step.
 
 ## Vault SDK (plugins/vault/)
 
