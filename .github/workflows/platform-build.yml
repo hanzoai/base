@@ -1,0 +1,94 @@
+name: Platform Build (arcd executor)
+
+# Dispatched by platform.hanzo.ai (NOT by GitHub on push). Platform receives
+# the repo webhook, schedules the build, and triggers this workflow via
+# workflow_dispatch with the inputs below — pinning the arcd runner pool per
+# build target. On completion this workflow calls back into platform, which
+# records the outcome and (on success) rolls the image out via the operator.
+#
+# This is the per-repo half of the platform-native CI/CD escape from GHA as a
+# single point of failure. The build muscle still runs on self-hosted arcd.
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-job-id:
+        description: Platform buildJob id (echoed back on completion)
+        required: true
+      target:
+        description: "Build target, e.g. linux/amd64"
+        required: true
+      runner-pool:
+        description: "arcd pool label, e.g. hanzoai-linux-amd64"
+        required: true
+      image:
+        description: "Fully-resolved image ref, e.g. ghcr.io/hanzoai/zip:<sha>"
+        required: true
+      dockerfile:
+        description: Path to the Dockerfile
+        required: true
+        default: ./Dockerfile
+      context:
+        description: Build context
+        required: true
+        default: .
+      push:
+        description: Whether to push the built image
+        required: true
+        default: "true"
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner-pool }}
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: ${{ inputs.push == 'true' }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: ${{ inputs.push }}
+          tags: ${{ inputs.image }}
+          provenance: false
+
+      - name: Report success to platform
+        if: success()
+        env:
+          TOKEN: ${{ secrets.PLATFORM_BUILD_CALLBACK_TOKEN }}
+        run: |
+          curl -fsS -X POST "https://platform.hanzo.ai/v1/build-callback" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -nc \
+              --arg id '${{ inputs.build-job-id }}' \
+              --arg inst '${{ github.event.installation.id }}' \
+              --arg img '${{ inputs.image }}' \
+              '{buildJobId:$id, outcome:"success", installationId:$inst, log:("built "+$img)}')"
+
+      - name: Report failure to platform
+        if: failure()
+        env:
+          TOKEN: ${{ secrets.PLATFORM_BUILD_CALLBACK_TOKEN }}
+        run: |
+          curl -fsS -X POST "https://platform.hanzo.ai/v1/build-callback" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -nc \
+              --arg id '${{ inputs.build-job-id }}' \
+              --arg inst '${{ github.event.installation.id }}' \
+              '{buildJobId:$id, outcome:"failure", installationId:$inst, error:"build step failed"}')"
