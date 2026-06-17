@@ -1,0 +1,24 @@
+# Platform-native CI/CD — hanzoai/base
+#
+# Build+deploy intent owned by platform.hanzo.ai (NOT GitHub Actions).
+# On webhook, platform schedules these builds onto self-hosted arcd pools
+# and (on main) rolls the image onto the hanzo operator's `base` Service CR.
+# See platform docs/PLATFORM_CI.md for the schema reference.
+build:
+  matrix:
+    - { os: linux, arch: amd64 }
+    - { os: linux, arch: arm64 }
+  dockerfile: ./Dockerfile
+  context: .
+  image: ghcr.io/hanzoai/base
+  tag-pattern: "{{git.sha}}"
+  push: true
+deploy:
+  on:
+    - main
+  target:
+    cluster: hanzo-k8s
+    namespace: hanzo
+    operator: hanzo-operator
+    crd: Service
+    name: base
