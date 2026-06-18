@@ -27,7 +27,7 @@ require (
 	github.com/luxfi/consensus v1.25.15
 	github.com/luxfi/fhe v1.8.2
 	github.com/luxfi/log v1.4.3
-	github.com/luxfi/zap v0.8.1
+	github.com/luxfi/zap v0.8.8
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
