@@ -2,6 +2,7 @@ package zap
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
@@ -32,7 +33,11 @@ func MustRegisterWithConfig(app core.App, config Config) {
 			if err := e.Next(); err != nil {
 				return err
 			}
-			p.start()
+			// e.Next() drove the terminal OnServe handler that runs
+			// Router.BuildMux and assigns e.Server.Handler, so the
+			// fully-wrapped HTTP handler (all middleware + routes) is now
+			// populated and can be bridged onto the ZAP node.
+			p.start(e.Server.Handler)
 			return nil
 		},
 	})
@@ -54,7 +59,14 @@ type plugin struct {
 	handler *handler
 }
 
-func (p *plugin) start() {
+// start brings up the ZAP node and registers its message handlers.
+//
+// httpHandler is base's fully-wrapped HTTP handler (e.Server.Handler — the
+// Router.BuildMux output carrying every middleware and route). It is bridged
+// onto the same node via the canonical luxfi/zap/forward terminal so the ZAP
+// gateway can route /v1/base/* over MsgTypeForward. It may be nil; the bridge
+// then no-ops and the legacy ZAP handlers are unaffected.
+func (p *plugin) start(httpHandler http.Handler) {
 	p.logger = luxlog.New("component", "zap")
 	p.logger.Info("starting ZAP transport", "port", p.config.Port, "nodeID", p.config.NodeID)
 
@@ -82,6 +94,11 @@ func (p *plugin) start() {
 	p.node.Handle(MsgTypeRealtime, func(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
 		return p.handler.handleRealtime(ctx, from, msg)
 	})
+
+	// Canonical HTTP-over-ZAP terminal (MsgTypeForward 0x80) on the same node:
+	// bridges base's fully-wrapped HTTP handler so the ZAP gateway can route
+	// /v1/base/* here. Additive — distinct message type from the handlers above.
+	p.bridgeForward(httpHandler)
 
 	if err := p.node.Start(); err != nil {
 		p.logger.Error("failed to start ZAP node", "error", err)
