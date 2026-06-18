@@ -9,8 +9,17 @@
 FROM golang:1.26.4-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
+# Private cross-org modules (hanzoai/*, luxfi/* — luxfi/zap forward bridge) are
+# fetched via authenticated git, bypassing the public proxy. gh_token is the
+# shared docker-build.yml BuildKit secret; no-op when absent (local/dev).
+ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*,github.com/zap-proto/*
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=secret,id=gh_token \
+    if [ -s /run/secrets/gh_token ]; then \
+      git config --global url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf "https://github.com/"; \
+    fi && \
+    go mod download
 COPY . .
 
 # Per SCALE_STANDARD.md §2 — every Go production Dockerfile that
