@@ -1,3 +1,35 @@
+## v1.5.0 — bootnode plugin foundation
+
+Adds the bootnode blockchain developer platform as a Base plugin — the first cut
+of the Go port of the Python bootnode backend (`bootnode/api/`). Consolidates the
+Python service onto Base's IAM + per-org tenant infrastructure.
+
+The changelog below follows Keep a Changelog.
+
+### Added
+
+- `plugins/bootnode/`: blockchain developer platform. Mounts under `/v1` with 5
+  modules ported end-to-end: auth (multi-network OAuth2 with the lux-web3 shared
+  client id; bn_ project API keys hashed with salted SHA-256), team (org/member
+  CRUD), networks (bootno.de/v1 `Network` CRs), nodes (bootno.de/v1 `NodeFleet`
+  CRs), keys (bootno.de/v1 `KMSSecret` CRs — never stores plaintext key material).
+  Reuses `github.com/hanzoai/base/iam` for IAM token + pk-/sk-/hk- key resolution;
+  no identity is duplicated (no `users` collection — IAM owns users). Opt-in via
+  `BOOTNODE_ENABLED=true`.
+- `plugins/bootnode/kube/`: dependency-free Kubernetes REST client for
+  server-side-apply of namespaced custom resources. No client-go, no CGO. Resolves
+  cluster access via in-cluster service account or `KUBE_APISERVER`/`KUBE_TOKEN`.
+- `plugins/commerce/`: typed client for the Hanzo Commerce HTTP API (Square
+  billing), exposed as a `Client` interface so the bootnode plugin depends on the
+  billing surface, not its transport.
+- 11 SQLAlchemy models ported to Base collections (`_bootnode_projects`,
+  `_bootnode_api_keys`, `_bootnode_webhooks`, `_bootnode_webhook_deliveries`,
+  `_bootnode_usage`, `_bootnode_smart_wallets`, `_bootnode_team_members`,
+  `_bootnode_gas_policies`, `_bootnode_subscriptions`, `_bootnode_org_clusters`).
+  `OrgCluster` is the canonical org→k8s-cluster mapping.
+- `examples/base/main.go` now sets `PrincipalIsolation: "sqlite"` on the platform
+  plugin (per-org + per-user encrypted SQLite) and registers the bootnode plugin.
+
 ## v1.0.0 — IAM-native
 
 Hanzo Base v1.0.0 is the IAM-native 1.0 line. Local-password / OTP / MFA /
