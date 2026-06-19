@@ -31,6 +31,8 @@ The server is a relay/index/cache layer, not the owner of truth.
 | kms | plugins/kms/ | Client-side KMS integration (talks to K-Chain or cloud HSM) |
 | zap | plugins/zap/ | ZAP transport (8.7us latency) |
 | platform | plugins/platform/ | Hanzo platform integration |
+| bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
+| commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
 | functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
 | jsvm | plugins/jsvm/ | JS hook host (.base.js hook files) — still goja-native |
 | gojavm | plugins/gojavm/ | `runtime: goja` extensions — delegates to zip's JSRuntime |
