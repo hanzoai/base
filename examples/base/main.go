@@ -9,11 +9,12 @@ import (
 	"github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/plugins/bootnode"
+	"github.com/hanzoai/base/plugins/cloudsql"
+	"github.com/hanzoai/base/plugins/functions"
 	"github.com/hanzoai/base/plugins/ghupdate"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
-	"github.com/hanzoai/base/plugins/cloudsql"
-	"github.com/hanzoai/base/plugins/functions"
 	"github.com/hanzoai/base/plugins/platform"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
@@ -110,13 +111,23 @@ func main() {
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
 
-	// Multi-tenant platform (IAM + KMS integration)
+	// Multi-tenant platform (IAM + KMS integration).
+	// PrincipalIsolation="sqlite" gives every org its own encrypted Liquid SQL
+	// database and every user a per-user database (see plugins/platform/org_db.go).
+	// The bootnode plugin's collections are resolved per-org through this.
 	platform.MustRegister(app, platform.PlatformConfig{
-		IAMEndpoint:     os.Getenv("IAM_URL"),
-		KMSEndpoint:     os.Getenv("KMS_URL"),
-		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
-		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
+		IAMEndpoint:            os.Getenv("IAM_URL"),
+		KMSEndpoint:            os.Getenv("KMS_URL"),
+		IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
+		IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
+		PrincipalIsolation:     "sqlite",
+		PrincipalEncryptionKey: os.Getenv("PRINCIPAL_ENCRYPTION_KEY"),
 	})
+
+	// Bootnode blockchain developer platform (multi-network OAuth, project keys,
+	// teams, network/node/key provisioning via bootno.de CRDs). Opt-in via
+	// BOOTNODE_ENABLED=true. Reuses the platform's IAM + per-org isolation.
+	bootnode.MustRegister(app, bootnode.ConfigFromEnv())
 
 	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
 	cloudsql.MustRegister(app, cloudsql.Config{
