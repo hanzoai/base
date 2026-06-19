@@ -23,11 +23,24 @@ var NetworkClientIDs = map[string]string{
 	"hanzo": "lux-web3",
 }
 
+// apexNetworks maps a bare white-label apex (the brand's own TLD) to its
+// network slug. These hosts have no network subdomain to parse — the brand IS
+// the registrable domain. bootno.de is the canonical Bootnode brand and is
+// served on the Lux primary network, matching the Python oauth.py default.
+var apexNetworks = map[string]string{
+	"bootno.de": "lux",
+	"lux.cloud": "lux",
+	"zoo.cloud": "zoo",
+}
+
 // NetworkFromRedirectURI extracts the network slug from an OAuth redirect_uri.
 //
-//	https://cloud.lux.network/auth/callback   → "lux"
-//	https://cloud.hanzo.ai/auth/callback      → "hanzo"
-//	https://bootno.de/...                      → "lux" (primary brand)
+//	https://cloud.lux.network/auth/callback   → "lux"   (cloud.<net>.<tld>)
+//	https://web3.hanzo.ai/auth/callback       → "hanzo" (web3.<net>.<tld>)
+//	https://web3.zoo.ngo/auth/callback        → "zoo"
+//	https://lux.cloud/auth/callback           → "lux"   (apex brand)
+//	https://zoo.cloud/auth/callback           → "zoo"
+//	https://bootno.de/...                      → "lux"   (primary brand)
 //
 // Returns "" when no network can be derived.
 func NetworkFromRedirectURI(redirectURI string) string {
@@ -39,12 +52,14 @@ func NetworkFromRedirectURI(redirectURI string) string {
 	if host == "" {
 		return ""
 	}
-	if strings.Contains(host, "bootno.de") {
-		return "lux"
+	if net, ok := apexNetworks[host]; ok {
+		return net
 	}
 	parts := strings.Split(host, ".")
-	// cloud.<network>.<tld...> → parts[1] is the network.
-	if len(parts) >= 3 && parts[0] == "cloud" {
+	// <prefix>.<network>.<tld...> where prefix is a web entrypoint (cloud or
+	// web3) → parts[1] is the network. Both prefixes resolve to the same
+	// per-network IAM redirect; they are alternate brand surfaces.
+	if len(parts) >= 3 && (parts[0] == "cloud" || parts[0] == "web3") {
 		return parts[1]
 	}
 	return ""
