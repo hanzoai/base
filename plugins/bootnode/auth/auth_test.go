@@ -8,10 +8,18 @@ func TestNetworkFromRedirectURI(t *testing.T) {
 		"https://cloud.hanzo.ai/auth/callback":     "hanzo",
 		"https://cloud.zoo.network/auth/callback":  "zoo",
 		"https://cloud.pars.network/auth/callback": "pars",
-		"https://bootno.de/login":                  "lux",
-		"https://example.com/cb":                   "",
-		"not a url at all":                         "",
-		"":                                         "",
+		// web3.<network>.<tld> — the live production brand surfaces.
+		"https://web3.hanzo.ai/auth/callback":    "hanzo",
+		"https://web3.lux.network/auth/callback": "lux",
+		"https://web3.zoo.ngo/auth/callback":     "zoo",
+		"https://web3.pars.id/auth/callback":     "pars",
+		// Apex brand surfaces (the brand is the registrable domain).
+		"https://bootno.de/login":         "lux",
+		"https://lux.cloud/auth/callback": "lux",
+		"https://zoo.cloud/auth/callback": "zoo",
+		"https://example.com/cb":          "",
+		"not a url at all":                "",
+		"":                                "",
 	}
 	for uri, want := range cases {
 		if got := NetworkFromRedirectURI(uri); got != want {
@@ -23,6 +31,17 @@ func TestNetworkFromRedirectURI(t *testing.T) {
 func TestClientIDForRedirect(t *testing.T) {
 	if got := ClientIDForRedirect("https://cloud.zoo.network/cb", "fallback"); got != "lux-web3" {
 		t.Errorf("zoo network must map to lux-web3, got %q", got)
+	}
+	// All four live brand surfaces share the single lux-web3 IAM app.
+	for _, uri := range []string{
+		"https://web3.hanzo.ai/auth/callback",
+		"https://bootno.de/auth/callback",
+		"https://lux.cloud/auth/callback",
+		"https://zoo.cloud/auth/callback",
+	} {
+		if got := ClientIDForRedirect(uri, "fallback"); got != "lux-web3" {
+			t.Errorf("%s must map to lux-web3, got %q", uri, got)
+		}
 	}
 	if got := ClientIDForRedirect("https://unknown.example/cb", "fallback"); got != "fallback" {
 		t.Errorf("unknown redirect must fall back, got %q", got)
