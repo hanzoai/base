@@ -31,7 +31,7 @@ import (
 
 	rootbase "github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
-	"github.com/hanzoai/cloud/pkg/cloud"
+	cloud "github.com/hanzoai/cloud"
 	"github.com/hanzoai/zip"
 )
 

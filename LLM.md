@@ -1,4 +1,4 @@
-# LLM.md - Hanzo Base
+# Hanzo Base
 
 ## Identity
 
