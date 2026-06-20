@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	metric "github.com/luxfi/metric"
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -231,7 +231,7 @@ func filter(all []string, drop string) []string {
 	return out
 }
 
-func counterVal(t *testing.T, c prometheus.Counter) float64 {
+func counterVal(t *testing.T, c metric.Counter) float64 {
 	t.Helper()
 	var m dto.Metric
 	if err := c.Write(&m); err != nil {
