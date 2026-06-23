@@ -110,11 +110,11 @@ func (e Env) K8sContext() string {
 func (e Env) K8sNamespace() string {
 	switch e {
 	case EnvMainnet:
-		return "liquid-mainnet"
+		return "base-mainnet"
 	case EnvTestnet:
-		return "liquid-testnet"
+		return "base-testnet"
 	case EnvDevnet:
-		return "liquid-devnet"
+		return "base-devnet"
 	default:
 		return "default"
 	}

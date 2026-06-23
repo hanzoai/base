@@ -152,11 +152,11 @@ func TestEnvK8sContext(t *testing.T) {
 func TestEnvK8sNamespace(t *testing.T) {
 	t.Parallel()
 
-	if got := EnvMainnet.K8sNamespace(); got != "liquid-mainnet" {
-		t.Fatalf("expected liquid-mainnet, got %s", got)
+	if got := EnvMainnet.K8sNamespace(); got != "base-mainnet" {
+		t.Fatalf("expected base-mainnet, got %s", got)
 	}
-	if got := EnvDevnet.K8sNamespace(); got != "liquid-devnet" {
-		t.Fatalf("expected liquid-devnet, got %s", got)
+	if got := EnvDevnet.K8sNamespace(); got != "base-devnet" {
+		t.Fatalf("expected base-devnet, got %s", got)
 	}
 }
 
