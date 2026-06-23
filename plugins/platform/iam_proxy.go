@@ -8,8 +8,11 @@
 //     reached via this transparent reverse proxy, or
 //   - an in-process IAM (IAM_MODE=embedded),
 //
-// is opaque to the client. Both expose the same OIDC surface at the
-// same path. One way. We do NOT use /api/* — that's Casdoor's path.
+// is opaque to the client. Both expose the same OIDC surface under the
+// same /v1/iam path (authorize/token/userinfo/.well-known live at
+// /v1/iam/oauth/* and /v1/iam/.well-known/*), so this proxy preserves
+// the prefix rather than stripping it. One way. We do NOT use /api/* —
+// that's Casdoor's path.
 
 package platform
 
@@ -45,13 +48,16 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	client := &http.Client{Timeout: 0}
 
 	handler := func(e *core.RequestEvent) error {
-		// Map /v1/iam/<rest> → ${IAMEndpoint}/<rest>.
-		rest := strings.TrimPrefix(e.Request.URL.Path, "/v1/iam")
-		if rest == "" {
-			rest = "/"
+		// Map /v1/iam/<rest> → ${IAMEndpoint}/v1/iam/<rest>. Hanzo IAM
+		// (hanzo.id) AND the embedded provider both mount their OIDC surface
+		// under /v1/iam — never at the root — so the prefix is preserved, not
+		// stripped. Stripping it lands on the SPA/static handler (HTML 200).
+		path := e.Request.URL.Path
+		if path == "" {
+			path = "/v1/iam"
 		}
 		upstream := *upstreamBase
-		upstream.Path = strings.TrimRight(upstreamBase.Path, "/") + rest
+		upstream.Path = strings.TrimRight(upstreamBase.Path, "/") + path
 		upstream.RawQuery = e.Request.URL.RawQuery
 
 		req, err := http.NewRequestWithContext(
