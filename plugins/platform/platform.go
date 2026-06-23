@@ -107,6 +107,21 @@ type PlatformConfig struct {
 	DefaultTemplates []CollectionTemplate
 }
 
+// OAuthBase returns the canonical IAM OAuth base URL: ${IAMEndpoint}/v1/iam.
+//
+// Both Hanzo IAM (hanzo.id) and the in-process embedded provider mount their
+// OIDC surface (authorize/token/userinfo/.well-known) under /v1/iam — never at
+// the root. Building those URLs without this prefix lands on the SPA/static
+// handler (HTTP 200 text/html), which is the root cause of exchange_failed.
+// One place defines the prefix; every OAuth call derives from it.
+func (c PlatformConfig) OAuthBase() string {
+	endpoint := strings.TrimRight(c.IAMEndpoint, "/")
+	if endpoint == "" {
+		endpoint = "https://hanzo.id"
+	}
+	return endpoint + "/v1/iam"
+}
+
 // MustRegister registers the platform plugin to the provided app instance
 // and panics if it fails.
 func MustRegister(app core.App, config PlatformConfig) {

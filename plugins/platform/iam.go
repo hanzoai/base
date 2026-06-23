@@ -29,22 +29,17 @@ type IAMUser struct {
 // service has its own IAMClient instance and a single token is shared
 // across many requests, so the working set stays well under cap).
 const (
-	tokenCacheTTL     = 5 * time.Minute
-	defaultCacheSize  = 10_000
+	tokenCacheTTL    = 5 * time.Minute
+	defaultCacheSize = 10_000
 )
 
 // ValidateIAMToken validates a bearer token against the IAM userinfo endpoint
-// at config.IAMEndpoint/api/userinfo.
+// at config.OAuthBase()/oauth/userinfo (i.e. ${IAMEndpoint}/v1/iam/oauth/userinfo).
 //
 // This is a convenience function that creates a one-off HTTP request. For
 // production use with caching, use the IAMClient returned by NewIAMClient.
 func ValidateIAMToken(token string, config PlatformConfig) (*IAMUser, error) {
-	endpoint := config.IAMEndpoint
-	if endpoint == "" {
-		endpoint = "https://hanzo.id"
-	}
-
-	req, err := http.NewRequest("GET", endpoint+"/api/userinfo", nil)
+	req, err := http.NewRequest("GET", config.OAuthBase()+"/oauth/userinfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: create request: %w", err)
 	}
@@ -73,13 +68,9 @@ func ValidateIAMToken(token string, config PlatformConfig) (*IAMUser, error) {
 }
 
 // ExchangeOAuth2Token exchanges an authorization code for tokens using the
-// IAM OAuth2 token endpoint.
+// IAM OAuth2 token endpoint at config.OAuthBase()/oauth/token (i.e.
+// ${IAMEndpoint}/v1/iam/oauth/token).
 func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (accessToken, refreshToken string, err error) {
-	endpoint := config.IAMEndpoint
-	if endpoint == "" {
-		endpoint = "https://hanzo.id"
-	}
-
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},
@@ -88,7 +79,7 @@ func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (acces
 		"client_secret": {config.IAMClientSecret},
 	}
 
-	resp, err := http.PostForm(endpoint+"/oauth/token", data)
+	resp, err := http.PostForm(config.OAuthBase()+"/oauth/token", data)
 	if err != nil {
 		return "", "", fmt.Errorf("iam: token exchange request failed: %w", err)
 	}
@@ -200,7 +191,7 @@ func (c *IAMClient) ValidateToken(token string) (*IAMUser, error) {
 }
 
 func (c *IAMClient) fetchUserInfo(token string) (*IAMUser, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/userinfo", nil)
+	req, err := http.NewRequest("GET", PlatformConfig{IAMEndpoint: c.baseURL}.OAuthBase()+"/oauth/userinfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: create request: %w", err)
 	}
@@ -240,7 +231,7 @@ func (c *IAMClient) InvalidateToken(token string) {
 type IAMKey struct {
 	Owner       string `json:"owner"`
 	Name        string `json:"name"`
-	Type        string `json:"type"`        // Organization, Application, User
+	Type        string `json:"type"` // Organization, Application, User
 	Org         string `json:"organization"`
 	Application string `json:"application"`
 	User        string `json:"user"`
