@@ -3,7 +3,7 @@
 Seamless, PQ-native, consensus-replicated HA for every Base app.
 One mechanism. One env flag. Replica count `N ∈ {1,2,3,…}` works
 identically on a laptop (`docker compose`) and on k8s (via
-`~/work/liquidity/operator`). No FUSE, no LiteFS, no Consul.
+the operator repo). No FUSE, no LiteFS, no Consul.
 
 Durability and replication come from `luxfi/consensus/protocol/quasar`
 — the same DAG consensus that runs Lux validators — applied to SQLite
@@ -287,7 +287,7 @@ if net := network.FromEnv(); net.Enabled() {
 
 That is all the coupling. Rest of Base code is unchanged.
 
-### `~/work/liquidity/operator/`  (reconciler update)
+### operator repo  (reconciler update)
 
 Add `BaseNetworkSpec` struct reused across Base-ish CRDs:
 
@@ -340,7 +340,7 @@ spec:
     enabled: true
     shardKey: user_id
     replication: 3
-    archive: gs://liquidity-base-wal/bd
+    archive: gs://<bucket>-base-wal/bd
     autoscale:
       min: 3
       max: 7
@@ -368,7 +368,7 @@ Config example:
 upstreams:
   - name: liquid-bd
     type: base-network
-    service: liquid-bd.liquidity.svc:8090
+    service: liquid-bd.example.svc:8090
     shardKey: user_id
     shardKeySource: jwt.sub
 ```

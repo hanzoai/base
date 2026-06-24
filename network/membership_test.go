@@ -54,11 +54,11 @@ func TestDNSMembershipSingleton(t *testing.T) {
 // to multiple IPs → one member per IP.
 func TestDNSMembershipHeadless(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd.liquidity.svc.cluster.local", []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"})
+	r.Set("bd.example.svc.cluster.local", []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"})
 	m := newDNSMembership(
 		context.Background(),
 		"liquid-bd-0",
-		[]string{"bd.liquidity.svc.cluster.local:9999"},
+		[]string{"bd.example.svc.cluster.local:9999"},
 		r,
 		time.Hour,
 	)

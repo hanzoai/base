@@ -284,7 +284,7 @@ base cli crons list
 ### Using from a downstream daemon
 
 Any Base-backed daemon can expose these subcommands without duplicating code.
-For example, in `~/work/liquidity/ats/main.go`:
+For example, in your daemon's `main.go`:
 
     import (
         "log"
