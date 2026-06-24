@@ -611,7 +611,7 @@ func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
 
 	// The canonical Hanzo KMS surface (`/v1/kms/orgs/{org}/secrets/...`)
 	// does not require a per-org bootstrap call — the URL segment IS
-	// the org. The Infisical-era CreateOrgProject() that lived here
+	// the org. The legacy CreateOrgProject() that lived here
 	// targeted the dead `/api/v2/workspace/environments` route. Drop
 	// the call; orgs come into existence the moment a secret is
 	// written under their path.
