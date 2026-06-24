@@ -13,8 +13,8 @@
 // at zap://kms.hanzo.svc.cluster.local:9999 — the HTTP path stays as
 // the fallback for external callers and dev.
 //
-// The previous implementation here targeted the legacy Infisical
-// surface (`/api/v3/secrets/raw/`, `/api/v1/auth/universal-auth/login`,
+// The previous implementation here targeted a legacy upstream
+// secret-manager surface (`/api/v3/secrets/raw/`, `/api/v1/auth/universal-auth/login`,
 // `/api/v2/workspace/environments`). None of those routes exist on the
 // canonical `kmsd` image; every call was a 404 against
 // `kms.hanzo.svc.cluster.local`. This file is the replacement.
