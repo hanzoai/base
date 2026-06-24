@@ -107,7 +107,7 @@ Every Base-derived daemon (ats, bd, ta) uses `cmd.AddCLISubcommands(root)` to ge
 | Command | Purpose | Lux CLI Equivalent |
 |---------|---------|-------------------|
 | `cluster init/start/stop/status/leader/replicate/failover` | Manage base-ha HA groups | `lux network start/stop/status` |
-| `operator apply/status/describe/upgrade/logs` | Manage Liquidity K8s operator CRDs | `lux chain deploy` |
+| `operator apply/status/describe/upgrade/logs` | Manage the K8s operator CRDs | `lux chain deploy` |
 | `config show/set-env/set-org/init` | CLI config (~/.config/base/config.json) | `lux config` |
 | `status` | Daemon health + cluster state | `lux status` |
 | `self version/doctor` | Binary management | `lux self` |
@@ -116,7 +116,7 @@ Every Base-derived daemon (ats, bd, ta) uses `cmd.AddCLISubcommands(root)` to ge
 ### Network Flags
 
 All commands accept `--mainnet/-m`, `--testnet/-t`, `--devnet/-d`, `--dev`. Exactly one may be set.
-Fallback: `$LIQUIDITY_ENV` -> `$BASE_ENV` -> default `local`.
+Fallback: `$BASE_ENV` -> default `local`.
 
 ### Config File
 
@@ -130,10 +130,10 @@ Consensus: `--consensus lux` (default) or `--consensus pubsub`.
 
 ### Operator (K8s CRDs)
 
-Wraps kubectl against `liquid.network/v1alpha1` CRDs. Context map:
-- devnet: `gke_liquidity-devnet_us-central1_dev`
-- testnet: `gke_liquidity-testnet_us-central1_test`
-- mainnet: `gke_liquidity-mainnet_us-central1_main`
+Wraps kubectl against the operator's `v1alpha1` CRDs. Context map:
+- devnet: `gke_<project>-devnet_us-central1_dev`
+- testnet: `gke_<project>-testnet_us-central1_test`
+- mainnet: `gke_<project>-mainnet_us-central1_main`
 
 ## FHE Position
 
