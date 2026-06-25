@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/dbutils"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/dbutils"
 )
 
 // see https://github.com/pocketbase/pocketbase/issues/7689

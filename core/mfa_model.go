@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/base/tools/types"
 )
 
 const (

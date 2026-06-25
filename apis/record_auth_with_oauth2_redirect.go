@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/subscriptions"
-	"github.com/pocketbase/pocketbase/ui"
+	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/subscriptions"
+	"github.com/hanzoai/base/ui"
 )
 
 const (

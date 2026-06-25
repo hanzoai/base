@@ -4,8 +4,8 @@ import (
 	"hash/crc32"
 	"strconv"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/base/core"
 )
 
 // note: this migration will be deleted in future version
