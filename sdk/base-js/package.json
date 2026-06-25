@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/base",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Hanzo Base SDK - Reactive queries, CRDT, realtime, and Base-compatible client",
   "type": "module",
   "main": "./dist/core/index.js",
