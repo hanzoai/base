@@ -223,3 +223,5 @@ require (
 require github.com/hanzoai/zip v0.2.0
 
 replace github.com/hanzoai/zip => github.com/hanzoai/zip v0.2.2-0.20260616200704-240cb7df9fd7
+
+replace github.com/mattn/go-sqlite3 v2.0.3+incompatible => github.com/mattn/go-sqlite3 v1.14.22
