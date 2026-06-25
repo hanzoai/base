@@ -113,7 +113,7 @@ require (
 	github.com/luxfi/go-bip32 v1.0.2 // indirect
 	github.com/luxfi/go-bip39 v1.1.2 // indirect
 	github.com/luxfi/keys v1.1.0 // indirect
-	github.com/luxfi/kms v1.11.0 // indirect
+	github.com/luxfi/kms v1.11.7 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
 	github.com/luxfi/lens v0.1.4 // indirect
 	github.com/luxfi/pq v1.0.3 // indirect
