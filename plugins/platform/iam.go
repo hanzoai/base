@@ -34,7 +34,7 @@ const (
 )
 
 // ValidateIAMToken validates a bearer token against the IAM userinfo endpoint
-// at config.IAMEndpoint/api/userinfo.
+// at config.IAMEndpoint/v1/iam/oauth/userinfo.
 //
 // This is a convenience function that creates a one-off HTTP request. For
 // production use with caching, use the IAMClient returned by NewIAMClient.
@@ -44,7 +44,7 @@ func ValidateIAMToken(token string, config PlatformConfig) (*IAMUser, error) {
 		endpoint = "https://hanzo.id"
 	}
 
-	req, err := http.NewRequest("GET", endpoint+"/api/userinfo", nil)
+	req, err := http.NewRequest("GET", endpoint+"/v1/iam/oauth/userinfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: create request: %w", err)
 	}
@@ -200,7 +200,7 @@ func (c *IAMClient) ValidateToken(token string) (*IAMUser, error) {
 }
 
 func (c *IAMClient) fetchUserInfo(token string) (*IAMUser, error) {
-	req, err := http.NewRequest("GET", c.baseURL+"/api/userinfo", nil)
+	req, err := http.NewRequest("GET", c.baseURL+"/v1/iam/oauth/userinfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: create request: %w", err)
 	}
