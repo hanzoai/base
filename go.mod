@@ -116,7 +116,7 @@ require (
 	github.com/luxfi/proto v1.3.5 // indirect
 	github.com/luxfi/pulsar v1.1.1 // indirect
 	github.com/luxfi/sampler v1.1.0 // indirect
-	github.com/luxfi/threshold v1.9.4 // indirect
+	github.com/luxfi/threshold v1.9.9 // indirect
 	github.com/luxfi/tls v1.0.3 // indirect
 	github.com/luxfi/vm v1.2.0 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
