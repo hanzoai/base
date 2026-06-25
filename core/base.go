@@ -45,6 +45,7 @@ const (
 	LocalBackupsDirName       string = "backups"
 	LocalTempDirName          string = ".hz_temp_to_delete" // temp hz_data sub directory that will be deleted on each app.Bootstrap()
 	LocalAutocertCacheDirName string = ".autocert_cache"
+	LocalNotifyDirName        string = ".notify" // optional watched directory used as a cross-platform workaround for synchronizing runtime state between multiple Base instances pointing to the same hz_data
 
 	// @todo consider removing after backups refactoring
 	lostFoundDirName string = "lost+found"
