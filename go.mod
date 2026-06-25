@@ -219,7 +219,14 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-// HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
-require github.com/hanzoai/zip v0.2.0
+require (
+	github.com/hanzoai/commerce/metering v0.0.0
+	// HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
+	github.com/hanzoai/zip v0.2.0
+)
 
 replace github.com/hanzoai/zip => github.com/hanzoai/zip v0.2.2-0.20260616200704-240cb7df9fd7
+
+// TODO(build): pin to a published github.com/hanzoai/commerce/metering tag before
+// CI build; local replace is for development only (metering module not yet published).
+replace github.com/hanzoai/commerce/metering => /Users/a/work/hanzo/commerce/metering
