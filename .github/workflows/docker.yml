@@ -17,8 +17,6 @@ permissions:
 jobs:
   test:
     runs-on: [self-hosted, linux, amd64]
-    env:
-      GOPRIVATE: github.com/hanzoai/*,github.com/luxfi/*,github.com/zap-proto/*
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

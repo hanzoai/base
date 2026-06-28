@@ -9,10 +9,11 @@
 FROM golang:1.26.4-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
-# Private cross-org modules (hanzoai/*, luxfi/* — luxfi/zap forward bridge) are
-# fetched via authenticated git, bypassing the public proxy. gh_token is the
-# shared docker-build.yml BuildKit secret; no-op when absent (local/dev).
-ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*,github.com/zap-proto/*
+# No GOPRIVATE — cross-org modules (hanzoai/*, luxfi/* incl. luxfi/zap forward
+# bridge, zap-proto/*) are PUBLIC, so go resolves them via the default public
+# proxy + sumdb (immutable hashes a force-moved tag can't break). GOPRIVATE would
+# route them `direct` (git) and re-introduce go.sum poisoning. The gh_token git
+# auth below stays as the direct fallback; no-op when absent (local/dev).
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=secret,id=gh_token \
