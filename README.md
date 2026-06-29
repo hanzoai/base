@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/hero.svg" alt="base" width="880"></p>
+
 # base
 
 Per-tenant SQLite + extension runtimes (HIP-0105). The storage substrate of the unified Hanzo cloud binary.
