@@ -321,7 +321,7 @@ func main() {
 
 4. To build a statically linked executable, you can run `CGO_ENABLED=0 go build` and then start the created executable with `./myapp serve`.
 
-_For more details please refer to [Extend with Go](https://pocketbase.io/docs/go-overview/)._
+_For more details please refer to [Extend with Go](https://docs.hanzo.ai/docs/go-overview/)._
 
 ### Building and running the repo main.go example
 
