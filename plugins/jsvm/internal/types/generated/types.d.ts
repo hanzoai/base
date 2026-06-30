@@ -14599,7 +14599,7 @@ namespace base {
   * could be accessed directly through the instance (eg. Base.DataDir()).
   */
  type _sFmyAGz = CoreApp
- interface PocketBase extends _sFmyAGz {
+ interface Base extends _sFmyAGz {
   /**
    * RootCmd is the main console command
    */
@@ -14789,7 +14789,7 @@ namespace template {
  }
 }
 
-namespace pocketbase {
+namespace base {
  /**
   * Base defines a Hanzo Base app launcher.
   *
@@ -14797,7 +14797,7 @@ namespace pocketbase {
   * could be accessed directly through the instance (eg. Base.DataDir()).
   */
  type _spLGfrP = CoreApp
- interface PocketBase extends _spLGfrP {
+ interface Base extends _spLGfrP {
   /**
    * RootCmd is the main console command
    */
@@ -14838,7 +14838,7 @@ namespace pocketbase {
    * If you want to initialize the application before calling [Base.Start],
    * then you'll have to manually call [Base.Bootstrap].
    */
-  (): (PocketBase)
+  (): (Base)
  }
  interface newWithConfig {
   /**
@@ -14850,16 +14850,16 @@ namespace pocketbase {
    * If you want to initialize the application before calling [Base.Start],
    * then you'll have to manually call [Base.Bootstrap].
    */
-  (config: Config): (PocketBase)
+  (config: Config): (Base)
  }
- interface PocketBase {
+ interface Base {
   /**
    * Start starts the application, aka. registers the default system
    * commands (serve, superuser, version) and executes pb.RootCmd.
    */
   start(): void
  }
- interface PocketBase {
+ interface Base {
   /**
    * Execute initializes the application (if not already) and executes
    * the pb.RootCmd with graceful shutdown support.
