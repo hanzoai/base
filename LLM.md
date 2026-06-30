@@ -28,7 +28,7 @@ identical across tiers:
 | Tier | Backend | When | Status |
 |------|---------|------|--------|
 | 0 (default) | embedded SQLite / `:memory:` | everything out of box | core `dialect.go` |
-| 1 | `hanzoai/sql` (PostgreSQL) | relational scale, multi-writer | core `dialect_postgres.go` + `db_connect_postgres.go` + `plugins/cloudsql` (wired); per-instance selector = TODO |
+| 1 | `hanzoai/sql` (PostgreSQL) | relational scale, multi-writer | core `dialect_postgres.go` + `db_connect_postgres.go` + `plugins/cloudsql`; **selector SHIPPED** (`BASE_DB_TIER=sql`) |
 | 2 | `hanzoai/datastore` | true horizontal OLAP analytics | repo exists; backend adapter = TODO |
 | +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
 
@@ -327,6 +327,25 @@ value. The committed `ui-react/dist` is built for the default `/_/`; to ship a
 relocated admin, rebuild with `BASE_ADMIN_UI_PATH=/admin/ pnpm --dir ui-react build`.
 The admin UI is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default —
 production services are headless `/v1` APIs); the `/v1` data plane is always on.
+
+## Storage tier (`BASE_DB_TIER`)
+
+One knob picks the data backend for a Base instance — default `sqlite`,
+upgradable in place with no app rewrite (the `/v1` data plane is identical
+across tiers). Resolved once in `core.ResolveStorageTier()` (called from
+`base.NewWithConfig`) → applied to `BaseAppConfig.DataDSN`/`AuxDSN`, built on the
+existing dialect + `PostgresDBConnect` plumbing.
+
+| `BASE_DB_TIER` | Backend | Extra env |
+|---|---|---|
+| `sqlite` (default / unset) | embedded SQLite (or `:memory:`) | — |
+| `sql` | `hanzoai/sql` (PostgreSQL) | `BASE_DB_URL` (DSN); optional `BASE_AUX_DSN` |
+| `datastore` | `hanzoai/datastore` (OLAP) | reserved — errors until the adapter ships |
+
+Misconfig fails loudly at startup (sql without `BASE_DB_URL`, the not-yet-wired
+`datastore`, or an unknown value) rather than silently running the wrong DB —
+same convention as the platform plugin's IAM check. Per-org tiering (each
+`plugins/platform/org_db.go` shard on its own tier) builds on this selector.
 
 ## Embedded IAM Mode (`IAM_MODE=embedded`)
 
