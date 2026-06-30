@@ -40,7 +40,7 @@ Attack chain:
 
 **Description**: Three settings forms populate their initial values from the server response, which returns redacted secrets (e.g., `smtp.password: "***"`). The forms use `react-hook-form` `values` prop, which resets the form to server data on every fetch. If an admin opens SMTP settings, changes the host, and clicks Save without re-entering the password, the form submits `password: "***"` back to the server. Depending on the server's handling, this either:
 - (a) Overwrites the real SMTP password with the literal string `"***"`, breaking email delivery, or
-- (b) The server special-cases `"***"` and ignores it (PocketBase does this for some fields, but not consistently).
+- (b) The server special-cases `"***"` and ignores it (Base does this for some fields, but not consistently).
 
 Same pattern in `settings.backups.tsx` (S3 `secret` field at line 67) and `settings.auth.tsx` (`clientSecret` at line 148).
 
@@ -97,7 +97,7 @@ This means a regular auth-collection user who somehow has a token in `authStore`
 
 ### [MEDIUM] R04: Import Collections — No `__proto__` / Prototype Pollution Guard
 
-**Description**: `settings.data.tsx:94` uses `JSON.parse(text)` on user-uploaded JSON. The parsed result is stored in state as `importParsed` and later passed to `base.collections.import(importParsed)`. While `JSON.parse` itself does not pollute prototypes, the parsed objects may contain `__proto__` or `constructor` keys. If any downstream code (in the PocketBase SDK, in React's reconciler during diffing, or in future refactors that use spread/Object.assign) iterates these objects, prototype pollution can occur.
+**Description**: `settings.data.tsx:94` uses `JSON.parse(text)` on user-uploaded JSON. The parsed result is stored in state as `importParsed` and later passed to `base.collections.import(importParsed)`. While `JSON.parse` itself does not pollute prototypes, the parsed objects may contain `__proto__` or `constructor` keys. If any downstream code (in the Base SDK, in React's reconciler during diffing, or in future refactors that use spread/Object.assign) iterates these objects, prototype pollution can occur.
 
 The `base.collections.import()` SDK method sends these objects directly to the server. If the server-side Go code deserializes the JSON into a map and uses it in template rendering or query construction, the `__proto__` key becomes a payload.
 
@@ -254,7 +254,7 @@ Empty labels could create rate limit rules that match nothing (silent no-op). Du
 
 ### [INFO] R13: No localStorage/sessionStorage Use in Settings
 
-**Description**: Grep confirms zero uses of `localStorage` or `sessionStorage` anywhere in the settings routes or SectionCard. Secrets are not persisted to browser storage. The PocketBase SDK's `authStore` uses its own storage mechanism (cookie-based by default), which is separate from the settings data flow.
+**Description**: Grep confirms zero uses of `localStorage` or `sessionStorage` anywhere in the settings routes or SectionCard. Secrets are not persisted to browser storage. The Base SDK's `authStore` uses its own storage mechanism (cookie-based by default), which is separate from the settings data flow.
 
 **Impact**: None. This is a positive finding.
 

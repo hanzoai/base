@@ -2,10 +2,10 @@
 
 ## Question
 
-How to align Hanzo Base (hanzoai/base, PocketBase fork) with the conventions
+How to align Hanzo Base (hanzoai/base, Base fork) with the conventions
 used across hanzoai/orm, hanzoai/commerce, hanzoai/dbx, hanzoai/sqlite,
 hanzoai/gateway, and luxfi/cache -- so Base feels native to the Hanzo
-ecosystem rather than a PocketBase derivative.
+ecosystem rather than a Base derivative.
 
 ## Method
 
@@ -14,7 +14,7 @@ Source-level analysis of 7 repos. Every claim cites file:line. No speculation.
 Repos analyzed:
 - hanzoai/orm (~/work/hanzo/orm/) -- 31 files, Go ORM with generics
 - hanzoai/commerce (~/work/hanzo/commerce/) -- 100+ model packages, Go service
-- hanzoai/base (~/work/hanzo/base/) -- PocketBase fork, Go
+- hanzoai/base (~/work/hanzo/base/) -- Base fork, Go
 - hanzoai/dbx (~/work/hanzo/dbx/) -- Low-level DB abstraction, Go
 - hanzoai/sqlite (~/work/hanzo/sqlite/) -- Encrypted SQLite driver, Go
 - hanzoai/gateway (~/work/hanzo/gateway/) -- KrakenD-based API gateway, Go
@@ -40,7 +40,7 @@ CONFLICT: Base uses `created`/`updated`. Everything else uses `createdAt`/`updat
 | hanzoai/base | `Updated types.DateTime` | `json:"updated"` | `updated` | base/core/collection_model.go:373 |
 
 The ORM/Commerce pattern (`createdAt`/`updatedAt`) is the ecosystem standard.
-Base's `created`/`updated` is PocketBase heritage.
+Base's `created`/`updated` is Base heritage.
 
 #### A2. Soft Delete
 
@@ -255,7 +255,7 @@ Base lacks inter-service event publishing. Commerce uses NATS.
 | Gateway | IAM JWT validation | gateway/auth_middleware.go |
 
 Base has TWO auth systems running in parallel:
-1. Built-in auth collections (PocketBase: email/password, OAuth2, OTP per collection)
+1. Built-in auth collections (Base: email/password, OAuth2, OTP per collection)
 2. OIDC for `_superusers` collection (partial Hanzo IAM integration)
 
 Ecosystem standard: Hanzo IAM exclusively (Commerce, Gateway both use it).
@@ -359,7 +359,7 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 
 **Changes:**
 - Fix JS SDK: `PB_CONNECT` to `HZ_CONNECT`
-- Search-replace remaining `PB_`, `pb_`, `pocketbase`, `PocketBase` references
+- Search-replace remaining `PB_`, `pb_`, `base`, `Base` references
 - Add NATS publisher for inter-service events (like Commerce)
 
 **Files to modify:**

@@ -28,7 +28,7 @@ type NetworkFlags struct {
 
 // AddNetworkFlags registers --mainnet, --testnet, --devnet, --dev on the
 // given command's persistent flags so they propagate to all subcommands.
-// Skips any flag already registered on the command (e.g. PocketBase's
+// Skips any flag already registered on the command (e.g. Base's
 // built-in --dev) so it's safe to call after app.RootCmd is constructed.
 func AddNetworkFlags(cmd *cobra.Command, nf *NetworkFlags) {
 	if cmd.PersistentFlags().Lookup("mainnet") == nil {
