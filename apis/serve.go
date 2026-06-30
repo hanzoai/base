@@ -23,6 +23,19 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// adminUIPath returns the normalized admin-dashboard mount path. Default "/_/".
+// Override with BASE_ADMIN_UI_PATH (e.g. "admin" or "/admin/") — any leading/
+// trailing slashes are normalized to a single "/x/" form. The ui-react SPA must
+// be built with the SAME value as its vite `base` (one knob, set at build+deploy
+// together — same contract as BASE_API_PREFIX ↔ VITE_API_PREFIX).
+func adminUIPath() string {
+	p := strings.Trim(os.Getenv("BASE_ADMIN_UI_PATH"), "/")
+	if p == "" {
+		return "/_/"
+	}
+	return "/" + p + "/"
+}
+
 // ServeConfig defines a configuration struct for apis.Serve().
 type ServeConfig struct {
 	// ShowStartBanner indicates whether to show or hide the server start console message.
@@ -78,23 +91,29 @@ func Serve(app core.App, config ServeConfig) error {
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
-	// Root redirect: disabled by default. Set BASE_ENABLE_ROOT_REDIRECT=1 to redirect / → /_/
+	// Admin UI mount path. Default "/_/". Override with BASE_ADMIN_UI_PATH
+	// (e.g. "/admin/") — the ui-react SPA must be built with the SAME value as
+	// its vite `base`, exactly like BASE_API_PREFIX ↔ VITE_API_PREFIX. One knob,
+	// configured at build+deploy together. Normalized to a "/x/" form.
+	adminPath := adminUIPath()
+
+	// Root redirect: disabled by default. Set BASE_ENABLE_ROOT_REDIRECT=1 to redirect / → admin.
 	if os.Getenv("BASE_ENABLE_ROOT_REDIRECT") == "1" {
 		baseRouter.GET("/", func(e *core.RequestEvent) error {
-			return e.Redirect(http.StatusTemporaryRedirect, "/_/")
+			return e.Redirect(http.StatusTemporaryRedirect, adminPath)
 		})
 	}
 
-	// Admin UI: disabled by default. Set BASE_ENABLE_ADMIN_UI=1 to serve /_/ dashboard.
+	// Admin UI: disabled by default. Set BASE_ENABLE_ADMIN_UI=1 to serve the dashboard.
 	// Production services are headless APIs — no UI surface exposed.
 	if os.Getenv("BASE_ENABLE_ADMIN_UI") != "1" {
-		baseRouter.GET("/_/{path...}", func(e *core.RequestEvent) error {
+		baseRouter.GET(adminPath+"{path...}", func(e *core.RequestEvent) error {
 			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
 		})
 	} else {
-	// indexFallback=true so deep links (/_/settings/auth, /_/records/...) hit
+	// indexFallback=true so deep links (settings/auth, records/...) hit
 	// the SPA index.html and let React Router resolve them client-side.
-	baseRouter.GET("/_/{path...}", Static(uireact.DistDirFS(), true)).
+	baseRouter.GET(adminPath+"{path...}", Static(uireact.DistDirFS(), true)).
 		BindFunc(func(e *core.RequestEvent) error {
 			// ignore root path
 			if e.Request.PathValue(StaticWildcardParam) != "" {
@@ -305,7 +324,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 		regular := color.New()
 		regular.Printf("├─ REST API:  %s\n", color.CyanString("%s/v1/", baseURL))
-		regular.Printf("└─ Dashboard: %s\n", color.CyanString("%s/_/", baseURL))
+		regular.Printf("└─ Dashboard: %s\n", color.CyanString("%s%s", baseURL, adminUIPath()))
 	}
 
 	var serveErr error
