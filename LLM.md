@@ -58,7 +58,7 @@ every zip consumer share it.
 
 Two thin shims remain in gojavm with `TODO(zip/runtime)` markers (tracked
 on hanzoai/zip PR #9): ctx-aware Eval, and multi-file bundling transpile.
-The HTTP layer stays on base's `tools/router` (PocketBase-native,
+The HTTP layer stays on base's `tools/router` (Base-native,
 `http.Handler` via `BuildMux`); cloud mounts it under `/v1/base/*` via
 `zip.AdaptNetHTTP` (see `cloud/mounts/base/mount.go`). A native-fiber
 rewrite of the router is a later, separate step.
@@ -248,6 +248,21 @@ it in-process. Apps do NOT mount their own IAM at `/v1/<app>/iam`.
 
 Root liveness probe stays at `/healthz` (outside the mount prefix) so
 ops doesn't have to know the app name.
+
+## Admin UI path (`BASE_ADMIN_UI_PATH`)
+
+One knob for where the admin dashboard mounts. Default `/_/`. Set
+`BASE_ADMIN_UI_PATH=/admin/` (any leading/trailing slashes are normalized to a
+single `/x/` form) to relocate it — `apis/serve.go` `adminUIPath()` drives the
+static mount, the root redirect, and the start-banner line from this one value.
+
+The SPA client must match (same contract as `BASE_API_PREFIX` ↔ `VITE_API_PREFIX`):
+`ui-react/vite.config.ts` `base` reads the SAME `BASE_ADMIN_UI_PATH` env, so the
+SPA's absolute asset URLs line up with the mount. Build + serve with the same
+value. The committed `ui-react/dist` is built for the default `/_/`; to ship a
+relocated admin, rebuild with `BASE_ADMIN_UI_PATH=/admin/ pnpm --dir ui-react build`.
+The admin UI is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default —
+production services are headless `/v1` APIs); the `/v1` data plane is always on.
 
 ## Embedded IAM Mode (`IAM_MODE=embedded`)
 
