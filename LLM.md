@@ -2,9 +2,73 @@
 
 ## Identity
 
-Hanzo Base is the **local-first application runtime for Lux**.
+Hanzo Base is the **local-first application runtime for Lux** — and the
+**universal backend** for any app: App Platform, CMS, CRM, or a one-off
+internal tool. One binary, AI-native, SQLite by default, upgradable per
+instance. Web5 client runtime at its core.
 
-Not a fork, not a wrapper. The Web5 client runtime.
+Not a fork, not a wrapper.
+
+## Program: Base as the universal backend (roadmap)
+
+The north star: **anyone can stand up any modern backend on Base** — a CRM, a
+CMS, an app platform, or a small internal tool — and it just works out of the
+box on embedded SQLite, then scales per-instance without a rewrite. AI-native,
+with flows/automations as first-class. Reaches parity with best-in-class CRM and
+headless-CMS products; their code is reference only, the brand is Hanzo only.
+
+### Storage tiering — one model, per-instance upgrade
+
+Out of the box every Base (and every tenant/org/user shard) is **embedded
+SQLite / in-memory** — zero-config, fast, the SaaS default. Each instance (or
+per-org / per-user DB) can be **upgraded in place** along one axis, no app
+rewrite — the data plane (`/v1` collections/records/auth/files/SQL/realtime) is
+identical across tiers:
+
+| Tier | Backend | When | Status |
+|------|---------|------|--------|
+| 0 (default) | embedded SQLite / `:memory:` | everything out of box | core `dialect.go` |
+| 1 | `hanzoai/sql` (PostgreSQL) | relational scale, multi-writer | core `dialect_postgres.go` + `db_connect_postgres.go` + `plugins/cloudsql` (wired); per-instance selector = TODO |
+| 2 | `hanzoai/datastore` | true horizontal OLAP analytics | repo exists; backend adapter = TODO |
+| +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
+
+The dialect abstraction (SQLite + Postgres) and the per-org/per-user encrypted DB
+provisioner (`plugins/platform/org_db.go`) already exist — Tier-0/1 are real
+today. Tier-2 (datastore) and the docdb plugin are the wiring gaps.
+
+### App layer — App Platform / CMS / CRM on one schema engine
+
+Base's `collections` + `records` + rules + auth + files + realtime already ARE a
+headless backend. The program adds the **product surfaces** on top, all rendered
+from the same metadata:
+
+- **Objects/records UI** (CRM/app): record views, filters, kanban/table/board,
+  relations, command-menu, dashboards — parity target: the reference CRM's
+  `object-record` / `views` / `workflow` / `dashboards` / `command-menu` modules.
+- **Publishing/CMS**: draft→publish, content models, scheduled publish, asset
+  pipeline (Contentful-class) — built on collections + the file API + scheduler.
+- **Flows/automations + AI**: `plugins/functions` (event workers on CRDT ops /
+  chain receipts) + `plugins/scheduler` + `plugins/tasks` + the polyglot
+  `extruntime` runtimes (gojavm/pyvm/v8vm/wasmvm/starkvm) are the engine; the
+  visual workflow + AI-native authoring UI is the gap.
+
+### UI rebuild — `@hanzo/ui` over `@hanzo/gui`
+
+The current admin (`ui-react/`, TanStack Router: Collections/Records/Settings) is
+replaced by shared **`@hanzo/ui`** components (powered by **`@hanzo/gui`**),
+Hanzo-branded, so the SAME components render the Base admin, the embedded console2
+surface, and any app built on Base. Admin mount stays configurable
+(`BASE_ADMIN_UI_PATH`, default `/_/`). Goes live in **console2** as the Base
+product (the tenant orchestrator embed already ships; this is the full app
+surface).
+
+### Execution
+
+Phased, not one-shot. P0: storage-tier selector + docdb plugin scaffold. P1:
+`@hanzo/ui` Base-admin foundation (objects/records/views). P2: flows/automations
++ AI authoring. P3: publishing/CMS. P4: parity hardening + console2 go-live. Each
+phase ships buildable + verified; no fabricated surfaces. Large fan-out (per
+feature module) suits a multi-agent workflow.
 
 ## Architecture
 
