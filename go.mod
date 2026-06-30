@@ -16,7 +16,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hanzoai/dbx v1.16.0
-	github.com/hanzoai/kms/sdk/go v1.1.0
+	github.com/hanzoai/kms/sdk/go v1.1.1
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.40.0
 	github.com/hanzoai/tygoja v0.0.2
@@ -108,7 +108,7 @@ require (
 	github.com/luxfi/go-bip32 v1.0.2 // indirect
 	github.com/luxfi/go-bip39 v1.1.2 // indirect
 	github.com/luxfi/keys v1.2.0 // indirect
-	github.com/luxfi/kms v1.11.4 // indirect
+	github.com/luxfi/kms v1.11.7 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
 	github.com/luxfi/lens v0.1.4 // indirect
 	github.com/luxfi/magnetar v1.2.0 // indirect
@@ -220,6 +220,4 @@ require (
 )
 
 // HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
-require github.com/hanzoai/zip v0.2.0
-
-replace github.com/hanzoai/zip => github.com/hanzoai/zip v0.2.2-0.20260616200704-240cb7df9fd7
+require github.com/hanzoai/zip v0.2.2
