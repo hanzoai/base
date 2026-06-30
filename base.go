@@ -134,6 +134,18 @@ func NewWithConfig(config Config) *Base {
 	// (errors are ignored, since the full flags parsing happens on Execute())
 	base.eagerParseFlags(&config)
 
+	// Storage tier — default sqlite (embedded), upgradable per instance to
+	// hanzoai/sql via BASE_DB_TIER=sql + BASE_DB_URL. One knob; the /v1 data
+	// plane is identical across tiers. Fail loudly on misconfig (like the
+	// platform plugin's IAM check) rather than silently running the wrong DB.
+	tier, dataDSN, auxDSN, tierErr := core.ResolveStorageTier()
+	if tierErr != nil {
+		panic("base: storage tier: " + tierErr.Error())
+	}
+	if tier != core.TierSQLite {
+		os.Stderr.WriteString("base: storage tier = " + string(tier) + "\n")
+	}
+
 	// initialize the app instance
 	base.App = core.NewBaseApp(core.BaseAppConfig{
 		IsDev:            base.devFlag,
@@ -145,6 +157,8 @@ func NewWithConfig(config Config) *Base {
 		AuxMaxOpenConns:  config.AuxMaxOpenConns,
 		AuxMaxIdleConns:  config.AuxMaxIdleConns,
 		DBConnect:        config.DBConnect,
+		DataDSN:          dataDSN,
+		AuxDSN:           auxDSN,
 	})
 
 	// hide the default help command (allow only `--help` flag)
