@@ -16,6 +16,7 @@ import (
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/platform"
+	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
@@ -107,6 +108,13 @@ func main() {
 
 	// ZAP binary protocol transport (port 9999)
 	zap.MustRegister(app)
+
+	// Waitlist — POST /v1/waitlist/join etc. (the "Join waitlist" CTA on
+	// coming-soon products; console2 proxies to it via WAITLIST_URL). Turnstile
+	// (TURNSTILE_SECRET_KEY) + admin export (WAITLIST_ADMIN_SECRET) resolve from
+	// env; join is IP rate-limited. Without this the route 404s and the UI shows
+	// "the waitlist is not open on this deployment yet".
+	waitlist.MustRegister(app, waitlist.Config{Enabled: true})
 
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
