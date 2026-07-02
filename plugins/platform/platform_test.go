@@ -82,7 +82,7 @@ func TestScopedQuery(t *testing.T) {
 
 func TestIAMClientValidateToken(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/userinfo" {
+		if r.URL.Path != "/v1/iam/oauth/userinfo" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
