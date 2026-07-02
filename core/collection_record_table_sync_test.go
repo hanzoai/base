@@ -55,7 +55,7 @@ func TestSyncRecordTableSchema(t *testing.T) {
 			"new base collection",
 			baseCol,
 			nil,
-			[]string{"id", "test"},
+			[]string{"id", "created", "updated", "test"},
 			0,
 		},
 		{
@@ -64,7 +64,7 @@ func TestSyncRecordTableSchema(t *testing.T) {
 			nil,
 			[]string{
 				"id", "test", "email", "verified",
-				"emailVisibility", "tokenKey",
+				"emailVisibility", "tokenKey", "created", "updated",
 			},
 			3,
 		},

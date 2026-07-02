@@ -174,7 +174,7 @@ func TestImportCollections(t *testing.T) {
 					"demo3":      5,
 					"demo4":      16,
 					"demo5":      9,
-					"new_import": 2,
+					"new_import": 4,
 				}
 				for name, expectedCount := range expectedCollectionFields {
 					collection, err := testApp.FindCollectionByNameOrId(name)
@@ -404,7 +404,10 @@ func TestImportCollectionsUpdateRules(t *testing.T) {
 					}
 				}
 			} else {
-				totalExpectedFields := 1
+				// the created/updated autodate defaults are always (re)added on save
+				// as system fields; the legacy fixture marks them non-system, so they
+				// are not counted by the loop below and must be added explicitly
+				totalExpectedFields := 1 + 2
 				for _, f := range beforeCollection.Fields {
 					if f.GetSystem() {
 						totalExpectedFields++

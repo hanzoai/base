@@ -97,6 +97,26 @@ migrate((app) => {
         "required": false,
         "system": true,
         "type": "bool"
+      },
+      {
+        "hidden": false,
+        "id": "autodate@TEST_RANDOM",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": true,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate@TEST_RANDOM",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": true,
+        "type": "autodate"
       }
     ],
     "fileToken": {
@@ -226,6 +246,26 @@ func init() {
 					"required": false,
 					"system": true,
 					"type": "bool"
+				},
+				{
+					"hidden": false,
+					"id": "autodate@TEST_RANDOM",
+					"name": "created",
+					"onCreate": true,
+					"onUpdate": false,
+					"presentable": false,
+					"system": true,
+					"type": "autodate"
+				},
+				{
+					"hidden": false,
+					"id": "autodate@TEST_RANDOM",
+					"name": "updated",
+					"onCreate": true,
+					"onUpdate": true,
+					"presentable": false,
+					"system": true,
+					"type": "autodate"
 				}
 			],
 			"fileToken": {
@@ -443,6 +483,26 @@ migrate((app) => {
         "required": false,
         "system": true,
         "type": "bool"
+      },
+      {
+        "hidden": false,
+        "id": "autodate@TEST_RANDOM",
+        "name": "created",
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "system": true,
+        "type": "autodate"
+      },
+      {
+        "hidden": false,
+        "id": "autodate@TEST_RANDOM",
+        "name": "updated",
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "system": true,
+        "type": "autodate"
       }
     ],
     "fileToken": {
@@ -575,6 +635,26 @@ func init() {
 					"required": false,
 					"system": true,
 					"type": "bool"
+				},
+				{
+					"hidden": false,
+					"id": "autodate@TEST_RANDOM",
+					"name": "created",
+					"onCreate": true,
+					"onUpdate": false,
+					"presentable": false,
+					"system": true,
+					"type": "autodate"
+				},
+				{
+					"hidden": false,
+					"id": "autodate@TEST_RANDOM",
+					"name": "updated",
+					"onCreate": true,
+					"onUpdate": true,
+					"presentable": false,
+					"system": true,
+					"type": "autodate"
 				}
 			],
 			"fileToken": {
@@ -732,7 +812,7 @@ migrate((app) => {
   collection.fields.removeById("f3_id")
 
   // add field
-  collection.fields.addAt(7, new Field({
+  collection.fields.addAt(9, new Field({
     "autogeneratePattern": "",
     "hidden": false,
     "id": "f4_id",
@@ -748,7 +828,7 @@ migrate((app) => {
   }))
 
   // update field
-  collection.fields.addAt(6, new Field({
+  collection.fields.addAt(8, new Field({
     "hidden": false,
     "id": "f2_id",
     "max": null,
@@ -786,7 +866,7 @@ migrate((app) => {
   }, collection)
 
   // add field
-  collection.fields.addAt(7, new Field({
+  collection.fields.addAt(9, new Field({
     "hidden": false,
     "id": "f3_id",
     "name": "f3_name",
@@ -800,7 +880,7 @@ migrate((app) => {
   collection.fields.removeById("f4_id")
 
   // update field
-  collection.fields.addAt(6, new Field({
+  collection.fields.addAt(8, new Field({
     "hidden": false,
     "id": "f2_id",
     "max": null,
@@ -862,7 +942,7 @@ func init() {
 		collection.Fields.RemoveById("f3_id")
 
 		// add field
-		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(9, []byte(` + "`" + `{
 			"autogeneratePattern": "",
 			"hidden": false,
 			"id": "f4_id",
@@ -880,7 +960,7 @@ func init() {
 		}
 
 		// update field
-		if err := collection.Fields.AddMarshaledJSONAt(6, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(8, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f2_id",
 			"max": null,
@@ -925,7 +1005,7 @@ func init() {
 		}
 
 		// add field
-		if err := collection.Fields.AddMarshaledJSONAt(7, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(9, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f3_id",
 			"name": "f3_name",
@@ -941,7 +1021,7 @@ func init() {
 		collection.Fields.RemoveById("f4_id")
 
 		// update field
-		if err := collection.Fields.AddMarshaledJSONAt(6, []byte(` + "`" + `{
+		if err := collection.Fields.AddMarshaledJSONAt(8, []byte(` + "`" + `{
 			"hidden": false,
 			"id": "f2_id",
 			"max": null,
