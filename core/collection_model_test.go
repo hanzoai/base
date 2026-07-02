@@ -1294,7 +1294,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			},
 			expectError: false,
 			expectColumns: []string{
-				"id", "example",
+				"id", "created", "updated", "example",
 			},
 		},
 		{
@@ -1310,7 +1310,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			expectError: false,
 			expectColumns: []string{
 				"id", "email", "tokenKey",
-				"verified", "emailVisibility", "example",
+				"verified", "emailVisibility", "created", "updated", "example",
 			},
 		},
 		{
@@ -1391,7 +1391,7 @@ func TestCollectionSaveModel(t *testing.T) {
 			},
 			expectError: false,
 			expectColumns: []string{
-				"id", "email", "emailVisibility", "tokenKey", "verified",
+				"id", "email", "emailVisibility", "tokenKey", "verified", "created", "updated",
 			},
 		},
 	}
