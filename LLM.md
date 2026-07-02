@@ -104,7 +104,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 ## JS Runtime — ONE engine, via zip
 
 Per HIP-0106, there is exactly **one** goja engine in the stack:
-`github.com/hanzoai/zip/runtime` (`*runtime.JSRuntime`). base, cloud and
+`github.com/zap-proto/zip/runtime` (`*runtime.JSRuntime`). base, cloud and
 every zip consumer share it.
 
 - `plugins/extruntime/` is the polyglot extension SPI
@@ -121,7 +121,7 @@ every zip consumer share it.
   onto zip needs base's host-API binds lifted into zip first.
 
 Two thin shims remain in gojavm with `TODO(zip/runtime)` markers (tracked
-on hanzoai/zip PR #9): ctx-aware Eval, and multi-file bundling transpile.
+on zap-proto/zip PR #9): ctx-aware Eval, and multi-file bundling transpile.
 The HTTP layer stays on base's `tools/router` (Base-native,
 `http.Handler` via `BuildMux`); cloud mounts it under `/v1/base/*` via
 `zip.AdaptNetHTTP` (see `cloud/mounts/base/mount.go`). A native-fiber
