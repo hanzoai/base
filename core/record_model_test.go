@@ -36,7 +36,7 @@ func TestNewRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := `{"id":"","status":false}`
+	expected := `{"created":"","id":"","status":false,"updated":""}`
 
 	if str := string(rawData); str != expected {
 		t.Fatalf("Expected schema data\n%v\ngot\n%v", expected, str)
@@ -526,7 +526,7 @@ func TestRecordMergeExpand(t *testing.T) {
 	}
 	rawStr := string(raw)
 
-	expected := `{"a":{"collectionId":"_hbc_123","collectionName":"test","expand":{"a1":{"collectionId":"_hbc_123","collectionName":"test","id":"a1"},"a23":[{"collectionId":"_hbc_123","collectionName":"test","id":"a2"},{"collectionId":"_hbc_123","collectionName":"test","expand":{"a31":{"collectionId":"_hbc_123","collectionName":"test","id":"a31"},"a32":[{"collectionId":"_hbc_123","collectionName":"test","id":"a32"},{"collectionId":"_hbc_123","collectionName":"test","id":"a32New"}],"a33New":{"collectionId":"_hbc_123","collectionName":"test","id":"a33New"}},"id":"a3"}]},"id":"a"},"b":[{"collectionId":"_hbc_123","collectionName":"test","expand":{"b1":{"collectionId":"_hbc_123","collectionName":"test","id":"b1"}},"id":"b"},{"collectionId":"_hbc_123","collectionName":"test","id":"bNew"}],"c":[{"collectionId":"_hbc_123","collectionName":"test","id":"c"}],"dNew":{"collectionId":"_hbc_123","collectionName":"test","id":"dNew"}}`
+	expected := `{"a":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","expand":{"a1":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a1","updatedAt":""},"a23":[{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a2","updatedAt":""},{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","expand":{"a31":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a31","updatedAt":""},"a32":[{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a32","updatedAt":""},{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a32New","updatedAt":""}],"a33New":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"a33New","updatedAt":""}},"id":"a3","updatedAt":""}]},"id":"a","updatedAt":""},"b":[{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","expand":{"b1":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"b1","updatedAt":""}},"id":"b","updatedAt":""},{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"bNew","updatedAt":""}],"c":[{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"c","updatedAt":""}],"dNew":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"dNew","updatedAt":""}}`
 
 	if expected != rawStr {
 		t.Fatalf("Expected \n%v, \ngot \n%v", expected, rawStr)
@@ -547,17 +547,17 @@ func TestRecordMergeExpandNilCheck(t *testing.T) {
 		{
 			"nil expand",
 			nil,
-			`{"collectionId":"_hbc_123","collectionName":"test","id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"","updatedAt":""}`,
 		},
 		{
 			"empty expand",
 			map[string]any{},
-			`{"collectionId":"_hbc_123","collectionName":"test","id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"","updatedAt":""}`,
 		},
 		{
 			"non-empty expand",
 			map[string]any{"test": core.NewRecord(collection)},
-			`{"collectionId":"_hbc_123","collectionName":"test","expand":{"test":{"collectionId":"_hbc_123","collectionName":"test","id":""}},"id":""}`,
+			`{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","expand":{"test":{"collectionId":"_hbc_123","collectionName":"test","createdAt":"","id":"","updatedAt":""}},"id":"","updatedAt":""}`,
 		},
 	}
 
@@ -667,7 +667,7 @@ func TestRecordFieldsData(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := `{"email":"test@example.com","emailVisibility":false,"field1":"123","field2":"456","id":"test_id","tokenKey":"789","verified":false}`
+	expected := `{"created":"","email":"test@example.com","emailVisibility":false,"field1":"123","field2":"456","id":"test_id","tokenKey":"789","updated":"","verified":false}`
 
 	if v := string(raw); v != expected {
 		t.Fatalf("Expected\n%v\ngot\n%v", expected, v)
@@ -1235,11 +1235,11 @@ func TestRecordDBExport(t *testing.T) {
 	}{
 		{
 			colBase,
-			`{"field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id"}`,
+			`{"created":"","field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id","updated":""}`,
 		},
 		{
 			colAuth,
-			`{"email":"test_email","emailVisibility":true,"field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id","tokenKey":"test_tokenKey","verified":false}`,
+			`{"created":"","email":"test_email","emailVisibility":true,"field1":"test","field2":"test.png","field3":["test1","test2"],"field4":["test11","test12"],"id":"test_id","tokenKey":"test_tokenKey","updated":"","verified":false}`,
 		},
 	}
 
@@ -1396,7 +1396,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","createdAt":"","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","updatedAt":""}`,
 		},
 		{
 			"[base] with email visibility",
@@ -1405,7 +1405,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_base_123","collectionName":"test_base","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id"}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","createdAt":"","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","updatedAt":""}`,
 		},
 		{
 			"[base] with custom data",
@@ -1414,7 +1414,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","createdAt":"","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","updatedAt":"","verified":true}`,
 		},
 		{
 			"[base] with explicit hide and unhide fields",
@@ -1423,7 +1423,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			[]string{"field3", "field1", "expand", "collectionId", "collectionName", "email", "tokenKey", "unknown"},
 			[]string{"field4", "@baseInternalAbc"},
-			`{"emailVisibility":"test_invalid","field2":"field_2.png","field4":"field_4","id":"test_id","password":"test_passwordHash","verified":true}`,
+			`{"createdAt":"","emailVisibility":"test_invalid","field2":"field_2.png","field4":"field_4","id":"test_id","password":"test_passwordHash","updatedAt":"","verified":true}`,
 		},
 		{
 			"[base] trying to unhide custom fields without explicit WithCustomData",
@@ -1432,7 +1432,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			[]string{"field5", "@baseInternalAbc", "email", "tokenKey", "unknown"},
-			`{"collectionId":"_hbc_base_123","collectionName":"test_base","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_base_123","collectionName":"test_base","createdAt":"","email":"test_email","emailVisibility":"test_invalid","expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","password":"test_passwordHash","tokenKey":"test_tokenKey","unknown":"test_unknown","updatedAt":"","verified":true}`,
 		},
 
 		// auth
@@ -1443,7 +1443,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","createdAt":"","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","updatedAt":"","verified":true}`,
 		},
 		{
 			"[auth] with email visibility",
@@ -1452,7 +1452,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			false,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","email":"test_email","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","createdAt":"","email":"test_email","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","updatedAt":"","verified":true}`,
 		},
 		{
 			"[auth] with custom data",
@@ -1461,7 +1461,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			nil,
-			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","createdAt":"","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"id":"test_id","unknown":"test_unknown","updatedAt":"","verified":true}`,
 		},
 		{
 			"[auth] with explicit hide and unhide fields",
@@ -1470,7 +1470,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			[]string{"field3", "field1", "expand", "collectionId", "collectionName", "email", "unknown"},
 			[]string{"field4", "@baseInternalAbc"},
-			`{"emailVisibility":false,"field2":"field_2.png","field4":"field_4","id":"test_id","verified":true}`,
+			`{"createdAt":"","emailVisibility":false,"field2":"field_2.png","field4":"field_4","id":"test_id","updatedAt":"","verified":true}`,
 		},
 		{
 			"[auth] trying to unhide custom fields without explicit WithCustomData",
@@ -1479,7 +1479,7 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 			true,
 			nil,
 			[]string{"field5", "@baseInternalAbc", "tokenKey", "unknown", "email"}, // emailVisibility:false has higher priority
-			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","unknown":"test_unknown","verified":true}`,
+			`{"collectionId":"_hbc_auth_123","collectionName":"test_auth","createdAt":"","emailVisibility":false,"expand":{"test":123},"field1":"field_1","field2":"field_2.png","field3":["test1","test2"],"field5":"field_5","id":"test_id","unknown":"test_unknown","updatedAt":"","verified":true}`,
 		},
 	}
 
