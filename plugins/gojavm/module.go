@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	zipruntime "github.com/hanzoai/zip/runtime"
+	zipruntime "github.com/zap-proto/zip/runtime"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 )
