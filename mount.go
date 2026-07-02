@@ -31,7 +31,7 @@ import (
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/cloud"
-	"github.com/hanzoai/zip"
+	"github.com/zap-proto/zip"
 )
 
 // Mount registers Base routes with the shared cloud zip.App per HIP-0106.

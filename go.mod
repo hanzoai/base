@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/storage v1.59.2
 	github.com/disintegration/imaging v1.6.2
 	github.com/domodwyer/mailyak/v3 v3.6.2
-	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
+	github.com/dop251/goja v0.0.0-20260607120635-348e6bea910d
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.9.0
@@ -31,6 +31,7 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.11.0
+	github.com/zap-proto/zip v1.1.0
 	go.starlark.net v0.0.0-20260326113308-fadfc96def35
 	golang.org/x/crypto v0.52.0
 	golang.org/x/image v0.38.0
@@ -63,8 +64,10 @@ require (
 	github.com/consensys/gnark-crypto v0.20.1 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
+	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.36.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.0 // indirect
+	github.com/evanw/esbuild v0.28.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
@@ -136,6 +139,8 @@ require (
 	github.com/valyala/fasthttp v1.70.0 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/zap-proto/go v1.3.0 // indirect
+	github.com/zap-proto/http v0.1.0 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
@@ -159,7 +164,6 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
@@ -212,7 +216,4 @@ require (
 )
 
 // HIP-0106 unified cloud binary — Mount() entry point in pkg/base/mount.go.
-require (
-	github.com/hanzoai/cloud v0.1.1
-	github.com/hanzoai/zip v0.2.0
-)
+require github.com/hanzoai/cloud v0.1.1
