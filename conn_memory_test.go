@@ -28,7 +28,7 @@ import (
 
 	luxlog "github.com/luxfi/log"
 
-	"github.com/hanzoai/zip"
+	"github.com/zap-proto/zip"
 )
 
 var connCount = flag.Int("conn-count", 1000, "concurrent connections to hold")
