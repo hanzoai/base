@@ -1,5 +1,5 @@
 // Package gojavm adapts zip's embedded JavaScript runtime
-// (github.com/hanzoai/zip/runtime) to base's extruntime.Runtime SPI, so
+// (github.com/zap-proto/zip/runtime) to base's extruntime.Runtime SPI, so
 // a manifest with `"runtime": "goja"` loads here. There is now exactly
 // ONE goja engine in the Hanzo stack — zip's *runtime.JSRuntime — and
 // base, cloud and every other zip consumer share it. gojavm is the thin
@@ -24,7 +24,7 @@ import (
 	"os"
 	"strconv"
 
-	zipruntime "github.com/hanzoai/zip/runtime"
+	zipruntime "github.com/zap-proto/zip/runtime"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 )
