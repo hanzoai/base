@@ -1,5 +1,6 @@
-// Package store implements the canonical per-(org, user) SQLite storage
-// model described in hanzo/ARCHITECTURE.md §5.
+// Package store implements the canonical per-tenant SQLite storage model
+// described in hanzo/ARCHITECTURE.md §5: a composable org / app / project /
+// user isolation hierarchy (see the tenant-data-hierarchy HIP).
 //
 // There is exactly one way to fetch the SQLite handle for the current
 // request:
@@ -51,21 +52,31 @@ import (
 
 // Key is the tuple that identifies a per-tenant SQLite DB.
 //
-// Scope = "users" for per-user DBs and "org" for the org-wide DB. Splitting
-// the space this way lets us keep a single cache and a single object-storage
-// layout for both shapes.
+// The tenant space is a composable hierarchy under one org: an org-wide DB,
+// a per-app DB, a per-app-per-project DB, and a per-user DB. Splitting the
+// space this way lets us keep a single cache and a single object-storage
+// layout for every shape. Scope selects which fields are significant:
+//
+//	ScopeOrg      OrgID
+//	ScopeApp      OrgID, App
+//	ScopeProject  OrgID, App, Project
+//	ScopeUser     OrgID, UserID
 type Key struct {
-	OrgID  string
-	UserID string // empty when Scope == ScopeOrg
-	Scope  Scope
+	OrgID   string
+	UserID  string // set when Scope == ScopeUser
+	App     string // set when Scope == ScopeApp or ScopeProject
+	Project string // set when Scope == ScopeProject
+	Scope   Scope
 }
 
-// Scope selects user-level or org-level DB for a given org.
+// Scope selects which tier of the org's tenant hierarchy a Key addresses.
 type Scope int
 
 const (
 	ScopeUser Scope = iota
 	ScopeOrg
+	ScopeApp
+	ScopeProject
 )
 
 // CAS reports whether this package performs object-storage compare-and-swap
@@ -100,55 +111,80 @@ var (
 
 // String implements fmt.Stringer for log lines and metric labels.
 func (k Key) String() string {
-	if k.Scope == ScopeOrg {
+	switch k.Scope {
+	case ScopeOrg:
 		return k.OrgID + "/org"
+	case ScopeApp:
+		return k.OrgID + "/apps/" + k.App
+	case ScopeProject:
+		return k.OrgID + "/apps/" + k.App + "/projects/" + k.Project
+	default: // ScopeUser
+		return k.OrgID + "/users/" + k.UserID
 	}
-	return k.OrgID + "/users/" + k.UserID
 }
 
 // ObjectKey returns the object-storage path for the DB.
 //
-//	user-scoped:  {org}/users/{user}.db
-//	org-scoped:   {org}/org.db
+//	org-scoped:      {org}/org.db
+//	app-scoped:      {org}/apps/{app}.db
+//	project-scoped:  {org}/apps/{app}/projects/{project}.db
+//	user-scoped:     {org}/users/{user}.db
 func (k Key) ObjectKey() string {
-	if k.Scope == ScopeOrg {
+	switch k.Scope {
+	case ScopeOrg:
 		return filepath.ToSlash(filepath.Join(k.OrgID, "org.db"))
+	case ScopeApp:
+		return filepath.ToSlash(filepath.Join(k.OrgID, "apps", k.App+".db"))
+	case ScopeProject:
+		return filepath.ToSlash(filepath.Join(k.OrgID, "apps", k.App, "projects", k.Project+".db"))
+	default: // ScopeUser
+		return filepath.ToSlash(filepath.Join(k.OrgID, "users", k.UserID+".db"))
 	}
-	return filepath.ToSlash(filepath.Join(k.OrgID, "users", k.UserID+".db"))
 }
 
-// LocalPath returns the in-pod filesystem path for the DB.
+// LocalPath returns the in-pod filesystem path for the DB. It mirrors
+// ObjectKey under cacheRoot so the on-disk cache and the bucket share one
+// layout — the path structure lives in exactly one place.
 func (k Key) LocalPath(cacheRoot string) string {
-	if k.Scope == ScopeOrg {
-		return filepath.Join(cacheRoot, k.OrgID, "org.db")
-	}
-	return filepath.Join(cacheRoot, k.OrgID, "users", k.UserID+".db")
+	return filepath.Join(cacheRoot, filepath.FromSlash(k.ObjectKey()))
 }
 
 // Valid reports whether the key is well-formed. Callers MUST validate keys
 // built from HTTP headers before passing them to the store — otherwise a
-// crafted org slug can reach the filesystem with `..`.
+// crafted org / app / project slug can reach the filesystem with `..`.
+// Every slug significant to the Scope passes the SAME validateSlug guard,
+// so no tier can escape cacheRoot.
 func (k Key) Valid() error {
 	if err := validateSlug(k.OrgID); err != nil {
 		return fmt.Errorf("OrgID: %w", err)
 	}
-	if k.Scope == ScopeUser {
+	switch k.Scope {
+	case ScopeUser:
 		if err := validateSlug(k.UserID); err != nil {
 			return fmt.Errorf("UserID: %w", err)
+		}
+	case ScopeProject:
+		if err := validateSlug(k.Project); err != nil {
+			return fmt.Errorf("Project: %w", err)
+		}
+		fallthrough
+	case ScopeApp:
+		if err := validateSlug(k.App); err != nil {
+			return fmt.Errorf("App: %w", err)
 		}
 	}
 	return nil
 }
 
-// MaxSlugLen caps org / user slug length. 128 bytes is generous: IAM ULIDs
+// MaxSlugLen caps every tenant slug length. 128 bytes is generous: IAM ULIDs
 // are 26 chars, UUIDs 36. A slug longer than this is either a mistake or an
 // attempt to blow up filesystem error messages with attacker-controlled
 // bytes — reject before any FS call.
 const MaxSlugLen = 128
 
 // validateSlug enforces `[a-z0-9_-]+` and length ≤ MaxSlugLen, rejecting
-// path traversal, mixed case, whitespace, and oversized inputs. Both slugs
-// (org, user) live under this contract in IAM.
+// path traversal, mixed case, whitespace, and oversized inputs. Every
+// tenant slug (org, app, project, user) lives under this contract in IAM.
 func validateSlug(s string) error {
 	if s == "" {
 		return errors.New("empty")
@@ -231,7 +267,7 @@ type Options struct {
 	OnReapFailure func(Key, error)
 }
 
-// MultiTenantStore owns the per-(org, user) SQLite universe for one pod.
+// MultiTenantStore owns the per-tenant SQLite universe for one pod.
 // Safe for concurrent use.
 type MultiTenantStore struct {
 	opts Options
@@ -353,9 +389,77 @@ func (s *MultiTenantStore) ForOrg(ctx context.Context) (*dbx.DB, error) {
 	return s.Get(ctx, Key{OrgID: c.OrgID, Scope: ScopeOrg})
 }
 
-// Get is the low-level path used by ForCtx / ForOrg. Exposed so that
-// background jobs (migrations, reports) can resolve a specific key without a
-// synthetic HTTP request.
+// appCtxKey / projectCtxKey are unexported context keys. App and project are
+// REQUEST scope, not caller identity: per the tenant-data-hierarchy HIP the
+// request carries app+project while IAM carries org (via claims). Keeping
+// them out of claims.Claims preserves the canonical 3-header identity
+// contract — the router attaches these the way claims.Inject attaches identity.
+type appCtxKey struct{}
+type projectCtxKey struct{}
+
+// WithApp returns a context carrying the request's app scope. Routers set it
+// once the app slug is resolved (typically one app per service).
+func WithApp(ctx context.Context, app string) context.Context {
+	return context.WithValue(ctx, appCtxKey{}, app)
+}
+
+// WithProject returns a context carrying the request's project scope.
+func WithProject(ctx context.Context, project string) context.Context {
+	return context.WithValue(ctx, projectCtxKey{}, project)
+}
+
+// AppFromContext returns the request's app scope, or "" when absent
+// (composable fallback to the org tier).
+func AppFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(appCtxKey{}).(string)
+	return s
+}
+
+// ProjectFromContext returns the request's project scope, or "" when absent
+// (composable fallback to the app tier).
+func ProjectFromContext(ctx context.Context) string {
+	s, _ := ctx.Value(projectCtxKey{}).(string)
+	return s
+}
+
+// ForApp resolves the app-scoped SQLite for the caller's org (per-org app
+// settings). Org comes from IAM (claims); the app slug from the request
+// (WithApp). An absent app composably falls back to the org tier.
+func (s *MultiTenantStore) ForApp(ctx context.Context) (*dbx.DB, error) {
+	c := claims.FromContext(ctx)
+	if c.OrgID == "" {
+		return nil, claims.ErrGatewayBypass
+	}
+	app := AppFromContext(ctx)
+	if app == "" {
+		return s.Get(ctx, Key{OrgID: c.OrgID, Scope: ScopeOrg})
+	}
+	return s.Get(ctx, Key{OrgID: c.OrgID, App: app, Scope: ScopeApp})
+}
+
+// ForProject resolves the project-scoped SQLite for the caller's org+app
+// (operational data: fleets, bots, machines). Org comes from IAM (claims);
+// app+project from the request (WithApp / WithProject). Composable fallback:
+// absent project → app tier, absent app → org tier.
+func (s *MultiTenantStore) ForProject(ctx context.Context) (*dbx.DB, error) {
+	c := claims.FromContext(ctx)
+	if c.OrgID == "" {
+		return nil, claims.ErrGatewayBypass
+	}
+	app := AppFromContext(ctx)
+	if app == "" {
+		return s.Get(ctx, Key{OrgID: c.OrgID, Scope: ScopeOrg})
+	}
+	project := ProjectFromContext(ctx)
+	if project == "" {
+		return s.Get(ctx, Key{OrgID: c.OrgID, App: app, Scope: ScopeApp})
+	}
+	return s.Get(ctx, Key{OrgID: c.OrgID, App: app, Project: project, Scope: ScopeProject})
+}
+
+// Get is the low-level path used by ForCtx / ForOrg / ForApp / ForProject.
+// Exposed so that background jobs (migrations, reports) can resolve a
+// specific key without a synthetic HTTP request.
 func (s *MultiTenantStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
 	if err := k.Valid(); err != nil {
 		return nil, fmt.Errorf("store: invalid key %s: %w", k, err)
