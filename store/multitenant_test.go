@@ -89,10 +89,32 @@ func TestKey_ObjectKey(t *testing.T) {
 	}{
 		{store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}, "acme/users/alice.db"},
 		{store.Key{OrgID: "acme", Scope: store.ScopeOrg}, "acme/org.db"},
+		{store.Key{OrgID: "acme", App: "fleet", Scope: store.ScopeApp}, "acme/apps/fleet.db"},
+		{store.Key{OrgID: "acme", App: "fleet", Project: "east", Scope: store.ScopeProject}, "acme/apps/fleet/projects/east.db"},
 	}
 	for _, tc := range cases {
 		if got := tc.k.ObjectKey(); got != tc.want {
 			t.Errorf("ObjectKey(%v) = %q, want %q", tc.k, got, tc.want)
+		}
+	}
+}
+
+// TestKey_LocalPath verifies the on-disk cache path mirrors ObjectKey under
+// the cache root for every tier — one layout, no divergence.
+func TestKey_LocalPath(t *testing.T) {
+	root := filepath.FromSlash("/data/cache")
+	cases := []struct {
+		k    store.Key
+		want string
+	}{
+		{store.Key{OrgID: "acme", Scope: store.ScopeOrg}, filepath.Join(root, "acme", "org.db")},
+		{store.Key{OrgID: "acme", App: "fleet", Scope: store.ScopeApp}, filepath.Join(root, "acme", "apps", "fleet.db")},
+		{store.Key{OrgID: "acme", App: "fleet", Project: "east", Scope: store.ScopeProject}, filepath.Join(root, "acme", "apps", "fleet", "projects", "east.db")},
+		{store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}, filepath.Join(root, "acme", "users", "alice.db")},
+	}
+	for _, tc := range cases {
+		if got := tc.k.LocalPath(root); got != tc.want {
+			t.Errorf("LocalPath(%s) = %q, want %q", tc.k, got, tc.want)
 		}
 	}
 }
@@ -105,6 +127,13 @@ func TestKey_Valid_RejectsTraversal(t *testing.T) {
 		{OrgID: "", UserID: "x", Scope: store.ScopeUser},
 		{OrgID: "acme", UserID: "", Scope: store.ScopeUser},
 		{OrgID: "acme has space", UserID: "x", Scope: store.ScopeUser},
+		// App / project tiers pass the SAME guard as org / user.
+		{OrgID: "acme", App: "../etc", Scope: store.ScopeApp},
+		{OrgID: "acme", App: "bad/slash", Scope: store.ScopeApp},
+		{OrgID: "acme", App: "", Scope: store.ScopeApp},
+		{OrgID: "acme", App: "fleet", Project: "../../secret", Scope: store.ScopeProject},
+		{OrgID: "acme", App: "fleet", Project: "", Scope: store.ScopeProject},
+		{OrgID: "acme", App: "", Project: "east", Scope: store.ScopeProject}, // app must also be valid
 	}
 	for _, k := range bad {
 		if err := k.Valid(); err == nil {
@@ -119,6 +148,8 @@ func TestKey_Valid_AcceptsSlugs(t *testing.T) {
 		{OrgID: "org-123", UserID: "user_42", Scope: store.ScopeUser},
 		{OrgID: "a", UserID: "b", Scope: store.ScopeUser},
 		{OrgID: "acme", Scope: store.ScopeOrg},
+		{OrgID: "acme", App: "fleet", Scope: store.ScopeApp},
+		{OrgID: "acme", App: "fleet-1", Project: "east_2", Scope: store.ScopeProject},
 	}
 	for _, k := range good {
 		if err := k.Valid(); err != nil {
@@ -225,7 +256,6 @@ func TestIsolationBetweenTenants(t *testing.T) {
 		t.Fatalf("alice saw %q, expected from-alice", v)
 	}
 }
-
 
 // TestForCtx_GatewayBypass returns claims.ErrGatewayBypass when the context
 // has no claims attached (identity stripped or never injected).
@@ -387,6 +417,122 @@ func TestOrgScope(t *testing.T) {
 	}
 	if orgDB == userDB {
 		t.Fatal("ForOrg must not alias ForCtx — they are different DBs")
+	}
+}
+
+// TestForApp_ResolvesAndFallsBack: with an app in context ForApp resolves a
+// distinct app-tier DB; without an app it composably falls back to the org
+// tier and persists at {org}/apps/{app}.db.
+func TestForApp_ResolvesAndFallsBack(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+	base := ctxWithClaims("acme", "alice")
+
+	orgDB, err := s.ForOrg(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No app in context → app tier falls back to the org DB.
+	fbDB, err := s.ForApp(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fbDB != orgDB {
+		t.Fatal("ForApp with no app must fall back to the org DB")
+	}
+	// App in context → distinct app-tier DB.
+	appDB, err := s.ForApp(store.WithApp(base, "fleet"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if appDB == orgDB {
+		t.Fatal("ForApp must not alias ForOrg when an app is present")
+	}
+	if _, err := appDB.NewQuery("CREATE TABLE t(v TEXT)").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	k := store.Key{OrgID: "acme", App: "fleet", Scope: store.ScopeApp}
+	if err := s.Checkpoint(base, k); err != nil {
+		t.Fatal(err)
+	}
+	if !fileExists(t, filepath.Join(bucketDir, "acme", "apps", "fleet.db")) {
+		t.Fatal("expected app-tier object at acme/apps/fleet.db")
+	}
+}
+
+// TestForProject_ResolvesAndFallsBack: project resolves the deepest tier;
+// absent project falls to app; absent app falls to org — composable.
+func TestForProject_ResolvesAndFallsBack(t *testing.T) {
+	s, bucketDir := newTestStore(t)
+	base := ctxWithClaims("acme", "alice")
+
+	orgDB, err := s.ForOrg(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// No app → org tier.
+	if db, err := s.ForProject(base); err != nil || db != orgDB {
+		t.Fatalf("ForProject with no app must fall back to org DB (equal=%v err=%v)", db == orgDB, err)
+	}
+	// App only → app tier.
+	appCtx := store.WithApp(base, "fleet")
+	appDB, err := s.ForApp(appCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if db, err := s.ForProject(appCtx); err != nil || db != appDB {
+		t.Fatalf("ForProject with app but no project must fall back to app DB (equal=%v err=%v)", db == appDB, err)
+	}
+	// App + project → distinct project tier.
+	projCtx := store.WithProject(appCtx, "east")
+	projDB, err := s.ForProject(projCtx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if projDB == appDB || projDB == orgDB {
+		t.Fatal("ForProject must resolve a distinct project-tier DB")
+	}
+	if _, err := projDB.NewQuery("CREATE TABLE t(v TEXT)").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	k := store.Key{OrgID: "acme", App: "fleet", Project: "east", Scope: store.ScopeProject}
+	if err := s.Checkpoint(projCtx, k); err != nil {
+		t.Fatal(err)
+	}
+	if !fileExists(t, filepath.Join(bucketDir, "acme", "apps", "fleet", "projects", "east.db")) {
+		t.Fatal("expected project-tier object at acme/apps/fleet/projects/east.db")
+	}
+}
+
+// TestForApp_GatewayBypass / project variant: an app/project scope with no
+// IAM identity still fails closed with ErrGatewayBypass.
+func TestForApp_GatewayBypass(t *testing.T) {
+	s, _ := newTestStore(t)
+	if _, err := s.ForApp(store.WithApp(context.Background(), "fleet")); !errors.Is(err, claims.ErrGatewayBypass) {
+		t.Fatalf("ForApp: expected ErrGatewayBypass, got %v", err)
+	}
+	ctx := store.WithProject(store.WithApp(context.Background(), "fleet"), "east")
+	if _, err := s.ForProject(ctx); !errors.Is(err, claims.ErrGatewayBypass) {
+		t.Fatalf("ForProject: expected ErrGatewayBypass, got %v", err)
+	}
+}
+
+// TestForApp_RejectsTraversalApp: a hostile app slug injected into the
+// request context is rejected by the store's Valid guard before any FS
+// access — a crafted app can never escape cacheRoot.
+func TestForApp_RejectsTraversalApp(t *testing.T) {
+	s, _ := newTestStore(t)
+	ctx := store.WithApp(ctxWithClaims("acme", "alice"), "../../../etc/passwd")
+	if _, err := s.ForApp(ctx); err == nil {
+		t.Fatal("expected ForApp to reject a traversal app slug")
+	}
+}
+
+// TestForProject_RejectsTraversalProject: same guard on the project slug.
+func TestForProject_RejectsTraversalProject(t *testing.T) {
+	s, _ := newTestStore(t)
+	ctx := store.WithProject(store.WithApp(ctxWithClaims("acme", "alice"), "fleet"), "../../secret")
+	if _, err := s.ForProject(ctx); err == nil {
+		t.Fatal("expected ForProject to reject a traversal project slug")
 	}
 }
 
