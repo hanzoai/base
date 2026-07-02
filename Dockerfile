@@ -6,7 +6,7 @@
 # binary at compile time (ui-react/embed.go uses //go:embed all:dist).
 # The committed ui-react/dist is the source of truth for CI builds —
 # rebuild it locally with `pnpm --dir ui-react build` before tagging.
-FROM golang:1.26.4-alpine AS builder
+FROM public.ecr.aws/docker/library/golang:1.26.4-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
 # No GOPRIVATE — cross-org modules (hanzoai/*, luxfi/* incl. luxfi/zap forward
@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o /build/base \
     ./examples/base/main.go
 
-FROM alpine:3.21
+FROM public.ecr.aws/docker/library/alpine:3.21
 RUN apk add --no-cache ca-certificates tzdata curl \
     && addgroup -S hanzo && adduser -S hanzo -G hanzo
 WORKDIR /app
