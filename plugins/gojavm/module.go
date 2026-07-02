@@ -78,7 +78,7 @@ func (m *module) Exports() []string { return m.exports }
 // TODO(zip/runtime): zip's JSRuntime.Eval takes no context.Context, so a
 // ctx cancel mid-call cannot interrupt the VM here (the previous
 // implementation ran a vm.Interrupt watchdog). Cooperative cancel needs
-// an Eval/Invoke-with-ctx on zip's JSRuntime. Tracked on hanzoai/zip
+// an Eval/Invoke-with-ctx on zip's JSRuntime. Tracked on zap-proto/zip
 // PR #9 (issues disabled there); until it lands we race Eval against
 // ctx.Done() below.
 func (m *module) Invoke(ctx context.Context, fn string, payload []byte) ([]byte, error) {

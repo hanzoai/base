@@ -35,7 +35,7 @@ var esmRe = regexp.MustCompile(`(?m)^\s*(import|export)\b|require\s*\(|module\.e
 // into one program, which zip does not yet expose. When zip grows a
 // bundling Transpile (BundleDir / multi-entry) this esbuild call moves
 // into zip/runtime and gojavm drops its direct esbuild dependency. Until
-// then the bundle step lives here. Tracked on hanzoai/zip PR #9 (issues
+// then the bundle step lives here. Tracked on zap-proto/zip PR #9 (issues
 // disabled there).
 func transpile(dir string, m *extruntime.Manifest) (string, error) {
 	src := m.Module
