@@ -232,11 +232,14 @@ func TestPoolManager_DataPersists(t *testing.T) {
 
 func TestPoolManager_IdleEviction(t *testing.T) {
 	dir := t.TempDir()
+	// IdleTimeout must comfortably exceed the setup loop's worst case (3 SQLite
+	// opens + CREATE TABLE on a loaded CI runner), or the sweeper evicts pool 0
+	// before the Len()==3 assertion below — a timing flake. 300ms gives headroom.
 	m := NewDBPoolManager(DBPoolConfig{
 		MaxPools:      10,
 		ReadConns:     4,
 		NumShards:     1,
-		IdleTimeout:   50 * time.Millisecond,
+		IdleTimeout:   300 * time.Millisecond,
 		SweepInterval: 20 * time.Millisecond,
 		Connect:       core.DefaultDBConnect,
 	})
@@ -255,8 +258,8 @@ func TestPoolManager_IdleEviction(t *testing.T) {
 		t.Fatalf("expected 3 pools, got %d", m.Len())
 	}
 
-	// Wait for idle timeout + sweep interval to pass
-	time.Sleep(150 * time.Millisecond)
+	// Wait for idle timeout (300ms) + sweep interval to pass
+	time.Sleep(400 * time.Millisecond)
 
 	// All 3 should have been evicted by the sweeper
 	if m.Len() != 0 {

@@ -22,7 +22,7 @@ import (
 func fakeIAM(t *testing.T) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/api/userinfo":
+		case "/v1/iam/oauth/userinfo":
 			if r.Header.Get("Authorization") != "Bearer valid-token" {
 				w.WriteHeader(http.StatusUnauthorized)
 				return
