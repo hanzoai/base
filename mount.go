@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"github.com/hanzoai/base/apis"
+	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/cloud"
 	"github.com/zap-proto/zip"
 )
@@ -124,6 +125,21 @@ func Mount(app *zip.App, deps cloud.Deps) error {
 // Package-global because cloud.MountAll has no per-subsystem teardown
 // handle today; registering one is a separate PR. nil-safe.
 var mountedHandle *Base
+
+// App returns the in-process Base app registered by Mount, or nil if Mount
+// has not yet run. Sibling in-process cloud subsystems (e.g. the provisioning
+// control plane per HIP-0106) use it to create and drop document collections
+// directly on the co-resident Base — the one-way, in-process substrate call.
+// This is the ONLY sanctioned way to reach the mounted app: the REST
+// /v1/base/collections surface is superuser-gated and Base's local password
+// auth is retired (IAM-only), so an out-of-band HTTP create is not available
+// to a server-side provisioner. *Base satisfies core.App (see base.go).
+func App() core.App {
+	if mountedHandle == nil {
+		return nil
+	}
+	return mountedHandle
+}
 
 // Shutdown drains the in-process Base app. Idempotent. Safe to call
 // when Mount was never invoked.
