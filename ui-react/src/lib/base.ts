@@ -1,18 +1,12 @@
-// Base client — thin wrapper around Hanzo Base SDK bound to the host that
-// served the page, so the same bundle works against any Base deploy.
-//
-// The SDK handles auth cookies, realtime EventSource subscriptions, and
-// pagination. We expose a single shared instance via `base`.
-import { BaseClient } from "/base";
+// Shared Base client instance. `BaseClient` is the ergonomic object API over
+// the `/v1` fetch layer (see ./base-client). One instance for the whole admin;
+// same bundle works against any Base deploy since the fetch layer is relative.
+import { BaseClient } from '~/lib/base-client'
 
-function resolveBaseUrl(): string {
-  if (typeof window === 'undefined') return '';
-  // Admin UI is served from the same origin as the API, so relative URL works.
-  return window.location.origin;
-}
+export type { CollectionField, CollectionModel, ListResult, RecordModel } from '~/lib/base-client'
 
-export const base = new BaseClient(resolveBaseUrl());
+export const base = new BaseClient()
 
-// Export commonly-used handles so pages don't have to reach into the SDK.
-export const superusers = base.collection('_superusers');
-export const settings = base.settings;
+// Commonly-used handles so pages don't reach into the client.
+export const superusers = base.collection('_superusers')
+export const settings = base.settings
