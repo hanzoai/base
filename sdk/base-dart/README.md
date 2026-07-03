@@ -1,12 +1,12 @@
 # Moved
 
-The Hanzo Base Dart client (`hanzo`) lives in its own repository:
+The Hanzo Base Dart client (`hanzo_base`) lives in its own repository:
 
 **https://github.com/hanzo-dart/base**
 
 ```yaml
 dependencies:
-  hanzo: ^0.1.0
+  hanzo_base: ^0.1.0
 ```
 
 The client SDKs no longer ship from this server repo. The

@@ -18,7 +18,7 @@ base.collection('tasks').subscribe('*', callback)
 
 ### Proposed: Reactive Query Hooks
 ```typescript
-import { useQuery, useMutation } from '@hanzoai/base-react'
+import { useQuery, useMutation } from '@hanzo/base/react'
 
 // Reactive query — auto-updates when data changes
 const tasks = useQuery('tasks', {
@@ -175,11 +175,11 @@ interface Transition {
 
 ## 7. React SDK Package
 
-### Package: `@hanzoai/base-react`
+### Package: `@hanzo/base/react`
 
 ```typescript
 // Provider
-import { BaseProvider } from '@hanzoai/base-react'
+import { BaseProvider } from '@hanzo/base/react'
 
 function App() {
   return (
@@ -190,7 +190,7 @@ function App() {
 }
 
 // Hooks
-import { useQuery, useMutation, useAuth, useRealtime } from '@hanzoai/base-react'
+import { useQuery, useMutation, useAuth, useRealtime } from '@hanzo/base/react'
 
 function TaskList() {
   const { data: tasks, isLoading } = useQuery('tasks', {
