@@ -1,9 +1,10 @@
-// Package uireact embeds the Base admin bundle (Hanzo GUI v7 + Vite).
+// Package uireact embeds the Base admin bundle (React 19 + Vite, @hanzo/ui
+// true-black design system).
 //
-// Source lives in ../gui/apps/admin-base. Build there with `bun run build`,
-// then sync into ./dist via scripts/sync-admin-ui.sh. The //go:embed
-// directive below picks up the resulting static assets at compile time
-// of the Base binary.
+// Source lives in ./src. Build with `pnpm --dir ui-react build`, which writes
+// the static bundle to ./dist where the //go:embed directive below picks it
+// up at compile time of the Base binary. dist/ is committed (CI does not
+// rebuild the SPA); refresh it before tagging when the admin changes.
 //
 // The Go HTTP handler serves the admin UI at the Base server's /_/ path
 // — see apis/serve.go (gated behind BASE_ENABLE_ADMIN_UI=1).

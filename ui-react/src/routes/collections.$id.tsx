@@ -5,7 +5,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 
 import { base } from '~/lib/base';
 
-import type { CollectionModel, CollectionField } from "/base";
+import type { CollectionModel, CollectionField } from '~/lib/base';
 
 // ---------------------------------------------------------------------------
 // Types

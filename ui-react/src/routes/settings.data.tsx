@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CollectionModel } from "/base";
+import type { CollectionModel } from '~/lib/base';
 import { useRef, useState } from 'react';
 
 import { base } from '~/lib/base';
