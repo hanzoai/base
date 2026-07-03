@@ -10,4 +10,4 @@ npm install @hanzo/base
 ```
 
 The client SDKs no longer ship from this server repo. The Dart client
-(`hanzo`) is at https://github.com/hanzo-dart/base.
+(`hanzo_base`) is at https://github.com/hanzo-dart/base.
