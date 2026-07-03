@@ -47,7 +47,7 @@ function RootLayout() {
             </Link>
           </nav>
           <div className="absolute bottom-4 left-4 right-4 text-xs text-neutral-400">
-            <div className="truncate">{ record?.email ?? '' }</div>
+            <div className="truncate">{ String(record?.email ?? '') }</div>
             <button onClick={ signOut } className="mt-1 text-neutral-500 hover:text-neutral-200">
               Sign out
             </button>

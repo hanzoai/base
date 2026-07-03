@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { base } from '~/lib/base';
 
-import type { RecordModel } from "/base";
+import type { RecordModel } from '~/lib/base';
 
 // ---------------------------------------------------------------------------
 // Constants

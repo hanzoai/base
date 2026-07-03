@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 
 import { base } from '~/lib/base';
 
-import type { CollectionField } from "/base";
+import type { CollectionField } from '~/lib/base';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -183,7 +183,7 @@ function RecordEditor() {
                 .map((f) => (
                     <div key={f.name} className="flex flex-col gap-1">
                         <span className="text-xs text-neutral-500">{f.name}</span>
-                        <span className="text-sm text-neutral-400">{record.data[f.name] ?? '-'}</span>
+                        <span className="text-sm text-neutral-400">{String(record.data[f.name] ?? '-')}</span>
                     </div>
                 ))}
         </form>
