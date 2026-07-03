@@ -9,8 +9,12 @@ import (
 )
 
 const (
-	expectedDriverVersion = "v1.46.2"
-	expectedLibcVersion   = "v1.70.0"
+	// Kept in lockstep: modernc.org/sqlite v1.50.0's own go.mod pins
+	// modernc.org/libc v1.72.0. libc is NOT semver-stable, so the driver and
+	// libc versions must move together (see issue #6136). Bump BOTH here
+	// whenever go.mod's modernc.org/sqlite changes, to the libc that tag requires.
+	expectedDriverVersion = "v1.50.0"
+	expectedLibcVersion   = "v1.72.0"
 
 	// ModerncDepsCheckHookId is the id of the hook that performs the modernc.org/* deps checks.
 	// It could be used for removing/unbinding the hook if you don't want the checks.

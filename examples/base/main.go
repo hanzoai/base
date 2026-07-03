@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
@@ -124,8 +125,12 @@ func main() {
 	// database and every user a per-user database (see plugins/platform/org_db.go).
 	// The bootnode plugin's collections are resolved per-org through this.
 	platform.MustRegister(app, platform.PlatformConfig{
-		IAMEndpoint:            os.Getenv("IAM_URL"),
-		KMSEndpoint:            os.Getenv("KMS_URL"),
+		// Accept the canonical *_ENDPOINT name or the *_URL alias so a
+		// deployment can set either without config drift (one way to
+		// configure Base's upstreams, two accepted spellings). Mirrors the
+		// resolution in plugins/platform/kms_helpers.go.
+		IAMEndpoint:            envAny("IAM_ENDPOINT", "IAM_URL"),
+		KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
 		IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
 		PrincipalIsolation:     "sqlite",
@@ -177,4 +182,17 @@ func defaultPublicDir() string {
 	}
 
 	return filepath.Join(os.Args[0], "../public")
+}
+
+// envAny returns the first non-empty, trimmed value among the given
+// environment variable names. It lets a deployment set either the canonical
+// name or a legacy alias (e.g. IAM_ENDPOINT or IAM_URL) without per-deploy
+// config drift.
+func envAny(keys ...string) string {
+	for _, k := range keys {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return v
+		}
+	}
+	return ""
 }
