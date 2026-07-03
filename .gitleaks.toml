@@ -1,0 +1,50 @@
+# Gitleaks configuration for hanzoai/base.
+#
+# Blocks any private key or hz_data/* runtime secret from re-entering
+# history. Added after the hz_data/iam.key remediation: an RSA-2048
+# embedded-IAM signer (hz_data/iam.key) plus seeded SQLite stores
+# (hz_data/data.db, hz_data/auxiliary.db, with a cracked z@hanzo.ai
+# superuser) were reachable from public tags v1.3.0/1/2 and 8 branches.
+# History was scrubbed with git-filter-repo; this gate stops recurrence.
+#
+# The CI job (.github/workflows/gitleaks.yml) scans the NEW commits of
+# each push / PR, so this config only ever fails on newly introduced
+# secrets — the pre-existing upstream PocketBase test vectors below never
+# gate a change unless a diff actually touches them.
+
+title = "hanzo-base secret scan"
+
+# Inherit the full upstream detector set (cloud keys, tokens, generic
+# private-key, high-entropy, etc.) and layer Base-specific rules on top.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "hanzo-private-key-pem"
+description = "PEM / OpenSSH private key material must never be committed"
+regex = '''-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----'''
+keywords = ["PRIVATE KEY"]
+tags = ["hanzo", "private-key"]
+
+[[rules]]
+id = "hanzo-hz-data-secret-file"
+description = "Base runtime data dir (hz_data/) — signing keys and SQLite stores stay untracked (also .gitignore'd)"
+path = '''(^|/)hz_data/.*\.(key|db|db-shm|db-wal)$'''
+regex = '''(?s).'''
+tags = ["hanzo", "hz_data"]
+
+[allowlist]
+description = """
+Known upstream PocketBase locations that legitimately contain the PEM
+header STRING (documentation / generated types / a test vector) but no
+real key body. Scoped by exact path so a real key committed anywhere
+else — including any other test file — is still caught.
+"""
+paths = [
+  # Field doc-comment: "Usually wrapped within -----BEGIN PRIVATE KEY-----".
+  '''^forms/apple_client_secret_create\.go$''',
+  # Test vector for Sign-in-with-Apple client-secret generation.
+  '''^forms/apple_client_secret_create_test\.go$''',
+  # Generated TypeScript type defs (JSVM) — PEM header appears in a doc string.
+  '''^plugins/jsvm/internal/types/generated/types\.d\.ts$''',
+]
