@@ -13,10 +13,8 @@ import (
 	"github.com/hanzoai/base/cmd"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/zap"
-	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/osutils"
-	"github.com/hanzoai/base/tools/routine"
 	"github.com/spf13/cobra"
 
 	_ "github.com/hanzoai/base/migrations"
@@ -163,24 +161,6 @@ func NewWithConfig(config Config) *Base {
 
 	// hide the default help command (allow only `--help` flag)
 	base.RootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
-
-	// https://github.com/hanzoai/base/issues/6136
-	base.OnBootstrap().Bind(&hook.Handler[*core.BootstrapEvent]{
-		Id: ModerncDepsCheckHookId,
-		Func: func(be *core.BootstrapEvent) error {
-			if err := be.Next(); err != nil {
-				return err
-			}
-
-			// run separately to avoid blocking
-			app := be.App
-			routine.FireAndForget(func() {
-				checkModerncDeps(app)
-			})
-
-			return nil
-		},
-	})
 
 	// Register ZAP transport plugin natively. ZAP is the binary,
 	// zero-copy wire protocol shared with Lux/Hanzo HFT services.

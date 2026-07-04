@@ -42,12 +42,9 @@ import (
 	"github.com/hanzoai/base/tools/claims"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/sqlite"
 	"github.com/luxfi/cache/bloom"
 	"github.com/luxfi/cache/lru"
-
-	// modernc sqlite driver; registers "sqlite" with database/sql. Same
-	// driver selected by core.DefaultDBConnect.
-	_ "modernc.org/sqlite"
 )
 
 // Key is the tuple that identifies a per-tenant SQLite DB.
@@ -837,11 +834,13 @@ func (s *MultiTenantStore) downloadTo(ctx context.Context, objKey, localPath str
 	return "", nil
 }
 
-// defaultConnect mirrors core.DefaultDBConnect without creating an import
-// cycle: busy_timeout first, then WAL, NORMAL sync, FK on, 32 MB page cache.
+// defaultConnect mirrors core.DefaultDBConnect: it opens on the canonical Hanzo
+// driver (github.com/hanzoai/sqlite, which registers "sqlite" under both build
+// configs) and applies the SAME sqlite.DefaultPragmas via sqlite.PragmaDSN —
+// one pragma set, encoded in the active backend's DSN syntax so busy_timeout +
+// WAL apply whether Base is built pure-Go (!cgo) or with mattn/SQLCipher (cgo).
 func defaultConnect(path string) (*dbx.DB, error) {
-	const pragmas = "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=journal_size_limit(200000000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-32000)"
-	return dbx.Open("sqlite", path+pragmas)
+	return dbx.Open("sqlite", sqlite.PragmaDSN(path, sqlite.DefaultPragmas))
 }
 
 // verifySQLiteFile reads the first 16 bytes of path and passes them to

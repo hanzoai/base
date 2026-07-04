@@ -7,7 +7,7 @@ import (
 
 	"github.com/hanzoai/base/network"
 	"github.com/hanzoai/dbx"
-	sqlite "modernc.org/sqlite"
+	"github.com/hanzoai/sqlite"
 )
 
 // baseNetwork is a local alias for network.Network so the BaseApp field can
@@ -59,7 +59,7 @@ func installCommitHook(ctx context.Context, db dbx.Builder, net network.Network,
 		return fmt.Errorf("network: reserve conn: %w", err)
 	}
 	return raw.Raw(func(driverConn any) error {
-		reg, ok := driverConn.(sqlite.HookRegisterer)
+		reg, ok := sqlite.CommitHookRegisterer(driverConn)
 		if !ok {
 			return fmt.Errorf("network: driver conn %T has no commit hook", driverConn)
 		}
@@ -67,10 +67,12 @@ func installCommitHook(ctx context.Context, db dbx.Builder, net network.Network,
 	})
 }
 
-// commitHookAdapter narrows sqlite.HookRegisterer to the network package's
-// own HookRegisterer shape, which takes func() int32 directly rather than
-// the modernc-typed CommitHookFn. This adapter is the only place in Base
-// that the sqlite driver type leaks into the integration surface.
+// commitHookAdapter narrows hanzoai/sqlite's HookRegisterer to the network
+// package's own HookRegisterer shape, which takes func() int32 directly rather
+// than the sqlite.CommitHookFn named type. This adapter is the ONE place in Base
+// where the sqlite driver type touches the integration surface: the network
+// package stays backend-agnostic, and hanzoai/sqlite hides whether the modernc
+// or mattn backend is active (CommitHookRegisterer resolves the raw conn).
 type commitHookAdapter struct{ inner sqlite.HookRegisterer }
 
 func (c commitHookAdapter) RegisterCommitHook(cb func() int32) {

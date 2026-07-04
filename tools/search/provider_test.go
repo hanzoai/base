@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/list"
-	_ "modernc.org/sqlite"
+	"github.com/hanzoai/orm/query"
+	_ "github.com/hanzoai/sqlite"
 )
 
 func TestNewProvider(t *testing.T) {

@@ -28,8 +28,8 @@ import (
 
 	"github.com/hanzoai/base/network"
 
-	// modernc sqlite has no cgo — matches core/base.
-	_ "modernc.org/sqlite"
+	// Canonical Hanzo SQLite driver — registers "sqlite", matches core/base.
+	_ "github.com/hanzoai/sqlite"
 )
 
 func main() {

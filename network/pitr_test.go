@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/hanzoai/sqlite"
 )
 
 // TestPITRRestore smoke-tests the hack/pitr-restore CLI by writing

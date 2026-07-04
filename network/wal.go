@@ -165,10 +165,12 @@ func appendU16(b []byte, v uint16) []byte { var t [2]byte; binary.BigEndian.PutU
 func appendU32(b []byte, v uint32) []byte { var t [4]byte; binary.BigEndian.PutUint32(t[:], v); return append(b, t[:]...) }
 func appendU64(b []byte, v uint64) []byte { var t [8]byte; binary.BigEndian.PutUint64(t[:], v); return append(b, t[:]...) }
 
-// HookRegisterer is the narrow surface we need from a SQLite driver
-// connection: the method modernc.org/sqlite exposes on its *conn. Accepting
-// it through a tiny interface keeps this package decoupled from the
-// concrete driver type and test-friendly.
+// HookRegisterer is the narrow surface we need to install a commit hook:
+// RegisterCommitHook(func() int32). In production core/base_network.go supplies
+// it by adapting a raw driver connection through github.com/hanzoai/sqlite's
+// CommitHookRegisterer (which hides whether the modernc or mattn backend is
+// active); tests supply a fake. Keeping this interface here keeps the network
+// package decoupled from any concrete SQLite driver type.
 type HookRegisterer interface {
 	RegisterCommitHook(func() int32)
 }
@@ -207,9 +209,10 @@ func (w *shardWriter) buildFrame() (Frame, error) {
 }
 
 // InstallWALHook installs the commit hook on a raw SQLite conn for the given
-// shard. rawConn must implement HookRegisterer (modernc.org/sqlite *conn
-// satisfies this). A no-op source is used unless one has been registered via
-// SetWALSource — SQLite-delta capture is a separate agent's scope.
+// shard. rawConn must implement HookRegisterer — in production the
+// core/base_network.go adapter over github.com/hanzoai/sqlite, in tests a fake.
+// A no-op source is used unless one has been registered via SetWALSource —
+// SQLite-delta capture is a separate agent's scope.
 //
 // Returns an error when:
 //   - the network is not running,
