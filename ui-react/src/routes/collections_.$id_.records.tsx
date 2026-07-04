@@ -26,7 +26,9 @@ function RecordsList() {
   const qc = useQueryClient();
 
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState('-created');
+  // Empty default = API insertion order, valid for any schema (base collections
+  // in this fork have no `created` field). Sorting is opt-in via column headers.
+  const [sort, setSort] = useState('');
   const [filter, setFilter] = useState('');
   const [filterInput, setFilterInput] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -253,7 +255,7 @@ function ErrorText({ error }: { error: unknown }) {
   return <div className="text-sm text-destructive">{ String(error) }</div>;
 }
 
-export const Route = createFileRoute('/collections/$id/records')({
+export const Route = createFileRoute('/collections_/$id_/records')({
   beforeLoad: () => {
     if (!base.authStore.token) throw redirect({ to: '/login' });
   },
