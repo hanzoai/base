@@ -22,7 +22,7 @@ require (
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
-	github.com/luxfi/age v1.5.0
+	github.com/luxfi/age v1.5.1
 	github.com/luxfi/cache v1.2.1
 	github.com/luxfi/consensus v1.25.15
 	github.com/luxfi/fhe v1.8.2
