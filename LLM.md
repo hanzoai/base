@@ -408,3 +408,52 @@ Env matrix:
 (`<svc>-0.<svc>-network.<ns>.svc.cluster.local:9999`) while
 `BASE_NODE_ID` is the bare hostname; `isSelfPeer` matches on the first DNS
 label so the transport never dials itself.
+
+## Admin UI (ui-react) — @hanzo/ui true-black rebuild + Twenty-grade grid
+
+The admin (`ui-react/`, React 19 + TanStack Router, embedded via `embed.go`
+`//go:embed all:dist`, built with `pnpm --dir ui-react build`) is rebuilt on the
+**@hanzo/ui true-black design system** with a Twenty-caliber inline-editable
+record grid. Verified end-to-end in a browser against a real `/v1` server:
+inline text edit (floating editor) and bool toggle both persist.
+
+### @hanzo/ui consumability verdict (settled empirically)
+- **Pin `@hanzo/ui@^5.7.1`** (shadcn/Tailwind/Radix, compiled dist). NOT
+  `@hanzo/ui@8` / `@luxfi/ui@7` — those are the `@hanzo/gui` (Tamagui) line:
+  raw-TS entry + a Tamagui compiler peer, not a clean Vite drop-in.
+- The `@hanzo/ui` **barrel is NOT Vite-consumable**: `dist/index.mjs` hard-imports
+  `next/image`, `next/link`, cmdk, sonner, vaul, react-resizable-panels. Granular
+  subpaths resolve but several components are coupled to bespoke `@hanzo/ui` theme
+  classes (`h-input`, `bg-bg-secondary`), which clash with a true-black shadcn token
+  scheme. So we adopt the **token table + vendored shadcn primitives** in
+  `src/components/ui/*` (the pattern @hanzo/ui's own `templates/vite-app` uses).
+- Wiring: Tailwind v3 + `tailwind.config.cjs` (shadcn HSL token map, `darkMode:['class']`,
+  Basel/Geist fonts, `content` scans `node_modules/@hanzo/ui/dist`), `src/index.css`
+  token vars with true-black `.dark{--background:0 0% 0%}` + gui surface ladder
+  (#0a0a0a/#171717/#1f1f1f), self-hosted Basel + Geist Mono. `.dark` pinned on `<html>`;
+  router `basepath` bound to `import.meta.env.BASE_URL` (= `BASE_ADMIN_UI_PATH`).
+
+### API layer
+- One `/v1` fetch layer (`src/lib/api.ts`) + `BaseClient` object facade
+  (`src/lib/base-client.ts`) exposing `base.collection(x).method()` / `settings` /
+  `authStore`. Realtime = `/v1/realtime` SSE. The old `"/base"` SDK import is gone.
+
+### Auth is IAM-native (confirmed in source + empirically)
+- This fork **retires local `_superusers` password auth**: no `superuser` CLI, no
+  password field, `auth-with-password` route unbound → 404 (or 410-Gone→IAM in
+  external-only mode). Admin is meant to authenticate via **IAM PKCE**
+  (`/v1/iam/oauth/authorize`, proxied by the platform plugin), HIP-0111.
+- **Open (top phased item):** `src/routes/login.tsx` + `api.authWithPassword` still
+  target the retired `_superusers/auth-with-password`. Rewire to `@hanzo/iam` PKCE.
+  For local testing without IAM, mint a superuser token via
+  `record.NewAuthToken()` and set `localStorage.base_auth_token`.
+
+### Phased convergence (remaining views onto @hanzo/ui true-black)
+Done: login, records grid, record editor, collections list, root sidebar.
+Next, behind the working routes, component-by-component:
+1. IAM PKCE login (replaces retired password auth) — unblocks real login.
+2. `collections_.$id` schema editor (still raw inputs + react-hook-form) → @hanzo/ui.
+3. `settings.*` (11 pages) + `logs` → @hanzo/ui (Input/Select/Switch/Table).
+4. Grid depth: rich relation picker (fetch related presentable), column
+   show/hide + width, saved views/filters (system collections exist), CSV export.
+5. Retire `scripts/sync-admin-ui.sh` (obsolete `gui/apps/admin-base` sync path).
