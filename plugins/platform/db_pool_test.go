@@ -18,7 +18,7 @@ func testPoolManager(t *testing.T, maxPools int) (*DBPoolManager, string) {
 	m := NewDBPoolManager(DBPoolConfig{
 		MaxPools:    maxPools,
 		ReadConns:   4,
-		NumShards:   1, // single shard for deterministic test behavior
+		NumShards:   1,  // single shard for deterministic test behavior
 		IdleTimeout: -1, // disable sweeper in tests
 		Connect:     core.DefaultDBConnect,
 	})
@@ -232,43 +232,52 @@ func TestPoolManager_DataPersists(t *testing.T) {
 
 func TestPoolManager_IdleEviction(t *testing.T) {
 	dir := t.TempDir()
-	// IdleTimeout must comfortably exceed the setup loop's worst case (3 SQLite
-	// opens + CREATE TABLE on a loaded CI runner), or the sweeper evicts pool 0
-	// before the Len()==3 assertion below — a timing flake. 300ms gives headroom.
 	m := NewDBPoolManager(DBPoolConfig{
 		MaxPools:      10,
 		ReadConns:     4,
 		NumShards:     1,
-		IdleTimeout:   300 * time.Millisecond,
-		SweepInterval: 20 * time.Millisecond,
+		IdleTimeout:   100 * time.Millisecond,
+		SweepInterval: 10 * time.Millisecond,
 		Connect:       core.DefaultDBConnect,
 	})
 	t.Cleanup(func() { m.Close() })
 
-	// Open 3 pools and release them
+	// Open 3 pools and hold them IN-USE through the count assertion. The idle
+	// sweeper skips any pool with refCount > 0 (see evictIdleLocked / the
+	// _SkipsInUse test), so it cannot race the setup loop: no matter how slow
+	// the runner is at opening 3 SQLite files, all 3 pools survive until we
+	// release them. This gates the assertion on a deterministic signal (the
+	// in-use flag), not wall-clock timing — which was the flake.
+	pools := make([]*DBPool, 3)
 	for i := 0; i < 3; i++ {
 		p, err := m.Get(dbPath(dir, i))
 		if err != nil {
 			t.Fatal(err)
 		}
-		p.Nonconcurrent.NewQuery("CREATE TABLE IF NOT EXISTS t (id INTEGER)").Execute()
-		p.Release()
+		if _, err := p.Nonconcurrent.NewQuery("CREATE TABLE IF NOT EXISTS t (id INTEGER)").Execute(); err != nil {
+			t.Fatal(err)
+		}
+		pools[i] = p
 	}
 	if m.Len() != 3 {
 		t.Fatalf("expected 3 pools, got %d", m.Len())
 	}
 
-	// Wait for idle timeout (300ms) + sweep interval to pass
-	time.Sleep(400 * time.Millisecond)
-
-	// All 3 should have been evicted by the sweeper
-	if m.Len() != 0 {
-		t.Fatalf("expected 0 pools after idle eviction, got %d", m.Len())
+	// Release all three — only now may the sweeper evict them.
+	for _, p := range pools {
+		p.Release()
 	}
 
-	stats := m.Stats()
-	if stats.IdleEvictions != 3 {
-		t.Fatalf("expected 3 idle evictions, got %d", stats.IdleEvictions)
+	// Poll on IdleEvictions, not Len(): the sweeper removes a pool from the LRU
+	// (dropping Len()) under lock, then Close()s it and bumps IdleEvictions
+	// after unlocking — so IdleEvictions is the LAST, monotonic completion
+	// signal. A bounded poll (not a fixed sleep) is robust on fast and slow
+	// runners alike: it returns the instant eviction completes.
+	if !eventually(3*time.Second, func() bool { return m.Stats().IdleEvictions == 3 }) {
+		t.Fatalf("expected 3 idle evictions, got %d", m.Stats().IdleEvictions)
+	}
+	if m.Len() != 0 {
+		t.Fatalf("expected 0 pools after idle eviction, got %d", m.Len())
 	}
 }
 
@@ -279,31 +288,38 @@ func TestPoolManager_IdleEviction_SkipsInUse(t *testing.T) {
 		ReadConns:     4,
 		NumShards:     1,
 		IdleTimeout:   50 * time.Millisecond,
-		SweepInterval: 20 * time.Millisecond,
+		SweepInterval: 10 * time.Millisecond,
 		Connect:       core.DefaultDBConnect,
 	})
 	t.Cleanup(func() { m.Close() })
 
-	// Open pool 0 and hold reference (in-use)
-	p0, _ := m.Get(dbPath(dir, 0))
+	// Pool 0 stays in-use (never released) — must survive every sweep.
+	p0, err := m.Get(dbPath(dir, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// Open pool 1 and release it (idle)
-	p1, _ := m.Get(dbPath(dir, 1))
+	// Pool 1 is released — idle — must be swept.
+	p1, err := m.Get(dbPath(dir, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
 	p1.Release()
 
-	// Wait for idle sweep
-	time.Sleep(150 * time.Millisecond)
-
-	// Pool 1 should be evicted, pool 0 should remain (in-use)
+	// Poll on IdleEvictions (the sweeper's last, monotonic step). The in-use
+	// pool keeps refCount > 0 the whole time, so exactly one pool is ever
+	// evicted and Len() settles at 1, never 0.
+	if !eventually(3*time.Second, func() bool { return m.Stats().IdleEvictions == 1 }) {
+		t.Fatalf("expected 1 idle eviction, got %d", m.Stats().IdleEvictions)
+	}
 	if m.Len() != 1 {
-		t.Fatalf("expected 1 pool (in-use), got %d", m.Len())
+		t.Fatalf("expected 1 pool (in-use) after sweep, got %d", m.Len())
 	}
 
-	stats := m.Stats()
-	if stats.IdleEvictions != 1 {
-		t.Fatalf("expected 1 idle eviction, got %d", stats.IdleEvictions)
+	// p0 was held the entire time — confirm it never got evicted.
+	if !p0.InUse() {
+		t.Fatal("in-use pool should still be held")
 	}
-
 	p0.Release()
 }
 
@@ -405,6 +421,21 @@ func TestDefaultPoolConfig_EnvOverride(t *testing.T) {
 	if c.ReadConns != 16 {
 		t.Fatalf("expected ReadConns=16, got %d", c.ReadConns)
 	}
+}
+
+// eventually polls cond every 5ms until it returns true or timeout elapses.
+// It replaces fixed sleeps in async eviction tests: fast when the condition is
+// met quickly, and only reports failure if the condition never holds — so the
+// test is robust to runner speed instead of racing a hard-coded delay.
+func eventually(timeout time.Duration, cond func() bool) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return cond()
 }
 
 // --- Benchmarks ---
