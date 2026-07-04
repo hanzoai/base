@@ -1,488 +1,301 @@
-import { createFileRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
+import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useRef } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { Button } from '~/components/ui/button';
+import { Checkbox } from '~/components/ui/checkbox';
+import { Input } from '~/components/ui/input';
+import { Label } from '~/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select';
+import { Textarea } from '~/components/ui/textarea';
 import { base } from '~/lib/base';
-
+import { editorKind, isMultiValue, selectValues, toEditorString } from '~/lib/fields';
 import type { CollectionField } from '~/lib/base';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type RecordFormValues = Record<string, unknown>;
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+// Fields the schema owns but the panel never edits directly.
+const HIDDEN = new Set(['id', 'tokenKey', 'emailVisibility']);
 
 function RecordEditor() {
-    const { id, recordId } = Route.useParams();
-    const qc = useQueryClient();
-    const nav = useNavigate();
+  const { id, recordId } = Route.useParams();
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const isNew = recordId === '_new';
 
-    const isNew = recordId === '_new';
+  const collection = useQuery({
+    queryKey: ['collections', id],
+    queryFn: () => base.collections.getOne(id),
+  });
+  const name = collection.data?.name ?? id;
+  const isAuth = collection.data?.type === 'auth';
 
-    // Fetch collection schema
-    const collection = useQuery({
-        queryKey: ['collections', id],
-        queryFn: () => base.collections.getOne(id),
-    });
+  const record = useQuery({
+    queryKey: ['records', name, recordId],
+    queryFn: () => base.collection(name).getOne(recordId),
+    enabled: !isNew && Boolean(collection.data),
+  });
 
-    const collectionName = collection.data?.name ?? id;
+  const editable = useMemo<CollectionField[]>(
+    () =>
+      (collection.data?.fields ?? []).filter(
+        (f) => f.type !== 'autodate' && !HIDDEN.has(f.name) && f.type !== 'password',
+      ),
+    [collection.data],
+  );
 
-    // Fetch existing record (skip for new)
-    const record = useQuery({
-        queryKey: ['records', collectionName, recordId],
-        queryFn: () => base.collection(collectionName).getOne(recordId),
-        enabled: !isNew && Boolean(collection.data),
-    });
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const files = useRef<Record<string, File[]>>({});
 
-    // Build editable fields list (skip system autodate, hidden id)
-    const editableFields = useMemo(() => {
-        if (!collection.data) return [];
-        return collection.data.fields.filter((f) => {
-            if (f.type === 'autodate') return false;
-            if (f.name === 'id') return false;
-            return true;
-        });
-    }, [collection.data]);
+  // Seed the form once the schema (and record, when editing) resolve.
+  useEffect(() => {
+    if (!collection.data) return;
+    if (!isNew && !record.data) return;
+    const seed: Record<string, unknown> = {};
+    for (const f of editable) seed[f.name] = record.data?.[f.name] ?? defaultForKind(f);
+    setValues(seed);
+  }, [collection.data, record.data, isNew, editable]);
 
-    // Default form values from existing record or empty
-    const defaults = useMemo(() => {
-        const vals: RecordFormValues = {};
-        for (const f of editableFields) {
-            vals[f.name] = record.data?.[f.name] ?? defaultForType(f.type);
+  const set = (field: string, value: unknown) => setValues((v) => ({ ...v, [field]: value }));
+
+  const save = useMutation({
+    mutationFn: () => {
+      const fd = buildFormData(editable, values, files.current);
+      if (isAuth && password) {
+        fd.append('password', password);
+        fd.append('passwordConfirm', password);
+      }
+      return isNew ? base.collection(name).create(fd) : base.collection(name).update(recordId, fd);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['records', name] });
+      nav({ to: '/collections/$id/records', params: { id } });
+    },
+    onError: (e) => setError(String((e as Error)?.message ?? e)),
+  });
+
+  const del = useMutation({
+    mutationFn: () => base.collection(name).delete(recordId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['records', name] });
+      nav({ to: '/collections/$id/records', params: { id } });
+    },
+  });
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      // Validate JSON fields up-front so we fail before the network call.
+      for (const f of editable) {
+        if (editorKind(f) === 'json') {
+          const raw = values[f.name];
+          if (typeof raw === 'string' && raw.trim()) JSON.parse(raw);
         }
-        return vals;
-    }, [editableFields, record.data]);
-
-    const form = useForm<RecordFormValues>({ values: defaults });
-
-    // Track file uploads per field
-    const fileUploads = useRef<Record<string, File[]>>({});
-
-    // Save mutation
-    const save = useMutation({
-        mutationFn: async (data: RecordFormValues) => {
-            const formData = buildFormData(data, editableFields, fileUploads.current, collection.data?.type === 'auth');
-            if (isNew) {
-                return base.collection(collectionName).create(formData);
-            }
-            return base.collection(collectionName).update(recordId, formData);
-        },
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ['records', collectionName] });
-            nav({ to: '/collections/$id/records', params: { id } });
-        },
-    });
-
-    // Delete mutation
-    const del = useMutation({
-        mutationFn: () => base.collection(collectionName).delete(recordId),
-        onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ['records', collectionName] });
-            nav({ to: '/collections/$id/records', params: { id } });
-        },
-    });
-
-    const handleSave = useCallback(
-        (data: RecordFormValues) => { save.mutate(data); },
-        [save],
-    );
-
-    const handleDelete = useCallback(() => {
-        if (confirm('Delete this record?')) del.mutate();
-    }, [del]);
-
-    const handleFileChange = useCallback((fieldName: string, files: FileList | null) => {
-        fileUploads.current[fieldName] = files ? Array.from(files) : [];
-    }, []);
-
-    // Loading
-    if (collection.isPending) return <div className="text-sm text-neutral-400">Loading schema...</div>;
-    if (collection.error) return <div className="text-sm text-red-400">{String(collection.error)}</div>;
-    if (!isNew && record.isPending) return <div className="text-sm text-neutral-400">Loading record...</div>;
-    if (!isNew && record.error) return <div className="text-sm text-red-400">{String(record.error)}</div>;
-
-    return (
-        <form onSubmit={form.handleSubmit(handleSave)} className="flex flex-col gap-4">
-            {/* Header */}
-            <header className="flex items-center gap-3">
-                <Link
-                    to="/collections/$id/records"
-                    params={{ id }}
-                    className="text-neutral-400 hover:text-neutral-200"
-                >
-                    {collection.data.name}
-                </Link>
-                <span className="text-neutral-600">/</span>
-                <h1 className="text-xl font-semibold">
-                    {isNew ? 'New record' : `Edit ${recordId}`}
-                </h1>
-                <div className="ml-auto flex gap-2">
-                    {!isNew && (
-                        <button
-                            type="button"
-                            onClick={handleDelete}
-                            disabled={del.isPending}
-                            className="rounded bg-red-900/50 px-3 py-1 text-sm text-red-300 hover:bg-red-900 disabled:opacity-50"
-                        >
-                            Delete
-                        </button>
-                    )}
-                    <button
-                        type="submit"
-                        disabled={(!isNew && !form.formState.isDirty) || save.isPending}
-                        className="rounded bg-indigo-600 px-3 py-1 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
-                    >
-                        {save.isPending ? 'Saving...' : isNew ? 'Create' : 'Save'}
-                    </button>
-                </div>
-            </header>
-
-            {save.error && (
-                <div className="text-sm text-red-400">{String(save.error)}</div>
-            )}
-
-            {/* ID field (read-only on edit) */}
-            {!isNew && record.data && (
-                <div className="flex flex-col gap-1">
-                    <span className="text-xs text-neutral-500">id</span>
-                    <span className="rounded bg-neutral-900 px-2 py-1 text-sm font-mono text-neutral-400">
-                        {record.data.id}
-                    </span>
-                </div>
-            )}
-
-            {/* Auth fields — password/email/verified */}
-            {collection.data.type === 'auth' && (
-                <AuthFields
-                    register={form.register}
-                    isNew={isNew}
-                    isSuperusers={collection.data.name === '_superusers'}
-                />
-            )}
-
-            {/* Dynamic fields from schema */}
-            {editableFields
-                .filter((f) => !isAuthSkipField(f.name, collection.data.type === 'auth'))
-                .map((f) => (
-                    <SchemaField
-                        key={f.name}
-                        field={f}
-                        register={form.register}
-                        onFileChange={handleFileChange}
-                    />
-                ))}
-
-            {/* Autodate fields (read-only) */}
-            {!isNew && record.data && collection.data.fields
-                .filter((f) => f.type === 'autodate')
-                .map((f) => (
-                    <div key={f.name} className="flex flex-col gap-1">
-                        <span className="text-xs text-neutral-500">{f.name}</span>
-                        <span className="text-sm text-neutral-400">{String(record.data[f.name] ?? '-')}</span>
-                    </div>
-                ))}
-        </form>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const AUTH_SKIP_FIELDS = new Set(['email', 'emailVisibility', 'verified', 'tokenKey', 'password']);
-
-function isAuthSkipField(name: string, isAuth: boolean): boolean {
-    return isAuth && AUTH_SKIP_FIELDS.has(name);
-}
-
-function defaultForType(type: string): unknown {
-    switch (type) {
-        case 'number': return 0;
-        case 'bool': return false;
-        case 'json': return '';
-        case 'select': return '';
-        case 'relation': return '';
-        case 'file': return '';
-        case 'date': return '';
-        default: return '';
+      }
+      save.mutate();
+    } catch {
+      setError('Invalid JSON in one of the fields');
     }
+  };
+
+  if (collection.isPending) return <Muted>Loading schema…</Muted>;
+  if (collection.error) return <ErrorText error={ collection.error } />;
+  if (!isNew && record.isPending) return <Muted>Loading record…</Muted>;
+  if (!isNew && record.error) return <ErrorText error={ record.error } />;
+
+  return (
+    <form onSubmit={ onSubmit } className="mx-auto flex max-w-2xl flex-col gap-5">
+      <header className="flex items-center gap-2">
+        <Link to="/collections/$id/records" params={{ id }} className="text-muted-foreground hover:text-foreground">
+          { name }
+        </Link>
+        <span className="text-muted-foreground/40">/</span>
+        <h1 className="text-xl font-semibold">{ isNew ? 'New record' : record.data?.id }</h1>
+        <div className="ml-auto flex gap-2">
+          { !isNew && (
+            <Button type="button" variant="destructive" disabled={ del.isPending } onClick={ () => del.mutate() }>
+              { del.isPending ? 'Deleting…' : 'Delete' }
+            </Button>
+          ) }
+          <Button type="submit" disabled={ save.isPending }>
+            { save.isPending ? 'Saving…' : isNew ? 'Create' : 'Save' }
+          </Button>
+        </div>
+      </header>
+
+      { error && <p className="text-sm text-destructive">{ error }</p> }
+
+      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6">
+        { !isNew && record.data && <ReadonlyRow label="id" value={ record.data.id } mono /> }
+
+        { editable.map((field) => (
+          <FieldEditor
+            key={ field.name }
+            field={ field }
+            value={ values[field.name] }
+            onChange={ (v) => set(field.name, v) }
+            onFiles={ (fl) => { files.current[field.name] = fl; } }
+          />
+        )) }
+
+        { isAuth && (
+          <div className="flex flex-col gap-1.5">
+            <Label>{ isNew ? 'Password' : 'New password (blank keeps current)' }</Label>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              value={ password }
+              onChange={ (e) => setPassword(e.target.value) }
+            />
+          </div>
+        ) }
+
+        { !isNew && record.data && (
+          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+            { (collection.data?.fields ?? [])
+              .filter((f) => f.type === 'autodate')
+              .map((f) => <ReadonlyRow key={ f.name } label={ f.name } value={ String(record.data?.[f.name] ?? '—') } />) }
+          </div>
+        ) }
+      </div>
+    </form>
+  );
+}
+
+function FieldEditor({
+  field,
+  value,
+  onChange,
+  onFiles,
+}: {
+  field: CollectionField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  onFiles: (files: File[]) => void;
+}) {
+  const kind = editorKind(field);
+
+  if (kind === 'bool') {
+    return (
+      <label className="flex items-center gap-2 text-sm">
+        <Checkbox checked={ Boolean(value) } onCheckedChange={ (c) => onChange(Boolean(c)) } />
+        <FieldLabel field={ field } inline />
+      </label>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <FieldLabel field={ field } />
+      { kind === 'select' && !isMultiValue(field) ? (
+        <Select value={ String(value ?? '') } onValueChange={ onChange }>
+          <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+          <SelectContent>
+            { selectValues(field).map((o) => <SelectItem key={ o } value={ o }>{ o }</SelectItem>) }
+          </SelectContent>
+        </Select>
+      ) : kind === 'textarea' || kind === 'json' ? (
+        <Textarea
+          rows={ kind === 'json' ? 5 : 4 }
+          className={ kind === 'json' ? 'font-mono text-xs' : '' }
+          value={ asText(value, field) }
+          placeholder={ kind === 'json' ? '{ }' : '' }
+          onChange={ (e) => onChange(e.target.value) }
+        />
+      ) : kind === 'file' ? (
+        <input
+          type="file"
+          multiple={ isMultiValue(field) }
+          onChange={ (e) => onFiles(e.target.files ? Array.from(e.target.files) : []) }
+          className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1 file:text-sm file:text-foreground"
+        />
+      ) : (
+        <Input
+          type={ kind === 'number' ? 'number' : kind === 'date' ? 'datetime-local' : 'text' }
+          step={ kind === 'number' ? 'any' : undefined }
+          placeholder={ kind === 'relation' ? 'record id(s), comma-separated' : '' }
+          value={ asText(value, field) }
+          onChange={ (e) => onChange(kind === 'number' ? e.target.value : e.target.value) }
+        />
+      ) }
+    </div>
+  );
+}
+
+function FieldLabel({ field, inline }: { field: CollectionField; inline?: boolean }) {
+  return (
+    <span className={ inline ? 'text-sm text-foreground' : 'flex items-center gap-1.5' }>
+      <span className="text-sm font-medium">{ field.name }</span>
+      <span className="text-[10px] uppercase text-muted-foreground/60">{ field.type }</span>
+      { field.system && <span className="text-[10px] text-muted-foreground/60">system</span> }
+    </span>
+  );
+}
+
+function ReadonlyRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[10px] uppercase text-muted-foreground/60">{ label }</span>
+      <span className={ mono ? 'font-mono text-sm text-muted-foreground' : 'text-sm text-muted-foreground' }>
+        { value }
+      </span>
+    </div>
+  );
+}
+
+function Muted({ children }: { children: React.ReactNode }) {
+  return <div className="text-sm text-muted-foreground">{ children }</div>;
+}
+
+function ErrorText({ error }: { error: unknown }) {
+  return <div className="text-sm text-destructive">{ String(error) }</div>;
+}
+
+function defaultForKind(field: CollectionField): unknown {
+  switch (editorKind(field)) {
+    case 'number': return '';
+    case 'bool': return false;
+    default: return '';
+  }
+}
+
+function asText(value: unknown, field: CollectionField): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  return toEditorString(value, field);
 }
 
 function buildFormData(
-    data: RecordFormValues,
-    fields: CollectionField[],
-    fileUploads: Record<string, File[]>,
-    isAuth: boolean,
+  fields: CollectionField[],
+  values: Record<string, unknown>,
+  files: Record<string, File[]>,
 ): FormData {
-    const fd = new FormData();
-
-    for (const field of fields) {
-        if (field.type === 'autodate') continue;
-        if (isAuth && field.type === 'password') continue;
-
-        const val = data[field.name];
-
-        if (field.type === 'json' && typeof val === 'string' && val.trim()) {
-            try {
-                JSON.parse(val);
-            } catch {
-                throw new Error(`Invalid JSON in field "${field.name}"`);
-            }
-            fd.append(field.name, val);
-        } else if (field.type === 'file') {
-            // Files handled separately below
-        } else if (val !== undefined && val !== null) {
-            fd.append(field.name, String(val));
-        }
-    }
-
-    // Auth password fields — only if explicitly set
-    if (isAuth) {
-        const pw = data['password'];
-        if (typeof pw === 'string' && pw) {
-            fd.append('password', pw);
-            fd.append('passwordConfirm', String(data['passwordConfirm'] ?? pw));
-        }
-    }
-
-    // File uploads
-    for (const [fieldName, files] of Object.entries(fileUploads)) {
-        for (const file of files) {
-            fd.append(fieldName, file);
-        }
-    }
-
-    return fd;
+  const fd = new FormData();
+  for (const field of fields) {
+    const kind = editorKind(field);
+    if (kind === 'file') continue; // handled below
+    const val = values[field.name];
+    if (val === undefined || val === null) continue;
+    if (kind === 'bool') fd.append(field.name, val ? 'true' : 'false');
+    else if (kind === 'number') { if (val !== '') fd.append(field.name, String(val)); }
+    else fd.append(field.name, typeof val === 'string' ? val : JSON.stringify(val));
+  }
+  for (const [fieldName, fl] of Object.entries(files)) {
+    for (const file of fl) fd.append(fieldName, file);
+  }
+  return fd;
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function AuthFields({ register, isNew, isSuperusers }: {
-    register: ReturnType<typeof useForm<RecordFormValues>>['register'];
-    isNew: boolean;
-    isSuperusers: boolean;
-}) {
-    return (
-        <div className="flex flex-col gap-3 rounded border border-neutral-800 p-3">
-            <h3 className="text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Auth fields
-            </h3>
-            <label className="flex flex-col gap-1">
-                <span className="text-xs text-neutral-400">Email</span>
-                <input
-                    {...register('email')}
-                    type="email"
-                    className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                />
-            </label>
-            {!isSuperusers && (
-                <>
-                    <label className="flex items-center gap-2 text-sm">
-                        <input {...register('emailVisibility')} type="checkbox" />
-                        <span className="text-neutral-400">Email visible</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                        <input {...register('verified')} type="checkbox" />
-                        <span className="text-neutral-400">Verified</span>
-                    </label>
-                </>
-            )}
-            <label className="flex flex-col gap-1">
-                <span className="text-xs text-neutral-400">
-                    {isNew ? 'Password' : 'New password (leave blank to keep)'}
-                </span>
-                <input
-                    {...register('password')}
-                    type="password"
-                    autoComplete="new-password"
-                    className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                />
-            </label>
-        </div>
-    );
-}
-
-function SchemaField({ field, register, onFileChange }: {
-    field: CollectionField;
-    register: ReturnType<typeof useForm<RecordFormValues>>['register'];
-    onFileChange: (fieldName: string, files: FileList | null) => void;
-}) {
-    switch (field.type) {
-        case 'text':
-        case 'email':
-        case 'url':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type={field.type === 'email' ? 'email' : field.type === 'url' ? 'url' : 'text'}
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'editor':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <textarea
-                        {...register(field.name)}
-                        rows={6}
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'number':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name, { valueAsNumber: true })}
-                        type="number"
-                        step="any"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'bool':
-            return (
-                <label className="flex items-center gap-2 text-sm">
-                    <input {...register(field.name)} type="checkbox" />
-                    <FieldLabel field={field} />
-                </label>
-            );
-
-        case 'select':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="text"
-                        placeholder="value (or comma-separated for multi)"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'date':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="datetime-local"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'json':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <textarea
-                        {...register(field.name)}
-                        rows={4}
-                        placeholder="{}"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm"
-                    />
-                </label>
-            );
-
-        case 'file':
-            return (
-                <div className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        type="file"
-                        multiple={Boolean((field as Record<string, unknown>).maxSelect !== 1)}
-                        onChange={(e) => onFileChange(field.name, e.target.files)}
-                        className="text-sm text-neutral-400"
-                    />
-                </div>
-            );
-
-        case 'relation':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="text"
-                        placeholder="Record ID (or comma-separated for multi)"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm"
-                    />
-                </label>
-            );
-
-        case 'password':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="password"
-                        autoComplete="new-password"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-
-        case 'geoPoint':
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="text"
-                        placeholder='{"lon": 0, "lat": 0}'
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 font-mono text-sm"
-                    />
-                </label>
-            );
-
-        default:
-            return (
-                <label className="flex flex-col gap-1">
-                    <FieldLabel field={field} />
-                    <input
-                        {...register(field.name)}
-                        type="text"
-                        className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm"
-                    />
-                </label>
-            );
-    }
-}
-
-function FieldLabel({ field }: { field: CollectionField }) {
-    return (
-        <span className="flex items-center gap-1 text-xs text-neutral-400">
-            <span>{field.name}</span>
-            <span className="text-neutral-600">({field.type})</span>
-            {field.system && <span className="text-neutral-600">system</span>}
-        </span>
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Route
-// ---------------------------------------------------------------------------
 
 export const Route = createFileRoute('/collections/$id/records/$recordId')({
-    beforeLoad: () => {
-        if (!base.authStore.token) throw redirect({ to: '/login' });
-    },
-    component: RecordEditor,
+  beforeLoad: () => {
+    if (!base.authStore.token) throw redirect({ to: '/login' });
+  },
+  component: RecordEditor,
 });
