@@ -1,3 +1,4 @@
+import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
@@ -11,7 +12,8 @@ const adminBase = (() => {
 })()
 
 export default defineConfig({
-  plugins: [react()],
+  // Router plugin generates src/routeTree.gen.ts from src/routes/** (gitignored).
+  plugins: [TanStackRouterVite({ target: 'react', autoCodeSplitting: false }), react()],
   base: adminBase,
   resolve: {
     alias: { '~': '/src' },
@@ -25,9 +27,10 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    // Dev proxy to a local Base server. The admin talks to the rebranded /v1
+    // API (BASE_API_PREFIX default). /v1/realtime is the SSE stream.
     proxy: {
-      '/api': 'http://localhost:8090',
-      '/realtime': {
+      '/v1': {
         target: 'http://localhost:8090',
         changeOrigin: true,
         ws: true,

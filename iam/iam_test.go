@@ -321,7 +321,7 @@ func TestCache_LRU_Evicts_When_Full(t *testing.T) {
 	// hit the upstream IAM again.
 	f := newFakeIAM(t)
 	var fetchCalls int64
-	f.setHandler("/api/userinfo", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/oauth/userinfo", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&fetchCalls, 1)
 		tok := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		writeUserJSON(w, &iam.User{ID: tok, Email: tok + "@x.com", Name: tok})
@@ -363,7 +363,7 @@ func TestCache_Singleflight_Collapses_Concurrent_Validates(t *testing.T) {
 	// reuse the inflight result.
 	f := newFakeIAM(t)
 	var fetchCalls int64
-	f.setHandler("/api/userinfo", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/oauth/userinfo", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&fetchCalls, 1)
 		// Hold long enough that all 100 goroutines have time to land in
 		// the singleflight slot before the first fetch completes.
@@ -402,7 +402,7 @@ func TestCache_Singleflight_Collapses_Concurrent_Validates(t *testing.T) {
 func TestCache_InvalidateToken_Forces_Refetch(t *testing.T) {
 	f := newFakeIAM(t)
 	var fetchCalls int64
-	f.setHandler("/api/userinfo", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/oauth/userinfo", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&fetchCalls, 1)
 		writeUserJSON(w, &iam.User{ID: "u-1", Email: "u@x.com", Name: "u"})
 	})
@@ -433,7 +433,7 @@ func TestCache_FailedFetch_DoesNotPoisonCache(t *testing.T) {
 	// successful fetch must hit upstream and succeed.
 	f := newFakeIAM(t)
 	var calls int64
-	f.setHandler("/api/userinfo", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/oauth/userinfo", func(w http.ResponseWriter, r *http.Request) {
 		c := atomic.AddInt64(&calls, 1)
 		if c == 1 {
 			w.WriteHeader(http.StatusUnauthorized)
@@ -460,7 +460,7 @@ func TestCache_FailedFetch_DoesNotPoisonCache(t *testing.T) {
 // Helpers
 // ──────────────────────────────────────────────────────────────────────
 
-// writeUserJSON encodes a user as IAM's /api/userinfo response shape
+// writeUserJSON encodes a user as IAM's /v1/iam/oauth/userinfo response shape
 // (raw user object, not Casdoor envelope).
 func writeUserJSON(w http.ResponseWriter, u *iam.User) {
 	_ = json.NewEncoder(w).Encode(u)

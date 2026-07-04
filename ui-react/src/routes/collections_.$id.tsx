@@ -5,7 +5,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 
 import { base } from '~/lib/base';
 
-import type { CollectionModel, CollectionField } from "/base";
+import type { CollectionModel, CollectionField } from '~/lib/base';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -400,7 +400,7 @@ function IndexesPanel({ indexes, onChange }: {
 // Route
 // ---------------------------------------------------------------------------
 
-export const Route = createFileRoute('/collections/$id')({
+export const Route = createFileRoute('/collections_/$id')({
     beforeLoad: () => {
         if (!base.authStore.token) throw redirect({ to: '/login' });
     },
