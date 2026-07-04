@@ -104,6 +104,12 @@ var (
 
 	// ErrClosed is returned when Get is called after Close.
 	ErrClosed = errors.New("store: closed")
+
+	// ErrCrossTenant is returned when an authenticated caller asks for a Key
+	// that does not belong to the caller's org. The claims->OrgID binding is
+	// the first-line cross-tenant boundary; per-org KMS key separation is the
+	// second. errors.Is-comparable.
+	ErrCrossTenant = errors.New("store: cross-tenant access denied")
 )
 
 // String implements fmt.Stringer for log lines and metric labels.
@@ -469,6 +475,15 @@ func (s *MultiTenantStore) ForProject(ctx context.Context) (*dbx.DB, error) {
 func (s *MultiTenantStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
 	if err := k.Valid(); err != nil {
 		return nil, fmt.Errorf("store: invalid key %s: %w", k, err)
+	}
+	// Defense in depth (IDOR guard): when the caller carries an authenticated
+	// org (claims), the requested Key MUST belong to that org. This is the
+	// first-line cross-tenant boundary — one shared store process serves many
+	// orgs and can fetch any org's KEK, so crypto alone does not stop a caller
+	// who reaches Get with a foreign OrgID. Claim-less internal callers
+	// (background jobs, migrations) are trusted and bypass the check.
+	if c := claims.FromContext(ctx); c.OrgID != "" && c.OrgID != k.OrgID {
+		return nil, fmt.Errorf("store: caller org %q may not access key %s: %w", c.OrgID, k, ErrCrossTenant)
 	}
 	if s.closed.Load() {
 		return nil, ErrClosed

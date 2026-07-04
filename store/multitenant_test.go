@@ -832,3 +832,27 @@ func (m *memRoot) OrgRoot(_ context.Context, orgID string) ([]byte, error) {
 	copy(out, k)
 	return out, nil
 }
+
+// TestGet_DeniesCrossTenant proves the IDOR guard: an authenticated caller
+// cannot resolve a well-formed Key for another org.
+func TestGet_DeniesCrossTenant(t *testing.T) {
+	s, _ := newTestStore(t)
+	ctx := ctxWithClaims("orga", "alice")
+
+	if _, err := s.Get(ctx, store.Key{OrgID: "orga", UserID: "alice", Scope: store.ScopeUser}); err != nil {
+		t.Fatalf("same-org Get must succeed: %v", err)
+	}
+	_, err := s.Get(ctx, store.Key{OrgID: "orgb", UserID: "bob", Scope: store.ScopeUser})
+	if !errors.Is(err, store.ErrCrossTenant) {
+		t.Fatalf("cross-tenant Get must be denied with ErrCrossTenant, got %v", err)
+	}
+}
+
+// TestGet_ClaimlessInternalCallerAllowed proves trusted internal callers
+// (no claims) can still resolve any org's Key (migrations, background jobs).
+func TestGet_ClaimlessInternalCallerAllowed(t *testing.T) {
+	s, _ := newTestStore(t)
+	if _, err := s.Get(context.Background(), store.Key{OrgID: "orgb", UserID: "bob", Scope: store.ScopeUser}); err != nil {
+		t.Fatalf("claim-less internal Get must succeed: %v", err)
+	}
+}
