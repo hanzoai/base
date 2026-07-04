@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -30,8 +31,14 @@ func newTestStore(t *testing.T, opts ...func(*store.Options)) (*store.MultiTenan
 	}
 	t.Cleanup(func() { fs.Close() })
 
+	kr, err := store.NewKeyring(newMemRoot(), fs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	o := store.Options{
 		ObjectStore: fs,
+		Keys:        kr,
 		CacheRoot:   cacheDir,
 		LRUSize:     4, // tiny on purpose to exercise eviction
 		// IdleTTL is long by default so standard tests don't race the
@@ -797,4 +804,31 @@ func itoa(i int) string {
 		i /= 10
 	}
 	return string(buf[pos:])
+}
+
+// memRoot is an in-memory RootSource for tests: a stable random 32-byte KEK
+// per org. It exercises the full envelope crypto path (HKDF + AES-256-GCM +
+// age) without a live KMS. OrgRoot returns a COPY each call so the store may
+// safely zero the returned KEK.
+type memRoot struct {
+	mu   sync.Mutex
+	keys map[string][]byte
+}
+
+func newMemRoot() *memRoot { return &memRoot{keys: make(map[string][]byte)} }
+
+func (m *memRoot) OrgRoot(_ context.Context, orgID string) ([]byte, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	k, ok := m.keys[orgID]
+	if !ok {
+		k = make([]byte, 32)
+		if _, err := rand.Read(k); err != nil {
+			return nil, err
+		}
+		m.keys[orgID] = k
+	}
+	out := make([]byte, len(k))
+	copy(out, k)
+	return out, nil
 }
