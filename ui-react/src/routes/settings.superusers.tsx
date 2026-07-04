@@ -68,7 +68,7 @@ function SuperusersSettings() {
                         <tbody>
                             { superusers.data.map((su) => (
                                 <tr key={ su.id } className="border-t border-neutral-800">
-                                    <td className="py-2 font-medium">{ su.email }</td>
+                                    <td className="py-2 font-medium">{ String(su.email ?? '') }</td>
                                     <td className="py-2 text-xs text-neutral-500">{ su.id }</td>
                                     <td className="py-2 text-xs text-neutral-500">{ su.created }</td>
                                     <td className="py-2 text-right">
