@@ -27,11 +27,16 @@
 //
 // # Isolation invariant (proven in keyring_test.go)
 //
-// org A cannot decrypt org B's DB: KEK_A != KEK_B are distinct KMS secrets and
-// B's Base process is KMS-scoped to B, so it can never fetch KEK_A. Within an
-// org, each DB has an independent random age identity and its sidecar is bound
-// to the exact objectKey via the AES-GCM AAD, so no wrapped blob can be
-// replayed against another tenant.
+// The FIRST-line cross-tenant boundary is the request's authenticated
+// claims->OrgID binding, enforced in MultiTenantStore.Get/ForCtx: a caller
+// scoped to org B cannot resolve an org A Key (Get returns ErrCrossTenant).
+// Cryptographic separation is the SECOND line, not the first — one shared
+// store process serves many orgs and CAN fetch any org's KEK, so the KEK does
+// not by itself stop a caller who reaches Get with a foreign OrgID. Given
+// correct scoping the crypto then guarantees isolation: KEK_A != KEK_B are
+// distinct KMS secrets, each DB has an independent random age identity, and
+// each sidecar is AAD-bound to its exact objectKey, so no wrapped blob can be
+// replayed across tenants (proven in keyring_test.go).
 
 package store
 
