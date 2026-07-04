@@ -1,54 +1,45 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
+import { Database, LayoutDashboard, ScrollText, Settings } from 'lucide-react';
 
 import { useAuth } from '~/hooks/useAuth';
 
-// Root layout: sidebar on every page except /login. Auth gate is
-// implemented here so we don't repeat it in every child route.
+const NAV = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/collections', label: 'Collections', icon: Database, exact: false },
+  { to: '/logs', label: 'Logs', icon: ScrollText, exact: false },
+  { to: '/settings', label: 'Settings', icon: Settings, exact: false },
+] as const;
+
+// Root layout: sidebar on every page except /login. Auth gate lives here so
+// child routes don't repeat it.
 function RootLayout() {
   const { isAuthenticated, record, signOut } = useAuth();
 
   return (
-    <div className="flex h-screen bg-neutral-950 text-neutral-100">
+    <div className="flex h-screen bg-background text-foreground">
       { isAuthenticated && (
-        <aside className="w-56 border-r border-neutral-800 p-4">
-          <div className="mb-6 flex items-center gap-2">
-            <img src="/icon.svg" alt="Base" className="h-6 w-6" />
-            <span className="font-semibold">Base Admin</span>
+        <aside className="flex w-56 flex-col border-r border-border p-3">
+          <div className="mb-6 flex items-center gap-2 px-2 pt-1">
+            <img src="/icon.svg" alt="Base" className="size-6" />
+            <span className="font-semibold">Base</span>
           </div>
-          <nav className="flex flex-col gap-1 text-sm">
-            <Link
-              to="/"
-              className="rounded px-2 py-1 hover:bg-neutral-800"
-              activeProps={{ className: 'rounded px-2 py-1 bg-neutral-800 text-neutral-100' }}
-              activeOptions={{ exact: true }}
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/collections"
-              className="rounded px-2 py-1 hover:bg-neutral-800"
-              activeProps={{ className: 'rounded px-2 py-1 bg-neutral-800 text-neutral-100' }}
-            >
-              Collections
-            </Link>
-            <Link
-              to="/logs"
-              className="rounded px-2 py-1 hover:bg-neutral-800"
-              activeProps={{ className: 'rounded px-2 py-1 bg-neutral-800 text-neutral-100' }}
-            >
-              Logs
-            </Link>
-            <Link
-              to="/settings"
-              className="rounded px-2 py-1 hover:bg-neutral-800"
-              activeProps={{ className: 'rounded px-2 py-1 bg-neutral-800 text-neutral-100' }}
-            >
-              Settings
-            </Link>
+          <nav className="flex flex-col gap-0.5 text-sm">
+            { NAV.map(({ to, label, icon: Icon, exact }) => (
+              <Link
+                key={ to }
+                to={ to }
+                activeOptions={ exact ? { exact: true } : undefined }
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                activeProps={{ className: 'flex items-center gap-2 rounded-md px-2 py-1.5 bg-accent text-foreground' }}
+              >
+                <Icon className="size-4" />
+                { label }
+              </Link>
+            )) }
           </nav>
-          <div className="absolute bottom-4 left-4 right-4 text-xs text-neutral-400">
+          <div className="mt-auto px-2 text-xs text-muted-foreground">
             <div className="truncate">{ String(record?.email ?? '') }</div>
-            <button onClick={ signOut } className="mt-1 text-neutral-500 hover:text-neutral-200">
+            <button onClick={ signOut } className="mt-1 hover:text-foreground">
               Sign out
             </button>
           </div>
