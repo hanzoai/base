@@ -29,6 +29,9 @@ package replicator
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 
 	"github.com/hanzoai/replicate"
 )
@@ -97,7 +100,45 @@ func Restore(ctx context.Context, localPath string, client replicate.ReplicaClie
 		}
 		return false, err
 	}
+	// Safety gate (defense in depth): the per-tenant age-decrypt already ran
+	// inside the encrypting client (a wrong-tenant or tampered replica fails
+	// there); reject anything that is not a real SQLite DB before the store
+	// opens it, and never leave a hostile file on disk.
+	if err := verifySQLiteFile(localPath); err != nil {
+		_ = os.Remove(localPath)
+		return false, err
+	}
 	return true, nil
+}
+
+// sqliteMagic is the 16-byte SQLite 3 file header.
+var sqliteMagic = []byte("SQLite format 3\x00")
+
+// verifySQLiteFile confirms path begins with the SQLite 3 magic header. An
+// empty file (fresh DB) is accepted.
+func verifySQLiteFile(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("replicator: open restored %s: %w", path, err)
+	}
+	defer f.Close()
+	var buf [16]byte
+	n, err := io.ReadFull(f, buf[:])
+	if err == io.EOF {
+		return nil // empty file: fresh DB
+	}
+	if err == io.ErrUnexpectedEOF || (err == nil && n < len(buf)) {
+		return fmt.Errorf("replicator: restored %s is not a SQLite database (short header)", path)
+	}
+	if err != nil {
+		return fmt.Errorf("replicator: header read %s: %w", path, err)
+	}
+	for i, b := range sqliteMagic {
+		if buf[i] != b {
+			return fmt.Errorf("replicator: restored %s is not a SQLite database (header mismatch)", path)
+		}
+	}
+	return nil
 }
 
 // hasSnapshot reports whether the replica holds any LTX file at level 0 — the
