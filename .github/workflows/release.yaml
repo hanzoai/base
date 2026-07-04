@@ -24,16 +24,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: pnpm
-          cache-dependency-path: ui-react/pnpm-lock.yaml
-
+      # No node/pnpm setup: this job never runs `pnpm install` — ui-react/dist
+      # is committed and embedded via //go:embed all:dist (see the SPA note
+      # below). setup-node with `cache: pnpm` only added a post-step that failed
+      # trying to save a non-existent pnpm store, reddening an otherwise-green
+      # release. Refresh ui-react/dist locally before tagging if the SPA changed.
       - uses: actions/setup-go@v6
         with:
           go-version: '>=1.26.1'
