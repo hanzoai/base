@@ -57,7 +57,7 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken()
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> ?? {}),
@@ -220,8 +220,22 @@ export async function listRecords(
   return request<ListResult<RecordModel>>(`/v1/collections/${encodeURIComponent(collection)}/records${q}`)
 }
 
-export async function getRecord(collection: string, id: string): Promise<RecordModel> {
+export async function getRecordById(collection: string, id: string): Promise<RecordModel> {
   return request<RecordModel>(`/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`)
+}
+
+// Fetch every record across all pages (bounded loop, 500/page).
+export async function getFullRecords(
+  collection: string,
+  params?: { sort?: string; filter?: string },
+): Promise<RecordModel[]> {
+  const out: RecordModel[] = []
+  for (let page = 1; ; page++) {
+    const res = await listRecords(collection, page, 500, params)
+    out.push(...res.items)
+    if (page >= res.totalPages || res.items.length === 0) break
+  }
+  return out
 }
 
 export async function createRecord(collection: string, data: FormData | Record<string, unknown>): Promise<RecordModel> {
@@ -328,4 +342,75 @@ export async function listSuperusers(params?: { sort?: string }): Promise<Record
   const q = qs({ sort: params?.sort, perPage: 200 })
   const res = await request<ListResult<RecordModel>>(`/v1/collections/_superusers/records${q}`)
   return res.items
+}
+
+// ---------------------------------------------------------------------------
+// Realtime — Base SSE protocol at /v1/realtime.
+//
+// One shared EventSource per page. On PB_CONNECT the server hands back a
+// clientId; we POST the active topic set to bind subscriptions. Events arrive
+// as named SSE messages (event name == topic). Reference-counted per topic.
+// ---------------------------------------------------------------------------
+
+export interface RealtimeEvent {
+  action: 'create' | 'update' | 'delete'
+  record: RecordModel
+}
+type RealtimeCallback = (e: RealtimeEvent) => void
+
+let es: EventSource | null = null
+let clientId = ''
+const topics = new Map<string, Set<RealtimeCallback>>()
+
+async function submitSubscriptions(): Promise<void> {
+  if (!clientId) return
+  await request<void>('/v1/realtime', {
+    method: 'POST',
+    body: JSON.stringify({ clientId, subscriptions: [...topics.keys()] }),
+  }).catch(() => { /* transient; resent on next change */ })
+}
+
+function ensureConnection(): void {
+  if (es) return
+  es = new EventSource('/v1/realtime')
+  es.addEventListener('PB_CONNECT', (ev) => {
+    try {
+      clientId = JSON.parse((ev as MessageEvent).data).clientId as string
+      void submitSubscriptions()
+    } catch { /* malformed handshake */ }
+  })
+}
+
+export function subscribeRecords(topic: string, cb: RealtimeCallback): () => void {
+  ensureConnection()
+  let subs = topics.get(topic)
+  if (!subs) {
+    subs = new Set()
+    topics.set(topic, subs)
+    es?.addEventListener(topic, (ev) => {
+      const bucket = topics.get(topic)
+      if (!bucket) return
+      try {
+        const evt = JSON.parse((ev as MessageEvent).data) as RealtimeEvent
+        for (const fn of bucket) fn(evt)
+      } catch { /* ignore malformed frame */ }
+    })
+    void submitSubscriptions()
+  }
+  subs.add(cb)
+
+  return () => {
+    const bucket = topics.get(topic)
+    if (!bucket) return
+    bucket.delete(cb)
+    if (bucket.size === 0) {
+      topics.delete(topic)
+      void submitSubscriptions()
+      if (topics.size === 0) {
+        es?.close()
+        es = null
+        clientId = ''
+      }
+    }
+  }
 }

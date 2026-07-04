@@ -6,7 +6,11 @@ dist: .builds
 
 before:
   hooks:
-    - go mod tidy
+    # NOT `go mod tidy` — release must build from the committed, already-tidy
+    # go.mod/go.sum, never re-resolve the graph (that both mutates deps at
+    # release time and trips the authenticated-git-only private module set).
+    # `download` populates the cache, verifying against the existing go.sum.
+    - go mod download
 
 builds:
   - id: build_noncgo

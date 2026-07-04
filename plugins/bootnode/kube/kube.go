@@ -73,8 +73,13 @@ func New(defaultNamespace string) *Client {
 			}
 			c.apiServer = "https://" + net_JoinHostPort(host, port)
 		}
-		if ns, err := os.ReadFile(saNSPath); err == nil {
-			c.namespace = strings.TrimSpace(string(ns))
+		// Adopt the pod's own namespace ONLY when the caller didn't specify one —
+		// an explicit namespace must win over the ambient serviceaccount namespace
+		// (otherwise an in-cluster runner, e.g. arc-system, silently overrides it).
+		if defaultNamespace == "" {
+			if ns, err := os.ReadFile(saNSPath); err == nil {
+				c.namespace = strings.TrimSpace(string(ns))
+			}
 		}
 		if ca, err := os.ReadFile(saCAPath); err == nil {
 			c.http.Transport = caTransport(ca)
