@@ -400,7 +400,7 @@ function IndexesPanel({ indexes, onChange }: {
 // Route
 // ---------------------------------------------------------------------------
 
-export const Route = createFileRoute('/collections/$id')({
+export const Route = createFileRoute('/collections_/$id')({
     beforeLoad: () => {
         if (!base.authStore.token) throw redirect({ to: '/login' });
     },
