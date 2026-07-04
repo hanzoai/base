@@ -347,6 +347,34 @@ Misconfig fails loudly at startup (sql without `BASE_DB_URL`, the not-yet-wired
 same convention as the platform plugin's IAM check. Per-org tiering (each
 `plugins/platform/org_db.go` shard on its own tier) builds on this selector.
 
+## SQLite driver — one driver, OUR way (`github.com/hanzoai/sqlite`)
+
+Base opens SQLite through EXACTLY ONE driver, `github.com/hanzoai/sqlite`, which
+registers the `"sqlite"` database/sql name under BOTH build configs — modernc
+(pure Go, `!cgo`) and mattn/SQLCipher (`cgo`, encrypted at rest). Base MUST NOT
+import `modernc.org/sqlite` directly: a cgo consumer (e.g. commerce, which needs
+SQLCipher for per-tenant money DBs) links hanzoai/sqlite→mattn AND base's modernc
+→ two `sql.Register("sqlite")` → `panic: sql: Register called twice for driver
+sqlite` at init. So every direct modernc import was removed (v1.5.5); `go mod why
+modernc.org/sqlite` now shows it ONLY transitively under `hanzoai/sqlite`.
+
+- **Connect DSN**: `core.DefaultDBConnect` + the multitenant `store.defaultConnect`
+  both open via `sqlite.PragmaDSN(path, sqlite.DefaultPragmas)`. That one pragma
+  set (busy_timeout→WAL→journal_size_limit→NORMAL→FK→temp_store→cache_size) is
+  encoded in the ACTIVE backend's DSN syntax (modernc `_pragma=name(value)` /
+  mattn `_name=value`) — a single-form DSN is silently dropped by the other
+  backend, so this is what makes busy_timeout+WAL actually apply under both.
+- **WAL/PITR commit hook**: `core/base_network.go` resolves the raw driver conn
+  via `sqlite.CommitHookRegisterer` (build-tagged: bridges mattn `func() int` /
+  modernc `func() int32` to one `CommitHookFn`) and adapts it to the network
+  package's backend-agnostic `HookRegisterer`. `network/*` never touches a
+  concrete driver type; test fakes implement `RegisterCommitHook(func() int32)`.
+- `go.mod`: `require github.com/hanzoai/sqlite v0.2.1`; `replace
+  github.com/mattn/go-sqlite3 => …v1.14.47` defeats the `v2.0.3+incompatible`
+  poison pulled by beego under cgo. modernc is now `// indirect` (via
+  hanzoai/sqlite). The old `modernc_versions_check.go` libc-pairing warning was
+  removed — that pairing is hanzoai/sqlite's concern now, not base's.
+
 ## Embedded IAM Mode (`IAM_MODE=embedded`)
 
 Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider

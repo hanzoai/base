@@ -4,19 +4,21 @@ package core
 
 import (
 	"github.com/hanzoai/dbx"
-	_ "modernc.org/sqlite"
+	"github.com/hanzoai/sqlite"
 )
 
+// DefaultDBConnect opens an embedded SQLite database on the canonical Hanzo
+// driver (github.com/hanzoai/sqlite). That package registers the "sqlite"
+// database/sql driver name under BOTH build configs — modernc (pure Go, !cgo)
+// and mattn/SQLCipher (cgo) — so exactly ONE package registers "sqlite" no
+// matter how Base is linked (standalone !cgo, or embedded into a cgo binary such
+// as commerce). Base MUST NOT import modernc.org/sqlite directly, or a cgo build
+// double-registers "sqlite" and panics at init.
+//
+// sqlite.PragmaDSN encodes sqlite.DefaultPragmas (busy_timeout leads — a
+// connection must block on a busy DB before journal_mode=WAL is set) in the
+// ACTIVE backend's DSN syntax, so the pragmas apply on both backends; a
+// single-form DSN would be silently dropped by the other backend.
 func DefaultDBConnect(dbPath string) (*dbx.DB, error) {
-	// Note: the busy_timeout pragma must be first because
-	// the connection needs to be set to block on busy before WAL mode
-	// is set in case it hasn't been already set by another connection.
-	pragmas := "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=journal_size_limit(200000000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-32000)"
-
-	db, err := dbx.Open("sqlite", dbPath+pragmas)
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
+	return dbx.Open("sqlite", sqlite.PragmaDSN(dbPath, sqlite.DefaultPragmas))
 }
