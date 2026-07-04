@@ -293,7 +293,7 @@ function buildFormData(
   return fd;
 }
 
-export const Route = createFileRoute('/collections/$id/records/$recordId')({
+export const Route = createFileRoute('/collections_/$id_/records_/$recordId')({
   beforeLoad: () => {
     if (!base.authStore.token) throw redirect({ to: '/login' });
   },
