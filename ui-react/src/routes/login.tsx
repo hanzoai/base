@@ -1,29 +1,27 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
 
 import { Button } from '~/components/ui/button';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
 import { base } from '~/lib/base';
+import { iam } from '~/lib/iam';
 
-interface LoginForm {
-  identity: string;
-  password: string;
-}
-
+// Base is IAM-native: sign-in is OAuth2 PKCE against Hanzo IAM. There is no
+// local password — the retired `_superusers` password endpoint is gone
+// (410/404). "Sign in with Hanzo" redirects to the IAM authorize endpoint;
+// the `/auth/callback` route completes the exchange.
 function LoginPage() {
-  const nav = useNavigate();
   const [error, setError] = useState<string>('');
-  const { register, handleSubmit, formState } = useForm<LoginForm>();
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = async (values: LoginForm) => {
+  const signIn = async () => {
     setError('');
+    setBusy(true);
     try {
-      await base.collection('_superusers').authWithPassword(values.identity, values.password);
-      await nav({ to: '/' });
+      await iam.signinRedirect();
+      // signinRedirect navigates away; nothing runs after it on success.
     } catch (err: unknown) {
       setError((err as Error)?.message ?? 'Sign-in failed');
+      setBusy(false);
     }
   };
 
@@ -34,34 +32,23 @@ function LoginPage() {
           <img src="/icon.svg" alt="Base" className="h-6 w-6" />
           <h1 className="text-lg font-semibold text-foreground">Sign in to Base</h1>
         </div>
-        <form onSubmit={ handleSubmit(onSubmit) } className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="identity">Email</Label>
-            <Input
-              id="identity"
-              { ...register('identity', { required: true }) }
-              type="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              { ...register('password', { required: true, minLength: 10 }) }
-              type="password"
-              autoComplete="current-password"
-            />
-          </div>
-          { error && <p className="text-sm text-destructive">{ error }</p> }
-          <Button type="submit" disabled={ formState.isSubmitting } className="mt-2 w-full">
-            { formState.isSubmitting ? 'Signing in…' : 'Sign in' }
-          </Button>
-        </form>
+        <p className="mb-6 text-sm text-muted-foreground">
+          Base uses Hanzo IAM for authentication. Sign in with your Hanzo
+          account to reach the admin.
+        </p>
+        { error && <p className="mb-4 text-sm text-destructive">{ error }</p> }
+        <Button onClick={ signIn } isLoading={ busy } disabled={ busy } className="w-full">
+          { busy ? 'Redirecting…' : 'Sign in with Hanzo' }
+        </Button>
       </div>
     </div>
   );
 }
 
-export const Route = createFileRoute('/login')({ component: LoginPage });
+export const Route = createFileRoute('/login')({
+  // Already signed in → straight to the dashboard.
+  beforeLoad: () => {
+    if (base.authStore.token) throw redirect({ to: '/' });
+  },
+  component: LoginPage,
+});
