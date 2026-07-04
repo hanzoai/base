@@ -228,6 +228,11 @@ type Options struct {
 	// filesystem.NewS3(...) / NewGCS(...); tests can pass filesystem.NewLocal.
 	ObjectStore *filesystem.System
 
+	// Keys provides the per-tenant at-rest encryption key for every DB.
+	// REQUIRED — the store never writes plaintext SQLite to durable storage.
+	// Production wires the KMS-rooted Keyring (NewKeyring + kmskeyring.Source).
+	Keys KeyProvider
+
 	// CacheRoot is the in-pod cache directory for hot SQLite files. Defaults
 	// to "/data/cache".
 	CacheRoot string
@@ -291,8 +296,9 @@ type MultiTenantStore struct {
 
 // openDB is the resident state for one tenant SQLite.
 type openDB struct {
-	key Key
-	db  *dbx.DB
+	key  Key
+	db   *dbx.DB
+	tkey *TenantKey // per-tenant at-rest encryption key (set at hydrate)
 
 	// mu guards writes to the DB and to the checkpoint bookkeeping. Reads
 	// through dbx go through sql.DB, which is already safe for concurrent
@@ -311,6 +317,9 @@ type openDB struct {
 func New(opts Options) (*MultiTenantStore, error) {
 	if opts.ObjectStore == nil {
 		return nil, errors.New("store: ObjectStore is required")
+	}
+	if opts.Keys == nil {
+		return nil, errors.New("store: Keys (per-tenant encryption) is required")
 	}
 	if opts.CacheRoot == "" {
 		opts.CacheRoot = "/data/cache"
@@ -524,6 +533,14 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 		return nil, fmt.Errorf("store: mkdir %s: %w", filepath.Dir(localPath), err)
 	}
 
+	// Resolve the per-tenant at-rest key first: for a fresh tenant this
+	// generates+persists the wrapped-key sidecar BEFORE any DB object
+	// exists, so an existing DB object always has a resolvable key.
+	tkey, err := s.opts.Keys.Resolve(ctx, k)
+	if err != nil {
+		return nil, fmt.Errorf("store: resolve key %s: %w", k, err)
+	}
+
 	var etag string
 	objKey := k.ObjectKey()
 	exists, err := s.opts.ObjectStore.Exists(objKey)
@@ -531,14 +548,23 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 		return nil, fmt.Errorf("store: object exists %s: %w", objKey, err)
 	}
 	if exists {
-		etag, err = s.downloadTo(ctx, objKey, localPath)
+		// Download ciphertext, then decrypt to the plaintext local path.
+		encPath := localPath + ".enc"
+		etag, err = s.downloadTo(ctx, objKey, encPath)
 		if err != nil {
 			return nil, err
 		}
-		// Defense in depth: reject non-SQLite blobs BEFORE handing bytes
-		// to modernc.org/sqlite. A poisoned bucket entry (SSRF, stolen
-		// creds, malicious CI) otherwise reaches the SQLite VM unchecked
-		// and any hostile sqlite_master row fires on first query.
+		if derr := decryptFileTo(encPath, localPath, tkey); derr != nil {
+			_ = os.Remove(encPath)
+			_ = os.Remove(localPath)
+			// An object we cannot age-decrypt to this tenant is corrupt or
+			// hostile — never retry blindly, never open it.
+			return nil, fmt.Errorf("store: decrypt %s: %w", k, errors.Join(derr, ErrCorruptDB))
+		}
+		_ = os.Remove(encPath)
+		// Defense in depth: reject non-SQLite plaintext BEFORE handing bytes
+		// to the SQLite VM. A poisoned-but-decryptable payload otherwise
+		// reaches sqlite_master unchecked.
 		if err := verifySQLiteFile(localPath); err != nil {
 			_ = os.Remove(localPath)
 			return nil, err
@@ -562,6 +588,7 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 	h := &openDB{
 		key:        k,
 		db:         db,
+		tkey:       tkey,
 		lastAccess: now,
 		lastFlush:  now,
 		etag:       etag,
@@ -623,7 +650,11 @@ func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
 	if err != nil {
 		return fmt.Errorf("store: read local %s: %w", h.localPath, err)
 	}
-	if err := s.opts.ObjectStore.Upload(content, k.ObjectKey()); err != nil {
+	ct, err := sealDB(h.tkey, content)
+	if err != nil {
+		return fmt.Errorf("store: encrypt %s: %w", k, err)
+	}
+	if err := s.opts.ObjectStore.Upload(ct, k.ObjectKey()); err != nil {
 		return fmt.Errorf("%w: %s: %v", ErrUploadFailed, k, err)
 	}
 
@@ -678,7 +709,17 @@ func (s *MultiTenantStore) flushAndCloseLocked(k Key) error {
 		return fmt.Errorf("store: read local %s: %w", h.localPath, readErr)
 	}
 	if len(content) > 0 {
-		if err := s.opts.ObjectStore.Upload(content, k.ObjectKey()); err != nil {
+		ct, encErr := sealDB(h.tkey, content)
+		if encErr != nil {
+			// Re-open so subsequent Gets don't hit a closed DB.
+			if db, openErr := s.opts.Connect(h.localPath); openErr == nil {
+				h.db = db
+			} else {
+				s.handles.Delete(k)
+			}
+			return fmt.Errorf("store: encrypt %s: %w", k, encErr)
+		}
+		if err := s.opts.ObjectStore.Upload(ct, k.ObjectKey()); err != nil {
 			// Re-open the handle so subsequent Gets don't hit a closed
 			// DB, and the retry path has something to Checkpoint.
 			db, openErr := s.opts.Connect(h.localPath)
@@ -867,4 +908,22 @@ func verifySQLiteFile(path string) error {
 		return ErrCorruptDB
 	}
 	return validateSQLiteMagic(buf[:])
+}
+
+// decryptFileTo reads the age-encrypted DB at encPath, decrypts it with the
+// tenant key, and writes the plaintext atomically to plainPath.
+func decryptFileTo(encPath, plainPath string, tk *TenantKey) error {
+	ciphertext, err := os.ReadFile(encPath)
+	if err != nil {
+		return fmt.Errorf("store: read enc %s: %w", encPath, err)
+	}
+	plain, err := openDBBytes(tk, ciphertext)
+	if err != nil {
+		return err
+	}
+	tmp := plainPath + ".tmp"
+	if err := os.WriteFile(tmp, plain, 0o600); err != nil {
+		return fmt.Errorf("store: write plain %s: %w", tmp, err)
+	}
+	return os.Rename(tmp, plainPath)
 }
