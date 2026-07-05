@@ -31,6 +31,12 @@ jobs:
     timeout-minutes: 10
     env:
       GOTOOLCHAIN: local+path
+      # luxfi/hanzoai are private cross-org modules (network/ pulls
+      # github.com/hanzoai/sqlite transitively) — resolve them via
+      # authenticated git (below), NOT the public proxy, so go.sum verifies
+      # (the proxy holds re-pushed bits for some luxfi tags; git matches go.sum).
+      GOPRIVATE: github.com/hanzoai/*,github.com/luxfi/*
+      GONOSUMDB: github.com/hanzoai/*,github.com/luxfi/*
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +46,14 @@ jobs:
         with:
           go-version: "1.26.4"
           cache: true
+
+      # Authenticated git for the private module set — every go operation in
+      # this job (go mod download + the test builds) then fetches hanzoai/* +
+      # luxfi/* from git, matching go.sum. Same step as release.yaml.
+      - name: Configure private cross-org module auth
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: git config --global url."https://x-access-token:${GH_PAT}@github.com/".insteadOf "https://github.com/"
 
       - name: Resolve dependencies
         working-directory: network
