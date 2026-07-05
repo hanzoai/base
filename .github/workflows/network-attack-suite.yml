@@ -51,6 +51,13 @@ jobs:
           go-version: "1.26.4"
           cache: true
 
+      # `go test -race` needs cgo, which needs a C compiler. The minimal arc
+      # runner image ships none (`gcc: not found`), so provision it — same
+      # sudo apt-get pattern hanzoai/ci uses to add jq/PyYAML. Guarded so it's
+      # a no-op if a future runner image bakes gcc in.
+      - name: Provision C compiler (cgo for -race)
+        run: command -v gcc >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq gcc; }
+
       # Authenticated git for the private module set — every go operation in
       # this job (go mod download + the test builds) then fetches hanzoai/* +
       # luxfi/* from git, matching go.sum. Same step as release.yaml.
