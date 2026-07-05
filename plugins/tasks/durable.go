@@ -18,13 +18,14 @@ import (
 var validIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,128}$`)
 
 // DurableConfig holds connection settings for durable task execution.
-// When enabled, tasks are submitted as Temporal workflows for crash-safe execution.
-// Supports both local Temporal (localhost:7233) and cloud (tasks.hanzo.ai).
+// When enabled, tasks are submitted as durable workflows for crash-safe execution
+// against cloud's embedded, identity-gated Hanzo Tasks engine.
 type DurableConfig struct {
 	// Enabled activates durable execution. Default false (SQLite-only mode).
 	Enabled bool `json:"enabled" yaml:"enabled"`
 
-	// Address is the Temporal frontend address. Default "tasks.hanzo.ai:7233".
+	// Address is the tasks ZAP frontend address. Default "cloud.hanzo.svc:9999"
+	// (cloud's Embedded.ServeGated listener; the standalone tasksd is retired).
 	Address string `json:"address" yaml:"address"`
 
 	// Namespace is the Temporal namespace. For multi-tenant, use org ID.
@@ -51,7 +52,7 @@ type DurableConfig struct {
 func DefaultDurableConfig() DurableConfig {
 	cfg := DurableConfig{
 		Enabled:      false,
-		Address:      "tasks.hanzo.ai:7233",
+		Address:      "cloud.hanzo.svc:9999",
 		Namespace:    "default",
 		DefaultQueue: "default",
 		RunWorker:    true,
@@ -93,28 +94,51 @@ type DurableStore struct {
 	namespace string
 	connected bool
 
-	// orgClients caches per-org Temporal client connections.
-	// Key is org ID (= Temporal namespace).
+	// token authenticates every dial to cloud's identity-gated tasks engine.
+	// nil dials ungated (dev/loopback); see iamTokenSource.
+	token client.TokenSource
+
+	// orgClients caches per-org client connections. Key is org ID (= namespace).
 	mu         sync.RWMutex
 	orgClients map[string]client.Client
 }
 
-// NewDurableStore connects to the Temporal service.
+// NewDurableStore connects to the tasks engine and registers its default
+// namespace. cloud's gated engine org-prefixes the store by the token owner,
+// so a namespace is invisible until registered — ExecuteWorkflow 400s otherwise.
 func NewDurableStore(addr, namespace string) (*DurableStore, error) {
+	token := iamTokenSource()
 	c, err := client.Dial(client.Options{
 		HostPort:  addr,
 		Namespace: namespace,
+		Token:     token,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("tasks: failed to connect to %s: %w", addr, err)
+	}
+	if err := registerNamespace(c, namespace); err != nil {
+		c.Close()
+		return nil, err
 	}
 	return &DurableStore{
 		Client:     c,
 		addr:       addr,
 		namespace:  namespace,
+		token:      token,
 		connected:  true,
 		orgClients: make(map[string]client.Client),
 	}, nil
+}
+
+// registerNamespace ensures name exists on the engine before any ExecuteWorkflow
+// targets it. The engine upserts, so this is idempotent across restarts.
+func registerNamespace(c client.Client, name string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := c.RegisterNamespace(ctx, &client.RegisterNamespaceRequest{Name: name}); err != nil {
+		return fmt.Errorf("tasks: register namespace %q: %w", name, err)
+	}
+	return nil
 }
 
 // ClientForOrg returns a Temporal client scoped to the given org namespace.
@@ -147,9 +171,14 @@ func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
 	c, err := client.Dial(client.Options{
 		HostPort:  ds.addr,
 		Namespace: orgID,
+		Token:     ds.token,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("tasks: failed to connect to namespace %s: %w", orgID, err)
+	}
+	if err := registerNamespace(c, orgID); err != nil {
+		c.Close()
+		return nil, err
 	}
 	ds.orgClients[orgID] = c
 	return c, nil
