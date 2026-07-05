@@ -57,6 +57,10 @@ export function EditableCell(props: EditableCellProps) {
 
   const editable = kind !== 'readonly' && kind !== 'file';
   const display = formatDisplay(value, field);
+  // Numeric columns right-align; numeric + date use tabular figures so digits
+  // line up column-wise (Twenty/Airtable-grade legibility).
+  const numeric = kind === 'number';
+  const tnum = numeric || kind === 'date';
 
   return (
     <Popover open={ editing } onOpenChange={ (o) => { if (!o) onEditEnd(); } }>
@@ -64,10 +68,11 @@ export function EditableCell(props: EditableCellProps) {
         <CellShell
           active={ active }
           editable={ editable }
+          numeric={ numeric }
           onActivate={ onActivate }
           onEdit={ editable ? onEdit : undefined }
         >
-          <span className={ cn('block truncate', kind === 'json' && 'font-mono text-xs') }>
+          <span className={ cn('block truncate', tnum && 'tabular-nums', kind === 'json' && 'font-mono text-xs') }>
             { display || <span className="text-muted-foreground/50">—</span> }
           </span>
         </CellShell>
@@ -96,12 +101,14 @@ export function EditableCell(props: EditableCellProps) {
 function CellShell({
   active,
   editable,
+  numeric,
   onActivate,
   onEdit,
   children,
 }: {
   active: boolean;
   editable?: boolean;
+  numeric?: boolean;
   onActivate: () => void;
   onEdit?: () => void;
   children: React.ReactNode;
@@ -114,6 +121,7 @@ function CellShell({
       onDoubleClick={ onEdit }
       className={ cn(
         'flex h-9 items-center px-3 text-sm outline-none',
+        numeric && 'justify-end',
         editable && 'cursor-text',
         active && 'ring-1 ring-inset ring-ring',
       ) }
