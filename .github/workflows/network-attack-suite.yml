@@ -31,6 +31,10 @@ jobs:
     timeout-minutes: 10
     env:
       GOTOOLCHAIN: local+path
+      # The suite's compile gate and attack run use `go test -race`, which
+      # requires cgo; the arc runner defaults CGO_ENABLED=0 (race steps then
+      # fail with "-race requires cgo"). Enable it for the whole job.
+      CGO_ENABLED: 1
       # luxfi/hanzoai are private cross-org modules (network/ pulls
       # github.com/hanzoai/sqlite transitively) — resolve them via
       # authenticated git (below), NOT the public proxy, so go.sum verifies
