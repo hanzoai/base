@@ -166,12 +166,14 @@ function SortHeader({
 }) {
   const asc = sort === field.name;
   const desc = sort === `-${field.name}`;
+  // Numeric headers right-align to sit over their right-aligned tabular cells.
+  const numeric = field.type === 'number';
   return (
-    <th className="whitespace-nowrap px-3 py-2 text-left font-medium text-muted-foreground">
+    <th className={ cn('whitespace-nowrap px-3 py-2 font-medium text-muted-foreground', numeric ? 'text-right' : 'text-left') }>
       <button
         type="button"
         onClick={ () => onSort(field.name) }
-        className="inline-flex items-center gap-1 hover:text-foreground"
+        className={ cn('inline-flex items-center gap-1 hover:text-foreground', numeric && 'flex-row-reverse') }
       >
         <span>{ field.name }</span>
         <span className="text-[10px] uppercase text-muted-foreground/60">{ field.type }</span>
