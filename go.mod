@@ -93,7 +93,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
-	github.com/luxfi/accel v1.2.2 // indirect
+	github.com/luxfi/accel v1.2.4 // indirect
 	github.com/luxfi/address v1.0.1 // indirect
 	github.com/luxfi/bft v0.1.5 // indirect
 	github.com/luxfi/compress v0.0.5 // indirect
@@ -182,12 +182,12 @@ require (
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hanzoai/orm v0.5.1
 	github.com/hanzoai/replicate v0.8.0
-	github.com/hanzoai/sqlite v0.2.1
+	github.com/hanzoai/sqlite v0.2.3
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/luxfi/crypto v1.19.17 // indirect
+	github.com/luxfi/crypto v1.19.26 // indirect
 	github.com/luxfi/ids v1.2.15 // indirect
 	github.com/luxfi/math v1.4.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
