@@ -51,6 +51,28 @@ type Config struct {
 	// DisposableDomains, if non-nil, replaces the built-in disposable
 	// e-mail blocklist. Pass an empty slice to disable blocking.
 	DisposableDomains []string
+
+	// ShareBaseURL, when set, is prepended to the ?ref=<code> share link so the
+	// response carries an ABSOLUTE, shareable URL (required for share-to-X and a
+	// copyable referral link). Resolved at boot from WAITLIST_SHARE_BASE_URL if
+	// empty. Empty -> the share URL stays the relative "?ref=<code>" (the widget
+	// resolves it against its own origin).
+	ShareBaseURL string
+}
+
+// ConfigFromEnv builds a Config from the environment, mirroring the bootnode
+// plugin's opt-in convention. The plugin is OFF unless WAITLIST_ENABLED=true.
+//
+//	WAITLIST_ENABLED         "true" to mount the plugin
+//	TURNSTILE_SECRET_KEY     Cloudflare Turnstile secret (empty -> captcha off)
+//	WAITLIST_ADMIN_SECRET    Bearer secret for /v1/waitlist/export (empty -> export off)
+//	WAITLIST_SHARE_BASE_URL  absolute base for the share link (e.g. https://waitlist.hanzo.ai)
+func ConfigFromEnv() Config {
+	return Config{
+		Enabled:      os.Getenv("WAITLIST_ENABLED") == "true",
+		ShareBaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("WAITLIST_SHARE_BASE_URL")), "/"),
+		// TurnstileSecret + AdminSecret are resolved from env in resolve().
+	}
 }
 
 func (c *Config) resolve() {
@@ -59,6 +81,9 @@ func (c *Config) resolve() {
 	}
 	if c.AdminSecret == "" {
 		c.AdminSecret = os.Getenv("WAITLIST_ADMIN_SECRET")
+	}
+	if c.ShareBaseURL == "" {
+		c.ShareBaseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("WAITLIST_SHARE_BASE_URL")), "/")
 	}
 	if c.JoinRateLimit == 0 {
 		c.JoinRateLimit = 5
@@ -78,6 +103,16 @@ func (c *Config) validate() error {
 		}
 	}
 	return nil
+}
+
+// shareURL builds the referral share link for a code. With ShareBaseURL set it
+// is absolute (https://host?ref=CODE) — shareable to X and copyable; otherwise
+// it stays the relative "?ref=CODE" the widget resolves against its own origin.
+func (c *Config) shareURL(code string) string {
+	if c.ShareBaseURL == "" {
+		return "?ref=" + code
+	}
+	return c.ShareBaseURL + "?ref=" + code
 }
 
 func (c *Config) waitlistsCollection() string {

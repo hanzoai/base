@@ -170,7 +170,7 @@ func (p *plugin) handleJoin(e *core.RequestEvent) error {
 		Rank:          rank,
 		Total:         total,
 		ReferralCount: referralCount,
-		ShareURL:      "?ref=" + entry.GetString("refCode"),
+		ShareURL:      p.config.shareURL(entry.GetString("refCode")),
 		AlreadyJoined: alreadyJoined,
 	})
 }
@@ -230,7 +230,7 @@ func (p *plugin) handleStatus(e *core.RequestEvent) error {
 		Total:         total,
 		AheadOf:       max0(total - rank),
 		ReferralCount: int(entry.GetFloat("referralCount")),
-		ShareURL:      "?ref=" + entry.GetString("refCode"),
+		ShareURL:      p.config.shareURL(entry.GetString("refCode")),
 	})
 }
 
