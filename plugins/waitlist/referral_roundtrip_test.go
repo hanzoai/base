@@ -12,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/hanzoai/base/apis"
-	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	luxlog "github.com/luxfi/log"
 )
@@ -35,26 +34,19 @@ func newWaitlistTestPlugin(t *testing.T) (*httptest.Server, func()) {
 		config:     cfg,
 		logger:     luxlog.New("component", "waitlist-test"),
 		limiter:    newSlidingLimiter(-1, 0), // rate-limit disabled for the test
-		turnstile:  newTurnstileVerifier(""),  // empty secret -> captcha skipped
+		turnstile:  newTurnstileVerifier(""), // empty secret -> captcha skipped
 		disposable: newDomainSet(nil),
 	}
 
+	// ensureSchema creates the collections AND self-seeds the default
+	// "launch" waitlist row (cfg.DefaultSlug), so no manual seed is needed.
 	if err := p.ensureSchema(); err != nil {
 		app.Cleanup()
 		t.Fatalf("ensureSchema: %v", err)
 	}
-
-	col, err := app.FindCollectionByNameOrId(cfg.waitlistsCollection())
-	if err != nil {
+	if _, err := app.FindFirstRecordByData(cfg.waitlistsCollection(), "slug", "launch"); err != nil {
 		app.Cleanup()
-		t.Fatalf("find waitlists collection: %v", err)
-	}
-	wl := core.NewRecord(col)
-	wl.Set("slug", "launch")
-	wl.Set("name", "Launch Waitlist")
-	if err := app.Save(wl); err != nil {
-		app.Cleanup()
-		t.Fatalf("seed waitlist: %v", err)
+		t.Fatalf("expected self-seeded launch waitlist: %v", err)
 	}
 
 	r, err := apis.NewRouter(app)
