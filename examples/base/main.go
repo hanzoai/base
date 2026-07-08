@@ -16,6 +16,7 @@ import (
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/platform"
+	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
@@ -128,6 +129,14 @@ func main() {
 	// teams, network/node/key provisioning via bootno.de CRDs). Opt-in via
 	// BOOTNODE_ENABLED=true. Reuses the platform's IAM + per-org isolation.
 	bootnode.MustRegister(app, bootnode.ConfigFromEnv())
+
+	// Viral waiting-list — POST /v1/waitlist/join, GET /v1/waitlist/status,
+	// GET /v1/waitlist/export. Referral engine (refCode / referredBy /
+	// referralCount / rank / shareUrl) backed by the host's per-tenant SQLite.
+	// Opt-in via WAITLIST_ENABLED=true (share links absolute via
+	// WAITLIST_SHARE_BASE_URL; captcha via TURNSTILE_SECRET_KEY; export via
+	// WAITLIST_ADMIN_SECRET).
+	waitlist.MustRegister(app, waitlist.ConfigFromEnv())
 
 	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
 	cloudsql.MustRegister(app, cloudsql.Config{
