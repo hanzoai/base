@@ -75,3 +75,12 @@ func emailDomain(email string) string {
 func normalizeEmail(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
+
+// titleSlug returns the slug with its first letter upper-cased, used as the
+// human-readable name of a seeded default waitlist (e.g. "hanzod" -> "Hanzod").
+func titleSlug(slug string) string {
+	if slug == "" {
+		return slug
+	}
+	return strings.ToUpper(slug[:1]) + slug[1:]
+}
