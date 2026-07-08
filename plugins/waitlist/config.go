@@ -3,10 +3,11 @@
 
 // Package waitlist registers a viral waiting-list plugin on a Base app.
 //
-// It exposes three endpoints under /v1/waitlist:
+// It exposes four endpoints under /v1/waitlist:
 //
 //	POST /v1/waitlist/join     - register an entry, optionally crediting a referrer
-//	GET  /v1/waitlist/status   - look up an entry's rank and share URL
+//	GET  /v1/waitlist/status   - look up an entry's rank, score and access
+//	POST /v1/waitlist/boost    - service-authed position boost (e.g. hanzod)
 //	GET  /v1/waitlist/export   - admin-only CSV export
 //
 // Backing storage is two Base collections (`waitlists`, `waitlist_entries`)
@@ -17,6 +18,7 @@ package waitlist
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -42,15 +44,31 @@ type Config struct {
 	// JoinRateWindow is the sliding window for JoinRateLimit. Zero -> 1h.
 	JoinRateWindow time.Duration
 
-	// AdminSecret guards /v1/waitlist/export. Required header is
-	// `Authorization: Bearer <AdminSecret>`. Resolved at boot from
-	// WAITLIST_ADMIN_SECRET if empty. If still empty after resolution,
-	// export is disabled (404).
+	// AdminSecret guards /v1/waitlist/export and /v1/waitlist/boost. Required
+	// header is `Authorization: Bearer <AdminSecret>`. Resolved at boot from
+	// WAITLIST_ADMIN_SECRET if empty. If still empty after resolution, those
+	// service endpoints are disabled (404) unless the caller is a superuser.
 	AdminSecret string
 
 	// DisposableDomains, if non-nil, replaces the built-in disposable
 	// e-mail blocklist. Pass an empty slice to disable blocking.
 	DisposableDomains []string
+
+	// DefaultSlugs are waitlist slugs seeded on bootstrap. Each becomes a
+	// waitlist row (name = slug with its first letter upper-cased) if absent.
+	// Resolved at boot from WAITLIST_DEFAULT_SLUGS (comma-separated). Empty
+	// seeds nothing.
+	DefaultSlugs []string
+
+	// AccessCapacity auto-grants product access to the top-N entries by rank.
+	// Resolved at boot from WAITLIST_ACCESS_CAPACITY. Zero (default) grants
+	// none automatically.
+	AccessCapacity int
+
+	// Open is the master switch that ends the waitlist: when true EVERYONE
+	// has access. Resolved at boot from WAITLIST_OPEN (1/true/yes,
+	// case-insensitive). Default false.
+	Open bool
 }
 
 func (c *Config) resolve() {
@@ -65,6 +83,17 @@ func (c *Config) resolve() {
 	}
 	if c.JoinRateWindow == 0 {
 		c.JoinRateWindow = time.Hour
+	}
+	if len(c.DefaultSlugs) == 0 {
+		c.DefaultSlugs = splitCSV(os.Getenv("WAITLIST_DEFAULT_SLUGS"))
+	}
+	if c.AccessCapacity == 0 {
+		if n, err := strconv.Atoi(strings.TrimSpace(os.Getenv("WAITLIST_ACCESS_CAPACITY"))); err == nil {
+			c.AccessCapacity = n
+		}
+	}
+	if !c.Open {
+		c.Open = parseBool(os.Getenv("WAITLIST_OPEN"))
 	}
 	c.CollectionPrefix = strings.TrimSpace(c.CollectionPrefix)
 }
@@ -92,4 +121,27 @@ func (c *Config) entriesCollection() string {
 		return "waitlist_entries"
 	}
 	return c.CollectionPrefix + "_waitlist_entries"
+}
+
+// splitCSV splits a comma-separated env value into trimmed, non-empty parts.
+// An empty or all-whitespace input yields nil.
+func splitCSV(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// parseBool reports whether s is an affirmative flag: 1/true/yes
+// (case-insensitive). Everything else — including empty — is false.
+func parseBool(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }

@@ -21,11 +21,12 @@ func MustRegister(app core.App, cfg Config) {
 // Register installs the waitlist plugin.
 //
 // On OnBootstrap the plugin auto-creates two collections (`waitlists`,
-// `waitlist_entries`) if they don't exist. On OnServe it mounts three
-// REST endpoints under /v1/waitlist:
+// `waitlist_entries`) if they don't exist and seeds any configured default
+// waitlists. On OnServe it mounts four REST endpoints under /v1/waitlist:
 //
 //	POST /v1/waitlist/join     - create an entry (Turnstile + rate-limit gated)
-//	GET  /v1/waitlist/status   - look up rank, share URL, referral count
+//	GET  /v1/waitlist/status   - look up rank, score, share URL, access
+//	POST /v1/waitlist/boost    - service-authed position boost (e.g. hanzod)
 //	GET  /v1/waitlist/export   - admin-only CSV dump
 //
 // The plugin owns its collections and never exposes them as direct CRUD
@@ -48,11 +49,11 @@ func Register(app core.App, cfg Config) error {
 	}
 
 	p := &plugin{
-		app:       app,
-		config:    cfg,
-		logger:    luxlog.New("component", "waitlist"),
-		limiter:   newSlidingLimiter(cfg.JoinRateLimit, cfg.JoinRateWindow),
-		turnstile: newTurnstileVerifier(cfg.TurnstileSecret),
+		app:        app,
+		config:     cfg,
+		logger:     luxlog.New("component", "waitlist"),
+		limiter:    newSlidingLimiter(cfg.JoinRateLimit, cfg.JoinRateWindow),
+		turnstile:  newTurnstileVerifier(cfg.TurnstileSecret),
 		disposable: newDomainSet(domains),
 	}
 
@@ -91,5 +92,6 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	g := r.Group("/v1/waitlist")
 	g.POST("/join", p.handleJoin)
 	g.GET("/status", p.handleStatus)
+	g.POST("/boost", p.handleBoost)
 	g.GET("/export", p.handleExport)
 }
