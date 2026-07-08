@@ -38,7 +38,13 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     ./examples/base/main.go
 
 FROM public.ecr.aws/docker/library/alpine:3.21
-RUN apk add --no-cache ca-certificates tzdata curl \
+# sqlite (CLI) + python3: CTO directive — every pod ships the sqlite3 CLI and a
+# python3 runtime for debugging the embedded store. Base is a CGO_ENABLED=0
+# pure-Go build (modernc sqlite) with per-value app encryption, so the on-disk
+# DB is a STANDARD SQLite file — the plaintext sqlite3 CLI opens it directly
+# (unlike IAM's SQLCipher store, which needs the codec build). Runtime only, no
+# build toolchain.
+RUN apk add --no-cache ca-certificates tzdata curl sqlite python3 \
     && addgroup -S hanzo && adduser -S hanzo -G hanzo
 WORKDIR /app
 COPY --from=builder /build/base /app/base
