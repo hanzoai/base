@@ -13,7 +13,8 @@ import (
 )
 
 // ensureSchema idempotently creates the two collections that back the
-// waitlist plugin. It is safe to call on every boot.
+// waitlist plugin AND the default waitlist row, so /join works out of the
+// box. It is safe to call on every boot.
 func (p *plugin) ensureSchema() error {
 	if _, err := p.ensureWaitlistsCollection(); err != nil {
 		return fmt.Errorf("waitlist: ensure waitlists collection: %w", err)
@@ -21,6 +22,36 @@ func (p *plugin) ensureSchema() error {
 	if _, err := p.ensureEntriesCollection(); err != nil {
 		return fmt.Errorf("waitlist: ensure entries collection: %w", err)
 	}
+	if err := p.ensureDefaultWaitlist(); err != nil {
+		return fmt.Errorf("waitlist: ensure default waitlist: %w", err)
+	}
+	return nil
+}
+
+// ensureDefaultWaitlist idempotently seeds the configured default waitlist
+// row (slug = Config.DefaultSlug, default "launch"). The join endpoint 404s
+// on an unknown slug, so a fresh deployment is useless without at least one
+// list — the plugin owns its default. An existing row with the slug is left
+// untouched (a superuser may rename it via the dashboard).
+func (p *plugin) ensureDefaultWaitlist() error {
+	name := p.config.waitlistsCollection()
+	if _, err := p.app.FindFirstRecordByData(name, "slug", p.config.DefaultSlug); err == nil {
+		return nil // already present
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
+	col, err := p.app.FindCollectionByNameOrId(name)
+	if err != nil {
+		return err
+	}
+	rec := core.NewRecord(col)
+	rec.Set("slug", p.config.DefaultSlug)
+	rec.Set("name", p.config.DefaultName)
+	if err := p.app.Save(rec); err != nil {
+		return err
+	}
+	p.logger.Info("waitlist: seeded default waitlist", "slug", p.config.DefaultSlug)
 	return nil
 }
 

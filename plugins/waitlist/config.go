@@ -58,6 +58,16 @@ type Config struct {
 	// empty. Empty -> the share URL stays the relative "?ref=<code>" (the widget
 	// resolves it against its own origin).
 	ShareBaseURL string
+
+	// DefaultSlug is the slug of the waitlist row auto-created on bootstrap so
+	// that /join works out of the box (the join endpoint 404s on an unknown
+	// slug). Resolved at boot from WAITLIST_DEFAULT_SLUG. Empty -> "launch".
+	// The seed is idempotent — an existing row with this slug is left untouched.
+	DefaultSlug string
+
+	// DefaultName is the display name for the auto-seeded default waitlist.
+	// Resolved at boot from WAITLIST_DEFAULT_NAME. Empty -> "Waitlist".
+	DefaultName string
 }
 
 // ConfigFromEnv builds a Config from the environment, mirroring the bootnode
@@ -71,6 +81,8 @@ func ConfigFromEnv() Config {
 	return Config{
 		Enabled:      os.Getenv("WAITLIST_ENABLED") == "true",
 		ShareBaseURL: strings.TrimRight(strings.TrimSpace(os.Getenv("WAITLIST_SHARE_BASE_URL")), "/"),
+		DefaultSlug:  strings.TrimSpace(os.Getenv("WAITLIST_DEFAULT_SLUG")),
+		DefaultName:  strings.TrimSpace(os.Getenv("WAITLIST_DEFAULT_NAME")),
 		// TurnstileSecret + AdminSecret are resolved from env in resolve().
 	}
 }
@@ -90,6 +102,12 @@ func (c *Config) resolve() {
 	}
 	if c.JoinRateWindow == 0 {
 		c.JoinRateWindow = time.Hour
+	}
+	if c.DefaultSlug == "" {
+		c.DefaultSlug = "launch"
+	}
+	if c.DefaultName == "" {
+		c.DefaultName = "Waitlist"
 	}
 	c.CollectionPrefix = strings.TrimSpace(c.CollectionPrefix)
 }
