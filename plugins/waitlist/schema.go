@@ -13,13 +13,17 @@ import (
 )
 
 // ensureSchema idempotently creates the two collections that back the
-// waitlist plugin. It is safe to call on every boot.
+// waitlist plugin and seeds any configured default waitlists. It is safe
+// to call on every boot.
 func (p *plugin) ensureSchema() error {
 	if _, err := p.ensureWaitlistsCollection(); err != nil {
 		return fmt.Errorf("waitlist: ensure waitlists collection: %w", err)
 	}
 	if _, err := p.ensureEntriesCollection(); err != nil {
 		return fmt.Errorf("waitlist: ensure entries collection: %w", err)
+	}
+	if err := p.ensureDefaultWaitlists(); err != nil {
+		return fmt.Errorf("waitlist: seed default waitlists: %w", err)
 	}
 	return nil
 }
@@ -106,6 +110,16 @@ func (p *plugin) ensureEntriesCollection() (*core.Collection, error) {
 			Name:     "referralCount",
 			Required: false,
 		},
+		// boost accumulates non-referral position points (hanzod
+		// contribution, admin grants). Additive: zero for existing rows.
+		&core.NumberField{
+			Name: "boost",
+		},
+		// accessGranted is a sticky instant/threshold access grant — once
+		// true it is never revoked by rank drift.
+		&core.BoolField{
+			Name: "accessGranted",
+		},
 		&core.AutodateField{Name: "createdAt", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
@@ -118,4 +132,31 @@ func (p *plugin) ensureEntriesCollection() (*core.Collection, error) {
 	}
 	p.logger.Info("waitlist: created collection", "name", name)
 	return c, nil
+}
+
+// ensureDefaultWaitlists seeds cfg.DefaultSlugs as waitlist rows. Each slug
+// that has no row yet gets one (slug + Title-cased name). Idempotent.
+func (p *plugin) ensureDefaultWaitlists() error {
+	if len(p.config.DefaultSlugs) == 0 {
+		return nil
+	}
+	col, err := p.app.FindCollectionByNameOrId(p.config.waitlistsCollection())
+	if err != nil {
+		return err
+	}
+	for _, slug := range p.config.DefaultSlugs {
+		if _, err := p.app.FindFirstRecordByData(p.config.waitlistsCollection(), "slug", slug); err == nil {
+			continue // already exists
+		} else if !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+		rec := core.NewRecord(col)
+		rec.Set("slug", slug)
+		rec.Set("name", titleSlug(slug))
+		if err := p.app.Save(rec); err != nil {
+			return err
+		}
+		p.logger.Info("waitlist: seeded default waitlist", "slug", slug)
+	}
+	return nil
 }
