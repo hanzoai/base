@@ -280,8 +280,8 @@ github.com/hanzoai/replicate v0.9.5 h1:/1rATcx7mxg5DuT+OjGf2hebkJBB2ihX5N0ZTaBWy
 github.com/hanzoai/replicate v0.9.5/go.mod h1:yCG5zw6sZon+XsZJncNPhBu/vBaHk9UbYK/l8QeQcNk=
 github.com/hanzoai/sqlite v0.2.3 h1:X9AmaAro1hCsYY/ykI/nD5wiTCPpHhtBkUqe+PfSzuM=
 github.com/hanzoai/sqlite v0.2.3/go.mod h1:jhU6OMiNmNmjFHOgfIskse/RImYEe7rUTm6+rMKMRzg=
-github.com/hanzoai/tasks v1.48.0 h1:Qts1pkFuUhS7IsVinDppENKkAh0t3SzD4jS9RJpZiYE=
-github.com/hanzoai/tasks v1.48.0/go.mod h1:DfBjEr4ONXo3W2GAmJQd2qwP0zAccD705PxC4xj1KOU=
+github.com/hanzoai/tasks v1.50.0 h1:vej75cDO4gzdIsUujLtCoQ6w6Zi6j3JJo46n8xpfX8M=
+github.com/hanzoai/tasks v1.50.0/go.mod h1:+Oqq+L3nY4uKeLyPanimlbcym/HoIUDaBezgIs6v4Hk=
 github.com/hanzoai/tygoja v0.0.2 h1:0wb1nm+k8LYfLDWdiiqQtKyVGEAXkuSlBpH3g/lUsIE=
 github.com/hanzoai/tygoja v0.0.2/go.mod h1:o+poSPLJ5S3SMtdz7gJHaL/6P6tjGBZcfQMl0SUIBr4=
 github.com/hashicorp/golang-lru/v2 v2.0.7 h1:a+bsQ5rvGLjzHuww6tVxozPZFVghXaHOwFs4luLUK2k=

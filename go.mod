@@ -19,7 +19,7 @@ require (
 	github.com/hanzoai/kms/sdk/go v1.1.1
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.48.0
+	github.com/hanzoai/tasks v1.50.0
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
