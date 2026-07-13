@@ -51,9 +51,7 @@ func newShard(parent context.Context, id string, members []NodeID, replication i
 	ctx, cancel := context.WithCancel(parent)
 
 	threshold := quorum(replication)
-	// Quasar requires threshold ≥ 2 except in test-engine mode — we pick
-	// that path when replication < 2 so single-node works.
-	eng, err := newQuasarEngine(ctx, id, members, threshold)
+	eng, err := newQuasarEngine(ctx, id)
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("shard %s: %w", id, err)

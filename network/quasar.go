@@ -2,122 +2,81 @@ package network
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
-	"time"
-
-	"github.com/luxfi/consensus/protocol/quasar"
 )
 
-// quasarEngine is the adapter over github.com/luxfi/consensus/protocol/quasar.
-// It narrows the upstream Engine to exactly the surface this package needs:
+// quasarEngine is Base's in-process, per-shard finalization pipe for the
+// Quasar replication plane. One quasarEngine per shard.
 //
-//	Submit(shardID, frame) — push a local commit into the DAG.
-//	Finalized() chan Frame — stream of frames that quorum has acked.
-//	Members() []NodeID     — current voting set for the shard.
-//	Stop()                 — graceful shutdown.
+// Base's replication is NOT BFT consensus. Cross-pod frame delivery is the
+// ZAP transport (transport_zap.go); the authoritative ordering, dedup and
+// quorum-routing live in shard.go (applyLoop), router.go and membership.go.
+// This engine's only job is to accept locally-submitted and peer-ingested
+// frames and stream them, in submission order, to the shard's apply loop.
 //
-// One quasarEngine per shard; one Quasar DAG per shard, per the design doc.
+// It deliberately does not depend on github.com/luxfi/consensus. Base never
+// wired a validator set, signer, or security profile into the upstream Quasar
+// engine, so that engine only ever behaved as this same buffered pass-through
+// (emitting a discarded SHA-256 placeholder certificate) while dragging ~220
+// transitive packages — the entire PQ crypto stack — into every binary built
+// on Base. If Base ever needs real cross-pod BFT finality here, that is a
+// deliberate, separately-scoped feature that reintroduces the consensus layer
+// with a configured validator set — not an implicit dependency of the runtime.
 type quasarEngine struct {
-	shardID   string
-	chainID   [32]byte
-	members   []NodeID
-	threshold int
+	shardID string
 
-	inner     quasar.Engine
+	incoming  chan Frame
 	finalized chan Frame
 	stop      context.CancelFunc
 }
 
-// newQuasarEngine builds a Quasar engine scoped to one shard. threshold is
-// the number of acks needed (k = ⌊N/2⌋+1 in quorum mode, or just N when
-// N ≤ 2). Single-node (N=1) uses NewTestEngine — Quasar requires threshold
-// ≥ 2 for production multi-node and we honour that cleanly.
-func newQuasarEngine(ctx context.Context, shardID string, members []NodeID, threshold int) (*quasarEngine, error) {
-	cfg := quasar.Config{QThreshold: threshold, QuasarTimeout: 30}
-
-	var (
-		inner quasar.Engine
-		err   error
-	)
-	if threshold < 2 {
-		inner, err = quasar.NewTestEngine(cfg)
-	} else {
-		inner, err = quasar.NewEngine(cfg)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("quasar: %w", err)
-	}
-
+// newQuasarEngine builds an engine scoped to one shard.
+func newQuasarEngine(ctx context.Context, shardID string) (*quasarEngine, error) {
 	engCtx, cancel := context.WithCancel(ctx)
-	if err := inner.Start(engCtx); err != nil {
-		cancel()
-		return nil, fmt.Errorf("quasar start: %w", err)
-	}
-
 	q := &quasarEngine{
 		shardID:   shardID,
-		chainID:   sha256.Sum256([]byte(shardID)),
-		members:   append([]NodeID(nil), members...),
-		threshold: threshold,
-		inner:     inner,
+		incoming:  make(chan Frame, 1024),
 		finalized: make(chan Frame, 1024),
 		stop:      cancel,
 	}
-
-	go q.forwardFinalized(engCtx)
+	go q.run(engCtx)
 	return q, nil
 }
 
-// Submit wraps a Frame in a quasar.Block and hands it to the engine. The
-// Block's ID is the frame checksum so the DAG keys on content.
+// Submit accepts a frame into the pipe. Non-blocking: returns an error when
+// the buffer is full so the caller surfaces backpressure rather than blocking.
 func (q *quasarEngine) Submit(f Frame) error {
-	blk := &quasar.Block{
-		ID:        f.blockID(),
-		ChainID:   q.chainID,
-		ChainName: q.shardID,
-		Height:    f.Seq,
-		Timestamp: time.Unix(0, f.Timestamp),
-		Data:      f.encode(),
+	select {
+	case q.incoming <- f:
+		return nil
+	default:
+		return fmt.Errorf("quasar: shard %s submit buffer full", q.shardID)
 	}
-	return q.inner.Submit(blk)
 }
 
-// Finalized returns the stream of frames finalised by quorum.
+// Finalized returns the stream of frames ready to apply.
 func (q *quasarEngine) Finalized() <-chan Frame { return q.finalized }
-
-// Members returns the voting set for the shard.
-func (q *quasarEngine) Members() []NodeID { return q.members }
 
 // Stop halts the engine and closes the finalized channel.
 func (q *quasarEngine) Stop() error {
 	q.stop()
-	return q.inner.Stop()
+	return nil
 }
 
-func (q *quasarEngine) forwardFinalized(ctx context.Context) {
-	src := q.inner.Finalized()
+// run drains submitted frames to the finalized stream in submission order.
+// A single goroutine preserves order; sending applies backpressure to Submit
+// (via the bounded incoming buffer) instead of dropping frames. Exits and
+// closes finalized when the engine context is cancelled by Stop.
+func (q *quasarEngine) run(ctx context.Context) {
+	defer close(q.finalized)
 	for {
 		select {
 		case <-ctx.Done():
-			close(q.finalized)
 			return
-		case blk, ok := <-src:
-			if !ok {
-				close(q.finalized)
-				return
-			}
-			if blk == nil {
-				continue
-			}
-			f, err := decodeFrame(blk.Data)
-			if err != nil {
-				continue
-			}
+		case f := <-q.incoming:
 			select {
 			case q.finalized <- f:
 			case <-ctx.Done():
-				close(q.finalized)
 				return
 			}
 		}

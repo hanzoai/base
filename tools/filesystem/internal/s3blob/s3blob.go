@@ -40,7 +40,7 @@ import (
 	"strings"
 
 	"github.com/hanzoai/base/tools/filesystem/blob"
-	"github.com/hanzoai/base/tools/filesystem/internal/s3blob/s3"
+	"github.com/hanzoai/base/internal/s3"
 )
 
 const defaultPageSize = 1000
