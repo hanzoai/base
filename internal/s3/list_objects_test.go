@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/base/tools/filesystem/internal/s3blob/s3"
-	"github.com/hanzoai/base/tools/filesystem/internal/s3blob/s3/tests"
+	"github.com/hanzoai/base/internal/s3"
+	"github.com/hanzoai/base/internal/s3/tests"
 )
 
 func TestS3ListParamsEncode(t *testing.T) {

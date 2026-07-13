@@ -1,5 +1,7 @@
-// Package network replicates Base SQLite commits across peers via the
-// luxfi/consensus Quasar engine. One shard = one Quasar engine = one DAG.
+// Package network replicates Base SQLite commits across peers over the ZAP
+// transport. One shard = one in-process finalization engine feeding the
+// shard's apply loop; ordering, dedup and quorum-routing live in this package
+// (shard.go, router.go, membership.go), not in an external consensus engine.
 //
 // See docs/NETWORK.md for the full design. Contract:
 //
