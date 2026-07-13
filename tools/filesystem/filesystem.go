@@ -21,7 +21,7 @@ import (
 	"github.com/hanzoai/base/tools/filesystem/blob"
 	"github.com/hanzoai/base/tools/filesystem/internal/fileblob"
 	"github.com/hanzoai/base/tools/filesystem/internal/s3blob"
-	"github.com/hanzoai/base/tools/filesystem/internal/s3blob/s3"
+	"github.com/hanzoai/base/internal/s3"
 	"github.com/hanzoai/base/tools/list"
 
 	// explicit webp decoder because disintegration/imaging does not support webp
