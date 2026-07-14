@@ -195,15 +195,6 @@ func TestConfigResolveDefaultSlugs(t *testing.T) {
 	}
 }
 
-func TestScore(t *testing.T) {
-	if got := score(3, 2); got != 5 {
-		t.Errorf("score(3,2) = %v, want 5", got)
-	}
-	if got := score(0, 0); got != 0 {
-		t.Errorf("score(0,0) = %v, want 0", got)
-	}
-}
-
 func TestGrantsAccess(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -276,7 +267,7 @@ func seedWaitlist(t *testing.T, app *tests.TestApp, slug string) string {
 // because AutodateField.FindSetter returns a noop for record.Set, and the
 // create interceptor only stamps "now" when the value equals the zero
 // last-known value — a pre-set non-zero value is preserved.
-func seedEntry(t *testing.T, app *tests.TestApp, wlID, email, refCode string, referralCount, boost float64, created time.Time) *core.Record {
+func seedEntry(t *testing.T, app *tests.TestApp, wlID, email, refCode string, referralCount, points float64, created time.Time) *core.Record {
 	t.Helper()
 	col, err := app.FindCollectionByNameOrId("waitlist_entries")
 	if err != nil {
@@ -291,7 +282,7 @@ func seedEntry(t *testing.T, app *tests.TestApp, wlID, email, refCode string, re
 	rec.Set("email", email)
 	rec.Set("refCode", refCode)
 	rec.Set("referralCount", referralCount)
-	rec.Set("boost", boost)
+	rec.Set("points", points)
 	rec.Set("accessGranted", false)
 	rec.SetRaw("createdAt", dt)
 	if err := app.Save(rec); err != nil {
@@ -302,14 +293,14 @@ func seedEntry(t *testing.T, app *tests.TestApp, wlID, email, refCode string, re
 
 func mustRank(t *testing.T, p *plugin, wlID string, entry *core.Record) (int, int) {
 	t.Helper()
-	rank, total, err := p.computeRank(wlID, entry)
+	rank, total, err := p.competitionRank(p.app, wlID, entry.GetFloat("points"))
 	if err != nil {
-		t.Fatalf("computeRank: %v", err)
+		t.Fatalf("competitionRank: %v", err)
 	}
 	return rank, total
 }
 
-func TestScoreRankOrderingWithBoost(t *testing.T) {
+func TestPointsRankOrdering(t *testing.T) {
 	p, app := newWaitlistTestPlugin(t, Config{})
 	wlID := seedWaitlist(t, app, "alpha")
 
@@ -317,25 +308,23 @@ func TestScoreRankOrderingWithBoost(t *testing.T) {
 	a := seedEntry(t, app, wlID, "a@x.com", "AAAA", 1, 0, base)
 	b := seedEntry(t, app, wlID, "b@x.com", "BBBB", 1, 0, base.Add(time.Hour))
 
-	// Equal referralCount, no boost: earlier createdAt (A) wins the tie.
+	// Equal points: competition rank is shared — nobody has strictly more, so
+	// both sit at rank 1 (standard leaderboard semantics).
 	if rankA, _ := mustRank(t, p, wlID, a); rankA != 1 {
 		t.Fatalf("A rank = %d, want 1", rankA)
 	}
-	if rankB, _ := mustRank(t, p, wlID, b); rankB != 2 {
-		t.Fatalf("B rank = %d, want 2", rankB)
+	if rankB, total := mustRank(t, p, wlID, b); rankB != 1 || total != 2 {
+		t.Fatalf("B rank = %d total = %d, want rank 1 total 2", rankB, total)
 	}
 
-	// Boost B by 1: score(B)=2 > score(A)=1 — B breaks in ahead of A despite
-	// its later createdAt.
-	b.Set("boost", 1)
+	// Award B one point: points ARE position, so B (1) now outranks A (0) — the
+	// single number decides the order, no separate boost store.
+	b.Set("points", 1)
 	if err := app.Save(b); err != nil {
-		t.Fatalf("boost B: %v", err)
-	}
-	if got := entryScore(b); got != 2 {
-		t.Fatalf("boosted B score = %v, want 2", got)
+		t.Fatalf("award B: %v", err)
 	}
 	if rankB, _ := mustRank(t, p, wlID, b); rankB != 1 {
-		t.Fatalf("boosted B rank = %d, want 1", rankB)
+		t.Fatalf("B rank after point = %d, want 1", rankB)
 	}
 	if rankA, total := mustRank(t, p, wlID, a); rankA != 2 || total != 2 {
 		t.Fatalf("A rank = %d total = %d, want rank 2 total 2", rankA, total)
