@@ -10,39 +10,29 @@ import (
 	luxlog "github.com/luxfi/log"
 )
 
-// MustRegister installs the waitlist plugin on the given app and panics
-// on error. Suitable for use in a Base process's startup wiring.
+// MustRegister installs the waitlist plugin on the given app and panics on
+// error. Suitable for a Base process's startup wiring.
 func MustRegister(app core.App, cfg Config) {
 	if err := Register(app, cfg); err != nil {
 		panic(err)
 	}
 }
 
-// Register installs the waitlist plugin.
+// Register installs the points-based waitlist plugin.
 //
-// On OnBootstrap the plugin auto-creates two collections (`waitlists`,
-// `waitlist_entries`) if they don't exist and seeds any configured default
-// waitlists. On OnServe it mounts four REST endpoints under /v1/waitlist:
-//
-//	POST /v1/waitlist/join     - create an entry (Turnstile + rate-limit gated)
-//	GET  /v1/waitlist/status   - look up rank, score, share URL, access
-//	POST /v1/waitlist/boost    - service-authed position boost (e.g. hanzod)
-//	GET  /v1/waitlist/export   - admin-only CSV dump
-//
-// The plugin owns its collections and never exposes them as direct CRUD
-// — the dashboard remains available for admins.
+// On OnBootstrap it auto-creates/upgrades three collections (`waitlists`,
+// `waitlist_entries`, `waitlist_events`) and seeds any configured default
+// waitlists. On OnServe it mounts the REST surface under /v1/waitlist. The
+// plugin owns its collections (no public CRUD); the dashboard remains
+// available to superusers.
 func Register(app core.App, cfg Config) error {
 	if !cfg.Enabled {
-		// default-enabled to avoid surprise: a zero-value Config disables.
-		// Callers must set Enabled:true explicitly to opt in.
 		return nil
 	}
-
 	cfg.resolve()
 	if err := cfg.validate(); err != nil {
 		return err
 	}
-
 	domains := cfg.DisposableDomains
 	if domains == nil {
 		domains = defaultDisposableDomains
@@ -90,8 +80,18 @@ type plugin struct {
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	g := r.Group("/v1/waitlist")
+	// public
 	g.POST("/join", p.handleJoin)
 	g.GET("/status", p.handleStatus)
+	g.GET("/neighborhood", p.handleNeighborhood)
+	g.GET("/list", p.handleList)
+	g.GET("/activity", p.handleActivity)
+	g.POST("/track-share", p.handleTrackShare)
+	g.POST("/invite", p.handleInvite)
+	// service-authed (superuser / AdminSecret) — the caller-amount boost seam
 	g.POST("/boost", p.handleBoost)
+	// server-to-server (AwardSecret) — the verified-event award seam
+	g.POST("/award", p.handleAward)
+	// admin
 	g.GET("/export", p.handleExport)
 }
