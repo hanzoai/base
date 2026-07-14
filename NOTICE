@@ -1,6 +1,22 @@
-base
+Base
 Copyright (c) 2026 Hanzo AI, Inc.
+
+Forked from https://github.com/pocketbase/pocketbase at v1.5.5.
 
 This product includes software from PocketBase (https://github.com/pocketbase/pocketbase), licensed under MIT:
 
     Copyright (c) 2022 - present, Gani Georgiev
+
+DEVIATIONS
+- Renamed the Go module github.com/pocketbase/pocketbase -> github.com/hanzoai/base, the package pocketbase -> base, the launcher type PocketBase -> Base, and the binary/CLI pocketbase -> base.
+- Delegates authentication to Hanzo IAM over OIDC: the iam package and plugins/platform expose iam.Client/User/Key against IAM userinfo and OAuth2 as the canonical identity path, alongside the built-in superuser auth.
+- Unifies extension runtimes under plugins/extruntime (HIP-0105) and makes them polyglot: beyond the upstream goja JS runtime (jsvm/gojavm), adds pyvm (Python), wasmvm (wazero/WASM), v8vm (V8), and starkvm (Starlark).
+- Stores one SQLite data file per org with a per-org KMS-derived DEK (store/multitenant.go, store/kmskeyring, plugins/kms).
+- Streams WAL replication to age-encrypted object storage (S3/GCS) via plugins/replicate, store/encreplica, and network/wal.go (HIP-0107).
+- Adds a ZapDB durability backend and zap transport (plugins/zap, network/transport_zap.go, HIP-0302).
+- Adds a clustered networking layer (network/): sharding, membership, TLS/zap transports, point-in-time recovery, and GCS/S3 archival.
+- Adds a CRDT document layer (crdt/) for local-first collaborative sync with age/FHE privacy.
+- Adds a selectable PostgreSQL dialect tier (core/dialect_postgres.go, core/db_connect_postgres.go, plugins/cloudsql) via BASE_DB_TIER=sql, alongside the default embedded SQLite.
+- Replaces the upstream Svelte admin UI with a React 19 + TanStack Router admin (ui-react/) built on @hanzo/ui and @hanzo/iam.
+- Adds plugins: commerce, tasks, scheduler, functions, vault, waitlist, bootnode, and ha (high availability).
+- Extends the CLI (cmd/cli/) with cluster, login, and config commands for multi-tenant and clustered operation.
