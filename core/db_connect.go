@@ -9,10 +9,11 @@ import (
 
 // DefaultDBConnect opens an embedded SQLite database on the canonical Hanzo
 // driver (github.com/hanzoai/sqlite). That package registers the "sqlite"
-// database/sql driver name under BOTH build configs — modernc (pure Go, !cgo)
-// and mattn/SQLCipher (cgo) — so exactly ONE package registers "sqlite" no
-// matter how Base is linked (standalone !cgo, or embedded into a cgo binary such
-// as commerce). Base MUST NOT import modernc.org/sqlite directly, or a cgo build
+// database/sql driver name under BOTH build configs — its pure-Go backend
+// (!cgo) and its hanzoai/sqlcipher (cgo) backend — so exactly ONE package
+// registers "sqlite" no matter how Base is linked (standalone !cgo, or embedded
+// into a cgo binary such as commerce). Base MUST NOT import a low-level SQLite
+// driver (modernc.org/sqlite or hanzoai/csqlite) directly, or a build
 // double-registers "sqlite" and panics at init.
 //
 // sqlite.PragmaDSN encodes sqlite.DefaultPragmas (busy_timeout leads — a
