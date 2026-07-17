@@ -84,6 +84,7 @@ require (
 	github.com/gtank/ristretto255 v0.2.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
+	github.com/hanzoai/csqlite v0.1.0 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
@@ -124,7 +125,6 @@ require (
 	github.com/luxfi/warp v1.24.1 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
-	github.com/mattn/go-sqlite3 v1.14.47 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
 	github.com/minio/crc64nvme v1.1.1 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
@@ -179,7 +179,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hanzoai/orm v0.5.1
 	github.com/hanzoai/replicate v0.9.5
-	github.com/hanzoai/sqlite v0.2.3
+	github.com/hanzoai/sqlite v0.3.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
