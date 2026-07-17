@@ -695,7 +695,7 @@ func (s *MultiTenantStore) Evict(ctx context.Context, k Key) error {
 //
 // Success path: WAL checkpoint → Close the handle → upload local bytes to
 // the bucket → drop from cache + shadow. Ordering matters: Close first so
-// modernc.org/sqlite flushes the WAL into the main file and drops its file
+// hanzoai/sqlite's pure-Go backend flushes the WAL into the main file and drops its file
 // locks. Only then is the file byte-equal to the committed state — reading
 // before Close risks uploading a partial page.
 //
@@ -894,7 +894,7 @@ func (s *MultiTenantStore) downloadTo(ctx context.Context, objKey, localPath str
 // driver (github.com/hanzoai/sqlite, which registers "sqlite" under both build
 // configs) and applies the SAME sqlite.DefaultPragmas via sqlite.PragmaDSN —
 // one pragma set, encoded in the active backend's DSN syntax so busy_timeout +
-// WAL apply whether Base is built pure-Go (!cgo) or with mattn/SQLCipher (cgo).
+// WAL apply whether Base is built pure-Go (!cgo) or with hanzoai/sqlcipher (cgo).
 func defaultConnect(path string) (*dbx.DB, error) {
 	return dbx.Open("sqlite", sqlite.PragmaDSN(path, sqlite.DefaultPragmas))
 }

@@ -559,7 +559,7 @@ func TestDoubleCloseIdempotent(t *testing.T) {
 // ============================================================
 
 // TestHydrate_RejectsPoisonedBlob (P7-C2) — a non-SQLite blob planted in
-// the bucket is rejected on hydrate and the modernc driver never touches
+// the bucket is rejected on hydrate and the pure-Go driver never touches
 // the bytes.
 func TestHydrate_RejectsPoisonedBlob(t *testing.T) {
 	s, bucketDir := newTestStore(t)
