@@ -24,11 +24,11 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.6.0
-	github.com/luxfi/cache v1.2.1
-	github.com/luxfi/consensus v1.25.15
+	github.com/luxfi/cache v1.3.1
+	github.com/luxfi/consensus v1.36.2
 	github.com/luxfi/fhe v1.8.2
 	github.com/luxfi/log v1.4.3
-	github.com/luxfi/zap v0.8.12
+	github.com/luxfi/zap v1.2.6
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
@@ -58,11 +58,9 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.54.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
-	github.com/bits-and-blooms/bitset v1.24.4 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cncf/xds/go v0.0.0-20260202195803-dba9d589def2 // indirect
-	github.com/consensys/gnark-crypto v0.20.1 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
@@ -94,35 +92,36 @@ require (
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
 	github.com/luxfi/accel v1.2.4 // indirect
-	github.com/luxfi/address v1.0.1 // indirect
+	github.com/luxfi/address v1.1.1 // indirect
 	github.com/luxfi/bft v0.1.5 // indirect
-	github.com/luxfi/compress v0.0.5 // indirect
-	github.com/luxfi/concurrent v0.0.3 // indirect
-	github.com/luxfi/constants v1.5.8 // indirect
-	github.com/luxfi/container v0.0.4 // indirect
-	github.com/luxfi/corona v0.7.6 // indirect
-	github.com/luxfi/crypto/ipa v1.2.4 // indirect
-	github.com/luxfi/database v1.19.3 // indirect
-	github.com/luxfi/formatting v1.0.1 // indirect
-	github.com/luxfi/geth v1.16.99 // indirect
-	github.com/luxfi/go-bip32 v1.0.2 // indirect
-	github.com/luxfi/go-bip39 v1.1.2 // indirect
-	github.com/luxfi/keys v1.2.0 // indirect
+	github.com/luxfi/compress v0.1.1 // indirect
+	github.com/luxfi/concurrent v0.1.1 // indirect
+	github.com/luxfi/constants v1.6.2 // indirect
+	github.com/luxfi/container v0.2.1 // indirect
+	github.com/luxfi/corona v0.10.4 // indirect
+	github.com/luxfi/database v1.21.1 // indirect
+	github.com/luxfi/dkg v0.3.5 // indirect
+	github.com/luxfi/formatting v1.1.1 // indirect
+	github.com/luxfi/geth v1.20.1 // indirect
+	github.com/luxfi/go-bip32 v1.1.0 // indirect
+	github.com/luxfi/go-bip39 v1.2.0 // indirect
+	github.com/luxfi/keys v1.4.1 // indirect
 	github.com/luxfi/kms v1.11.7 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
-	github.com/luxfi/lens v0.1.4 // indirect
-	github.com/luxfi/magnetar v1.2.0 // indirect
-	github.com/luxfi/p2p v1.21.1 // indirect
+	github.com/luxfi/lens v0.2.1 // indirect
+	github.com/luxfi/magnetar v1.2.3 // indirect
+	github.com/luxfi/mlwe v0.3.0 // indirect
+	github.com/luxfi/p2p v1.22.1 // indirect
 	github.com/luxfi/pq v1.1.0 // indirect
-	github.com/luxfi/proto v1.3.5 // indirect
-	github.com/luxfi/pulsar v1.1.1 // indirect
+	github.com/luxfi/protocol v0.0.2 // indirect
+	github.com/luxfi/pulsar v1.9.2 // indirect
 	github.com/luxfi/sampler v1.1.0 // indirect
-	github.com/luxfi/threshold v1.9.9 // indirect
-	github.com/luxfi/tls v1.0.3 // indirect
-	github.com/luxfi/validators v1.2.0 // indirect
+	github.com/luxfi/threshold v1.12.3 // indirect
+	github.com/luxfi/tls v1.1.1 // indirect
+	github.com/luxfi/validators v1.3.1 // indirect
 	github.com/luxfi/version v1.0.1 // indirect
-	github.com/luxfi/vm v1.2.0 // indirect
-	github.com/luxfi/warp v1.19.3 // indirect
+	github.com/luxfi/vm v1.3.1 // indirect
+	github.com/luxfi/warp v1.24.1 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mattn/go-sqlite3 v1.14.47 // indirect
@@ -185,17 +184,17 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/luxfi/crypto v1.19.26 // indirect
-	github.com/luxfi/ids v1.2.15 // indirect
-	github.com/luxfi/math v1.4.1 // indirect
+	github.com/luxfi/crypto v1.20.2 // indirect
+	github.com/luxfi/ids v1.3.2 // indirect
+	github.com/luxfi/math v1.5.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.1.1 // indirect
-	github.com/luxfi/metric v1.7.0
+	github.com/luxfi/metric v1.8.1
 	github.com/luxfi/mock v0.1.1 // indirect
-	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.21 // indirect
+	github.com/mattn/go-colorable v0.1.15 // indirect
+	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/miekg/dns v1.1.72 // indirect
-	github.com/mr-tron/base58 v1.2.0 // indirect
+	github.com/mr-tron/base58 v1.3.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
@@ -204,7 +203,7 @@ require (
 	github.com/zap-proto/http v0.2.0 // indirect
 	github.com/zap-proto/zip v1.2.0
 	go.uber.org/mock v0.6.0 // indirect
-	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
+	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
