@@ -71,8 +71,8 @@ func installCommitHook(ctx context.Context, db dbx.Builder, net network.Network,
 // package's own HookRegisterer shape, which takes func() int32 directly rather
 // than the sqlite.CommitHookFn named type. This adapter is the ONE place in Base
 // where the sqlite driver type touches the integration surface: the network
-// package stays backend-agnostic, and hanzoai/sqlite hides whether the modernc
-// or mattn backend is active (CommitHookRegisterer resolves the raw conn).
+// package stays backend-agnostic, and hanzoai/sqlite hides whether the pure-Go
+// or hanzoai/sqlcipher backend is active (CommitHookRegisterer resolves the raw conn).
 type commitHookAdapter struct{ inner sqlite.HookRegisterer }
 
 func (c commitHookAdapter) RegisterCommitHook(cb func() int32) {

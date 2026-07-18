@@ -95,7 +95,7 @@ func titleSlug(slug string) string {
 }
 
 // isUniqueViolation reports whether err is a SQLite UNIQUE-constraint failure.
-// Both backends (modernc, mattn/SQLCipher) surface it in the message, so a
+// Both backends (pure-Go and hanzoai/sqlcipher) surface it in the message, so a
 // substring check is the one portable test.
 func isUniqueViolation(err error) bool {
 	if err == nil {
