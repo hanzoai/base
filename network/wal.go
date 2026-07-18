@@ -168,7 +168,7 @@ func appendU64(b []byte, v uint64) []byte { var t [8]byte; binary.BigEndian.PutU
 // HookRegisterer is the narrow surface we need to install a commit hook:
 // RegisterCommitHook(func() int32). In production core/base_network.go supplies
 // it by adapting a raw driver connection through github.com/hanzoai/sqlite's
-// CommitHookRegisterer (which hides whether the modernc or mattn backend is
+// CommitHookRegisterer (which hides whether the pure-Go or hanzoai/sqlcipher backend is
 // active); tests supply a fake. Keeping this interface here keeps the network
 // package decoupled from any concrete SQLite driver type.
 type HookRegisterer interface {
