@@ -195,7 +195,7 @@ func TestSQLRun(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"execTime":`,
-				// modernc.org/sqlite (ours' pure-Go, no-CGO driver) reports
+				// hanzoai/sqlite's pure-Go (no-CGO) backend reports
 				// RowsAffected()=1 for DDL; the handler passes the driver
 				// value through faithfully rather than special-casing DDL.
 				`"affectedRows":1`,

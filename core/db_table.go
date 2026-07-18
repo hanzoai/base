@@ -41,8 +41,9 @@ func (app *BaseApp) TableInfo(tableName string) ([]*TableInfoRow, error) {
 		return nil, err
 	}
 
-	// mattn/go-sqlite3 doesn't throw an error on invalid or missing table
-	// so we additionally have to check whether the loaded info result is nonempty
+	// SQLite doesn't throw an error on invalid or missing table (PRAGMA
+	// table_info returns an empty set), so we additionally have to check
+	// whether the loaded info result is nonempty
 	if len(info) == 0 {
 		return nil, fmt.Errorf("empty table info probably due to invalid or missing table %s", tableName)
 	}
