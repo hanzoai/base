@@ -65,6 +65,12 @@ jobs:
           push: ${{ inputs.push }}
           tags: ${{ inputs.image }}
           provenance: false
+          # Cross-org private modules (hanzoai/*, luxfi/*) need authenticated git
+          # in the builder stage — the Dockerfile mounts this as secret id
+          # `gh_token` and configs `url.insteadOf` before `go mod download`.
+          # Without it the build fails SECURITY ERROR on force-moved luxfi tags.
+          secrets: |
+            gh_token=${{ secrets.GH_PAT }}
 
       - name: Report success to platform
         if: success()
