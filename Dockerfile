@@ -9,11 +9,16 @@
 FROM public.ecr.aws/docker/library/golang:1.26.4-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
-# No GOPRIVATE — cross-org modules (hanzoai/*, luxfi/* incl. luxfi/zap forward
-# bridge, zap-proto/*) are PUBLIC, so go resolves them via the default public
-# proxy + sumdb (immutable hashes a force-moved tag can't break). GOPRIVATE would
-# route them `direct` (git) and re-introduce go.sum poisoning. The gh_token git
-# auth below stays as the direct fallback; no-op when absent (local/dev).
+# Cross-org modules (hanzoai/*, luxfi/*) resolve via AUTHENTICATED GIT, not the
+# public proxy — the SAME path release.yaml's `go test` uses (its own comment:
+# "the proxy holds re-pushed bits for some luxfi tags; git matches go.sum").
+# Some luxfi tags were force-moved, so proxy hashes DON'T match go.sum (which is
+# tidied against git) → a bare-proxy `go mod download` fails with SECURITY ERROR.
+# GOPRIVATE routes those modules `direct`; the mounted gh_token authenticates the
+# fetch. One module-resolution path for test + image (CI passes gh_token; a local
+# build without the secret falls back to ambient git creds / the mod cache).
+ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*
+ENV GONOSUMDB=github.com/hanzoai/*,github.com/luxfi/*
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=secret,id=gh_token \
