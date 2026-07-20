@@ -155,6 +155,11 @@ func Register(app core.App, config PlatformConfig) error {
 		return p.ensureSystemCollections()
 	})
 
+	// Stamp owner+org on every tenant-collection create from the VALIDATED
+	// principal — never from client body/headers. Makes tenant isolation
+	// tamper-proof: a caller cannot attribute a record to another user/org.
+	app.OnRecordCreateRequest().BindFunc(stampTenantOwnership)
+
 	// IAM is the only auth source. Every Base route validates JWTs against
 	// IAM's JWKS; the legacy local-password / OTP / MFA paths are
 	// unreachable (see apis/record_auth_*: 410 Gone with a Location pointer
@@ -288,6 +293,20 @@ func Register(app core.App, config PlatformConfig) error {
 				method := re.Request.Method
 				if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
 					return re.Next() // reads allowed
+				}
+
+				// Exception: a publishable key MAY create in a PUBLIC-FORM
+				// collection (createRule == "" ⇒ anonymous create allowed) — the
+				// public submit path (contact forms, signups, waitlists). Every
+				// other write stays blocked. Org is derived from the key by the
+				// stampTenantOwnership create hook, never from the request.
+				if method == http.MethodPost {
+					if name := recordsCreateCollectionName(re.Request.URL.Path); name != "" {
+						if c, err := re.App.FindCachedCollectionByNameOrId(name); err == nil &&
+							c.CreateRule != nil && *c.CreateRule == "" {
+							return re.Next()
+						}
+					}
 				}
 
 				// pk- key trying to write — block it
@@ -1004,4 +1023,56 @@ func isValidSlug(s string) bool {
 		}
 	}
 	return true
+}
+
+// stampTenantOwnership force-sets owner+org on record create from the VALIDATED
+// principal (IAM JWT auth record, or resolved IAM API key) — never from the
+// request body or headers, so tenant attribution cannot be forged. Collections
+// without owner/org fields (non-tenant) are left untouched. An org-scoped record
+// with no trusted org (anonymous, no key) is refused — this is what makes the
+// publishable key mandatory even when a collection's createRule is "".
+func stampTenantOwnership(e *core.RecordRequestEvent) error {
+	col := e.Collection
+	hasOwner := col.Fields.GetByName("owner") != nil
+	hasOrg := col.Fields.GetByName("org") != nil
+	if col.System || col.IsAuth() || (!hasOwner && !hasOrg) {
+		return e.Next()
+	}
+
+	// Derive identity from the validated principal ONLY.
+	owner, org := "", ""
+	if e.Auth != nil { // IAM JWT session
+		owner = e.Auth.Id
+		org = e.Auth.GetString("org_id")
+	} else if sub, _ := e.Get("authSub").(string); sub != "" { // IAM API key (pk-/sk-)
+		owner = sub
+		org, _ = e.Get("authOwner").(string)
+	}
+
+	if hasOrg {
+		if org == "" {
+			return e.ForbiddenError("Organization context required to create this record.", nil)
+		}
+		e.Record.Set("org", org)
+	}
+	if hasOwner {
+		e.Record.Set("owner", owner) // may be "" for a pure-anon public submit
+	}
+	return e.Next()
+}
+
+// recordsCreateCollectionName returns the collection name if path targets the
+// records CREATE endpoint (…/collections/<name>/records, no trailing id), else
+// "". Prefix-agnostic (works under any BASE_API_PREFIX).
+func recordsCreateCollectionName(path string) string {
+	const marker = "/collections/"
+	i := strings.Index(path, marker)
+	if i < 0 {
+		return ""
+	}
+	parts := strings.Split(strings.Trim(path[i+len(marker):], "/"), "/") // ["<name>","records"]
+	if len(parts) == 2 && parts[1] == "records" {
+		return parts[0]
+	}
+	return ""
 }
