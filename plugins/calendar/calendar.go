@@ -62,6 +62,9 @@ func Register(app core.App, config Config) error {
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Id: "calendar",
 		Func: func(e *core.ServeEvent) error {
+			if err := p.seedHost(); err != nil {
+				return err
+			}
 			p.registerRoutes(e.Router)
 			return e.Next()
 		},
