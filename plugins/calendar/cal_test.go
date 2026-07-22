@@ -47,12 +47,46 @@ func TestSlotsDTO_GroupingAndHolds(t *testing.T) {
 	if grouped["2026-07-28"] == nil {
 		t.Fatal("next-day slot should group under its own date")
 	}
-	// times are RFC3339 UTC
 	if got := d0[0]["time"].(string); !strings.HasSuffix(got, "Z") {
 		t.Errorf("slot time must be UTC RFC3339, got %q", got)
 	}
 }
 
+// TestComputeSlotsCapBounds proves the maxSlots cap stops generation early, so a
+// wide window cannot produce an unbounded slice (Red PoC #1, unit level).
+func TestComputeSlotsCapBounds(t *testing.T) {
+	loc := time.UTC
+	from := time.Date(2026, 1, 1, 0, 0, 0, 0, loc)
+	to := from.AddDate(5, 0, 0) // 5 years
+	now := from.AddDate(-1, 0, 0)
+	allDay := make([]availWindow, 0, 7)
+	for wd := 0; wd < 7; wd++ {
+		allDay = append(allDay, availWindow{Weekday: wd, StartMinute: 0, EndMinute: 24 * 60})
+	}
+	uncapped := computeSlots(from, to, now, 10, 0, allDay, loc, nil, 0)
+	capped := computeSlots(from, to, now, 10, 0, allDay, loc, nil, maxSlotsPerQuery)
+	if len(capped) != maxSlotsPerQuery {
+		t.Fatalf("capped generation should stop at %d, got %d", maxSlotsPerQuery, len(capped))
+	}
+	if len(uncapped) <= maxSlotsPerQuery {
+		t.Fatalf("sanity: the 5-year window should generate far more than the cap, got %d", len(uncapped))
+	}
+	t.Logf("cap bounds generation: uncapped=%d -> capped=%d", len(uncapped), len(capped))
+}
+
+func TestMeDTO_NoLeak(t *testing.T) {
+	b, _ := json.Marshal(meDTO())
+	for _, forbidden := range []string{"@", `"email"`, `"name"`} {
+		if strings.Contains(string(b), forbidden) {
+			t.Errorf("anonymous /me leaks %q: %s", forbidden, b)
+		}
+	}
+	if !strings.Contains(string(b), `"username":""`) {
+		t.Errorf("/me should carry an empty anonymous username: %s", b)
+	}
+}
+
+// TestHolds_Lifecycle — reserve/active/release/expire.
 func TestHolds_Lifecycle(t *testing.T) {
 	h := newHolds(50 * time.Millisecond)
 	start := time.Now().Truncate(time.Hour).Add(48 * time.Hour)
@@ -67,7 +101,6 @@ func TestHolds_Lifecycle(t *testing.T) {
 	if got := h.activeStarts("42"); len(got) != 0 {
 		t.Fatal("released hold must be gone")
 	}
-	// TTL expiry
 	h.reserve("42", start)
 	time.Sleep(70 * time.Millisecond)
 	if got := h.activeStarts("42"); len(got) != 0 {
@@ -75,42 +108,64 @@ func TestHolds_Lifecycle(t *testing.T) {
 	}
 }
 
-func TestMeDTO_NoLeak(t *testing.T) {
-	b, _ := json.Marshal(meDTO())
-	// No contact fields, and no populated identity — username is deliberately empty.
-	for _, forbidden := range []string{"@", `"email"`, `"name"`} {
-		if strings.Contains(string(b), forbidden) {
-			t.Errorf("anonymous /me leaks %q: %s", forbidden, b)
-		}
+// TestHolds_HardCap reproduces Red PoC #2 (reserve spam) and asserts the map is
+// HARD-bounded — fresh reserves past the TTL no longer grow it without limit.
+func TestHolds_HardCap(t *testing.T) {
+	h := newHolds(time.Hour) // long TTL: nothing expires during the test
+	start := time.Now().Add(48 * time.Hour)
+	spam := holdsMaxEntries + 5000
+	for i := 0; i < spam; i++ {
+		h.reserve(fmt.Sprintf("et%d", i), start.Add(time.Duration(i)*time.Minute))
 	}
-	if !strings.Contains(string(b), `"username":""`) {
-		t.Errorf("/me should carry an empty anonymous username: %s", b)
+	if len(h.byUID) > holdsMaxEntries {
+		t.Fatalf("holds map exceeded hard cap: %d > %d", len(h.byUID), holdsMaxEntries)
 	}
+	t.Logf("holds hard-capped at %d after %d fresh reserves (before fix: retained all %d)", len(h.byUID), spam, spam)
+}
+
+// TestLimiter_HardCap reproduces Red PoC #3 (key rotation) and asserts the limiter
+// map is HARD-bounded — rotating distinct keys no longer grows it without limit.
+func TestLimiter_HardCap(t *testing.T) {
+	l := newLimiter(time.Hour, 5) // long window: nothing expires
+	now := time.Now()
+	spam := limiterMaxKeys + 5000
+	for i := 0; i < spam; i++ {
+		l.allow(fmt.Sprintf("k%d", i), now)
+	}
+	if len(l.hits) > limiterMaxKeys {
+		t.Fatalf("limiter map exceeded hard cap: %d > %d", len(l.hits), limiterMaxKeys)
+	}
+	t.Logf("limiter hard-capped at %d after %d distinct keys (before fix: retained all %d)", len(l.hits), spam, spam)
 }
 
 // --- HTTP contract tests over the real mounted mux ---
 
-// seed boots a test app with the scheduling migration, one host with a default
-// 09:00–11:00 schedule on a future weekday, and one active event type carrying a
-// SECRET meeting location. Returns the plugin, host id, event slug and a valid
-// future grid start (09:00 UTC).
-func seed(t *testing.T) (*plugin, string, string, time.Time, func()) {
+const secretLocation = "https://meet.example.com/j/SECRET-ROOM-9f3a1c"
+
+func nextWeekNine() time.Time {
+	return time.Now().UTC().Truncate(24*time.Hour).AddDate(0, 0, 7).Add(9 * time.Hour)
+}
+
+// seedWith boots a test app and seeds one host with the given weekly availability
+// and event duration. owner is a distinct INTERNAL IAM id that must never surface;
+// handle is the PUBLIC booking identifier used in URLs.
+func seedWith(t *testing.T, weekly []map[string]any, durationMin int) (p *plugin, handle, owner, slug string, start time.Time, cleanup func()) {
 	t.Helper()
 	app, err := tests.NewTestApp()
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner := "host_" + security.RandomString(6)
-	day := time.Now().UTC().Truncate(24 * time.Hour).AddDate(0, 0, 7)
-	start := day.Add(9 * time.Hour)
-	wd := int(start.Weekday())
+	owner = "iamsub_" + security.RandomString(12) // internal IAM subject — never published
+	handle = "host" + security.RandomString(6)    // public booking handle
+	slug = "intro"
+	start = nextWeekNine()
 
 	schedCol, _ := app.FindCollectionByNameOrId("availabilitySchedule")
 	sched := core.NewRecord(schedCol)
 	sched.Set("owner", owner)
 	sched.Set("name", "default")
 	sched.Set("timezone", "UTC")
-	sched.Set("weekly", []map[string]any{{"weekday": wd, "startMinute": 9 * 60, "endMinute": 11 * 60}})
+	sched.Set("weekly", weekly)
 	sched.Set("isDefault", true)
 	if err := app.Save(sched); err != nil {
 		t.Fatalf("save schedule: %v", err)
@@ -119,10 +174,11 @@ func seed(t *testing.T) (*plugin, string, string, time.Time, func()) {
 	etCol, _ := app.FindCollectionByNameOrId("eventType")
 	et := core.NewRecord(etCol)
 	et.Set("owner", owner)
+	et.Set("handle", handle)
 	et.Set("title", "Intro Call")
-	et.Set("slug", "intro")
+	et.Set("slug", slug)
 	et.Set("description", "A quick chat")
-	et.Set("durationMinutes", 30)
+	et.Set("durationMinutes", durationMin)
 	et.Set("locationType", "video")
 	et.Set("location", secretLocation)
 	et.Set("availabilitySchedule", sched.Id)
@@ -131,16 +187,24 @@ func seed(t *testing.T) (*plugin, string, string, time.Time, func()) {
 		t.Fatalf("save eventType: %v", err)
 	}
 
-	p := &plugin{
-		app:       app,
-		ipLimit:   newLimiter(time.Minute, 15),
-		hostLimit: newLimiter(time.Minute, 60),
-		holds:     newHolds(5 * time.Minute),
+	p = &plugin{
+		app:             app,
+		ipLimit:         newLimiter(time.Minute, 15),
+		hostLimit:       newLimiter(time.Minute, 60),
+		readIPLimit:     newLimiter(time.Minute, 240),
+		readHandleLimit: newLimiter(time.Minute, 600),
+		holds:           newHolds(5 * time.Minute),
 	}
-	return p, owner, "intro", start, app.Cleanup
+	return p, handle, owner, slug, start, app.Cleanup
 }
 
-const secretLocation = "https://meet.example.com/j/SECRET-ROOM-9f3a1c"
+// seed is the standard fixture: 09:00–11:00 on the (fixed, future) start weekday,
+// 30-minute events.
+func seed(t *testing.T) (p *plugin, handle, owner, slug string, start time.Time, cleanup func()) {
+	t.Helper()
+	wd := int(nextWeekNine().Weekday())
+	return seedWith(t, []map[string]any{{"weekday": wd, "startMinute": 9 * 60, "endMinute": 11 * 60}}, 30)
+}
 
 func mux(t *testing.T, p *plugin) *httptest.Server {
 	t.Helper()
@@ -178,41 +242,44 @@ func req(t *testing.T, method, url, body string) (int, string) {
 }
 
 func TestHTTP_PublicEventNoLeak(t *testing.T) {
-	p, owner, slug, _, cleanup := seed(t)
+	p, handle, owner, slug, _, cleanup := seed(t)
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
 
-	status, body := req(t, "GET", srv.URL+"/v1/calendar/atoms/event-types/"+slug+"/public?username="+owner, "")
+	status, body := req(t, "GET", srv.URL+"/v1/calendar/atoms/event-types/"+slug+"/public?username="+handle, "")
 	if status != 200 {
 		t.Fatalf("public event: want 200, got %d: %s", status, body)
 	}
-	for _, want := range []string{`"status":"success"`, `"bookingFields"`, `"length":30`, "Intro Call", `"locations":[]`} {
+	for _, want := range []string{`"status":"success"`, `"bookingFields"`, `"length":30`, "Intro Call", `"locations":[]`, `"username":"` + handle} {
 		if !strings.Contains(body, want) {
 			t.Errorf("public event missing %q in: %s", want, body)
 		}
+	}
+	// The raw IAM owner id must NEVER be published (decoupled from the public handle).
+	if strings.Contains(body, owner) {
+		t.Fatalf("LEAK: public event exposed the internal IAM owner id %q: %s", owner, body)
 	}
 	// The secret meeting location must NEVER appear pre-booking.
 	if strings.Contains(body, secretLocation) || strings.Contains(body, "SECRET-ROOM") {
 		t.Fatalf("LEAK: public event exposed the raw meeting location: %s", body)
 	}
-	// No attendee/host contact fields on the public event.
 	if strings.Contains(body, "attendeeEmail") || strings.Contains(body, "@") {
 		t.Fatalf("LEAK: public event exposed a contact field: %s", body)
 	}
 }
 
 func TestHTTP_AvailableSlots(t *testing.T) {
-	p, owner, slug, start, cleanup := seed(t)
+	p, handle, _, slug, start, cleanup := seed(t)
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
 
-	etID := stableNumericID(mustEventTypeID(t, p, owner, slug))
+	etID := stableNumericID(mustEventTypeID(t, p, handle, slug))
 	from := time.Now().UTC().Format(time.RFC3339)
 	to := time.Now().UTC().AddDate(0, 0, 14).Format(time.RFC3339)
 	url := fmt.Sprintf("%s/v1/calendar/slots/available?startTime=%s&endTime=%s&eventTypeSlug=%s&usernameList=%s&timeZone=UTC&eventTypeId=%d",
-		srv.URL, from, to, slug, owner, etID)
+		srv.URL, from, to, slug, handle, etID)
 	status, body := req(t, "GET", url, "")
 	if status != 200 {
 		t.Fatalf("slots: want 200, got %d: %s", status, body)
@@ -226,35 +293,79 @@ func TestHTTP_AvailableSlots(t *testing.T) {
 	}
 }
 
-func TestHTTP_ReserveHidesSlotThenDelete(t *testing.T) {
-	p, owner, slug, start, cleanup := seed(t)
+// TestHTTP_SlotsAmplificationBounded reproduces Red PoC #1: a ~1000-year range from a
+// ~200-byte request. It must be clamped (≤ ~62 days) and capped (≤ maxSlotsPerQuery),
+// not the measured 203,164 slots / 7.26 MB.
+func TestHTTP_SlotsAmplificationBounded(t *testing.T) {
+	allWeek := make([]map[string]any, 0, 7)
+	for wd := 0; wd < 7; wd++ {
+		allWeek = append(allWeek, map[string]any{"weekday": wd, "startMinute": 0, "endMinute": 24 * 60})
+	}
+	p, handle, _, slug, _, cleanup := seedWith(t, allWeek, 10) // dense: all-day, all-week, 10-min
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
 
-	etID := stableNumericID(mustEventTypeID(t, p, owner, slug))
-	slotsURL := fmt.Sprintf("%s/v1/calendar/slots/available?startTime=%s&endTime=%s&eventTypeSlug=%s&usernameList=%s&timeZone=UTC&eventTypeId=%d",
-		srv.URL, time.Now().UTC().Format(time.RFC3339), time.Now().UTC().AddDate(0, 0, 14).Format(time.RFC3339), slug, owner, etID)
+	etID := stableNumericID(mustEventTypeID(t, p, handle, slug))
+	// startTime=now so the clamped window covers real future slots; endTime=year 3000.
+	url := fmt.Sprintf("%s/v1/calendar/slots/available?startTime=%s&endTime=3000-01-01T00:00:00Z&eventTypeSlug=%s&usernameList=%s&timeZone=UTC&eventTypeId=%d",
+		srv.URL, time.Now().UTC().Format(time.RFC3339), slug, handle, etID)
+	status, body := req(t, "GET", url, "")
+	if status != 200 {
+		t.Fatalf("slots: want 200, got %d (len %d)", status, len(body))
+	}
+	var env struct {
+		Data struct {
+			Slots map[string][]map[string]any `json:"slots"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(body), &env); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	total := 0
+	for _, v := range env.Data.Slots {
+		total += len(v)
+	}
+	days := len(env.Data.Slots)
+	if total > maxSlotsPerQuery {
+		t.Fatalf("amplification NOT bounded: %d slots > cap %d", total, maxSlotsPerQuery)
+	}
+	if total != maxSlotsPerQuery {
+		t.Fatalf("dense schedule over the clamped window should hit the cap exactly, got %d (want %d)", total, maxSlotsPerQuery)
+	}
+	if days > 63 {
+		t.Fatalf("window NOT clamped: %d days > ~62-day clamp", days)
+	}
+	t.Logf("amplification bounded: 1000-year range -> %d slots / %d bytes across %d days (cap %d; unclamped Red PoC was 203,164 slots / 7.26 MB)",
+		total, len(body), days, maxSlotsPerQuery)
+}
 
-	// reserve the 09:00 slot
+func TestHTTP_ReserveHidesSlotThenDelete(t *testing.T) {
+	p, handle, _, slug, start, cleanup := seed(t)
+	defer cleanup()
+	srv := mux(t, p)
+	defer srv.Close()
+
+	etID := stableNumericID(mustEventTypeID(t, p, handle, slug))
+	slotsURL := fmt.Sprintf("%s/v1/calendar/slots/available?startTime=%s&endTime=%s&eventTypeSlug=%s&usernameList=%s&timeZone=UTC&eventTypeId=%d",
+		srv.URL, time.Now().UTC().Format(time.RFC3339), time.Now().UTC().AddDate(0, 0, 14).Format(time.RFC3339), slug, handle, etID)
+
 	body := fmt.Sprintf(`{"slotUtcStartDate":%q,"slotUtcEndDate":%q,"eventTypeId":%d}`,
 		start.Format(time.RFC3339), start.Add(30*time.Minute).Format(time.RFC3339), etID)
 	status, resBody := req(t, "POST", srv.URL+"/v1/calendar/slots/reserve", body)
 	if status != 200 || !strings.Contains(resBody, `"status":"success"`) {
 		t.Fatalf("reserve: want 200 success, got %d: %s", status, resBody)
 	}
-	uid := dataString(t, resBody)
+	uid := dataString(resBody)
 	if uid == "" {
 		t.Fatal("reserve must return a reservation uid")
 	}
 
-	// the held slot is now hidden from the listing
 	_, slotsBody := req(t, "GET", slotsURL, "")
 	if strings.Contains(slotsBody, start.Format(time.RFC3339)) {
 		t.Errorf("held 09:00 slot should be hidden from listing: %s", slotsBody)
 	}
 
-	// deleting the hold brings it back
 	dStatus, _ := req(t, "DELETE", srv.URL+"/v1/calendar/slots/selected-slot?uid="+uid, "")
 	if dStatus != 200 {
 		t.Fatalf("delete selected-slot: want 200, got %d", dStatus)
@@ -266,36 +377,38 @@ func TestHTTP_ReserveHidesSlotThenDelete(t *testing.T) {
 }
 
 func TestHTTP_CreateBookingRevealsLocationAndBlocksDoubleBook(t *testing.T) {
-	p, owner, slug, start, cleanup := seed(t)
+	p, handle, owner, slug, start, cleanup := seed(t)
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
 
-	etID := stableNumericID(mustEventTypeID(t, p, owner, slug))
+	etID := stableNumericID(mustEventTypeID(t, p, handle, slug))
 	book := fmt.Sprintf(`{"user":%q,"eventTypeSlug":%q,"eventTypeId":%d,"start":%q,"timeZone":"UTC","responses":{"name":"Ada Lovelace","email":"ada@example.com","notes":"hi"}}`,
-		owner, slug, etID, start.Format(time.RFC3339))
+		handle, slug, etID, start.Format(time.RFC3339))
 
 	status, body := req(t, "POST", srv.URL+"/v1/calendar/bookings", book)
 	if status != 201 {
 		t.Fatalf("create booking: want 201, got %d: %s", status, body)
 	}
-	for _, want := range []string{`"status":"accepted"`, `"uid"`, "Ada Lovelace", "ada@example.com"} {
+	for _, want := range []string{`"status":"accepted"`, `"uid"`, "Ada Lovelace", "ada@example.com", `"username":"` + handle} {
 		if !strings.Contains(body, want) {
 			t.Errorf("booking response missing %q: %s", want, body)
 		}
 	}
-	uid := fieldString(t, body, "uid")
+	// The internal IAM owner id must not appear in the booking response either.
+	if strings.Contains(body, owner) {
+		t.Fatalf("LEAK: booking response exposed the internal IAM owner id %q: %s", owner, body)
+	}
+	uid := fieldString(body, "uid")
 	if uid == "" {
 		t.Fatal("booking must return a uid")
 	}
 
-	// The confirmed attendee (holding the uid) may see the real location.
 	cStatus, cBody := req(t, "GET", srv.URL+"/v1/calendar/bookings/"+uid, "")
 	if cStatus != 200 || !strings.Contains(cBody, secretLocation) {
 		t.Fatalf("confirmation should reveal the real location to the uid holder, got %d: %s", cStatus, cBody)
 	}
 
-	// A second identical booking loses the race → 409.
 	status2, body2 := req(t, "POST", srv.URL+"/v1/calendar/bookings", book)
 	if status2 != 409 {
 		t.Fatalf("double-book must 409, got %d: %s", status2, body2)
@@ -306,30 +419,62 @@ func TestHTTP_CreateBookingRevealsLocationAndBlocksDoubleBook(t *testing.T) {
 }
 
 func TestHTTP_CrossOwnerIsolation(t *testing.T) {
-	p, owner, slug, start, cleanup := seed(t)
+	p, handle, _, slug, start, cleanup := seed(t)
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
 
-	// A different, unrelated host id must not resolve this host's event type.
-	other := "host_" + security.RandomString(6)
+	other := "host" + security.RandomString(6)
 	status, _ := req(t, "GET", srv.URL+"/v1/calendar/atoms/event-types/"+slug+"/public?username="+other, "")
 	if status != 404 {
-		t.Errorf("cross-owner public event must 404, got %d", status)
+		t.Errorf("cross-handle public event must 404, got %d", status)
 	}
 
-	// A booking whose user does not own the slug must not create a booking.
 	book := fmt.Sprintf(`{"user":%q,"eventTypeSlug":%q,"start":%q,"timeZone":"UTC","responses":{"name":"X","email":"x@example.com"}}`,
 		other, slug, start.Format(time.RFC3339))
 	bStatus, _ := req(t, "POST", srv.URL+"/v1/calendar/bookings", book)
 	if bStatus != 404 {
-		t.Errorf("booking under a non-owning user must 404, got %d", bStatus)
+		t.Errorf("booking under a non-owning handle must 404, got %d", bStatus)
 	}
-	_ = owner
+	_ = handle
+}
+
+// TestHTTP_ReadRateLimited proves the public reserve path is throttled per IP (Red's
+// missing-read-limit finding): a single IP exceeding the budget eventually gets 429.
+func TestHTTP_ReadRateLimited(t *testing.T) {
+	p, handle, _, slug, start, cleanup := seed(t)
+	defer cleanup()
+	srv := mux(t, p)
+	defer srv.Close()
+
+	etID := stableNumericID(mustEventTypeID(t, p, handle, slug))
+	body := fmt.Sprintf(`{"slotUtcStartDate":%q,"slotUtcEndDate":%q,"eventTypeId":%d}`,
+		start.Format(time.RFC3339), start.Add(30*time.Minute).Format(time.RFC3339), etID)
+
+	sent := 0
+	got429 := false
+	for i := 0; i < 245 && !got429; i++ {
+		rq, _ := http.NewRequest("POST", srv.URL+"/v1/calendar/slots/reserve", strings.NewReader(body))
+		rq.Header.Set("Content-Type", "application/json")
+		rq.Header.Set("X-Forwarded-For", "203.0.113.7") // fixed client IP
+		resp, err := http.DefaultClient.Do(rq)
+		if err != nil {
+			t.Fatalf("reserve %d: %v", i, err)
+		}
+		resp.Body.Close()
+		sent++
+		if resp.StatusCode == http.StatusTooManyRequests {
+			got429 = true
+		}
+	}
+	if !got429 {
+		t.Fatalf("expected a 429 within 245 reserves from one IP (budget 240/min), got none")
+	}
+	t.Logf("read path throttled: 429 after %d reserves from one IP (budget 240/min)", sent)
 }
 
 func TestHTTP_MeNoLeak(t *testing.T) {
-	p, _, _, _, cleanup := seed(t)
+	p, _, _, _, _, cleanup := seed(t)
 	defer cleanup()
 	srv := mux(t, p)
 	defer srv.Close()
@@ -345,18 +490,16 @@ func TestHTTP_MeNoLeak(t *testing.T) {
 
 // --- test helpers ---
 
-func mustEventTypeID(t *testing.T, p *plugin, owner, slug string) string {
+func mustEventTypeID(t *testing.T, p *plugin, handle, slug string) string {
 	t.Helper()
-	et, err := p.eventType(owner, slug)
+	et, err := p.eventType(handle, slug)
 	if err != nil {
 		t.Fatalf("event type: %v", err)
 	}
 	return et.Id
 }
 
-// dataString reads {"status":"success","data":"<s>"}.
-func dataString(t *testing.T, body string) string {
-	t.Helper()
+func dataString(body string) string {
 	var env struct {
 		Data string `json:"data"`
 	}
@@ -364,9 +507,7 @@ func dataString(t *testing.T, body string) string {
 	return env.Data
 }
 
-// fieldString reads a top-level string field from {"status":"success","data":{...}}.
-func fieldString(t *testing.T, body, field string) string {
-	t.Helper()
+func fieldString(body, field string) string {
 	var env struct {
 		Data map[string]any `json:"data"`
 	}
