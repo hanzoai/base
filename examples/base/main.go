@@ -11,13 +11,13 @@ import (
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/bootnode"
+	"github.com/hanzoai/base/plugins/calendar"
 	"github.com/hanzoai/base/plugins/cloudsql"
 	"github.com/hanzoai/base/plugins/functions"
 	"github.com/hanzoai/base/plugins/ghupdate"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/platform"
-	"github.com/hanzoai/base/plugins/scheduling"
 	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
@@ -143,9 +143,10 @@ func main() {
 	// BOOTNODE_ENABLED=true. Reuses the platform's IAM + per-org isolation.
 	bootnode.MustRegister(app, bootnode.ConfigFromEnv())
 
-	// Scheduling — the native booking API (event types, availability, bookings)
-	// over the scheduling collections, IAM-owned. Opt-in via SCHEDULING_ENABLED=true.
-	scheduling.MustRegister(app, scheduling.ConfigFromEnv())
+	// Calendar — the native booking API that speaks Cal.com's API-v2 shapes over the
+	// scheduling collections, IAM-owned, so cal.hanzo.ai's <Booker> talks to Base.
+	// Mounts under /v1/calendar. Opt-in via CALENDAR_ENABLED=true.
+	calendar.MustRegister(app, calendar.ConfigFromEnv())
 
 	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
 	cloudsql.MustRegister(app, cloudsql.Config{
