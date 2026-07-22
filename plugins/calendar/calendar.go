@@ -29,11 +29,13 @@ func ConfigFromEnv() Config {
 }
 
 type plugin struct {
-	app       core.App
-	config    Config
-	ipLimit   *limiter // per client IP
-	hostLimit *limiter // per host (owner)
-	holds     *holds   // advisory short-TTL slot reservations
+	app             core.App
+	config          Config
+	ipLimit         *limiter // booking, per client IP
+	hostLimit       *limiter // booking, per host (owner)
+	readIPLimit     *limiter // public reads/reserve, per client IP
+	readHandleLimit *limiter // public reads, per host handle (hard bound)
+	holds           *holds   // advisory short-TTL slot reservations
 }
 
 // MustRegister registers the calendar plugin and panics on error.
@@ -49,11 +51,13 @@ func Register(app core.App, config Config) error {
 		return nil
 	}
 	p := &plugin{
-		app:       app,
-		config:    config,
-		ipLimit:   newLimiter(time.Minute, 15), // 15 booking attempts/min per client IP
-		hostLimit: newLimiter(time.Minute, 60), // 60 booking attempts/min per host
-		holds:     newHolds(5 * time.Minute),   // advisory slot holds expire after 5 minutes
+		app:             app,
+		config:          config,
+		ipLimit:         newLimiter(time.Minute, 15),  // 15 booking attempts/min per client IP
+		hostLimit:       newLimiter(time.Minute, 60),  // 60 booking attempts/min per host
+		readIPLimit:     newLimiter(time.Minute, 240), // 240 reads/min per client IP (defense-in-depth)
+		readHandleLimit: newLimiter(time.Minute, 600), // 600 reads/min per host handle (hard bound)
+		holds:           newHolds(5 * time.Minute),    // advisory slot holds expire after 5 minutes
 	}
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Id: "calendar",
