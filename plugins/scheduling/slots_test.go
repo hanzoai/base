@@ -55,3 +55,31 @@ func TestComputeSlotsGuards(t *testing.T) {
 		t.Errorf("no windows must yield no slots, got %v", s)
 	}
 }
+
+// TestComputeSlotsRejectsOffWindow locks the availability-enforcement regression:
+// handleBook validates a requested start by requiring it to be a member of
+// computeSlots, so computeSlots must never emit an off-hours, wrong-day, or past
+// time — otherwise the write path would accept it (the NO-GO finding).
+func TestComputeSlotsRejectsOffWindow(t *testing.T) {
+	loc := time.UTC
+	from := time.Date(2026, 7, 27, 0, 0, 0, 0, loc)
+	wd := int(from.Weekday())
+	to := from.Add(24 * time.Hour)
+	now := from.Add(-48 * time.Hour)
+	windows := []availWindow{{Weekday: wd, StartMinute: 9 * 60, EndMinute: 11 * 60}}
+	slots := computeSlots(from, to, now, 30, 0, windows, loc, nil)
+
+	offHours := from.Add(3 * time.Hour)                 // 03:00 — outside 9–11
+	wrongDay := from.Add(3*24*time.Hour + 10*time.Hour) // a different weekday, 10:00
+	past := from.Add(-2 * time.Hour)                    // before the window even opens
+	for _, bad := range []time.Time{offHours.UTC(), wrongDay.UTC(), past.UTC()} {
+		for _, s := range slots {
+			if s.Equal(bad) {
+				t.Errorf("computeSlots emitted an off-window/past time %v — handleBook would wrongly accept it", bad)
+			}
+		}
+	}
+	if len(slots) != 4 {
+		t.Fatalf("sanity: want 4 in-window slots, got %d", len(slots))
+	}
+}
