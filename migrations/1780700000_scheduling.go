@@ -75,7 +75,7 @@ func createAvailabilityScheduleCollection(txApp core.App) error {
 	c.Fields.Add(&core.TextField{Name: "name", Required: true})
 	c.Fields.Add(&core.TextField{Name: "timezone", Required: true}) // IANA tz, e.g. America/Los_Angeles
 	c.Fields.Add(&core.JSONField{Name: "weekly"})                   // [{weekday:0-6, startMinute, endMinute}]
-	c.Fields.Add(&core.JSONField{Name: "overrides"})               // [{date:"YYYY-MM-DD", windows:[...] | unavailable:true}]
+	c.Fields.Add(&core.JSONField{Name: "overrides"})                // [{date:"YYYY-MM-DD", windows:[...] | unavailable:true}]
 	c.Fields.Add(&core.BoolField{Name: "isDefault"})
 	addTimestamps(c)
 	c.AddIndex("idx_sched_owner_name", true, "owner, name", "")
@@ -86,10 +86,16 @@ func createAvailabilityScheduleCollection(txApp core.App) error {
 // booking page renders without auth; only the host can change it.
 func createEventTypeCollection(txApp core.App) error {
 	c := hostOwned("eventType")
-	c.ListRule = types.Pointer("") // public read — booking pages are public
-	c.ViewRule = types.Pointer("")
+	// The collection stays owner-scoped. Public booking pages read the event type
+	// through the scheduling plugin's handler (a filtered superuser query that
+	// returns only active types and omits internal fields), so the raw records
+	// API never enumerates other hosts' event types or leaks the location.
 	c.Fields.Add(&core.TextField{Name: "title", Required: true})
 	c.Fields.Add(&core.TextField{Name: "slug", Required: true})
+	// handle is the host's PUBLIC booking identifier (calendly-style), decoupled
+	// from the internal IAM owner id. Public booking resolves by (handle, slug), so
+	// the raw IAM subject is never placed in a URL or published in a DTO.
+	c.Fields.Add(&core.TextField{Name: "handle"})
 	c.Fields.Add(&core.TextField{Name: "description"})
 	c.Fields.Add(&core.NumberField{Name: "durationMinutes", Required: true})
 	c.Fields.Add(&core.SelectField{Name: "locationType", MaxSelect: 1, Values: []string{"video", "phone", "in_person", "custom"}})
@@ -102,6 +108,9 @@ func createEventTypeCollection(txApp core.App) error {
 	c.Fields.Add(&core.BoolField{Name: "active"})
 	addTimestamps(c)
 	c.AddIndex("idx_eventtype_owner_slug", true, "owner, slug", "")
+	// A public (handle, slug) pair is globally unique so public resolution is
+	// deterministic; empty handles (not yet published) are excluded from the index.
+	c.AddIndex("idx_eventtype_handle_slug", true, "handle, slug", "handle != ''")
 	return txApp.Save(c)
 }
 
@@ -111,6 +120,7 @@ func createEventTypeCollection(txApp core.App) error {
 func createBookingCollection(txApp core.App) error {
 	c := endpointWritten("booking")
 	c.Fields.Add(refField("eventType"))
+	c.Fields.Add(&core.TextField{Name: "handle"}) // denormalized host public handle (for the booking DTO / reschedule); never the IAM owner id
 	c.Fields.Add(&core.DateField{Name: "startsAt"})
 	c.Fields.Add(&core.DateField{Name: "endsAt"})
 	c.Fields.Add(&core.TextField{Name: "timezone"}) // attendee tz at booking time
@@ -118,16 +128,19 @@ func createBookingCollection(txApp core.App) error {
 	c.Fields.Add(&core.TextField{Name: "title"})
 	c.Fields.Add(&core.TextField{Name: "description"})
 	c.Fields.Add(&core.TextField{Name: "location"})
-	c.Fields.Add(&core.TextField{Name: "attendeeName", Required: true})
-	c.Fields.Add(&core.TextField{Name: "attendeeEmail", Required: true})
-	c.Fields.Add(&core.TextField{Name: "attendeeTimezone"})
-	c.Fields.Add(&core.TextField{Name: "attendeeNotes"})
+	c.Fields.Add(&core.TextField{Name: "attendeeName", Required: true, Max: 200})
+	c.Fields.Add(&core.EmailField{Name: "attendeeEmail", Required: true})
+	c.Fields.Add(&core.TextField{Name: "attendeeTimezone", Max: 80})
+	c.Fields.Add(&core.TextField{Name: "attendeeNotes", Max: 4000})
 	c.Fields.Add(&core.TextField{Name: "uid", Required: true}) // opaque token for the attendee's manage link
 	c.Fields.Add(refField("calendarEvent"))                    // the event written back to the host's calendar
-	c.Fields.Add(&core.TextField{Name: "cancelReason"})
+	c.Fields.Add(&core.TextField{Name: "cancelReason", Max: 500})
 	c.Fields.Add(&core.DateField{Name: "cancelledAt"})
 	addTimestamps(c)
-	c.AddIndex("idx_booking_owner_start", false, "owner, startsAt", "")
+	// UNIQUE partial index: a host cannot hold two live bookings at the same start
+	// — the backstop against a check-then-write double-book race. Cancelled rows
+	// are excluded so a freed slot can be re-booked.
+	c.AddIndex("idx_booking_owner_start", true, "owner, startsAt", "status != 'cancelled'")
 	c.AddIndex("idx_booking_uid", true, "uid", "")
 	return txApp.Save(c)
 }

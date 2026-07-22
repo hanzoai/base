@@ -1,4 +1,4 @@
-package scheduling
+package calendar
 
 import (
 	"encoding/json"
@@ -13,6 +13,15 @@ type availWindow struct {
 	StartMinute int `json:"startMinute"` // minutes past local midnight
 	EndMinute   int `json:"endMinute"`
 }
+
+const (
+	// maxSlotsPerQuery caps how many open slots a single availability query
+	// generates, so a wide window cannot amplify one small request.
+	maxSlotsPerQuery = 5000
+	// maxSlotWindow caps the [startTime,endTime] span a query may request. The day
+	// loop is then bounded regardless of the attacker-controlled range.
+	maxSlotWindow = 62 * 24 * time.Hour
+)
 
 // interval is a busy span (an existing booking or a synced calendar event),
 // already padded by the event type's buffers.
@@ -35,7 +44,10 @@ func weeklyWindows(schedule *core.Record) []availWindow {
 // computeSlots generates the open start times in [from,to] for an event of
 // durationMin, from the weekly availability evaluated in loc, dropping slots that
 // overlap a busy interval or fall inside the minimum-notice horizon. Pure — no DB.
-func computeSlots(from, to, now time.Time, durationMin, minNoticeMin int, windows []availWindow, loc *time.Location, busy []interval) []time.Time {
+// maxSlots caps the number generated (<=0 means no cap); with a positive cap the
+// day loop stops early, so a wide [from,to] can never amplify one request into an
+// unbounded amount of work.
+func computeSlots(from, to, now time.Time, durationMin, minNoticeMin int, windows []availWindow, loc *time.Location, busy []interval, maxSlots int) []time.Time {
 	if durationMin <= 0 || len(windows) == 0 {
 		return nil
 	}
@@ -68,6 +80,9 @@ func computeSlots(from, to, now time.Time, durationMin, minNoticeMin int, window
 				}
 				if open {
 					slots = append(slots, su)
+					if maxSlots > 0 && len(slots) >= maxSlots {
+						return slots
+					}
 				}
 			}
 		}
