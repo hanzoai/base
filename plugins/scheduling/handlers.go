@@ -6,6 +6,7 @@ import (
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/types"
 	"github.com/hanzoai/dbx"
 )
 
@@ -57,18 +58,15 @@ func (p *plugin) handleGetSlots(e *core.RequestEvent) error {
 	if err != nil {
 		return e.NotFoundError("event type not found", err)
 	}
-	sched, err := p.scheduleFor(owner, et.GetString("availabilitySchedule"))
+	sched, err := p.scheduleFor(p.app, owner, et.GetString("availabilitySchedule"))
 	if err != nil {
 		return e.JSON(http.StatusOK, map[string]any{"slots": []string{}})
 	}
-	loc, err := time.LoadLocation(sched.GetString("timezone"))
-	if err != nil {
-		loc = time.UTC
-	}
+	loc := loadLoc(sched.GetString("timezone"))
 	now := time.Now().UTC()
 	from := parseTimeOr(e.Request.URL.Query().Get("from"), now)
 	to := parseTimeOr(e.Request.URL.Query().Get("to"), now.AddDate(0, 0, 14))
-	busy := p.busyIntervals(owner, from, to, et.GetInt("bufferBeforeMinutes"), et.GetInt("bufferAfterMinutes"))
+	busy := p.busyIntervals(p.app, owner, from, to, et.GetInt("bufferBeforeMinutes"), et.GetInt("bufferAfterMinutes"))
 	slots := computeSlots(from, to, now, et.GetInt("durationMinutes"), et.GetInt("minimumNoticeMinutes"), weeklyWindows(sched), loc, busy)
 
 	out := make([]string, 0, len(slots))
@@ -85,6 +83,9 @@ func (p *plugin) handleGetSlots(e *core.RequestEvent) error {
 // POST /v1/schedule/{owner}/{slug}/book
 func (p *plugin) handleBook(e *core.RequestEvent) error {
 	owner := e.Request.PathValue("owner")
+	if !p.allow(e, "book:"+owner) {
+		return e.JSON(http.StatusTooManyRequests, map[string]any{"error": "too many requests — try again shortly"})
+	}
 	et, err := p.eventType(owner, e.Request.PathValue("slug"))
 	if err != nil {
 		return e.NotFoundError("event type not found", err)
@@ -105,11 +106,13 @@ func (p *plugin) handleBook(e *core.RequestEvent) error {
 	start = start.UTC()
 	end := start.Add(time.Duration(et.GetInt("durationMinutes")) * time.Minute)
 
-	// Re-check the slot is still free before committing.
-	for _, iv := range p.busyIntervals(owner, start.Add(-24*time.Hour), end.Add(24*time.Hour), 0, 0) {
-		if iv.overlaps(start, end) {
-			return e.JSON(http.StatusConflict, map[string]any{"error": "slot is no longer available"})
-		}
+	// The requested start must be a genuinely open slot — inside the host's
+	// availability window, past the minimum-notice horizon, future-dated, grid-
+	// aligned, and free of conflicts incl. buffers. Validating against
+	// computeSlots (the same enforcement /slots renders) is the one authoritative
+	// gate; it closes the availability-bypass, buffer, and arbitrary-time oracle.
+	if !p.isOpenSlot(p.app, owner, et, start) {
+		return e.JSON(http.StatusConflict, map[string]any{"error": "that time isn't available"})
 	}
 
 	col, err := p.app.FindCollectionByNameOrId("booking")
@@ -130,8 +133,18 @@ func (p *plugin) handleBook(e *core.RequestEvent) error {
 	rec.Set("attendeeTimezone", body.Timezone)
 	rec.Set("attendeeNotes", body.Notes)
 	rec.Set("uid", security.RandomString(24))
-	if err := p.app.Save(rec); err != nil {
-		return e.InternalServerError("failed to create booking", err)
+
+	// Serialize the final availability re-check with the write. The partial
+	// unique index on (owner, startsAt) is the backstop against a concurrent
+	// double-book — its violation surfaces here as an error and becomes a 409.
+	err = p.app.RunInTransaction(func(txApp core.App) error {
+		if !p.isOpenSlot(txApp, owner, et, start) {
+			return errSlotTaken
+		}
+		return txApp.Save(rec)
+	})
+	if err != nil {
+		return e.JSON(http.StatusConflict, map[string]any{"error": "that time was just taken — pick another"})
 	}
 	return e.JSON(http.StatusCreated, bookingJSON(rec))
 }
@@ -153,6 +166,9 @@ func (p *plugin) handleCancelBooking(e *core.RequestEvent) error {
 	}
 	var body struct{ Reason string }
 	_ = e.BindBody(&body)
+	if len(body.Reason) > 500 {
+		body.Reason = body.Reason[:500]
+	}
 	rec.Set("status", "cancelled")
 	rec.Set("cancelReason", body.Reason)
 	rec.Set("cancelledAt", time.Now().UTC())
@@ -166,42 +182,76 @@ func (p *plugin) bookingByUID(uid string) (*core.Record, error) {
 	return p.app.FindFirstRecordByFilter("booking", "uid={:uid}", dbx.Params{"uid": uid})
 }
 
+// isOpenSlot reports whether start is a genuinely bookable slot for the event
+// type against the given app (which may be a transaction): inside the host's
+// availability, past the minimum-notice horizon, future-dated, grid-aligned and
+// conflict-free (incl. buffers). It is the single source of truth reused by both
+// /slots and /book, so the write path can never accept a time /slots wouldn't.
+func (p *plugin) isOpenSlot(app core.App, owner string, et *core.Record, start time.Time) bool {
+	sched, err := p.scheduleFor(app, owner, et.GetString("availabilitySchedule"))
+	if err != nil {
+		return false
+	}
+	loc := loadLoc(sched.GetString("timezone"))
+	from := start.Add(-24 * time.Hour)
+	to := start.Add(24 * time.Hour)
+	busy := p.busyIntervals(app, owner, from, to, et.GetInt("bufferBeforeMinutes"), et.GetInt("bufferAfterMinutes"))
+	for _, s := range computeSlots(from, to, time.Now().UTC(), et.GetInt("durationMinutes"), et.GetInt("minimumNoticeMinutes"), weeklyWindows(sched), loc, busy) {
+		if s.Equal(start) {
+			return true
+		}
+	}
+	return false
+}
+
 // scheduleFor resolves the availability schedule for an event type — the one it
 // references, else the host's default.
-func (p *plugin) scheduleFor(owner, id string) (*core.Record, error) {
+func (p *plugin) scheduleFor(app core.App, owner, id string) (*core.Record, error) {
 	if id != "" {
-		if rec, err := p.app.FindRecordById("availabilitySchedule", id); err == nil {
+		if rec, err := app.FindRecordById("availabilitySchedule", id); err == nil {
 			return rec, nil
 		}
 	}
-	return p.app.FindFirstRecordByFilter("availabilitySchedule",
+	return app.FindFirstRecordByFilter("availabilitySchedule",
 		"owner={:owner} && isDefault=true", dbx.Params{"owner": owner})
 }
 
 // busyIntervals collects the host's non-cancelled bookings and synced calendar
-// events overlapping [from,to], padded by the event type's buffers.
-func (p *plugin) busyIntervals(owner string, from, to time.Time, bufBefore, bufAfter int) []interval {
+// events that OVERLAP [from,to], padded by the event type's buffers. The overlap
+// is filtered in SQL (startsAt < to && endsAt > from) so a host with many rows
+// never blinds the conflict check the way a fixed row cap would.
+func (p *plugin) busyIntervals(app core.App, owner string, from, to time.Time, bufBefore, bufAfter int) []interval {
 	var out []interval
+	fromDT, _ := types.ParseDateTime(from)
+	toDT, _ := types.ParseDateTime(to)
+	params := dbx.Params{"owner": owner, "from": fromDT, "to": toDT}
 	add := func(s, en time.Time) {
 		s = s.Add(-time.Duration(bufBefore) * time.Minute)
 		en = en.Add(time.Duration(bufAfter) * time.Minute)
-		if en.After(from) && s.Before(to) {
-			out = append(out, interval{s, en})
-		}
+		out = append(out, interval{s, en})
 	}
-	if recs, err := p.app.FindRecordsByFilter("booking",
-		"owner={:owner} && status!='cancelled'", "startsAt", 1000, 0, dbx.Params{"owner": owner}); err == nil {
+	if recs, err := app.FindRecordsByFilter("booking",
+		"owner={:owner} && status!='cancelled' && startsAt<{:to} && endsAt>{:from}",
+		"startsAt", 2000, 0, params); err == nil {
 		for _, r := range recs {
 			add(r.GetDateTime("startsAt").Time(), r.GetDateTime("endsAt").Time())
 		}
 	}
-	if recs, err := p.app.FindRecordsByFilter("calendarEvent",
-		"owner={:owner} && isCanceled=false", "startsAt", 1000, 0, dbx.Params{"owner": owner}); err == nil {
+	if recs, err := app.FindRecordsByFilter("calendarEvent",
+		"owner={:owner} && isCanceled=false && startsAt<{:to} && endsAt>{:from}",
+		"startsAt", 2000, 0, params); err == nil {
 		for _, r := range recs {
 			add(r.GetDateTime("startsAt").Time(), r.GetDateTime("endsAt").Time())
 		}
 	}
 	return out
+}
+
+func loadLoc(tz string) *time.Location {
+	if loc, err := time.LoadLocation(tz); err == nil {
+		return loc
+	}
+	return time.UTC
 }
 
 func parseTimeOr(s string, def time.Time) time.Time {
