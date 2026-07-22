@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"errors"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,8 +58,29 @@ func (l *limiter) prune(now time.Time) {
 	}
 }
 
+// clientIP returns the caller's address for rate-limit keying. Behind the ingress,
+// e.RealIP() falls back to the direct socket peer (the ingress pod) unless Base's
+// TrustedProxy headers are configured — which would key every booker to one IP and
+// defeat the per-IP budget. So prefer the forwarded client address the ingress sets.
+// This header is spoofable on its own, which is why the per-host budget is the hard
+// bound; the per-IP budget is defense-in-depth for honest clients.
+func clientIP(e *core.RequestEvent) string {
+	if xff := e.Request.Header.Get("X-Forwarded-For"); xff != "" {
+		if i := strings.IndexByte(xff, ','); i >= 0 {
+			xff = xff[:i]
+		}
+		if ip := strings.TrimSpace(xff); ip != "" {
+			return ip
+		}
+	}
+	if xr := strings.TrimSpace(e.Request.Header.Get("X-Real-IP")); xr != "" {
+		return xr
+	}
+	return e.RealIP()
+}
+
 // allow gates a booking request: within both the per-IP and per-host budgets.
 func (p *plugin) allow(e *core.RequestEvent, hostKey string) bool {
 	now := time.Now()
-	return p.ipLimit.allow("ip:"+e.RealIP(), now) && p.hostLimit.allow(hostKey, now)
+	return p.ipLimit.allow("ip:"+clientIP(e), now) && p.hostLimit.allow(hostKey, now)
 }
