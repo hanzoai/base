@@ -86,8 +86,10 @@ func createAvailabilityScheduleCollection(txApp core.App) error {
 // booking page renders without auth; only the host can change it.
 func createEventTypeCollection(txApp core.App) error {
 	c := hostOwned("eventType")
-	c.ListRule = types.Pointer("") // public read — booking pages are public
-	c.ViewRule = types.Pointer("")
+	// The collection stays owner-scoped. Public booking pages read the event type
+	// through the scheduling plugin's handler (a filtered superuser query that
+	// returns only active types and omits internal fields), so the raw records
+	// API never enumerates other hosts' event types or leaks the location.
 	c.Fields.Add(&core.TextField{Name: "title", Required: true})
 	c.Fields.Add(&core.TextField{Name: "slug", Required: true})
 	c.Fields.Add(&core.TextField{Name: "description"})
@@ -118,16 +120,19 @@ func createBookingCollection(txApp core.App) error {
 	c.Fields.Add(&core.TextField{Name: "title"})
 	c.Fields.Add(&core.TextField{Name: "description"})
 	c.Fields.Add(&core.TextField{Name: "location"})
-	c.Fields.Add(&core.TextField{Name: "attendeeName", Required: true})
-	c.Fields.Add(&core.TextField{Name: "attendeeEmail", Required: true})
-	c.Fields.Add(&core.TextField{Name: "attendeeTimezone"})
-	c.Fields.Add(&core.TextField{Name: "attendeeNotes"})
+	c.Fields.Add(&core.TextField{Name: "attendeeName", Required: true, Max: 200})
+	c.Fields.Add(&core.EmailField{Name: "attendeeEmail", Required: true})
+	c.Fields.Add(&core.TextField{Name: "attendeeTimezone", Max: 80})
+	c.Fields.Add(&core.TextField{Name: "attendeeNotes", Max: 4000})
 	c.Fields.Add(&core.TextField{Name: "uid", Required: true}) // opaque token for the attendee's manage link
 	c.Fields.Add(refField("calendarEvent"))                    // the event written back to the host's calendar
-	c.Fields.Add(&core.TextField{Name: "cancelReason"})
+	c.Fields.Add(&core.TextField{Name: "cancelReason", Max: 500})
 	c.Fields.Add(&core.DateField{Name: "cancelledAt"})
 	addTimestamps(c)
-	c.AddIndex("idx_booking_owner_start", false, "owner, startsAt", "")
+	// UNIQUE partial index: a host cannot hold two live bookings at the same start
+	// — the backstop against a check-then-write double-book race. Cancelled rows
+	// are excluded so a freed slot can be re-booked.
+	c.AddIndex("idx_booking_owner_start", true, "owner, startsAt", "status != 'cancelled'")
 	c.AddIndex("idx_booking_uid", true, "uid", "")
 	return txApp.Save(c)
 }

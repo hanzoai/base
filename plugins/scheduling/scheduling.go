@@ -9,6 +9,7 @@ package scheduling
 
 import (
 	"os"
+	"time"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
@@ -26,8 +27,10 @@ func ConfigFromEnv() Config {
 }
 
 type plugin struct {
-	app    core.App
-	config Config
+	app       core.App
+	config    Config
+	ipLimit   *limiter // per client IP
+	hostLimit *limiter // per host (owner)
 }
 
 // MustRegister registers the scheduling plugin and panics on error.
@@ -42,7 +45,12 @@ func Register(app core.App, config Config) error {
 	if !config.Enabled {
 		return nil
 	}
-	p := &plugin{app: app, config: config}
+	p := &plugin{
+		app:       app,
+		config:    config,
+		ipLimit:   newLimiter(time.Minute, 15), // 15 booking attempts/min per client IP
+		hostLimit: newLimiter(time.Minute, 60), // 60 booking attempts/min per host
+	}
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Id: "scheduling",
 		Func: func(e *core.ServeEvent) error {
