@@ -1,4 +1,4 @@
-package scheduling
+package calendar
 
 import (
 	"encoding/json"
