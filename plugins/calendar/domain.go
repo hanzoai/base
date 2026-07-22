@@ -9,12 +9,15 @@ import (
 	"github.com/hanzoai/dbx"
 )
 
-// eventType loads an active event type by its host and slug. The query is owner-
-// and slug-scoped and active-only, so it never enumerates another host's types.
-func (p *plugin) eventType(owner, slug string) (*core.Record, error) {
+// eventType loads an active event type by its PUBLIC handle and slug. Resolution is
+// by (handle, slug) via bound params — never the internal IAM owner id — so the raw
+// IAM subject is never a public URL key or an enumeration target. The lookup is
+// handle- and slug-scoped, active-only, and rejects an empty handle, so it never
+// resolves an unpublished type or enumerates another host's types.
+func (p *plugin) eventType(handle, slug string) (*core.Record, error) {
 	return p.app.FindFirstRecordByFilter("eventType",
-		"owner={:owner} && slug={:slug} && active=true",
-		dbx.Params{"owner": owner, "slug": slug})
+		"handle={:handle} && slug={:slug} && active=true && handle!=''",
+		dbx.Params{"handle": handle, "slug": slug})
 }
 
 func (p *plugin) bookingByUID(uid string) (*core.Record, error) {
@@ -44,7 +47,9 @@ func (p *plugin) openSlots(app core.App, owner string, et *core.Record, from, to
 	}
 	loc := loadLoc(sched.GetString("timezone"))
 	busy := p.busyIntervals(app, owner, from, to, et.GetInt("bufferBeforeMinutes"), et.GetInt("bufferAfterMinutes"))
-	slots := computeSlots(from, to, now, et.GetInt("durationMinutes"), et.GetInt("minimumNoticeMinutes"), weeklyWindows(sched), loc, busy)
+	// maxSlotsPerQuery caps generation so a wide window can't amplify one small
+	// request into a huge response (the handler also clamps the window span).
+	slots := computeSlots(from, to, now, et.GetInt("durationMinutes"), et.GetInt("minimumNoticeMinutes"), weeklyWindows(sched), loc, busy, maxSlotsPerQuery)
 	return slots, sched
 }
 
@@ -107,6 +112,11 @@ type attendee struct {
 // availability re-check with the write in one transaction. The partial unique
 // index on (owner, startsAt) is the backstop against a concurrent double-book — its
 // violation surfaces here as an error. Returns the saved record or errSlotTaken.
+//
+// DEPLOY GATE: the in-transaction re-check + unique index guarantee exactly-one
+// booking only under a single writer. On the default SQLite backend the `cal` App
+// CR MUST pin replicas:1 with strategy:Recreate; scaling it out on SQLite would
+// reopen the double-book TOCTOU. Multi-writer needs a shared-DB backend.
 func (p *plugin) book(owner string, et *core.Record, start time.Time, a attendee) (*core.Record, error) {
 	col, err := p.app.FindCollectionByNameOrId("booking")
 	if err != nil {
@@ -115,6 +125,7 @@ func (p *plugin) book(owner string, et *core.Record, start time.Time, a attendee
 	end := start.Add(time.Duration(et.GetInt("durationMinutes")) * time.Minute)
 	rec := core.NewRecord(col)
 	rec.Set("owner", owner)
+	rec.Set("handle", et.GetString("handle")) // denormalized public handle; never surfaces the owner id
 	rec.Set("eventType", et.Id)
 	rec.Set("startsAt", start)
 	rec.Set("endsAt", end)

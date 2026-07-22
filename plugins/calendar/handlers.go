@@ -18,16 +18,20 @@ import (
 // email, no other host's types, no raw meeting location (only its type).
 func (p *plugin) handlePublicEvent(e *core.RequestEvent) error {
 	slug := e.Request.PathValue("slug")
-	owner := firstUsername(e.Request.URL.Query().Get("username"))
-	if owner == "" || slug == "" {
+	handle := firstUsername(e.Request.URL.Query().Get("username"))
+	if handle == "" || slug == "" {
 		return calError(e, http.StatusNotFound, "event type not found")
 	}
-	et, err := p.eventType(owner, slug)
+	if !p.allowReadHandle(e, handle) {
+		return calError(e, http.StatusTooManyRequests, "too many requests — slow down")
+	}
+	et, err := p.eventType(handle, slug)
 	if err != nil {
 		return calError(e, http.StatusNotFound, "event type not found")
 	}
-	sched, _ := p.scheduleFor(p.app, owner, et.GetString("availabilitySchedule"))
-	return calOK(e, publicEventDTO(owner, et, sched))
+	// The internal IAM owner drives availability; it is never published.
+	sched, _ := p.scheduleFor(p.app, et.GetString("owner"), et.GetString("availabilitySchedule"))
+	return calOK(e, publicEventDTO(handle, et, sched))
 }
 
 // handleAvailableSlots serves useAvailableSlots:
@@ -38,15 +42,30 @@ func (p *plugin) handlePublicEvent(e *core.RequestEvent) error {
 // eventTypeId is NEVER trusted for data access, only as the advisory-hold key.
 func (p *plugin) handleAvailableSlots(e *core.RequestEvent) error {
 	q := e.Request.URL.Query()
-	owner := usernameListParam(e)
-	et, err := p.eventType(owner, q.Get("eventTypeSlug"))
+	handle := usernameListParam(e)
+	if handle == "" {
+		return calOK(e, emptySlotsDTO())
+	}
+	if !p.allowReadHandle(e, handle) {
+		return calError(e, http.StatusTooManyRequests, "too many requests — slow down")
+	}
+	et, err := p.eventType(handle, q.Get("eventTypeSlug"))
 	if err != nil {
 		// The Booker tolerates an empty slot map; never leak why.
 		return calOK(e, emptySlotsDTO())
 	}
+	owner := et.GetString("owner")
 	now := time.Now().UTC()
 	from := parseTimeOr(q.Get("startTime"), now)
 	to := parseTimeOr(q.Get("endTime"), now.AddDate(0, 0, 14))
+	// Clamp the requested span BEFORE generation so a huge [startTime,endTime]
+	// can't amplify one ~200-byte request into an unbounded slot computation.
+	if to.Before(from) {
+		to = from
+	}
+	if to.Sub(from) > maxSlotWindow {
+		to = from.Add(maxSlotWindow)
+	}
 	slots, sched := p.openSlots(p.app, owner, et, from, to, now)
 	if sched == nil {
 		return calOK(e, emptySlotsDTO())
@@ -64,6 +83,9 @@ func (p *plugin) handleAvailableSlots(e *core.RequestEvent) error {
 // NOT gate the write path — the authoritative anti-double-book is the transactional
 // isOpenSlot re-check plus the partial unique index in book().
 func (p *plugin) handleReserveSlot(e *core.RequestEvent) error {
+	if !p.allowRead(e) {
+		return calError(e, http.StatusTooManyRequests, "too many requests — slow down")
+	}
 	var body struct {
 		SlotUtcStartDate string          `json:"slotUtcStartDate"`
 		SlotUtcEndDate   string          `json:"slotUtcEndDate"`
@@ -123,17 +145,18 @@ func (p *plugin) handleCreateBooking(e *core.RequestEvent) error {
 	if err := e.BindBody(&body); err != nil {
 		return calError(e, http.StatusBadRequest, "invalid body")
 	}
-	owner := oneUser(body.User)
-	if owner == "" || body.EventTypeSlug == "" {
+	handle := oneUser(body.User)
+	if handle == "" || body.EventTypeSlug == "" {
 		return calError(e, http.StatusBadRequest, "user and eventTypeSlug are required")
 	}
-	if !p.allow(e, "book:"+owner) {
+	if !p.allow(e, "book:"+handle) {
 		return calError(e, http.StatusTooManyRequests, "too many requests — try again shortly")
 	}
-	et, err := p.eventType(owner, body.EventTypeSlug)
+	et, err := p.eventType(handle, body.EventTypeSlug)
 	if err != nil {
 		return calError(e, http.StatusNotFound, "event type not found")
 	}
+	owner := et.GetString("owner") // internal IAM id, from the resolved record
 	start, err := parseCalTime(body.Start)
 	if err != nil {
 		return calError(e, http.StatusBadRequest, "invalid start time")

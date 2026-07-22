@@ -75,7 +75,7 @@ func createAvailabilityScheduleCollection(txApp core.App) error {
 	c.Fields.Add(&core.TextField{Name: "name", Required: true})
 	c.Fields.Add(&core.TextField{Name: "timezone", Required: true}) // IANA tz, e.g. America/Los_Angeles
 	c.Fields.Add(&core.JSONField{Name: "weekly"})                   // [{weekday:0-6, startMinute, endMinute}]
-	c.Fields.Add(&core.JSONField{Name: "overrides"})               // [{date:"YYYY-MM-DD", windows:[...] | unavailable:true}]
+	c.Fields.Add(&core.JSONField{Name: "overrides"})                // [{date:"YYYY-MM-DD", windows:[...] | unavailable:true}]
 	c.Fields.Add(&core.BoolField{Name: "isDefault"})
 	addTimestamps(c)
 	c.AddIndex("idx_sched_owner_name", true, "owner, name", "")
@@ -92,6 +92,10 @@ func createEventTypeCollection(txApp core.App) error {
 	// API never enumerates other hosts' event types or leaks the location.
 	c.Fields.Add(&core.TextField{Name: "title", Required: true})
 	c.Fields.Add(&core.TextField{Name: "slug", Required: true})
+	// handle is the host's PUBLIC booking identifier (calendly-style), decoupled
+	// from the internal IAM owner id. Public booking resolves by (handle, slug), so
+	// the raw IAM subject is never placed in a URL or published in a DTO.
+	c.Fields.Add(&core.TextField{Name: "handle"})
 	c.Fields.Add(&core.TextField{Name: "description"})
 	c.Fields.Add(&core.NumberField{Name: "durationMinutes", Required: true})
 	c.Fields.Add(&core.SelectField{Name: "locationType", MaxSelect: 1, Values: []string{"video", "phone", "in_person", "custom"}})
@@ -104,6 +108,9 @@ func createEventTypeCollection(txApp core.App) error {
 	c.Fields.Add(&core.BoolField{Name: "active"})
 	addTimestamps(c)
 	c.AddIndex("idx_eventtype_owner_slug", true, "owner, slug", "")
+	// A public (handle, slug) pair is globally unique so public resolution is
+	// deterministic; empty handles (not yet published) are excluded from the index.
+	c.AddIndex("idx_eventtype_handle_slug", true, "handle, slug", "handle != ''")
 	return txApp.Save(c)
 }
 
@@ -113,6 +120,7 @@ func createEventTypeCollection(txApp core.App) error {
 func createBookingCollection(txApp core.App) error {
 	c := endpointWritten("booking")
 	c.Fields.Add(refField("eventType"))
+	c.Fields.Add(&core.TextField{Name: "handle"}) // denormalized host public handle (for the booking DTO / reschedule); never the IAM owner id
 	c.Fields.Add(&core.DateField{Name: "startsAt"})
 	c.Fields.Add(&core.DateField{Name: "endsAt"})
 	c.Fields.Add(&core.TextField{Name: "timezone"}) // attendee tz at booking time
