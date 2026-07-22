@@ -17,6 +17,7 @@ import (
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/platform"
+	"github.com/hanzoai/base/plugins/scheduling"
 	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
@@ -141,6 +142,10 @@ func main() {
 	// teams, network/node/key provisioning via bootno.de CRDs). Opt-in via
 	// BOOTNODE_ENABLED=true. Reuses the platform's IAM + per-org isolation.
 	bootnode.MustRegister(app, bootnode.ConfigFromEnv())
+
+	// Scheduling — the native booking API (event types, availability, bookings)
+	// over the scheduling collections, IAM-owned. Opt-in via SCHEDULING_ENABLED=true.
+	scheduling.MustRegister(app, scheduling.ConfigFromEnv())
 
 	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
 	cloudsql.MustRegister(app, cloudsql.Config{
