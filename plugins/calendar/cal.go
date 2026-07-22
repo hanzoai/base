@@ -53,11 +53,11 @@ func stableNumericID(s string) int64 {
 
 // publicEventDTO renders the event for the unauthenticated booker. It carries what
 // the Booker needs to render and NOTHING that leaks the host: no email, no internal
-// ids, and no raw meeting location — only the booking fields, layouts, and a public
-// profile whose handle is the owner's public booking username.
-func publicEventDTO(owner string, et, sched *core.Record) map[string]any {
+// IAM id, and no raw meeting location — only the booking fields, layouts, and a
+// public profile keyed on the host's PUBLIC handle (never the IAM owner id).
+func publicEventDTO(handle string, et, sched *core.Record) map[string]any {
 	layouts := bookerLayoutsDTO()
-	name := profileName(owner)
+	name := profileName(handle)
 
 	var schedule any
 	if sched != nil {
@@ -92,10 +92,10 @@ func publicEventDTO(owner string, et, sched *core.Record) map[string]any {
 		"bookerLayouts": layouts,
 		"schedule":      schedule,
 		"timeZone":      nil, // attendee picks their timezone; event is not tz-locked
-		"users":         []any{userDTO(owner, name)},
+		"users":         []any{userDTO(handle, name)},
 		"profile": map[string]any{
 			"name":           name,
-			"username":       owner,
+			"username":       handle,
 			"image":          "",
 			"weekStart":      "Sunday",
 			"brandColor":     "#292929",
@@ -115,20 +115,20 @@ func publicEventDTO(owner string, et, sched *core.Record) map[string]any {
 }
 
 // profileName is the host's public display name. We do not store a separate display
-// name, so the public booking handle (owner) is used — it is already public in the
-// URL and carries no PII beyond the handle itself.
-func profileName(owner string) string { return owner }
+// name, so the public booking handle is used — it is host-chosen and already public
+// in the URL, and carries no PII beyond the handle itself.
+func profileName(handle string) string { return handle }
 
-func userDTO(owner, name string) map[string]any {
+func userDTO(handle, name string) map[string]any {
 	return map[string]any{
 		"name":           name,
-		"username":       owner,
+		"username":       handle,
 		"weekStart":      "Sunday",
 		"organizationId": nil,
 		"avatarUrl":      nil,
 		"bookerUrl":      "",
 		"profile": map[string]any{
-			"username":     owner,
+			"username":     handle,
 			"name":         name,
 			"organization": nil,
 		},
@@ -220,8 +220,8 @@ func bookingDTO(rec *core.Record) map[string]any {
 			"timeZone": rec.GetString("attendeeTimezone"),
 		}},
 		"user": map[string]any{
-			"username": rec.GetString("owner"),
-			"name":     profileName(rec.GetString("owner")),
+			"username": rec.GetString("handle"),
+			"name":     profileName(rec.GetString("handle")),
 		},
 		"responses": map[string]any{
 			"name":  rec.GetString("attendeeName"),
