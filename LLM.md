@@ -1,4 +1,38 @@
-# LLM.md - Hanzo Base
+# LLM.md — hanzoai/base
+
+> Orientation for AI agents. Deep architecture, plugin, IAM, and env reference follows below the divider — keep it.
+
+## What this is
+Base is the embedded, **SQLite-first** application backend for the Hanzo cloud:
+per-tenant data files, per-org KMS-derived DEK, WAL replication to age-encrypted
+object storage, in-process extension runtimes (goja/wazero/pyvm/starkvm), and
+**Hanzo IAM** as the one and only auth path (HIP-0111). One Go binary; the storage
+substrate every multi-tenant Hanzo Go service builds on (HIP-0105/0106/0107/0302).
+
+## Canonical role
+Canonical impl repo — the real code lives here (`github.com/hanzoai/base`). It is
+not an SDK; SDK clients and discovery repos link OUT to it. One impl, one place.
+
+## Install / run
+- Library: `import "github.com/hanzoai/base"` (Go 1.26+)
+- Binary: `go install github.com/hanzoai/base/examples/base@latest && base serve`
+- Test: `go test ./...`
+
+## Key entry points
+- `base.New()` / `base.NewWithConfig` — app constructor (root package)
+- `examples/base/main.go` — the prebuilt binary
+- `core/` — app, dialect, storage tier (`ResolveStorageTier`, `BASE_DB_TIER`)
+- `plugins/platform/` — Hanzo IAM (mandatory, one way), per-org DBs
+- `cmd/` — CLI (`AddCLISubcommands`), serve, superuser
+
+## Brand rules (hard)
+- Hanzo is a full **AI SDK / AI cloud**, never an "LLM gateway" or LiteLLM proxy.
+- `/v1` only — never an `/api/` prefix.
+- Zen models are our own family — never name upstream models.
+- Voice: "Hanzo — the Open AI Cloud."
+
+Canonical SDK model: `~/work/hanzo/SDK-ARCHITECTURE.md`.
+---
 
 ## Identity
 
