@@ -2,7 +2,7 @@
 
 # Base
 
-Per-tenant SQLite + extension runtimes (HIP-0105). The storage substrate of the unified Hanzo cloud binary.
+The embedded, **SQLite-first** application backend for the Hanzo cloud — per-tenant data, in-process extension runtimes, and Hanzo IAM built in. One Go binary; the storage substrate every multi-tenant Hanzo Go service builds on.
 
 [![Status](https://img.shields.io/badge/status-beta-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
@@ -10,86 +10,57 @@ Per-tenant SQLite + extension runtimes (HIP-0105). The storage substrate of the 
 ## Quick start
 
 ```bash
-go install github.com/hanzoai/base/cmd/base@latest
+go install github.com/hanzoai/base/examples/base@latest
 base serve
 ```
 
+Then open the admin dashboard at `http://127.0.0.1:8090/_/`.
+
+> [!NOTE]
+> Base is under active development. Full backward compatibility is not guaranteed before `v1.0.0`.
+
 ## What this is
 
-`base` is the multi-tenant backend substrate every Hanzo Go service builds on. Each org gets its own per-tenant data file with a per-org KMS-derived DEK; replicate streams the WAL to age-encrypted object storage. Per-record validators, computed fields, and access rules run inside the same process via in-process extension runtimes (goja, wazero, pyvm, starkvm).
+[Base](https://hanzo.ai/base) is an open source Go backend that gives every Hanzo Go service the same multi-tenant substrate. It includes:
 
-## Specs
-
-Implements:
-- HIP-0105 In-Process Extension Runtime Standard
-- HIP-0107 Streaming Replication over VFS
-- HIP-0302 Encrypted SQLite + ZapDB Durability
-
-Used as the storage backend by every multi-tenant subsystem in HIP-0106.
-
-## Architecture
-
-```
-   http request  ->  zip.App  ->  base.App
-                                     |
-                  per-tenant data/{orgSlug}.db (SQLite or ZapDB)
-                                     |
-                  KMS-derived DEK   replicate -> S3/GCS (age-encrypted)
-                                     |
-                  in-process extension runtime (HIP-0105):
-                    goja (JS) | wazero (WASM) | pyvm (Python) | starkvm (Starlark)
-```
-
-
----
-
-# base
-
-[Base](https://hanzo.ai/base) is an open source Go backend that includes:
-
-- embedded in-memory, SQL and vector databases with **realtime subscriptions**
+- embedded **in-memory, SQL, and vector** data with **realtime subscriptions**
 - built-in **files and users management**
-- convenient **Admin dashboard UI**
-- and simple **GraphQL** && **REST-ish API**
-- native **Analytics and LLM observability**
-- deeply with integrated **[Hanzo AI Platform](https://hanzo.ai)** for
-  hyperscalability day one.
+- a convenient **Admin dashboard UI**
+- **GraphQL** and a REST-style **`/v1` API**
+- native **analytics and AI observability**
+- **Hanzo IAM** as the one and only auth path (OIDC / PKCE)
+- deep integration with the **[Hanzo AI Cloud](https://hanzo.ai)** for scale on day one
 
-**Use [Hanzo App](https://hanzo.app) to rapidly iterate and build new apps!
+Each org gets its own per-tenant data file with a per-org KMS-derived DEK; `replicate` streams the WAL to age-encrypted object storage. Per-record validators, computed fields, and access rules run inside the same process via in-process extension runtimes (goja, wazero, pyvm, starkvm).
 
-> [!WARNING]
-> Please keep in mind that Base is still under active development
-> and therefore full backward compatibility is not guaranteed before reaching v1.0.0.
+Use **[Hanzo App](https://hanzo.app)** to rapidly iterate and build new apps.
 
-## API SDK clients
+## API clients
 
-The easiest way to interact with the Base Web APIs is to use one of the official SDK clients:
+The easiest way to talk to the Base web API is one of the official SDK clients:
 
-- **JavaScript - [@hanzoai/js-sdk](https://github.com/hanzoai/js-sdk)** (_Browser, Node.js, React Native_)
-- **Dart - [@hanzoai/dart-sdk](https://github.com/hanzoai/dart-sdk)** (_Web, Mobile, Desktop, CLI_)
+- **JavaScript — [@hanzoai/js-sdk](https://github.com/hanzoai/js-sdk)** (_Browser, Node.js, React Native_)
+- **Dart — [@hanzoai/dart-sdk](https://github.com/hanzoai/dart-sdk)** (_Web, Mobile, Desktop, CLI_)
 
-You could also check the recommendations in https://docs.hanzo.ai/how-to-use/.
-
+See the full guide at [docs.hanzo.ai](https://docs.hanzo.ai).
 
 ## Overview
 
-### Use as standalone app
+### Use as a standalone app
 
-You could download the prebuilt executable for your platform from the [Releases page](https://github.com/hanzoai/base/releases).
-Once downloaded, extract the archive and run `./base serve` in the extracted directory.
+Download the prebuilt executable for your platform from the [Releases page](https://github.com/hanzoai/base/releases), extract the archive, and run `./base serve`.
 
-The prebuilt executables are based on the [`examples/base/main.go` file](https://github.com/hanzoai/base/blob/master/examples/base/main.go) and comes with a JavaScript plugin enabled by default which allows to extend Base with JavaScript (_for more details please refer to [Extend with JavaScript](https://docs.hanzo.ai/js-overview/)_).
+The prebuilt executables are built from [`examples/base/main.go`](https://github.com/hanzoai/base/blob/main/examples/base/main.go) and ship with a JavaScript plugin enabled by default, so you can extend Base with JavaScript (see [Extend with JavaScript](https://docs.hanzo.ai/js-overview/)).
 
-### Use as a Go framework/toolkit
+### Use as a Go framework / toolkit
 
-Base Base is distributed as a regular Go library package which allows you to build
-your own custom app specific business logic and still have a single portable executable at the end.
+Base is distributed as a regular Go library, so you can build your own app-specific business logic and still ship a single portable executable.
 
-Here is a minimal example:
+Minimal example:
 
-0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
+0. [Install Go 1.26+](https://go.dev/doc/install) (_if you haven't already_).
 
-1. Create a new project directory with the following `main.go` file inside it:
+1. Create a new project directory with the following `main.go`:
     ```go
     package main
 
@@ -104,7 +75,7 @@ Here is a minimal example:
         app := base.New()
 
         app.OnServe().BindFunc(func(se *core.ServeEvent) error {
-            // registers new "GET /hello" route
+            // registers a new "GET /hello" route
             se.Router.GET("/hello", func(re *core.RequestEvent) error {
                 return re.String(200, "Hello world!")
             })
@@ -118,95 +89,83 @@ Here is a minimal example:
     }
     ```
 
-2. To init the dependencies, run `go mod init myapp && go mod tidy`.
+2. Initialize dependencies: `go mod init myapp && go mod tidy`.
 
-3. To start the application, run `go run main.go serve`.
+3. Start the app: `go run main.go serve`.
 
-4. To build a statically linked executable, you can run `CGO_ENABLED=0 go build` and then start the created executable with `./myapp serve`.
+4. Build a statically linked executable: `CGO_ENABLED=0 go build`, then start it with `./myapp serve`.
 
-_For more details please refer to [Extend with Go](https://docs.hanzo.ai/go-overview/)._
+See [Extend with Go](https://docs.hanzo.ai/go-overview/) for details.
 
-### Building and running the repo main.go example
+### Building the repo example
 
-To build the minimal standalone executable, like the prebuilt ones in the releases page, you can simply run `go build` inside the `examples/base` directory:
+To build the minimal standalone executable (like the prebuilt releases), run `go build` inside `examples/base`:
 
-0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
-1. Clone/download the repo
-2. Navigate to `examples/base`
-3. Run `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`
-   (_https://go.dev/doc/install/source#environment_)
-4. Start the created executable by running `./base serve`.
+0. [Install Go 1.26+](https://go.dev/doc/install) (_if you haven't already_).
+1. Clone the repo.
+2. Navigate to `examples/base`.
+3. Run `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build` (see the [Go environment reference](https://go.dev/doc/install/source#environment)).
+4. Start the executable: `./base serve`.
 
-Note that the supported build targets by the pure Go SQLite driver at the moment are:
+The pure-Go SQLite driver currently supports these build targets:
 
 ```
-darwin  amd64
-darwin  arm64
-freebsd amd64
-freebsd arm64
-linux   386
+darwin  amd64      linux   arm64      linux   s390x
+darwin  arm64      linux   loong64    windows 386
+freebsd amd64      linux   ppc64le    windows amd64
+freebsd arm64      linux   riscv64    windows arm64
+linux   386        linux   arm
 linux   amd64
-linux   arm
-linux   arm64
-linux   loong64
-linux   ppc64le
-linux   riscv64
-linux   s390x
-windows 386
-windows amd64
-windows arm64
 ```
 
 ### Testing
 
-Base comes with mixed bag of unit and integration tests.
-To run them, use the standard `go test` command:
+Base comes with a mixed bag of unit and integration tests. Run them with the standard `go test` command:
 
 ```sh
 go test ./...
 ```
 
-Check also the [Testing guide](http://docs.hanzo.ai/testing) to learn how to write your own custom application tests.
+See the [Testing guide](https://docs.hanzo.ai/testing) to learn how to write your own application tests.
 
-## SQLite Replication
+## SQLite replication
 
-Base uses SQLite per org (encrypted via `hanzoai/sqlite` with per-principal CEK).
-The `hanzoai/replicate` sidecar streams WAL changes to S3, encrypted with `luxfi/age`.
+Base opens SQLite through the encrypted `hanzoai/sqlite` driver (per-principal CEK). The `hanzoai/replicate` sidecar streams WAL changes to object storage, encrypted end-to-end with `luxfi/age`.
 
 K8s sidecar pattern:
-- **Init container**: restores the latest snapshot from S3 on startup
-- **Sidecar**: continuously replicates WAL to S3 while the service runs
 
-Config: `litestream.yml` with `age-identities` / `age-recipients` fields for
-end-to-end encryption of replicated data.
+- **Init container** — restores the latest snapshot from object storage on startup.
+- **Sidecar** — continuously replicates the WAL while the service runs.
 
-## Security
+Configure `age-identities` / `age-recipients` for end-to-end encryption of replicated data.
 
-If you discover a security vulnerability within Base, please send an e-mail to **security at hanzo.ai**.
+## Specs
 
-All reports will be promptly addressed and you'll be credited in the fix release notes.
+Base implements:
 
-## Contributing
+- **HIP-0105** — In-Process Extension Runtime Standard
+- **HIP-0107** — Streaming Replication over VFS
+- **HIP-0302** — Encrypted SQLite + ZapDB Durability
+- **HIP-0111** — Hanzo IAM (the one auth path)
 
-Base is free and open source project licensed under the [MIT License](LICENSE.md).
-You are free to do whatever you want with it, even offering it as a paid service.
+It is the storage backend for every multi-tenant subsystem in **HIP-0106**.
 
-You could help continuing its development by:
+## Architecture
 
-- [Contribute to the source code](CONTRIBUTING.md)
-- [Suggest new features and report issues](https://github.com/hanzoai/base/issues)
-
-PRs for new OAuth2 providers, bug fixes, code optimizations and documentation improvements are more than welcome.
-
-But please refrain creating PRs for _new features_ without previously discussing the implementation details.
-Base has a [roadmap](https://github.com/orgs/base/projects/2) and I try to work on issues in specific order and such PRs often come in out of nowhere and skew all initial planning with tedious back-and-forth communication.
-
-Don't get upset if I close your PR, even if it is well executed and tested. This doesn't mean that it will never be merged.
-Later we can always refer to it and/or take pieces of your implementation when the time comes to work on the issue (don't worry you'll be credited in the release notes).
+```
+   http request  ->  zip.App  ->  base.App
+                                     |
+                  per-tenant data/{orgSlug}.db (SQLite or ZapDB)
+                                     |
+                  KMS-derived DEK   replicate -> S3/GCS (age-encrypted)
+                                     |
+                  in-process extension runtime (HIP-0105):
+                    goja (JS) | wazero (WASM) | pyvm (Python) | starkvm (Starlark)
+```
 
 ## CLI
 
-The `base cli` subcommand provides a complete HTTP client for operating any running Base-backed daemon from the command line. It works against `base`, `atsd`, `brokerd`, `tad`, `bdd`, or any binary that embeds Base.
+The `base cli` subcommand is a complete HTTP client for operating any running Base-backed daemon from the command line. It works against `base`, `atsd`, `brokerd`, `tad`, `bdd`, or any binary that embeds Base.
 
 ### Targeting a server
 
@@ -226,8 +185,8 @@ Global flags (apply to all subcommands):
 |------|---------|---------|-------------|
 | `--url` | `BASE_URL` | `http://127.0.0.1:8090` | Server URL |
 | `--token` | `BASE_TOKEN` | `~/.config/base/token` | Auth token |
-| `--tenant` | - | - | Sets `X-Org-Id` header |
-| `--format` | - | `table` on TTY, `json` otherwise | `table`, `json`, or `yaml` |
+| `--tenant` | — | — | Sets `X-Org-Id` header |
+| `--format` | — | `table` on TTY, `json` otherwise | `table`, `json`, or `yaml` |
 
 ### Authentication
 
@@ -242,7 +201,7 @@ base cli login --email admin@example.com --password secret123 --superuser
 base cli whoami
 ```
 
-Token is stored at `~/.config/base/token` (or `$XDG_CONFIG_HOME/base/token`) with mode `0600`.
+The token is stored at `~/.config/base/token` (or `$XDG_CONFIG_HOME/base/token`) with mode `0600`.
 
 ### Collections
 
@@ -285,26 +244,24 @@ base cli crons list
 
 ### Using from a downstream daemon
 
-Any Base-backed daemon can expose these subcommands without duplicating code.
-For example, in a downstream `main.go`:
+Any Base-backed daemon can expose these subcommands without duplicating code. For example, in a downstream `main.go`:
 
-    import (
-        "log"
+```go
+package main
 
 import (
     "log"
 
     "github.com/hanzoai/base"
     "github.com/hanzoai/base/cmd"
-    "github.com/hanzoai/base/core"
 )
 
 func main() {
     app := base.New()
 
-    // ... register ATS-specific hooks and routes ...
+    // ... register domain-specific hooks and routes ...
 
-    // Register system commands manually for flattened CLI:
+    // Register system commands for a flattened CLI:
     // `ats collection list` instead of `ats cli collection list`
     app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app))
     app.RootCmd.AddCommand(cmd.NewServeCommand(app, true))
@@ -313,48 +270,10 @@ func main() {
     if err := app.Execute(); err != nil {
         log.Fatal(err)
     }
-    ```
-
-2. To init the dependencies, run `go mod init myapp && go mod tidy`.
-
-3. To start the application, run `go run main.go serve`.
-
-4. To build a statically linked executable, you can run `CGO_ENABLED=0 go build` and then start the created executable with `./myapp serve`.
-
-_For more details please refer to [Extend with Go](https://docs.hanzo.ai/docs/go-overview/)._
-
-### Building and running the repo main.go example
-
-To build the minimal standalone executable, like the prebuilt ones in the releases page, you can simply run `go build` inside the `examples/base` directory:
-
-0. [Install Go 1.25+](https://go.dev/doc/install) (_if you haven't already_)
-1. Clone/download the repo
-2. Navigate to `examples/base`
-3. Run `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`
-   (_https://go.dev/doc/install/source#environment_)
-4. Start the created executable by running `./base serve`.
-
-Note that the supported build targets by the pure Go SQLite driver at the moment are:
-
-```
-darwin  amd64
-darwin  arm64
-freebsd amd64
-freebsd arm64
-linux   386
-linux   amd64
-linux   arm
-linux   arm64
-linux   loong64
-linux   ppc64le
-linux   riscv64
-linux   s390x
-windows 386
-windows amd64
-windows arm64
+}
 ```
 
-Then operate the running ATS:
+Then operate the running daemon:
 
 ```bash
 ats collection list
@@ -363,9 +282,9 @@ ats crons list
 ats daemon status
 ```
 
-### CLI Registration Patterns
+### Registration patterns
 
-**Flattened** (recommended for domain daemons): commands at root level.
+**Flattened** (recommended for domain daemons) — commands at the root level:
 
 ```go
 app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app))
@@ -374,14 +293,14 @@ cmd.AddCLISubcommands(app.RootCmd)  // collection, record, login, whoami, crons,
 app.Execute()
 ```
 
-**Nested** (default via `app.Start()`): commands under `cli` parent.
+**Nested** (default via `app.Start()`) — commands under a `cli` parent:
 
 ```go
 app.Start()  // registers serve, superuser, cli (with all subcommands)
 // Access via: myapp cli collection list
 ```
 
-### Daemon Lifecycle
+### Daemon lifecycle
 
 The `daemon` subcommand manages the process lifecycle:
 
@@ -392,9 +311,28 @@ myapp daemon status             # local: pgrep
 myapp daemon logs --follow      # local: tail -f
 myapp daemon restart            # local: stop + start
 
-myapp daemon status --env dev   # K8s: kubectl get pods
-myapp daemon restart --env test --yes  # K8s: rollout restart
+myapp daemon status --env dev              # K8s: kubectl get pods
+myapp daemon restart --env test --yes      # K8s: rollout restart
 ```
 
-K8s actions require `--env` (dev, test, main) and are dry-run by default.
-Pass `--yes` to execute.
+K8s actions require `--env` (`dev`, `test`, `main`) and are dry-run by default. Pass `--yes` to execute.
+
+## Security
+
+Report security vulnerabilities to **security@hanzo.ai**. All reports are addressed promptly, and you'll be credited in the fix release notes.
+
+## Contributing
+
+Base is free and open source under the [MIT License](LICENSE.md).
+
+- [Open an issue](https://github.com/hanzoai/base/issues) for bugs and feature requests.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before sending a PR.
+- For new features, open an issue to discuss the design first.
+
+Bug fixes, optimizations, documentation improvements, and new OAuth2 providers are always welcome.
+
+## Hanzo — the Open AI Cloud
+
+Open source · every language · on-chain settlement. [hanzo.ai](https://hanzo.ai) · [docs.hanzo.ai](https://docs.hanzo.ai)
+
+**SDKs in every language** — [Python](https://github.com/hanzoai/python-sdk) (flagship) · [TypeScript](https://github.com/hanzo-js/sdk) · [Go](https://github.com/hanzo-go/sdk) · [Rust](https://github.com/hanzo-rs/sdk) · [C++](https://github.com/hanzo-cpp/sdk) · [Swift](https://github.com/hanzo-swift/sdk) · [Kotlin](https://github.com/hanzo-kt/sdk) · [umbrella](https://github.com/hanzoai/sdk)
