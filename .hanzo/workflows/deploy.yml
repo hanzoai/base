@@ -1,0 +1,24 @@
+name: deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: hanzo-linux-amd64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + push image
+        run: |
+          SHA="${GITHUB_SHA::8}"
+          buildctl-daemonless.sh build --frontend=dockerfile.v0 \
+            --opt context="${{ github.server_url }}/${{ github.repository }}.git#${GITHUB_SHA}" \
+            --opt filename=Dockerfile --opt platform=linux/amd64 \
+            --secret id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN \
+            --output "type=image,name=ghcr.io/hanzoai/base:${SHA},push=true" --progress=plain
+        env:
+          GIT_AUTH_TOKEN: ${{ secrets.GIT_CLONE_TOKEN }}
+      - name: Deploy — declare tag to operator
+        run: |
+          for app in cal hanzo-app-base; do
+            kubectl -n hanzo patch app "$app" --type=merge -p "{\"spec\":{\"image\":{\"repository\":\"ghcr.io/hanzoai/base\",\"tag\":\"${GITHUB_SHA::8}\"}}}"
+          done
