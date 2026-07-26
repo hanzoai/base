@@ -3,7 +3,6 @@ package apis
 import (
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/auth"
@@ -21,7 +20,7 @@ import (
 // unset, DisplayName is empty and the UI renders a neutral fallback.
 func externalIAMAuthMethods(e *core.RequestEvent) authMethodsResponse {
 	jwksURL, _ := e.App.Store().Get(StoreKeyJWKSURL).(string)
-	base := strings.TrimSuffix(jwksURL, "/.well-known/jwks")
+	base := iamOrigin(jwksURL)
 
 	state := security.RandomString(30)
 	verifier := security.RandomString(43)
@@ -29,7 +28,7 @@ func externalIAMAuthMethods(e *core.RequestEvent) authMethodsResponse {
 
 	authURL := ""
 	if base != "" {
-		authURL = base + "/oauth/authorize?response_type=code&state=" + state +
+		authURL = base + "/v1/iam/oauth/authorize?response_type=code&state=" + state +
 			"&code_challenge=" + challenge +
 			"&code_challenge_method=S256" +
 			"&redirect_uri="

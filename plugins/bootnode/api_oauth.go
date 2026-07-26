@@ -78,7 +78,7 @@ func (p *plugin) handleMe(e *core.RequestEvent) error {
 // secret. Kept here rather than in the iam package because the client id is
 // per-request (multi-network), not a fixed service credential.
 func (p *plugin) exchangeCode(ctx context.Context, code, redirectURI, clientID string) (token string, expiresIn int, err error) {
-	endpoint := strings.TrimRight(p.config.IAMEndpoint, "/") + "/oauth/token"
+	endpoint := strings.TrimRight(p.config.IAMEndpoint, "/") + "/v1/iam/oauth/token"
 	form := url.Values{
 		"grant_type":    {"authorization_code"},
 		"code":          {code},

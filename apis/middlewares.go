@@ -175,7 +175,7 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 // Set these via app.Store() from the platform plugin or manually.
 const (
 	// StoreKeyJWKSURL is the JWKS endpoint URL for the identity provider
-	// (e.g., "https://auth.example.com/.well-known/jwks").
+	// (e.g., "https://auth.example.com/v1/iam/.well-known/jwks").
 	// When set, loadAuthToken validates bearer tokens against this endpoint.
 	StoreKeyJWKSURL = "jwksURL"
 
@@ -193,6 +193,17 @@ const (
 	// redirect login lands.
 	StoreKeyExternalAuthOnly = "externalAuthOnly"
 )
+
+// iamJWKSPath is IAM's canonical JWKS endpoint (HIP-0111). It is the one
+// suffix that turns StoreKeyJWKSURL back into the IAM origin, which is
+// what the retired-endpoint pointers and the auth-methods authorize URL
+// are built from.
+const iamJWKSPath = "/v1/iam/.well-known/jwks"
+
+// iamOrigin recovers the IAM origin from the configured JWKS URL.
+func iamOrigin(jwksURL string) string {
+	return strings.TrimSuffix(jwksURL, iamJWKSPath)
+}
 
 // shared JWKS cache for external token validation (10 minute TTL on keys).
 var jwksCache = security.NewJWKSCache(10 * time.Minute)

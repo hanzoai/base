@@ -88,7 +88,7 @@ func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (acces
 		"client_secret": {config.IAMClientSecret},
 	}
 
-	resp, err := http.PostForm(endpoint+"/oauth/token", data)
+	resp, err := http.PostForm(endpoint+"/v1/iam/oauth/token", data)
 	if err != nil {
 		return "", "", fmt.Errorf("iam: token exchange request failed: %w", err)
 	}
@@ -315,7 +315,7 @@ func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
 }
 
 func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
-	u := c.baseURL + "/api/get-user?accessKey=" + url.QueryEscape(accessKey)
+	u := c.baseURL + "/v1/iam/get-user?accessKey=" + url.QueryEscape(accessKey)
 
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
@@ -490,7 +490,7 @@ func (c *IAMClient) LookupByAttribute(ctx context.Context, attr, value, org stri
 		q.Set("field", attr)
 		q.Set("value", candidate)
 
-		req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/api/get-users?"+q.Encode(), nil)
+		req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/v1/iam/get-users?"+q.Encode(), nil)
 		if err != nil {
 			return nil, fmt.Errorf("iam: LookupByAttribute build request: %w", err)
 		}
@@ -598,7 +598,7 @@ func (c *IAMClient) EnsureUser(ctx context.Context, spec EnsureUserSpec) (*IAMUs
 	q.Set("id", owner+"/"+name)
 
 	req, err := http.NewRequestWithContext(ctx, "POST",
-		c.baseURL+"/api/add-user?"+q.Encode(), bytes.NewReader(body))
+		c.baseURL+"/v1/iam/add-user?"+q.Encode(), bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("iam: EnsureUser build request: %w", err)
 	}
@@ -654,7 +654,7 @@ func (c *IAMClient) fetchUserByEmail(ctx context.Context, owner, email string) (
 	q.Set("clientSecret", creds.ClientSecret)
 
 	req, err := http.NewRequestWithContext(ctx, "GET",
-		c.baseURL+"/api/get-user?"+q.Encode(), nil)
+		c.baseURL+"/v1/iam/get-user?"+q.Encode(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: fetchUserByEmail build request: %w", err)
 	}

@@ -662,13 +662,13 @@ func TestExternalAuthGuard(t *testing.T) {
 			URL:    "/v1/collections/users/auth-methods",
 			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
-				app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.com/.well-known/jwks")
+				app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.com/v1/iam/.well-known/jwks")
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"name":"iam"`,
 				`"oauth2":{"providers":[{"name":"iam"`,
-				`https://iam.example.com/oauth/authorize?response_type=code`,
+				`https://iam.example.com/v1/iam/oauth/authorize?response_type=code`,
 			},
 			// Base must not bake any specific brand name into the protocol layer.
 			NotExpectedContent: []string{`"hanzo"`, `"google"`, `"github"`},
