@@ -96,14 +96,15 @@ func externalAuthGuard() *hook.Handler[*core.RequestEvent] {
 // that replaces it. Returns "" when no public IAM equivalent exists
 // (e.g. local OTP — IAM owns MFA internally, there is no public surface).
 //
-// jwksURL is the configured `${IAM_ENDPOINT}/.well-known/jwks` — we
-// strip the suffix to recover the base URL.
+// jwksURL is the configured `${IAM_ENDPOINT}/v1/iam/.well-known/jwks` — we
+// recover the IAM origin from it. `/forget` and `/account` are login-SPA
+// pages served off that origin; `/v1/iam/oauth/authorize` is the canonical
+// OIDC endpoint (HIP-0111).
 func iamReplacementURL(reqPath, jwksURL string) string {
 	if jwksURL == "" {
 		return ""
 	}
-	const jwksSuffix = "/.well-known/jwks"
-	base := strings.TrimSuffix(jwksURL, jwksSuffix)
+	base := iamOrigin(jwksURL)
 	switch {
 	case strings.HasSuffix(reqPath, "/request-password-reset"),
 		strings.HasSuffix(reqPath, "/confirm-password-reset"):
@@ -121,7 +122,7 @@ func iamReplacementURL(reqPath, jwksURL string) string {
 		return ""
 	case strings.HasSuffix(reqPath, "/auth-with-password"),
 		strings.HasSuffix(reqPath, "/auth-with-oauth2"):
-		return base + "/oauth/authorize"
+		return base + "/v1/iam/oauth/authorize"
 	}
 	return ""
 }

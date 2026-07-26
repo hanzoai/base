@@ -165,7 +165,7 @@ func Register(app core.App, config PlatformConfig) error {
 	// unreachable (see apis/record_auth_*: 410 Gone with a Location pointer
 	// to the IAM equivalent). Base never hosts identity — it only validates.
 	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
-	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/.well-known/jwks"
+	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/v1/iam/.well-known/jwks"
 	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
 
 	app.Logger().Info("platform: IAM is the only auth source",
