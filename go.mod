@@ -56,7 +56,6 @@ require (
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
-	github.com/gofiber/fiber/v3 v3.2.0 // indirect
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/utils/v2 v2.0.4 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
@@ -116,10 +115,11 @@ require (
 	github.com/valyala/fasthttp v1.72.0 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/zap-proto/fiber/v3 v3.2.1 // indirect
 	github.com/zap-proto/go v1.3.0 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.42.0 // indirect
-	go.opentelemetry.io/otel v1.44.0 // indirect
+	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
@@ -165,8 +165,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/zap-proto/http v0.2.0 // indirect
-	github.com/zap-proto/zip v1.2.0
+	github.com/zap-proto/http v0.2.2 // indirect
+	github.com/zap-proto/zip v1.9.0
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.36.0 // indirect
