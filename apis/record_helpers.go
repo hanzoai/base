@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/dbx"
 )
 
 const (
@@ -429,4 +429,3 @@ func execAfterSuccessTx(checkTx bool, app core.App, fn func() error) error {
 
 	return fn()
 }
-
