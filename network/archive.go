@@ -1,6 +1,6 @@
 // Package network archive layer.
 //
-// Archive writes quasar-finalised WAL frames to object storage (S3 or GCS)
+// Archive writes quasar-finalised WAL frames to object storage (S3)
 // as per-shard segment files. Each segment is a length-prefixed list of
 // PQ-signed frames that can be replayed for point-in-time recovery.
 //
@@ -50,7 +50,6 @@ type Archive interface {
 // fall back to defaults (8 MiB, 10 s).
 type ArchiveConfig struct {
 	// URL is the backend destination: s3://bucket/prefix or
-	// gs://bucket/prefix. Prefix is optional; if absent, objects land
 	// at the bucket root.
 	URL string
 
@@ -157,9 +156,10 @@ func BindArchiveMetrics(m *Metrics) *ArchiveMetrics {
 	}
 }
 
-// NewArchive dispatches on the URL scheme. Currently supported:
+// NewArchive dispatches on the URL scheme. s3:// is the only one — every
+// Hanzo and Lux deploy ships MinIO-protocol S3 (hanzoai/s3) for storage.
+// Currently supported:
 // s3://   → MinIO-protocol S3 (hanzoai/s3 self-hosted or AWS).
-// gs://   → Google Cloud Storage.
 // off     → nil Archive, disabled (call sites treat as no-op).
 // Anything else is a config error.
 func NewArchive(ctx context.Context, cfg ArchiveConfig, svc string, m *ArchiveMetrics) (Archive, error) {
@@ -187,9 +187,7 @@ func NewArchive(ctx context.Context, cfg ArchiveConfig, svc string, m *ArchiveMe
 	switch strings.ToLower(u.Scheme) {
 	case "s3":
 		return newS3Archive(ctx, u.Host, objPrefix, cfg, m)
-	case "gs":
-		return newGCSArchive(ctx, u.Host, objPrefix, cfg, m)
 	default:
-		return nil, fmt.Errorf("archive: unsupported scheme %q (want s3:// or gs://)", u.Scheme)
+		return nil, fmt.Errorf("archive: unsupported scheme %q (want s3://)", u.Scheme)
 	}
 }
