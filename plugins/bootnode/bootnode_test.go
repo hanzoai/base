@@ -30,7 +30,7 @@ func fakeIAM(t *testing.T) *httptest.Server {
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id": "user-123", "email": "z@lux.network", "name": "Z", "orgIds": []string{"lux"},
 			})
-		case "/api/get-users": // LookupByAttribute (team invite)
+		case "/v1/iam/get-users": // LookupByAttribute (team invite)
 			_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "data": []any{}})
 		default:
 			w.WriteHeader(http.StatusNotFound)

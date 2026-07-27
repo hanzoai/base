@@ -234,7 +234,7 @@ func TestEnsureUser_Create(t *testing.T) {
 func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
 	// IAM/Casdoor returns HTTP 200 with status:"error" + "X already exists"
 	// when the user is already present. EnsureUser must treat this as
-	// idempotent-replay and resolve the user via GET /api/get-user.
+	// idempotent-replay and resolve the user via GET /v1/iam/get-user.
 	f := newFakeIAM(t)
 	var addUserCalls int64
 	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
