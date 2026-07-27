@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/osutils"
+	"github.com/hanzoai/dbx"
 )
 
 // DefaultInstallerFunc is the default Base installer function.
