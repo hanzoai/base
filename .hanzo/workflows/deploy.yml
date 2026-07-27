@@ -52,8 +52,12 @@ jobs:
           push: true
           provenance: false
           tags: ghcr.io/hanzoai/base:${{ steps.meta.outputs.tag }}
+          # This Dockerfile mounts `--mount=type=secret,id=gh_token` and reads
+          # /run/secrets/gh_token to authenticate private hanzoai module fetches.
+          # The secret ID must match exactly — a mismatched name is not an error,
+          # the file is simply empty and the build fails inside the RUN step.
           secrets: |
-            GIT_AUTH_TOKEN=${{ secrets.GH_PAT }}
+            gh_token=${{ secrets.GH_PAT }}
 
       # build-push-action can exit 0 before the manifest resolves, so a green run
       # could still mean a future ImagePullBackOff. Prove it pulls.
