@@ -16,10 +16,10 @@ import (
 // bindPrivateApi exposes the /private endpoint — a blind, per-user encrypted
 // blob store. The server never inspects the ciphertext and never derives keys.
 //
-//   PUT    /private/{tag}   upsert ciphertext (body = raw bytes)
-//   GET    /private/{tag}   fetch ciphertext
-//   GET    /private         list tags (user_id, tag, size, updated_at)
-//   DELETE /private/{tag}   hard delete
+//	PUT    /private/{tag}   upsert ciphertext (body = raw bytes)
+//	GET    /private/{tag}   fetch ciphertext
+//	GET    /private         list tags (user_id, tag, size, updated_at)
+//	DELETE /private/{tag}   hard delete
 //
 // The client is responsible for encryption (recommended: luxfi/age, X25519 or
 // X-Wing PQ-hybrid). The server has no key material and cannot decrypt under
@@ -36,9 +36,14 @@ func bindPrivateApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 }
 
 const (
-	maxTagBytesDefault  int64 = 1 << 20  // 1 MiB
+	maxTagBytesDefault  int64 = 1 << 20   // 1 MiB
 	maxUserBytesDefault int64 = 100 << 20 // 100 MiB
 )
+
+// privateTable is a plain table rather than a Base collection, so its rows stay
+// invisible to the admin UI and the CRUD endpoints. Named once because six
+// queries reference it.
+const privateTable = "_private"
 
 func ensurePrivateTable(app core.App) error {
 	// Idempotent. Stored in a plain table (not a Base collection) so the rows
@@ -85,9 +90,10 @@ func privateEnvInt64(key string, fallback int64) int64 {
 
 func privateUserBytes(db dbx.Builder, userID string) (int64, error) {
 	var total int64
-	err := db.NewQuery(
-		`SELECT COALESCE(SUM(LENGTH(ct)), 0) FROM _private WHERE user_id = {:u}`,
-	).Bind(dbx.Params{"u": userID}).Row(&total)
+	err := db.Select("COALESCE(SUM(LENGTH(ct)), 0)").
+		From(privateTable).
+		Where(dbx.HashExp{"user_id": userID}).
+		Row(&total)
 	return total, err
 }
 
@@ -122,9 +128,10 @@ func privatePut(e *core.RequestEvent) error {
 	// Quota check — subtract the old row size so overwrites don't double count.
 	userID := e.Auth.Id
 	var oldSize int64
-	_ = e.App.DB().NewQuery(
-		`SELECT LENGTH(ct) FROM _private WHERE user_id = {:u} AND tag = {:t}`,
-	).Bind(dbx.Params{"u": userID, "t": tag}).Row(&oldSize)
+	_ = e.App.DB().Select("LENGTH(ct)").
+		From(privateTable).
+		Where(dbx.HashExp{"user_id": userID, "tag": tag}).
+		Row(&oldSize)
 
 	total, err := privateUserBytes(e.App.DB(), userID)
 	if err != nil {
@@ -135,16 +142,16 @@ func privatePut(e *core.RequestEvent) error {
 	}
 
 	now := time.Now().UnixMilli()
-	_, err = e.App.DB().NewQuery(`
-		INSERT INTO _private (user_id, tag, ct, updated_at)
-		VALUES ({:u}, {:t}, {:c}, {:n})
-		ON CONFLICT (user_id, tag) DO UPDATE SET ct = excluded.ct, updated_at = excluded.updated_at
-	`).Bind(dbx.Params{
-		"u": userID,
-		"t": tag,
-		"c": body,
-		"n": now,
-	}).Execute()
+	// Upsert, keyed on the (user_id, tag) primary key. This was hand-written
+	// ON CONFLICT SQL because SqliteBuilder.Upsert used to answer "not
+	// supported" — it was simply an unimplemented override, and dbx v1.17.2
+	// implements it. The builder emits the same statement.
+	_, err = e.App.DB().Upsert(privateTable, dbx.Params{
+		"user_id":    userID,
+		"tag":        tag,
+		"ct":         body,
+		"updated_at": now,
+	}, "user_id", "tag").Execute()
 	if err != nil {
 		return e.InternalServerError("Write failed.", err)
 	}
@@ -172,9 +179,10 @@ func privateGet(e *core.RequestEvent) error {
 		CT        []byte `db:"ct"`
 		UpdatedAt int64  `db:"updated_at"`
 	}
-	err := e.App.DB().NewQuery(
-		`SELECT ct, updated_at FROM _private WHERE user_id = {:u} AND tag = {:t}`,
-	).Bind(dbx.Params{"u": e.Auth.Id, "t": tag}).One(&row)
+	err := e.App.DB().Select("ct", "updated_at").
+		From(privateTable).
+		Where(dbx.HashExp{"user_id": e.Auth.Id, "tag": tag}).
+		One(&row)
 	if err != nil {
 		// Indistinguishable from not-authorized — don't leak existence.
 		return e.NotFoundError("", nil)
@@ -205,9 +213,11 @@ func privateList(e *core.RequestEvent) error {
 	}
 
 	rows := []privateListItem{}
-	err := e.App.DB().NewQuery(
-		`SELECT tag, LENGTH(ct) AS size, updated_at FROM _private WHERE user_id = {:u} ORDER BY tag`,
-	).Bind(dbx.Params{"u": e.Auth.Id}).All(&rows)
+	err := e.App.DB().Select("tag", "LENGTH(ct) AS size", "updated_at").
+		From(privateTable).
+		Where(dbx.HashExp{"user_id": e.Auth.Id}).
+		OrderBy("tag").
+		All(&rows)
 	if err != nil {
 		return e.InternalServerError("List failed.", err)
 	}
@@ -223,12 +233,11 @@ func privateDelete(e *core.RequestEvent) error {
 	if !validPrivateTag(tag) {
 		return e.BadRequestError("Invalid tag.", nil)
 	}
-	_, err := e.App.DB().NewQuery(
-		`DELETE FROM _private WHERE user_id = {:u} AND tag = {:t}`,
-	).Bind(dbx.Params{"u": e.Auth.Id, "t": tag}).Execute()
+	_, err := e.App.DB().Delete(privateTable,
+		dbx.HashExp{"user_id": e.Auth.Id, "tag": tag},
+	).Execute()
 	if err != nil {
 		return e.InternalServerError("Delete failed.", err)
 	}
 	return e.NoContent(http.StatusNoContent)
 }
-

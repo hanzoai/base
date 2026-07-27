@@ -31,9 +31,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 const (
@@ -173,9 +173,9 @@ func (p *plugin) ensureCollection() error {
 			Required: true,
 		},
 		&core.SelectField{
-			Name:     "status",
-			Values:   []string{StatusPending, StatusRunning, StatusCompleted, StatusFailed, StatusCancelled},
-			Required: true,
+			Name:      "status",
+			Values:    []string{StatusPending, StatusRunning, StatusCompleted, StatusFailed, StatusCancelled},
+			Required:  true,
 			MaxSelect: 1,
 		},
 		&core.JSONField{
@@ -296,14 +296,13 @@ func (p *plugin) findDueFunctions(now types.DateTime) ([]*core.Record, error) {
 // claimFunction atomically transitions a function from pending to running.
 // Returns true if the claim succeeded (exactly-once semantics).
 func (p *plugin) claimFunction(record *core.Record) bool {
-	// Use a direct SQL update with WHERE status='pending' for atomicity.
-	result, err := p.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + CollectionName + "}} SET [[status]] = {:running} WHERE [[id]] = {:id} AND [[status]] = {:pending}",
-	).Bind(dbx.Params{
-		"running": StatusRunning,
-		"id":      record.Id,
-		"pending": StatusPending,
-	}).Execute()
+	// Guarded on the current status, so the claim IS the check: two schedulers
+	// racing for the same function both issue this, and only the one whose
+	// UPDATE matched a still-pending row sees a row affected.
+	result, err := p.app.NonconcurrentDB().Update(CollectionName,
+		dbx.Params{"status": StatusRunning},
+		dbx.HashExp{"id": record.Id, "status": StatusPending},
+	).Execute()
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to claim function",
@@ -375,14 +374,14 @@ func (p *plugin) markCompleted(record *core.Record, result any) {
 		}
 	}
 
-	_, err := p.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + CollectionName + "}} SET [[status]] = {:status}, [[result]] = {:result}, [[completedAt]] = {:completedAt} WHERE [[id]] = {:id}",
-	).Bind(dbx.Params{
-		"status":      StatusCompleted,
-		"result":      string(resultJSON),
-		"completedAt": now.String(),
-		"id":          record.Id,
-	}).Execute()
+	_, err := p.app.NonconcurrentDB().Update(CollectionName,
+		dbx.Params{
+			"status":      StatusCompleted,
+			"result":      string(resultJSON),
+			"completedAt": now.String(),
+		},
+		dbx.HashExp{"id": record.Id},
+	).Execute()
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to mark function completed",
@@ -396,14 +395,14 @@ func (p *plugin) markCompleted(record *core.Record, result any) {
 func (p *plugin) markFailed(record *core.Record, errMsg string) {
 	now := types.NowDateTime()
 
-	_, err := p.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + CollectionName + "}} SET [[status]] = {:status}, [[error]] = {:error}, [[completedAt]] = {:completedAt} WHERE [[id]] = {:id}",
-	).Bind(dbx.Params{
-		"status":      StatusFailed,
-		"error":       errMsg,
-		"completedAt": now.String(),
-		"id":          record.Id,
-	}).Execute()
+	_, err := p.app.NonconcurrentDB().Update(CollectionName,
+		dbx.Params{
+			"status":      StatusFailed,
+			"error":       errMsg,
+			"completedAt": now.String(),
+		},
+		dbx.HashExp{"id": record.Id},
+	).Execute()
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to mark function failed",
@@ -418,15 +417,15 @@ func (p *plugin) scheduleRetry(record *core.Record, retryCount int, origErr erro
 	delay := p.config.RetryDelay * time.Duration(retryCount)
 	nextRun, _ := types.ParseDateTime(time.Now().UTC().Add(delay))
 
-	_, err := p.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{"+CollectionName+"}} SET [[status]] = {:status}, [[scheduledAt]] = {:scheduledAt}, [[retryCount]] = {:retryCount}, [[error]] = {:error} WHERE [[id]] = {:id}",
-	).Bind(dbx.Params{
-		"status":      StatusPending,
-		"scheduledAt": nextRun.String(),
-		"retryCount":  retryCount,
-		"error":       origErr.Error(),
-		"id":          record.Id,
-	}).Execute()
+	_, err := p.app.NonconcurrentDB().Update(CollectionName,
+		dbx.Params{
+			"status":      StatusPending,
+			"scheduledAt": nextRun.String(),
+			"retryCount":  retryCount,
+			"error":       origErr.Error(),
+		},
+		dbx.HashExp{"id": record.Id},
+	).Execute()
 	if err != nil {
 		p.app.Logger().Error(
 			"scheduler: failed to schedule retry",
@@ -459,13 +458,10 @@ func ScheduleAt(app core.App, at time.Time, functionName string, args any) (stri
 // CancelScheduled cancels a pending scheduled function by ID.
 // Returns an error if the function is not found or is not in pending status.
 func CancelScheduled(app core.App, id string) error {
-	_, err := app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + CollectionName + "}} SET [[status]] = {:status} WHERE [[id]] = {:id} AND [[status]] = {:pending}",
-	).Bind(dbx.Params{
-		"status":  StatusCancelled,
-		"id":      id,
-		"pending": StatusPending,
-	}).Execute()
+	_, err := app.NonconcurrentDB().Update(CollectionName,
+		dbx.Params{"status": StatusCancelled},
+		dbx.HashExp{"id": id, "status": StatusPending},
+	).Execute()
 	return err
 }
 
