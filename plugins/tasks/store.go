@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 const (
@@ -142,193 +142,128 @@ func (s *Store) ListTasks(filters TaskFilters) ([]*Task, error) {
 	return result, nil
 }
 
-// --- Atomic state transitions (raw SQL for exactly-once semantics) ---
+// --- Atomic state transitions ---
 
-// ClaimTask atomically transitions a task from pending to claimed.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) ClaimTask(taskID, agentID string, orgID ...string) error {
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id} AND [[state]] = {:pending}"
-	params := dbx.Params{
-		"state":   string(TaskClaimed),
-		"agent":   agentID,
-		"now":     now.String(),
-		"id":      taskID,
-		"pending": string(TaskPending),
+// transition applies one state change as a single guarded UPDATE, and reports
+// the two ways it can decline.
+//
+// Every transition below is the same shape: set some columns, but only on a row
+// in an acceptable starting state, owned by the caller's org. Writing that shape
+// out six times meant six copies of the org-scoping clause and six copies of the
+// nothing-matched branch — and the org clause is an authorization boundary, so
+// one copy drifting is one caller mutating another org's task.
+//
+// from is the states this transition will accept; nil accepts any.
+func (s *Store) transition(taskID string, set dbx.Params, from dbx.Expression, conflict error, orgID []string) error {
+	where := []dbx.Expression{dbx.HashExp{"id": taskID}}
+	if from != nil {
+		where = append(where, from)
 	}
 	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
+		where = append(where, dbx.HashExp{"orgId": orgID[0]})
 	}
 
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[state]] = {:state}, [[assignedTo]] = {:agent}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
+	result, err := s.app.NonconcurrentDB().
+		Update(TasksCollection, set, dbx.And(where...)).
+		Execute()
 	if err != nil {
 		return err
 	}
 
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		// Check if task exists and belongs to the caller's org.
+		// Zero rows is two different answers wearing the same face: the task is
+		// not there (or not the caller's), or it is there in a state this
+		// transition does not accept. Only a second read can tell them apart,
+		// and the caller needs to — one is a 404, the other a conflict.
 		if _, err := s.GetTask(taskID, orgID...); err != nil {
 			return ErrTaskNotFound
 		}
-		return ErrAlreadyClaimed
+		return conflict
 	}
 	return nil
+}
+
+// ClaimTask atomically transitions a task from pending to claimed.
+// orgID scopes the mutation to a specific org when provided.
+func (s *Store) ClaimTask(taskID, agentID string, orgID ...string) error {
+	now := types.NowDateTime().String()
+	return s.transition(taskID,
+		dbx.Params{"state": string(TaskClaimed), "assignedTo": agentID, "updated": now},
+		dbx.HashExp{"state": string(TaskPending)},
+		ErrAlreadyClaimed, orgID)
 }
 
 // StartTask transitions a claimed (or pending) task to running.
 // orgID scopes the mutation to a specific org when provided.
 func (s *Store) StartTask(taskID string, orgID ...string) error {
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id} AND ([[state]] = {:claimed} OR [[state]] = {:pending})"
-	params := dbx.Params{
-		"running": string(TaskRunning),
-		"now":     now.String(),
-		"id":      taskID,
-		"claimed": string(TaskClaimed),
-		"pending": string(TaskPending),
-	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
-	}
-
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[state]] = {:running}, [[startedAt]] = {:now}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
-			return ErrTaskNotFound
-		}
-		return ErrInvalidTransition
-	}
-	return nil
+	now := types.NowDateTime().String()
+	return s.transition(taskID,
+		dbx.Params{"state": string(TaskRunning), "startedAt": now, "updated": now},
+		dbx.In("state", string(TaskClaimed), string(TaskPending)),
+		ErrInvalidTransition, orgID)
 }
 
 // CompleteTask transitions a running task to completed with output.
 // orgID scopes the mutation to a specific org when provided.
 func (s *Store) CompleteTask(taskID string, output map[string]any, orgID ...string) error {
-	now := types.NowDateTime()
-	outputJSON := marshalJSON(output)
-
-	where := "WHERE [[id]] = {:id} AND [[state]] = {:running}"
-	params := dbx.Params{
-		"state":   string(TaskCompleted),
-		"output":  string(outputJSON),
-		"now":     now.String(),
-		"id":      taskID,
-		"running": string(TaskRunning),
-	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
-	}
-
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[state]] = {:state}, [[output]] = {:output}, [[progress]] = 100, " +
-			"[[completedAt]] = {:now}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
-			return ErrTaskNotFound
-		}
-		return ErrInvalidTransition
-	}
-	return nil
+	now := types.NowDateTime().String()
+	return s.transition(taskID,
+		dbx.Params{
+			"state":       string(TaskCompleted),
+			"output":      string(marshalJSON(output)),
+			"progress":    100,
+			"completedAt": now,
+			"updated":     now,
+		},
+		dbx.HashExp{"state": string(TaskRunning)},
+		ErrInvalidTransition, orgID)
 }
 
 // FailTask transitions a running task to failed. If retries remain, re-queues as pending.
 // Uses a single atomic SQL with CASE to avoid TOCTOU races.
 // orgID scopes the mutation to a specific org when provided.
 func (s *Store) FailTask(taskID string, errMsg string, orgID ...string) error {
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id} AND [[state]] = {:running}"
-	params := dbx.Params{
-		"pending": string(TaskPending),
-		"failed":  string(TaskFailed),
-		"error":   errMsg,
-		"now":     now.String(),
-		"id":      taskID,
-		"running": string(TaskRunning),
-	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
+	now := types.NowDateTime().String()
+
+	// Whether this failure retries or ends the task depends on a column, so the
+	// decision has to be made by the database inside the same statement that
+	// acts on it. Reading retryCount first and then writing would let two
+	// concurrent failures both see "retries remain" and both retry.
+	//
+	// retry is that condition, written once and reused, so every column cannot
+	// disagree about which branch it is in.
+	const retry = "[[retryCount]] < [[maxRetries]]"
+	keep := func(thenValue, elseColumn string) dbx.Expression {
+		return dbx.NewExp("CASE WHEN "+retry+" THEN "+thenValue+" ELSE "+elseColumn+" END",
+			dbx.Params{"pending": string(TaskPending), "failed": string(TaskFailed), "now": now})
 	}
 
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[state]] = CASE WHEN [[retryCount]] < [[maxRetries]] THEN {:pending} ELSE {:failed} END, " +
-			"[[retryCount]] = CASE WHEN [[retryCount]] < [[maxRetries]] THEN [[retryCount]] + 1 ELSE [[retryCount]] END, " +
-			"[[assignedTo]] = CASE WHEN [[retryCount]] < [[maxRetries]] THEN '' ELSE [[assignedTo]] END, " +
-			"[[startedAt]] = CASE WHEN [[retryCount]] < [[maxRetries]] THEN '' ELSE [[startedAt]] END, " +
-			"[[progress]] = CASE WHEN [[retryCount]] < [[maxRetries]] THEN 0 ELSE [[progress]] END, " +
-			"[[completedAt]] = CASE WHEN [[retryCount]] >= [[maxRetries]] THEN {:now} ELSE [[completedAt]] END, " +
-			"[[error]] = {:error}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
-			return ErrTaskNotFound
-		}
-		return ErrInvalidTransition
-	}
-	return nil
+	return s.transition(taskID,
+		dbx.Params{
+			"state":      keep("{:pending}", "{:failed}"),
+			"retryCount": keep("[[retryCount]] + 1", "[[retryCount]]"),
+			"assignedTo": keep("''", "[[assignedTo]]"),
+			"startedAt":  keep("''", "[[startedAt]]"),
+			"progress":   keep("0", "[[progress]]"),
+			// Inverted: a task that still has retries left has not completed.
+			"completedAt": dbx.NewExp("CASE WHEN "+retry+" THEN [[completedAt]] ELSE {:now} END",
+				dbx.Params{"now": now}),
+			"error":   errMsg,
+			"updated": now,
+		},
+		dbx.HashExp{"state": string(TaskRunning)},
+		ErrInvalidTransition, orgID)
 }
 
 // CancelTask transitions any non-terminal task to cancelled.
 // orgID scopes the mutation to a specific org when provided.
 func (s *Store) CancelTask(taskID string, orgID ...string) error {
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id} AND [[state]] NOT IN ({:completed}, {:cancelled})"
-	params := dbx.Params{
-		"cancelled": string(TaskCancelled),
-		"completed": string(TaskCompleted),
-		"now":       now.String(),
-		"id":        taskID,
-	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
-	}
-
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[state]] = {:cancelled}, [[completedAt]] = {:now}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
-			return ErrTaskNotFound
-		}
-		return ErrInvalidTransition
-	}
-	return nil
+	now := types.NowDateTime().String()
+	return s.transition(taskID,
+		dbx.Params{"state": string(TaskCancelled), "completedAt": now, "updated": now},
+		dbx.NotIn("state", string(TaskCompleted), string(TaskCancelled)),
+		ErrInvalidTransition, orgID)
 }
 
 // UpdateProgress sets progress (0-100) on a running task.
@@ -341,35 +276,10 @@ func (s *Store) UpdateProgress(taskID string, progress int, orgID ...string) err
 		progress = 100
 	}
 
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id} AND [[state]] = {:running}"
-	params := dbx.Params{
-		"progress": progress,
-		"now":      now.String(),
-		"id":       taskID,
-		"running":  string(TaskRunning),
-	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
-	}
-
-	result, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + TasksCollection + "}} SET " +
-			"[[progress]] = {:progress}, [[updated]] = {:now} " +
-			where,
-	).Bind(params).Execute()
-	if err != nil {
-		return err
-	}
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
-			return ErrTaskNotFound
-		}
-		return ErrInvalidTransition
-	}
-	return nil
+	return s.transition(taskID,
+		dbx.Params{"progress": progress, "updated": types.NowDateTime().String()},
+		dbx.HashExp{"state": string(TaskRunning)},
+		ErrInvalidTransition, orgID)
 }
 
 // GetNextPendingTask finds and atomically claims the highest-priority pending task
@@ -428,21 +338,24 @@ func (s *Store) dependenciesMet(task *Task) bool {
 // AgentHasActiveTask reports whether the agent has a claimed or running task.
 // orgID scopes the query to a specific org when provided.
 func (s *Store) AgentHasActiveTask(agentID string, orgID ...string) (bool, error) {
-	where := "WHERE [[assignedTo]] = {:agent} AND [[state]] IN ({:claimed}, {:running})"
-	params := dbx.Params{
-		"agent":   agentID,
-		"claimed": string(TaskClaimed),
-		"running": string(TaskRunning),
+	where := []dbx.Expression{
+		dbx.HashExp{"assignedTo": agentID},
+		dbx.In("state", string(TaskClaimed), string(TaskRunning)),
 	}
 	if len(orgID) > 0 && orgID[0] != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = orgID[0]
+		where = append(where, dbx.HashExp{"orgId": orgID[0]})
 	}
 
+	// COUNT rather than a LIMIT 1 probe, because an aggregate always returns a
+	// row. A probe returns NO row when nothing matches, and Row then reports
+	// sql.ErrNoRows — turning "this agent is free", the answer the scheduler
+	// acts on most, into an error.
 	var count int
-	err := s.app.ConcurrentDB().NewQuery(
-		"SELECT COUNT(*) FROM {{" + TasksCollection + "}} " + where,
-	).Bind(params).Row(&count)
+	err := s.app.ConcurrentDB().
+		Select("COUNT(*)").
+		From(TasksCollection).
+		Where(dbx.And(where...)).
+		Row(&count)
 	if err != nil {
 		return false, err
 	}
@@ -524,21 +437,16 @@ func (s *Store) ListWorkflows(spaceID string, orgID ...string) ([]*Workflow, err
 // UpdateWorkflowTasks updates the task ID list on an existing workflow.
 // When the workflow has an OrgID, the update is scoped to that org.
 func (s *Store) UpdateWorkflowTasks(wf *Workflow) error {
-	now := types.NowDateTime()
-	where := "WHERE [[id]] = {:id}"
-	params := dbx.Params{
-		"tasks": string(marshalJSON(wf.Tasks)),
-		"now":   now.String(),
-		"id":    wf.ID,
-	}
+	now := types.NowDateTime().String()
+	where := []dbx.Expression{dbx.HashExp{"id": wf.ID}}
 	if wf.OrgID != "" {
-		where += " AND [[orgId]] = {:orgId}"
-		params["orgId"] = wf.OrgID
+		where = append(where, dbx.HashExp{"orgId": wf.OrgID})
 	}
 
-	_, err := s.app.NonconcurrentDB().NewQuery(
-		"UPDATE {{" + WorkflowsCollection + "}} SET [[tasks]] = {:tasks}, [[updated]] = {:now} " + where,
-	).Bind(params).Execute()
+	_, err := s.app.NonconcurrentDB().Update(WorkflowsCollection,
+		dbx.Params{"tasks": string(marshalJSON(wf.Tasks)), "updated": now},
+		dbx.And(where...),
+	).Execute()
 	return err
 }
 
@@ -558,7 +466,7 @@ func (s *Store) AdvanceWorkflows() error {
 		return err
 	}
 
-	now := types.NowDateTime()
+	now := types.NowDateTime().String()
 	for _, record := range records {
 		wf := s.recordToWorkflow(record)
 
@@ -591,18 +499,13 @@ func (s *Store) AdvanceWorkflows() error {
 		}
 
 		if newState != "" && newState != wf.State {
-			params := dbx.Params{
-				"state": string(newState),
-				"now":   now.String(),
-				"id":    record.Id,
-			}
-			query := "UPDATE {{" + WorkflowsCollection + "}} SET [[state]] = {:state}, [[updated]] = {:now}"
+			set := dbx.Params{"state": string(newState), "updated": now}
 			if newState == TaskCompleted || newState == TaskFailed {
-				query += ", [[completedAt]] = {:now}"
+				set["completedAt"] = now
 			}
-			query += " WHERE [[id]] = {:id}"
-
-			_, _ = s.app.NonconcurrentDB().NewQuery(query).Bind(params).Execute()
+			_, _ = s.app.NonconcurrentDB().Update(WorkflowsCollection,
+				set, dbx.HashExp{"id": record.Id},
+			).Execute()
 		}
 	}
 	return nil

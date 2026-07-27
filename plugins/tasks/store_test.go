@@ -490,3 +490,57 @@ func TestWorkflowOrgIsolation(t *testing.T) {
 		t.Fatalf("expected 2 workflows, got %d", len(all))
 	}
 }
+
+// TestAgentHasActiveTask covers the predicate in both directions, and in
+// particular the NO-match case.
+//
+// It had no test at all, which is how a rewrite of it reached a green suite:
+// "no rows matched" and "the query failed" are different answers that a
+// single-row read can easily conflate, and only the negative case can tell
+// whether the query returns a false or an error.
+func TestAgentHasActiveTask(t *testing.T) {
+	app := newTestApp(t)
+	s := GetStore(app)
+
+	// Nothing claimed by anyone yet: false, and NOT an error.
+	active, err := s.AgentHasActiveTask("agent-1")
+	if err != nil {
+		t.Fatalf("no active task should be a clean false, got error: %v", err)
+	}
+	if active {
+		t.Fatal("expected no active task")
+	}
+
+	task := &Task{SpaceID: "s1", Title: "work"}
+	if err := s.CreateTask(task); err != nil {
+		t.Fatal(err)
+	}
+
+	// Pending is not active — it is claimed/running that count.
+	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || active {
+		t.Fatalf("pending task must not read as active (active=%v err=%v)", active, err)
+	}
+
+	if err := s.ClaimTask(task.ID, "agent-1"); err != nil {
+		t.Fatal(err)
+	}
+	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || !active {
+		t.Fatalf("claimed task should be active (active=%v err=%v)", active, err)
+	}
+
+	// Scoped to the agent, not global.
+	if active, err := s.AgentHasActiveTask("agent-2"); err != nil || active {
+		t.Fatalf("another agent must not see it (active=%v err=%v)", active, err)
+	}
+
+	// And terminal state clears it.
+	if err := s.StartTask(task.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.CompleteTask(task.ID, map[string]any{"ok": true}); err != nil {
+		t.Fatal(err)
+	}
+	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || active {
+		t.Fatalf("completed task must not read as active (active=%v err=%v)", active, err)
+	}
+}
