@@ -176,7 +176,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/hanzoai/orm v0.6.8
+	github.com/hanzoai/orm v0.6.10
 	github.com/hanzoai/replicate v0.9.5
 	github.com/hanzoai/sqlite v0.3.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
