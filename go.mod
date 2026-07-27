@@ -142,7 +142,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/hanzoai/orm v0.6.14
+	github.com/hanzoai/orm v0.6.16
 	github.com/hanzoai/replicate v0.9.5
 	github.com/hanzoai/sqlite v0.3.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
@@ -165,8 +165,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/zap-proto/http v0.2.2 // indirect
-	github.com/zap-proto/zip v1.9.0
+	github.com/zap-proto/http v0.3.0 // indirect
+	github.com/zap-proto/zip v1.10.0
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.36.0 // indirect
