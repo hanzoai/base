@@ -81,7 +81,7 @@ func (p *plugin) proxyToIAM(e *core.RequestEvent, method, path string, body []by
 
 // handleVerifyPhone proxies a phone verification request to IAM.
 //
-// Maps { countryCode, phone } to IAM /api/send-verification-code.
+// Maps { countryCode, phone } to IAM /v1/iam/send-verification-code.
 func (p *plugin) handleVerifyPhone(e *core.RequestEvent) error {
 	raw, err := io.ReadAll(e.Request.Body)
 	if err != nil {
@@ -109,12 +109,12 @@ func (p *plugin) handleVerifyPhone(e *core.RequestEvent) error {
 		"method":        "login",
 	})
 
-	return p.proxyToIAM(e, http.MethodPost, "/api/send-verification-code", iamBody)
+	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/send-verification-code", iamBody)
 }
 
 // handleVerifyCode proxies OTP verification to IAM login.
 //
-// Maps { phone, code } to IAM /api/login.
+// Maps { phone, code } to IAM /v1/iam/login.
 func (p *plugin) handleVerifyCode(e *core.RequestEvent) error {
 	raw, err := io.ReadAll(e.Request.Body)
 	if err != nil {
@@ -143,7 +143,7 @@ func (p *plugin) handleVerifyCode(e *core.RequestEvent) error {
 		"type":         "code",
 	})
 
-	return p.proxyToIAM(e, http.MethodPost, "/api/login", iamBody)
+	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/login", iamBody)
 }
 
 // handleLogin proxies login credentials to IAM.
@@ -153,7 +153,7 @@ func (p *plugin) handleLogin(e *core.RequestEvent) error {
 		return e.JSON(http.StatusBadRequest, map[string]any{"message": "failed to read request body"})
 	}
 
-	return p.proxyToIAM(e, http.MethodPost, "/api/login", raw)
+	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/login", raw)
 }
 
 // handleSignup proxies signup to IAM.
@@ -163,10 +163,10 @@ func (p *plugin) handleSignup(e *core.RequestEvent) error {
 		return e.JSON(http.StatusBadRequest, map[string]any{"message": "failed to read request body"})
 	}
 
-	return p.proxyToIAM(e, http.MethodPost, "/api/signup", raw)
+	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/signup", raw)
 }
 
 // handleUserinfo proxies a userinfo request to IAM.
 func (p *plugin) handleUserinfo(e *core.RequestEvent) error {
-	return p.proxyToIAM(e, http.MethodGet, "/api/userinfo", nil)
+	return p.proxyToIAM(e, http.MethodGet, "/v1/iam/userinfo", nil)
 }

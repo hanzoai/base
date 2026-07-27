@@ -50,7 +50,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 
 		switch r.URL.Path {
-		case "/api/send-verification-code":
+		case "/v1/iam/send-verification-code":
 			if r.Method != http.MethodPost {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
@@ -65,7 +65,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 			w.Header().Set("X-Test-Endpoint", "verify-phone")
 			json.NewEncoder(w).Encode(map[string]string{"status": "sent"})
 
-		case "/api/login":
+		case "/v1/iam/login":
 			if r.Method != http.MethodPost {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
@@ -76,7 +76,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 				"user_id":      "user-abc",
 			})
 
-		case "/api/signup":
+		case "/v1/iam/signup":
 			if r.Method != http.MethodPost {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
@@ -85,7 +85,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(map[string]string{"user_id": "new-user-456"})
 
-		case "/api/userinfo":
+		case "/v1/iam/userinfo":
 			if r.Method != http.MethodGet {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return
@@ -133,7 +133,7 @@ func TestProxyToIAM(t *testing.T) {
 	e, rec := makeEvent(http.MethodPost, "/test", `{"test":true}`)
 	e.Request.Header.Set("Authorization", "Bearer my-token")
 
-	err := p.proxyToIAM(e, http.MethodPost, "/api/login", []byte(`{"username":"test"}`))
+	err := p.proxyToIAM(e, http.MethodPost, "/v1/iam/login", []byte(`{"username":"test"}`))
 	if err != nil {
 		t.Fatalf("proxyToIAM returned error: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestProxyToIAM_ForwardsHeaders(t *testing.T) {
 	e, _ := makeEvent(http.MethodPost, "/test", `{}`)
 	e.Request.Header.Set("Authorization", "Bearer abc")
 
-	p.proxyToIAM(e, http.MethodPost, "/api/login", []byte(`{}`))
+	p.proxyToIAM(e, http.MethodPost, "/v1/iam/login", []byte(`{}`))
 
 	if gotAuth != "Bearer abc" {
 		t.Errorf("Authorization not forwarded: got %q", gotAuth)
@@ -177,7 +177,7 @@ func TestProxyToIAM_Unreachable(t *testing.T) {
 
 	e, rec := makeEvent(http.MethodGet, "/test", "")
 
-	err := p.proxyToIAM(e, http.MethodGet, "/api/userinfo", nil)
+	err := p.proxyToIAM(e, http.MethodGet, "/v1/iam/userinfo", nil)
 	if err != nil {
 		t.Fatalf("proxyToIAM should not return Go error: %v", err)
 	}

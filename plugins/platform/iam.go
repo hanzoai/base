@@ -288,7 +288,7 @@ func IsWidgetKey(token string) bool {
 }
 
 // ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
-// Uses IAM's GET /api/get-user?accessKey= endpoint. Results are cached for
+// Uses IAM's GET /v1/iam/get-user?accessKey= endpoint. Results are cached for
 // tokenCacheTTL; concurrent resolves of the same key are coalesced via
 // singleflight.
 func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
