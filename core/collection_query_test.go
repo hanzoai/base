@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/dbx"
 )
 
 func TestCollectionQuery(t *testing.T) {
@@ -78,13 +78,28 @@ func TestFindAllCollections(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
+	// How many collections exist, asked through a DIFFERENT path than the one
+	// under test. Written as the literal 27 until the calendar-booking
+	// migration took it to 31 and these three rows started failing — a count of
+	// "everything" is invalidated by every migration that adds anything.
+	//
+	// Reading it from CollectionQuery keeps the assertion real: the three rows
+	// below say that a nil filter, an empty filter and a blank filter all mean
+	// "no filter", and that FindAllCollections then returns every collection the
+	// store holds. Comparing FindAllCollections to itself would say nothing.
+	var stored []*core.Collection
+	if err := app.CollectionQuery().All(&stored); err != nil {
+		t.Fatal(err)
+	}
+	total := len(stored)
+
 	scenarios := []struct {
 		collectionTypes []string
 		expectTotal     int
 	}{
-		{nil, 27},
-		{[]string{}, 27},
-		{[]string{""}, 27},
+		{nil, total},
+		{[]string{}, total},
+		{[]string{""}, total},
 		{[]string{"unknown"}, 0},
 		{[]string{"unknown", core.CollectionTypeAuth}, 4},
 		{[]string{core.CollectionTypeAuth, core.CollectionTypeView}, 7},

@@ -544,7 +544,7 @@ func (c *IAMClient) LookupByAttribute(ctx context.Context, attr, value, org stri
 // EnsureUser idempotently provisions an IAM user matching spec. If the user
 // already exists (matched by email within spec.Owner), the existing user is
 // returned without modification. Otherwise the user is created via
-// POST /api/add-user and the new user is fetched and returned.
+// POST /v1/iam/add-user and the new user is fetched and returned.
 //
 // EnsureUser treats both HTTP 409 and IAM's status:"error" + "already exists"
 // envelope as the idempotent-replay path — IAM responds with HTTP 200 in

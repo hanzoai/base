@@ -145,8 +145,13 @@ func TestSQLRun(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{}`,
+				// "Raw error:" is OUR wording — that the driver's complaint was
+				// surfaced rather than swallowed. What follows it is the
+				// driver's, and pinning that here asserted a third-party string:
+				// this read `SQL logic error` until SQLite started saying
+				// `near "invalid": syntax error`, and the test broke without
+				// anything in this repo changing.
 				`Raw error:`,
-				`SQL logic error`,
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},
@@ -246,8 +251,13 @@ func TestSQLRun(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{}`,
+				// "Raw error:" is OUR wording — that the driver's complaint was
+				// surfaced rather than swallowed. What follows it is the
+				// driver's, and pinning that here asserted a third-party string:
+				// this read `SQL logic error` until SQLite started saying
+				// `near "invalid": syntax error`, and the test broke without
+				// anything in this repo changing.
 				`Raw error:`,
-				`SQL logic error`,
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},

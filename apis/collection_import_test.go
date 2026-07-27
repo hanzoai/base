@@ -13,9 +13,16 @@ import (
 func TestCollectionsImport(t *testing.T) {
 	t.Parallel()
 
-	// 17 framework/system + demo collections plus the 10 CRM connect/messaging/
-	// calendar collections added by migration 1780500000_connect_messaging_calendar.
-	totalCollections := 27
+	// Derived, not counted by hand: every migration that adds a collection
+	// changes both of these, and the literals they replace (27 and 19) had gone
+	// stale behind the calendar-booking collections.
+	totalCollections, nonSystemCollections := collectionCounts(t)
+
+	// The create/update/delete payload updates ONE existing collection and
+	// creates one that did not exist. System collections are never deleted, and
+	// every other non-system collection is absent from the payload, so it goes.
+	// Hence: all non-system, less the single one the payload updates.
+	deleted := nonSystemCollections - 1
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -289,15 +296,13 @@ func TestCollectionsImport(t *testing.T) {
 				"OnCollectionUpdateExecute":      1,
 				"OnCollectionAfterUpdateSuccess": 1,
 				// ---
-				// 9 original non-system collections + the 10 CRM connect/messaging/
-				// calendar collections (migration 1780500000) are all "missing" from
-				// this import payload and get deleted.
-				"OnModelDelete":                  19,
-				"OnModelAfterDeleteSuccess":      19,
-				"OnModelDeleteExecute":           19,
-				"OnCollectionDelete":             19,
-				"OnCollectionDeleteExecute":      19,
-				"OnCollectionAfterDeleteSuccess": 19,
+				// Every non-system collection absent from the payload is deleted.
+				"OnModelDelete":                  deleted,
+				"OnModelAfterDeleteSuccess":      deleted,
+				"OnModelDeleteExecute":           deleted,
+				"OnCollectionDelete":             deleted,
+				"OnCollectionDeleteExecute":      deleted,
+				"OnCollectionAfterDeleteSuccess": deleted,
 			},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				collections := []*core.Collection{}
