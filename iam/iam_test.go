@@ -79,7 +79,7 @@ func TestLookupByAttribute_Hit(t *testing.T) {
 		"16125551234":  true,
 		"6125551234":   true,
 	}
-	f.setHandler("/api/get-users", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("field"); got != "phone" {
 			t.Errorf("field: got %q want phone", got)
 		}
@@ -108,7 +108,7 @@ func TestLookupByAttribute_Hit(t *testing.T) {
 
 func TestLookupByAttribute_Miss(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/api/get-users", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
 		writeOK(w, []map[string]any{})
 	})
 
@@ -129,7 +129,7 @@ func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
 	// The user actually exists under the raw US-national form ("6125551234"),
 	// so the first two probes miss and the third hits.
 	f := newFakeIAM(t)
-	f.setHandler("/api/get-users", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Query().Get("value") {
 		case "6125551234":
 			writeOK(w, []map[string]any{
@@ -150,7 +150,7 @@ func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
 	if len(out) != 1 || out[0].ID != "u-7" {
 		t.Fatalf("expected normalization to recover u-7, got %+v", out)
 	}
-	if got := f.callCount("/api/get-users"); got != 3 {
+	if got := f.callCount("/v1/iam/get-users"); got != 3 {
 		t.Fatalf("expected 3 probes (raw, no-plus, no-US), got %d", got)
 	}
 }
@@ -165,7 +165,7 @@ func TestLookupByAttribute_RequiresAdminCreds(t *testing.T) {
 
 func TestLookupByAttribute_IAMErrorPropagates(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/api/get-users", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "field not supported")
 	})
 
@@ -185,7 +185,7 @@ func TestLookupByAttribute_IAMErrorPropagates(t *testing.T) {
 func TestEnsureUser_Create(t *testing.T) {
 	f := newFakeIAM(t)
 	var addUserCalls, getUserCalls int64
-	f.setHandler("/api/add-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&addUserCalls, 1)
 		body, _ := io.ReadAll(r.Body)
 		var payload map[string]any
@@ -198,7 +198,7 @@ func TestEnsureUser_Create(t *testing.T) {
 		}
 		writeOK(w, "Affected")
 	})
-	f.setHandler("/api/get-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&getUserCalls, 1)
 		writeOK(w, map[string]any{
 			"id":    "new-id",
@@ -237,11 +237,11 @@ func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
 	// idempotent-replay and resolve the user via GET /api/get-user.
 	f := newFakeIAM(t)
 	var addUserCalls int64
-	f.setHandler("/api/add-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
 		atomic.AddInt64(&addUserCalls, 1)
 		writeErr(w, "user:Email already exists")
 	})
-	f.setHandler("/api/get-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("email"); got != "dup@x.com" {
 			t.Errorf("email: got %q want dup@x.com", got)
 		}
@@ -269,11 +269,11 @@ func TestEnsureUser_Idempotent_HTTP409(t *testing.T) {
 	// Some IAM versions / proxies may return HTTP 409 directly. EnsureUser
 	// handles both signals.
 	f := newFakeIAM(t)
-	f.setHandler("/api/add-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		_, _ = w.Write([]byte(`{"status":"error","msg":"already exists"}`))
 	})
-	f.setHandler("/api/get-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
 		writeOK(w, map[string]any{
 			"id":    "existing-id",
 			"name":  "dup",
@@ -298,7 +298,7 @@ func TestEnsureUser_PropagatesNonExistsError(t *testing.T) {
 	// Errors that are NOT "already exists" must propagate to the caller —
 	// not get silently swallowed by the idempotent-replay path.
 	f := newFakeIAM(t)
-	f.setHandler("/api/add-user", func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, "organization not found")
 	})
 

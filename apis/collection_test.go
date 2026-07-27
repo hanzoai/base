@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -13,8 +14,54 @@ import (
 	"github.com/hanzoai/base/tools/list"
 )
 
+// collectionCount is how many collections a freshly bootstrapped test app has.
+//
+// It used to be written as the literal 27 in two assertions. That is a number
+// every migration changes — it had already drifted to 31, and both scenarios
+// had been failing ever since the calendar-booking collections landed. A stale
+// literal in a passing-by-default position is a test that stops testing.
+//
+// Deriving it keeps the assertion that matters — the list endpoint reports
+// EVERY collection, dropping or filtering none — without re-arming a trap that
+// fires on the next migration.
+func collectionCount(t *testing.T) int {
+	total, _ := collectionCounts(t)
+	return total
+}
+
+// collectionCounts reports how many collections a freshly bootstrapped test app
+// has, and how many of those are NOT system collections.
+//
+// Callers need both because the numbers that used to be hardcoded were derived
+// from each other by hand, in comments: "17 framework/system + demo collections
+// plus the 10 CRM ... collections" for the total, and "9 original non-system
+// collections + the 10 CRM ... collections are all missing from this import
+// payload and get deleted" for the delete-event counts. Arithmetic over the
+// migration list is wrong the moment a migration lands, and it was.
+func collectionCounts(t *testing.T) (total, nonSystem int) {
+	t.Helper()
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	var cols []*core.Collection
+	if err := app.CollectionQuery().All(&cols); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cols {
+		if !c.System {
+			nonSystem++
+		}
+	}
+	return len(cols), nonSystem
+}
+
 func TestCollectionsList(t *testing.T) {
 	t.Parallel()
+
+	totalItems := `"totalItems":` + strconv.Itoa(collectionCount(t))
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -47,7 +94,7 @@ func TestCollectionsList(t *testing.T) {
 			ExpectedContent: []string{
 				`"page":1`,
 				`"perPage":30`,
-				`"totalItems":27`,
+				totalItems,
 				`"items":[{`,
 				`"name":"` + core.CollectionNameSuperusers + `"`,
 				`"name":"users"`,
@@ -81,7 +128,7 @@ func TestCollectionsList(t *testing.T) {
 			ExpectedContent: []string{
 				`"page":2`,
 				`"perPage":2`,
-				`"totalItems":27`,
+				totalItems,
 				`"items":[{`,
 			},
 			ExpectedEvents: map[string]int{
