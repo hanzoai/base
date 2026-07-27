@@ -94,6 +94,44 @@ func TestPrivateAPI(t *testing.T) {
 			},
 		},
 		{
+			// The overwrite branch. Every other PUT here inserts a new row, so
+			// nothing exercised ON CONFLICT — and the upsert is the one
+			// statement in this file whose two halves can disagree: an insert
+			// that silently fails to update leaves the OLD ciphertext readable
+			// under a tag the client believes it just replaced.
+			Name:    "PUT over an existing tag replaces it",
+			Method:  http.MethodPut,
+			URL:     "/v1/private/watchlist",
+			Body:    bytes.NewReader([]byte("REPLACED-ciphertext")),
+			Headers: map[string]string{"Authorization": privateUserAToken},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				if err := seedPrivateRow(app, "watchlist", ciphertext); err != nil {
+					t.Fatalf("seed failed: %v", err)
+				}
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"tag":"watchlist"`,
+				`"size":19`, // len("REPLACED-ciphertext"), not the 8-byte seed
+			},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				// One row, not two, and holding the new bytes.
+				var rows []struct {
+					CT []byte `db:"ct"`
+				}
+				if err := app.DB().Select("ct").From("_private").
+					Where(dbx.HashExp{"tag": "watchlist"}).All(&rows); err != nil {
+					t.Fatalf("readback failed: %v", err)
+				}
+				if len(rows) != 1 {
+					t.Fatalf("upsert left %d rows, want 1", len(rows))
+				}
+				if string(rows[0].CT) != "REPLACED-ciphertext" {
+					t.Fatalf("ciphertext not replaced: got %q", rows[0].CT)
+				}
+			},
+		},
+		{
 			Name:            "PUT empty body → 400 (must DELETE)",
 			Method:          http.MethodPut,
 			URL:             "/v1/private/empty",
