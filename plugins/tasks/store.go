@@ -69,14 +69,14 @@ func (s *Store) CreateTask(task *Task) error {
 }
 
 // GetTask retrieves a task by ID.
-// If orgID is provided, verifies the task belongs to that org.
-func (s *Store) GetTask(id string, orgID ...string) (*Task, error) {
+// A non-empty org additionally requires the task to belong to it.
+func (s *Store) GetTask(id string, org string) (*Task, error) {
 	record, err := s.app.FindRecordById(TasksCollection, id)
 	if err != nil {
 		return nil, ErrTaskNotFound
 	}
 	task := s.recordToTask(record)
-	if len(orgID) > 0 && orgID[0] != "" && task.OrgID != orgID[0] {
+	if org != "" && task.OrgID != org {
 		return nil, ErrTaskNotFound
 	}
 	return task, nil
@@ -142,26 +142,49 @@ func (s *Store) ListTasks(filters TaskFilters) ([]*Task, error) {
 	return result, nil
 }
 
+// allOrgs is the unscoped org: every org, no narrowing.
+//
+// Named, because "" at a call site says nothing about whether the author meant
+// every org or forgot to pass one — which is exactly what the variadic form
+// could not distinguish either.
+const allOrgs = ""
+
 // --- Atomic state transitions ---
+
+// scoped narrows where to one org, or leaves it alone.
+//
+// The empty string is every org, not the org named "": an absent X-Org-Id
+// header must widen, never match a row whose orgId happens to be blank. This
+// guard was written at seven call sites, each free to drift; it is written
+// here.
+func scoped(where []dbx.Expression, org string) []dbx.Expression {
+	if org == "" {
+		return where
+	}
+	return append(where, dbx.HashExp{"orgId": org})
+}
 
 // transition applies one state change as a single guarded UPDATE, and reports
 // the two ways it can decline.
 //
 // Every transition below is the same shape: set some columns, but only on a row
-// in an acceptable starting state, owned by the caller's org. Writing that shape
-// out six times meant six copies of the org-scoping clause and six copies of the
-// nothing-matched branch — and the org clause is an authorization boundary, so
-// one copy drifting is one caller mutating another org's task.
+// in an acceptable starting state, and only within the requested org. Written
+// out six times, that was six copies of the scoping clause and six copies of
+// the nothing-matched branch.
+//
+// The org is a FILTER, not a permission. Every route reaching these methods is
+// behind RequireSuperuserAuth and the value comes from a caller-supplied
+// X-Org-Id header, so it narrows what an already-privileged caller sees rather
+// than restricting what they may reach. Saying otherwise in a comment would
+// invite someone to lean on it.
 //
 // from is the states this transition will accept; nil accepts any.
-func (s *Store) transition(taskID string, set dbx.Params, from dbx.Expression, conflict error, orgID []string) error {
+func (s *Store) transition(taskID string, set dbx.Params, from dbx.Expression, conflict error, org string) error {
 	where := []dbx.Expression{dbx.HashExp{"id": taskID}}
 	if from != nil {
 		where = append(where, from)
 	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where = append(where, dbx.HashExp{"orgId": orgID[0]})
-	}
+	where = scoped(where, org)
 
 	result, err := s.app.NonconcurrentDB().
 		Update(TasksCollection, set, dbx.And(where...)).
@@ -176,7 +199,7 @@ func (s *Store) transition(taskID string, set dbx.Params, from dbx.Expression, c
 		// not there (or not the caller's), or it is there in a state this
 		// transition does not accept. Only a second read can tell them apart,
 		// and the caller needs to — one is a 404, the other a conflict.
-		if _, err := s.GetTask(taskID, orgID...); err != nil {
+		if _, err := s.GetTask(taskID, org); err != nil {
 			return ErrTaskNotFound
 		}
 		return conflict
@@ -185,28 +208,28 @@ func (s *Store) transition(taskID string, set dbx.Params, from dbx.Expression, c
 }
 
 // ClaimTask atomically transitions a task from pending to claimed.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) ClaimTask(taskID, agentID string, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) ClaimTask(taskID, agentID string, org string) error {
 	now := types.NowDateTime().String()
 	return s.transition(taskID,
 		dbx.Params{"state": string(TaskClaimed), "assignedTo": agentID, "updated": now},
 		dbx.HashExp{"state": string(TaskPending)},
-		ErrAlreadyClaimed, orgID)
+		ErrAlreadyClaimed, org)
 }
 
 // StartTask transitions a claimed (or pending) task to running.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) StartTask(taskID string, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) StartTask(taskID string, org string) error {
 	now := types.NowDateTime().String()
 	return s.transition(taskID,
 		dbx.Params{"state": string(TaskRunning), "startedAt": now, "updated": now},
 		dbx.In("state", string(TaskClaimed), string(TaskPending)),
-		ErrInvalidTransition, orgID)
+		ErrInvalidTransition, org)
 }
 
 // CompleteTask transitions a running task to completed with output.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) CompleteTask(taskID string, output map[string]any, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) CompleteTask(taskID string, output map[string]any, org string) error {
 	now := types.NowDateTime().String()
 	return s.transition(taskID,
 		dbx.Params{
@@ -217,13 +240,13 @@ func (s *Store) CompleteTask(taskID string, output map[string]any, orgID ...stri
 			"updated":     now,
 		},
 		dbx.HashExp{"state": string(TaskRunning)},
-		ErrInvalidTransition, orgID)
+		ErrInvalidTransition, org)
 }
 
 // FailTask transitions a running task to failed. If retries remain, re-queues as pending.
 // Uses a single atomic SQL with CASE to avoid TOCTOU races.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) FailTask(taskID string, errMsg string, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) FailTask(taskID string, errMsg string, org string) error {
 	now := types.NowDateTime().String()
 
 	// Whether this failure retries or ends the task depends on a column, so the
@@ -253,22 +276,22 @@ func (s *Store) FailTask(taskID string, errMsg string, orgID ...string) error {
 			"updated": now,
 		},
 		dbx.HashExp{"state": string(TaskRunning)},
-		ErrInvalidTransition, orgID)
+		ErrInvalidTransition, org)
 }
 
 // CancelTask transitions any non-terminal task to cancelled.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) CancelTask(taskID string, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) CancelTask(taskID string, org string) error {
 	now := types.NowDateTime().String()
 	return s.transition(taskID,
 		dbx.Params{"state": string(TaskCancelled), "completedAt": now, "updated": now},
 		dbx.NotIn("state", string(TaskCompleted), string(TaskCancelled)),
-		ErrInvalidTransition, orgID)
+		ErrInvalidTransition, org)
 }
 
 // UpdateProgress sets progress (0-100) on a running task.
-// orgID scopes the mutation to a specific org when provided.
-func (s *Store) UpdateProgress(taskID string, progress int, orgID ...string) error {
+// org narrows the mutation to one org; empty is every org.
+func (s *Store) UpdateProgress(taskID string, progress int, org string) error {
 	if progress < 0 {
 		progress = 0
 	}
@@ -279,22 +302,20 @@ func (s *Store) UpdateProgress(taskID string, progress int, orgID ...string) err
 	return s.transition(taskID,
 		dbx.Params{"progress": progress, "updated": types.NowDateTime().String()},
 		dbx.HashExp{"state": string(TaskRunning)},
-		ErrInvalidTransition, orgID)
+		ErrInvalidTransition, org)
 }
 
 // GetNextPendingTask finds and atomically claims the highest-priority pending task
 // in the given space whose dependencies are all completed.
-// orgID scopes the query to a specific org when provided.
-func (s *Store) GetNextPendingTask(spaceID, agentID string, orgID ...string) (*Task, error) {
+// org narrows the query to one org; empty is every org.
+func (s *Store) GetNextPendingTask(spaceID, agentID string, org string) (*Task, error) {
 	pending := TaskPending
 	filters := TaskFilters{
 		SpaceID: spaceID,
 		State:   &pending,
 		Limit:   50,
 	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		filters.OrgID = orgID[0]
-	}
+	filters.OrgID = org
 	candidates, err := s.ListTasks(filters)
 	if err != nil {
 		return nil, err
@@ -306,12 +327,12 @@ func (s *Store) GetNextPendingTask(spaceID, agentID string, orgID ...string) (*T
 		}
 
 		// Attempt atomic claim scoped to org.
-		if err := s.ClaimTask(task.ID, agentID, orgID...); err != nil {
+		if err := s.ClaimTask(task.ID, agentID, org); err != nil {
 			continue // lost race or invalid transition
 		}
 
 		// Re-read the claimed task scoped to org.
-		claimed, err := s.GetTask(task.ID, orgID...)
+		claimed, err := s.GetTask(task.ID, org)
 		if err != nil {
 			return nil, err
 		}
@@ -327,7 +348,11 @@ func (s *Store) dependenciesMet(task *Task) bool {
 		return true
 	}
 	for _, depID := range task.DependsOn {
-		dep, err := s.GetTask(depID)
+		// allOrgs deliberately: a dependency is a property of the task graph,
+		// not of tenancy, so a blocker in another org still blocks. This read
+		// was already unscoped — the variadic just made it impossible to see
+		// that it differed from the scoped call that leads here.
+		dep, err := s.GetTask(depID, allOrgs)
 		if err != nil || dep.State != TaskCompleted {
 			return false
 		}
@@ -336,15 +361,13 @@ func (s *Store) dependenciesMet(task *Task) bool {
 }
 
 // AgentHasActiveTask reports whether the agent has a claimed or running task.
-// orgID scopes the query to a specific org when provided.
-func (s *Store) AgentHasActiveTask(agentID string, orgID ...string) (bool, error) {
+// org narrows the query to one org; empty is every org.
+func (s *Store) AgentHasActiveTask(agentID string, org string) (bool, error) {
 	where := []dbx.Expression{
 		dbx.HashExp{"assignedTo": agentID},
 		dbx.In("state", string(TaskClaimed), string(TaskRunning)),
 	}
-	if len(orgID) > 0 && orgID[0] != "" {
-		where = append(where, dbx.HashExp{"orgId": orgID[0]})
-	}
+	where = scoped(where, org)
 
 	// COUNT rather than a LIMIT 1 probe, because an aggregate always returns a
 	// row. A probe returns NO row when nothing matches, and Row then reports
@@ -397,26 +420,26 @@ func (s *Store) CreateWorkflow(wf *Workflow) error {
 }
 
 // GetWorkflow retrieves a workflow by ID.
-// If orgID is provided, verifies the workflow belongs to that org.
-func (s *Store) GetWorkflow(id string, orgID ...string) (*Workflow, error) {
+// A non-empty org additionally requires the workflow to belong to it.
+func (s *Store) GetWorkflow(id string, org string) (*Workflow, error) {
 	record, err := s.app.FindRecordById(WorkflowsCollection, id)
 	if err != nil {
 		return nil, ErrWorkflowNotFound
 	}
 	wf := s.recordToWorkflow(record)
-	if len(orgID) > 0 && orgID[0] != "" && wf.OrgID != orgID[0] {
+	if org != "" && wf.OrgID != org {
 		return nil, ErrWorkflowNotFound
 	}
 	return wf, nil
 }
 
 // ListWorkflows returns workflows for a space, optionally scoped to an org.
-func (s *Store) ListWorkflows(spaceID string, orgID ...string) ([]*Workflow, error) {
+func (s *Store) ListWorkflows(spaceID string, org string) ([]*Workflow, error) {
 	query := s.app.RecordQuery(WorkflowsCollection).
 		OrderBy("created ASC")
 
-	if len(orgID) > 0 && orgID[0] != "" {
-		query = query.AndWhere(dbx.HashExp{"orgId": orgID[0]})
+	if org != "" {
+		query = query.AndWhere(dbx.HashExp{"orgId": org})
 	}
 	if spaceID != "" {
 		query = query.AndWhere(dbx.HashExp{"spaceId": spaceID})
@@ -474,7 +497,9 @@ func (s *Store) AdvanceWorkflows() error {
 		anyFailed := false
 
 		for _, taskID := range wf.Tasks {
-			t, err := s.GetTask(taskID)
+			// allOrgs: AdvanceWorkflows is a background sweep over every
+			// workflow, so its member-task reads are unscoped by design.
+			t, err := s.GetTask(taskID, allOrgs)
 			if err != nil {
 				continue
 			}
@@ -533,7 +558,8 @@ func (s *Store) CheckTimeouts() error {
 			continue
 		}
 
-		_ = s.FailTask(task.ID, "task timed out")
+		// allOrgs: the timeout sweep runs across every org.
+		_ = s.FailTask(task.ID, "task timed out", allOrgs)
 	}
 	return nil
 }

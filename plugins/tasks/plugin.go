@@ -404,10 +404,13 @@ func (p *plugin) autoExecute() {
 			continue
 		}
 
-		if err := p.store.ClaimTask(task.ID, "_scheduler"); err != nil {
+		// allOrgs: the in-process scheduler runs across every org, so it is
+		// deliberately unscoped — now stated rather than implied by an argument
+		// nobody wrote.
+		if err := p.store.ClaimTask(task.ID, "_scheduler", allOrgs); err != nil {
 			continue
 		}
-		if err := p.store.StartTask(task.ID); err != nil {
+		if err := p.store.StartTask(task.ID, allOrgs); err != nil {
 			continue
 		}
 
@@ -422,7 +425,7 @@ func (p *plugin) autoExecute() {
 func (p *plugin) executeTask(task *Task) {
 	output, err := p.config.OnExecute(task)
 	if err != nil {
-		if failErr := p.store.FailTask(task.ID, err.Error()); failErr != nil {
+		if failErr := p.store.FailTask(task.ID, err.Error(), allOrgs); failErr != nil {
 			p.app.Logger().Error("tasks: failed to record task failure",
 				"task_id", task.ID,
 				"error", failErr.Error(),
@@ -431,7 +434,7 @@ func (p *plugin) executeTask(task *Task) {
 		return
 	}
 
-	if err := p.store.CompleteTask(task.ID, output); err != nil {
+	if err := p.store.CompleteTask(task.ID, output, allOrgs); err != nil {
 		p.app.Logger().Error("tasks: failed to complete task",
 			"task_id", task.ID,
 			"error", err.Error(),

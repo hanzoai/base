@@ -554,7 +554,9 @@ func workflowsCreate(e *core.RequestEvent) error {
 	// Return workflow with tasks.
 	taskList := make([]*tasks.Task, 0, len(taskIDs))
 	for _, tid := range taskIDs {
-		if t, err := s.GetTask(tid); err == nil {
+		// Same org they were just created under. Reading them back unscoped
+		// was inconsistent with the write directly above it.
+		if t, err := s.GetTask(tid, orgID); err == nil {
 			taskList = append(taskList, t)
 		}
 	}
