@@ -35,8 +35,8 @@ type Config struct {
 	// they subscribe to finalized frames and append to cold storage.
 	Role NodeRole
 
-	// Archive is the cold-storage URL or "off". s3://bucket/prefix,
-	// gs://bucket/prefix, file://path (dev), off.
+	// Archive is the cold-storage URL or "off". s3://bucket/prefix is
+	// the only scheme; see NewArchive in archive.go.
 	Archive string
 
 	// ListenHTTP is the Base HTTP listen address. Used only for the
