@@ -14,7 +14,7 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/dbx v1.16.0
+	github.com/hanzoai/dbx v1.17.2
 	github.com/hanzoai/kms/sdk/go v1.1.1
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/pubsub-go v1.0.0
@@ -142,7 +142,7 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/hanzoai/orm v0.6.10
+	github.com/hanzoai/orm v0.6.14
 	github.com/hanzoai/replicate v0.9.5
 	github.com/hanzoai/sqlite v0.3.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
