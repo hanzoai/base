@@ -3,10 +3,10 @@ package apis
 import (
 	"net/http"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"
+	"github.com/hanzoai/dbx"
 )
 
 // bindLogsApi registers the request logs api endpoints.
