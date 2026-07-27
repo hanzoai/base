@@ -12,9 +12,6 @@
 //	AWS_ENDPOINT_URL=http://127.0.0.1:9000 \
 //	AWS_ACCESS_KEY_ID=minio AWS_SECRET_ACCESS_KEY=minio1234 \
 //	go test -tags=integration ./network -run TestS3Integration -v
-//
-// A GCS variant lives alongside at archive_gcs_integration_test.go,
-// gated behind "integration && gcs" with fake-gcs-server.
 
 package network
 

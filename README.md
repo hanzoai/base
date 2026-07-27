@@ -157,7 +157,7 @@ It is the storage backend for every multi-tenant subsystem in **HIP-0106**.
                                      |
                   per-tenant data/{orgSlug}.db (SQLite or ZapDB)
                                      |
-                  KMS-derived DEK   replicate -> S3/GCS (age-encrypted)
+                  KMS-derived DEK   replicate -> S3 (age-encrypted)
                                      |
                   in-process extension runtime (HIP-0105):
                     goja (JS) | wazero (WASM) | pyvm (Python) | starkvm (Starlark)
