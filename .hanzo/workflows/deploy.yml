@@ -1,24 +1,68 @@
+# Build the image and push it. Nothing else.
+#
+# The previous version called buildctl-daemonless.sh, which does not exist in
+# the job image (catthehacker/ubuntu:act-24.04, per GIT_RUNNER_LABELS) — exit
+# 127 — and read secrets.GIT_CLONE_TOKEN, which exists on neither the repo nor
+# the hanzoai org. It had never produced an image.
+#
+# No deploy step on purpose: kubectl is absent from the job image too, and a
+# CI-side patch is reverted within minutes by cd.hanzo.ai's selfHeal, which
+# restores the App CR from the reviewed pin in hanzoai/universe. CI's job ends
+# at "the tag exists and resolves"; choosing which tag runs is a reviewed change.
+#
+# This matters more than it used to: actions-runner-controller was decommissioned
+# 2026-07-27, so this pipeline is now the ONLY CI this repo has.
 name: deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-base-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  deploy:
-    runs-on: hanzo-build-linux-amd64
+  build:
+    # Must name a label a runner ACTUALLY advertises. The git-runners offer
+    # hanzo-build-linux-amd64; a label nothing offers does not fail, it queues
+    # until the 24h timeout — silence, not an error.
+    runs-on: [hanzo-build-linux-amd64]
     steps:
       - uses: actions/checkout@v4
-      - name: Build + push image
+
+      - id: meta
+        run: echo "tag=sha-$(echo "$GITHUB_SHA" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+        with: { driver: docker-container, driver-opts: network=host }
+
+      # Without this the push is unauthenticated and 403s at the registry.
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USER }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: ghcr.io/hanzoai/base:${{ steps.meta.outputs.tag }}
+          secrets: |
+            GIT_AUTH_TOKEN=${{ secrets.GH_PAT }}
+
+      # build-push-action can exit 0 before the manifest resolves, so a green run
+      # could still mean a future ImagePullBackOff. Prove it pulls.
+      - name: Verify the pushed image resolves
         run: |
-          SHA="${GITHUB_SHA::8}"
-          buildctl-daemonless.sh build --frontend=dockerfile.v0 \
-            --opt context="${{ github.server_url }}/${{ github.repository }}.git#${GITHUB_SHA}" \
-            --opt filename=Dockerfile --opt platform=linux/amd64 \
-            --secret id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN \
-            --output "type=image,name=ghcr.io/hanzoai/base:${SHA},push=true" --progress=plain
-        env:
-          GIT_AUTH_TOKEN: ${{ secrets.GIT_CLONE_TOKEN }}
-      - name: Deploy — declare tag to operator
-        run: |
-          for app in cal hanzo-app-base; do
-            kubectl -n hanzo patch app "$app" --type=merge -p "{\"spec\":{\"image\":{\"repository\":\"ghcr.io/hanzoai/base\",\"tag\":\"${GITHUB_SHA::8}\"}}}"
+          set -euo pipefail
+          img="ghcr.io/hanzoai/base:${{ steps.meta.outputs.tag }}"
+          for i in 1 2 3 4 5 6; do
+            docker buildx imagetools inspect "$img" >/dev/null 2>&1 && { echo "resolved $img"; exit 0; }
+            sleep 5
           done
+          echo "::error::pushed image never resolved: $img"; exit 1
