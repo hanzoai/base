@@ -144,17 +144,17 @@ func registerNamespace(c client.Client, name string) error {
 // ClientForOrg returns a Temporal client scoped to the given org namespace.
 // Connections are cached and protected by a mutex. Falls back to the default
 // client if org is empty or matches the default namespace.
-func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
-	if orgID == "" || orgID == ds.namespace {
+func (ds *DurableStore) ClientForOrg(org string) (client.Client, error) {
+	if org == "" || org == ds.namespace {
 		return ds.Client, nil
 	}
-	if !validIDPattern.MatchString(orgID) {
-		return nil, fmt.Errorf("tasks: invalid org ID: %q", orgID)
+	if !validIDPattern.MatchString(org) {
+		return nil, fmt.Errorf("tasks: invalid org ID: %q", org)
 	}
 
 	// Fast path: read lock.
 	ds.mu.RLock()
-	if c, ok := ds.orgClients[orgID]; ok {
+	if c, ok := ds.orgClients[org]; ok {
 		ds.mu.RUnlock()
 		return c, nil
 	}
@@ -164,23 +164,23 @@ func (ds *DurableStore) ClientForOrg(orgID string) (client.Client, error) {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 
-	if c, ok := ds.orgClients[orgID]; ok {
+	if c, ok := ds.orgClients[org]; ok {
 		return c, nil
 	}
 
 	c, err := client.Dial(client.Options{
 		HostPort:  ds.addr,
-		Namespace: orgID,
+		Namespace: org,
 		Token:     ds.token,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("tasks: failed to connect to namespace %s: %w", orgID, err)
+		return nil, fmt.Errorf("tasks: failed to connect to namespace %s: %w", org, err)
 	}
-	if err := registerNamespace(c, orgID); err != nil {
+	if err := registerNamespace(c, org); err != nil {
 		c.Close()
 		return nil, err
 	}
-	ds.orgClients[orgID] = c
+	ds.orgClients[org] = c
 	return c, nil
 }
 
@@ -275,9 +275,9 @@ func (ds *DurableStore) SubmitWorkflow(ctx context.Context, wf *Workflow, tasks 
 }
 
 // GetTaskStatus queries a running workflow for its current state.
-// orgID selects the Temporal namespace. Empty string uses the default.
-func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string, orgID ...string) (TaskState, string, error) {
-	c, err := ds.clientForOrgVar(orgID)
+// org selects the Temporal namespace. Empty string uses the default.
+func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string, org string) (TaskState, string, error) {
+	c, err := ds.clientFor(org)
 	if err != nil {
 		return TaskPending, "", err
 	}
@@ -303,8 +303,8 @@ func (ds *DurableStore) GetTaskStatus(ctx context.Context, taskID string, orgID 
 }
 
 // CancelTask cancels a running workflow.
-func (ds *DurableStore) CancelTask(ctx context.Context, taskID string, orgID ...string) error {
-	c, err := ds.clientForOrgVar(orgID)
+func (ds *DurableStore) CancelTask(ctx context.Context, taskID string, org string) error {
+	c, err := ds.clientFor(org)
 	if err != nil {
 		return err
 	}
@@ -312,28 +312,33 @@ func (ds *DurableStore) CancelTask(ctx context.Context, taskID string, orgID ...
 }
 
 // SignalTask sends a signal to a running workflow.
-func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName string, data interface{}, orgID ...string) error {
-	c, err := ds.clientForOrgVar(orgID)
+func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName string, data interface{}, org string) error {
+	c, err := ds.clientFor(org)
 	if err != nil {
 		return err
 	}
 	return c.SignalWorkflow(ctx, taskID, "", signalName, data)
 }
 
-// clientForOrgVar extracts the first orgID from a variadic param.
-func (ds *DurableStore) clientForOrgVar(orgID []string) (client.Client, error) {
-	if len(orgID) > 0 && orgID[0] != "" {
-		return ds.ClientForOrg(orgID[0])
+// clientForOrgVar extracts the first org from a variadic param.
+// clientFor returns the org's client, or the shared one when unscoped.
+//
+// Was clientForOrgVar — a name whose suffix described the CALLING CONVENTION of
+// its argument rather than anything about the client it returns. With the
+// variadic gone there is nothing left for "Var" to mean.
+func (ds *DurableStore) clientFor(org string) (client.Client, error) {
+	if org == "" {
+		return ds.Client, nil
 	}
-	return ds.Client, nil
+	return ds.ClientForOrg(org)
 }
 
 // ListTasks returns tasks in a space by querying workflow visibility.
-func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, orgID ...string) ([]*Task, error) {
+func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, org string) ([]*Task, error) {
 	if spaceID != "" && !validIDPattern.MatchString(spaceID) {
 		return nil, fmt.Errorf("tasks: invalid space ID: %q", spaceID)
 	}
-	c, err := ds.clientForOrgVar(orgID)
+	c, err := ds.clientFor(org)
 	if err != nil {
 		return nil, err
 	}
@@ -371,14 +376,17 @@ func (ds *DurableStore) ListTasks(ctx context.Context, spaceID string, orgID ...
 }
 
 // GetNextTask finds the next pending task in a space and claims it for the agent.
-func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string, orgID ...string) (*Task, error) {
-	tasks, err := ds.ListTasks(ctx, spaceID, orgID...)
+func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string, org string) (*Task, error) {
+	tasks, err := ds.ListTasks(ctx, spaceID, org)
 	if err != nil {
 		return nil, err
 	}
 	for _, t := range tasks {
 		if t.State == TaskRunning || t.State == TaskPending {
-			_ = ds.SignalTask(ctx, t.ID, "claim", map[string]string{"agent_id": agentID})
+			// Same org the task was listed under. It was silently unscoped
+			// while the argument was variadic — invisible, because omitting a
+			// variadic looks like nothing at all.
+			_ = ds.SignalTask(ctx, t.ID, "claim", map[string]string{"agent_id": agentID}, org)
 			return t, nil
 		}
 	}
@@ -386,11 +394,11 @@ func (ds *DurableStore) GetNextTask(ctx context.Context, spaceID, agentID string
 }
 
 // ListWorkflows returns workflows in a space by querying visibility.
-func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, orgID ...string) ([]*Workflow, error) {
+func (ds *DurableStore) ListWorkflows(ctx context.Context, spaceID string, org string) ([]*Workflow, error) {
 	if spaceID != "" && !validIDPattern.MatchString(spaceID) {
 		return nil, fmt.Errorf("tasks: invalid space ID: %q", spaceID)
 	}
-	c, err := ds.clientForOrgVar(orgID)
+	c, err := ds.clientFor(org)
 	if err != nil {
 		return nil, err
 	}

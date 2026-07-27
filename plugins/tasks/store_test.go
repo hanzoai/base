@@ -53,7 +53,7 @@ func TestCreateAndGetTask(t *testing.T) {
 		t.Fatalf("expected pending, got %s", task.State)
 	}
 
-	got, err := s.GetTask(task.ID)
+	got, err := s.GetTask(task.ID, allOrgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,16 +74,16 @@ func TestClaimTask(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := s.ClaimTask(task.ID, "agent-1"); err != nil {
+	if err := s.ClaimTask(task.ID, "agent-1", allOrgs); err != nil {
 		t.Fatal(err)
 	}
 
 	// Second claim should fail.
-	if err := s.ClaimTask(task.ID, "agent-2"); err != ErrAlreadyClaimed {
+	if err := s.ClaimTask(task.ID, "agent-2", allOrgs); err != ErrAlreadyClaimed {
 		t.Fatalf("expected ErrAlreadyClaimed, got %v", err)
 	}
 
-	got, _ := s.GetTask(task.ID)
+	got, _ := s.GetTask(task.ID, allOrgs)
 	if got.State != TaskClaimed {
 		t.Fatalf("expected claimed, got %s", got.State)
 	}
@@ -98,15 +98,15 @@ func TestCompleteTask(t *testing.T) {
 
 	task := &Task{SpaceID: "s1", Title: "Completable"}
 	_ = s.CreateTask(task)
-	_ = s.ClaimTask(task.ID, "agent-1")
-	_ = s.StartTask(task.ID)
+	_ = s.ClaimTask(task.ID, "agent-1", allOrgs)
+	_ = s.StartTask(task.ID, allOrgs)
 
 	output := map[string]any{"result": "success"}
-	if err := s.CompleteTask(task.ID, output); err != nil {
+	if err := s.CompleteTask(task.ID, output, allOrgs); err != nil {
 		t.Fatal(err)
 	}
 
-	got, _ := s.GetTask(task.ID)
+	got, _ := s.GetTask(task.ID, allOrgs)
 	if got.State != TaskCompleted {
 		t.Fatalf("expected completed, got %s", got.State)
 	}
@@ -124,14 +124,14 @@ func TestFailTaskWithRetry(t *testing.T) {
 
 	task := &Task{SpaceID: "s1", Title: "Retriable", MaxRetries: 2}
 	_ = s.CreateTask(task)
-	_ = s.ClaimTask(task.ID, "agent-1")
-	_ = s.StartTask(task.ID)
+	_ = s.ClaimTask(task.ID, "agent-1", allOrgs)
+	_ = s.StartTask(task.ID, allOrgs)
 
 	// First failure should re-queue.
-	if err := s.FailTask(task.ID, "oops"); err != nil {
+	if err := s.FailTask(task.ID, "oops", allOrgs); err != nil {
 		t.Fatal(err)
 	}
-	got, _ := s.GetTask(task.ID)
+	got, _ := s.GetTask(task.ID, allOrgs)
 	if got.State != TaskPending {
 		t.Fatalf("expected re-queued to pending, got %s", got.State)
 	}
@@ -140,11 +140,11 @@ func TestFailTaskWithRetry(t *testing.T) {
 	}
 
 	// Second cycle.
-	_ = s.ClaimTask(task.ID, "agent-2")
-	_ = s.StartTask(task.ID)
-	_ = s.FailTask(task.ID, "oops again")
+	_ = s.ClaimTask(task.ID, "agent-2", allOrgs)
+	_ = s.StartTask(task.ID, allOrgs)
+	_ = s.FailTask(task.ID, "oops again", allOrgs)
 
-	got, _ = s.GetTask(task.ID)
+	got, _ = s.GetTask(task.ID, allOrgs)
 	if got.State != TaskPending {
 		t.Fatalf("expected re-queued, got %s", got.State)
 	}
@@ -153,11 +153,11 @@ func TestFailTaskWithRetry(t *testing.T) {
 	}
 
 	// Third failure should be terminal.
-	_ = s.ClaimTask(task.ID, "agent-3")
-	_ = s.StartTask(task.ID)
-	_ = s.FailTask(task.ID, "final fail")
+	_ = s.ClaimTask(task.ID, "agent-3", allOrgs)
+	_ = s.StartTask(task.ID, allOrgs)
+	_ = s.FailTask(task.ID, "final fail", allOrgs)
 
-	got, _ = s.GetTask(task.ID)
+	got, _ = s.GetTask(task.ID, allOrgs)
 	if got.State != TaskFailed {
 		t.Fatalf("expected terminal failed, got %s", got.State)
 	}
@@ -170,17 +170,17 @@ func TestCancelTask(t *testing.T) {
 	task := &Task{SpaceID: "s1", Title: "Cancellable"}
 	_ = s.CreateTask(task)
 
-	if err := s.CancelTask(task.ID); err != nil {
+	if err := s.CancelTask(task.ID, allOrgs); err != nil {
 		t.Fatal(err)
 	}
 
-	got, _ := s.GetTask(task.ID)
+	got, _ := s.GetTask(task.ID, allOrgs)
 	if got.State != TaskCancelled {
 		t.Fatalf("expected cancelled, got %s", got.State)
 	}
 
 	// Can't cancel again.
-	if err := s.CancelTask(task.ID); err != ErrInvalidTransition {
+	if err := s.CancelTask(task.ID, allOrgs); err != ErrInvalidTransition {
 		t.Fatalf("expected ErrInvalidTransition, got %v", err)
 	}
 }
@@ -195,7 +195,7 @@ func TestGetNextPendingTask(t *testing.T) {
 	_ = s.CreateTask(high)
 
 	// Should get high-priority first.
-	next, err := s.GetNextPendingTask("s1", "agent-1")
+	next, err := s.GetNextPendingTask("s1", "agent-1", allOrgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,13 +210,13 @@ func TestGetNextPendingTask(t *testing.T) {
 	}
 
 	// Next should get low.
-	next, _ = s.GetNextPendingTask("s1", "agent-2")
+	next, _ = s.GetNextPendingTask("s1", "agent-2", allOrgs)
 	if next == nil || next.Title != "Low" {
 		t.Fatalf("expected Low, got %v", next)
 	}
 
 	// No more.
-	next, _ = s.GetNextPendingTask("s1", "agent-3")
+	next, _ = s.GetNextPendingTask("s1", "agent-3", allOrgs)
 	if next != nil {
 		t.Fatalf("expected nil, got %+v", next)
 	}
@@ -233,23 +233,23 @@ func TestDependencyBlocking(t *testing.T) {
 	_ = s.CreateTask(b)
 
 	// Next should return A (B blocked).
-	next, _ := s.GetNextPendingTask("s1", "agent-1")
+	next, _ := s.GetNextPendingTask("s1", "agent-1", allOrgs)
 	if next == nil || next.Title != "Task A" {
 		t.Fatal("expected Task A")
 	}
 
 	// B still blocked (A claimed, not completed).
-	next, _ = s.GetNextPendingTask("s1", "agent-2")
+	next, _ = s.GetNextPendingTask("s1", "agent-2", allOrgs)
 	if next != nil {
 		t.Fatalf("expected nil (B blocked), got %q", next.Title)
 	}
 
 	// Complete A.
-	_ = s.StartTask(a.ID)
-	_ = s.CompleteTask(a.ID, nil)
+	_ = s.StartTask(a.ID, allOrgs)
+	_ = s.CompleteTask(a.ID, nil, allOrgs)
 
 	// Now B available.
-	next, _ = s.GetNextPendingTask("s1", "agent-2")
+	next, _ = s.GetNextPendingTask("s1", "agent-2", allOrgs)
 	if next == nil || next.Title != "Task B" {
 		t.Fatal("expected Task B after A completed")
 	}
@@ -290,7 +290,7 @@ func TestWorkflowLifecycle(t *testing.T) {
 		t.Fatal("expected auto-generated ID")
 	}
 
-	got, err := s.GetWorkflow(wf.ID)
+	got, err := s.GetWorkflow(wf.ID, allOrgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestWorkflowLifecycle(t *testing.T) {
 		t.Fatalf("expected pending, got %s", got.State)
 	}
 
-	items, _ := s.ListWorkflows("s1")
+	items, _ := s.ListWorkflows("s1", allOrgs)
 	if len(items) != 1 {
 		t.Fatalf("expected 1, got %d", len(items))
 	}
@@ -323,22 +323,22 @@ func TestWorkflowAdvancement(t *testing.T) {
 
 	// Advance: should go from pending → running.
 	_ = s.AdvanceWorkflows()
-	got, _ := s.GetWorkflow(wf.ID)
+	got, _ := s.GetWorkflow(wf.ID, allOrgs)
 	if got.State != TaskRunning {
 		t.Fatalf("expected running, got %s", got.State)
 	}
 
 	// Complete both tasks.
-	_ = s.ClaimTask(t1.ID, "a")
-	_ = s.StartTask(t1.ID)
-	_ = s.CompleteTask(t1.ID, nil)
-	_ = s.ClaimTask(t2.ID, "a")
-	_ = s.StartTask(t2.ID)
-	_ = s.CompleteTask(t2.ID, nil)
+	_ = s.ClaimTask(t1.ID, "a", allOrgs)
+	_ = s.StartTask(t1.ID, allOrgs)
+	_ = s.CompleteTask(t1.ID, nil, allOrgs)
+	_ = s.ClaimTask(t2.ID, "a", allOrgs)
+	_ = s.StartTask(t2.ID, allOrgs)
+	_ = s.CompleteTask(t2.ID, nil, allOrgs)
 
 	// Advance: should complete workflow.
 	_ = s.AdvanceWorkflows()
-	got, _ = s.GetWorkflow(wf.ID)
+	got, _ = s.GetWorkflow(wf.ID, allOrgs)
 	if got.State != TaskCompleted {
 		t.Fatalf("expected completed, got %s", got.State)
 	}
@@ -482,7 +482,7 @@ func TestWorkflowOrgIsolation(t *testing.T) {
 	}
 
 	// ListWorkflows without org should return both.
-	all, err := s.ListWorkflows("s1")
+	all, err := s.ListWorkflows("s1", allOrgs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +503,7 @@ func TestAgentHasActiveTask(t *testing.T) {
 	s := GetStore(app)
 
 	// Nothing claimed by anyone yet: false, and NOT an error.
-	active, err := s.AgentHasActiveTask("agent-1")
+	active, err := s.AgentHasActiveTask("agent-1", allOrgs)
 	if err != nil {
 		t.Fatalf("no active task should be a clean false, got error: %v", err)
 	}
@@ -517,30 +517,30 @@ func TestAgentHasActiveTask(t *testing.T) {
 	}
 
 	// Pending is not active — it is claimed/running that count.
-	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || active {
+	if active, err := s.AgentHasActiveTask("agent-1", allOrgs); err != nil || active {
 		t.Fatalf("pending task must not read as active (active=%v err=%v)", active, err)
 	}
 
-	if err := s.ClaimTask(task.ID, "agent-1"); err != nil {
+	if err := s.ClaimTask(task.ID, "agent-1", allOrgs); err != nil {
 		t.Fatal(err)
 	}
-	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || !active {
+	if active, err := s.AgentHasActiveTask("agent-1", allOrgs); err != nil || !active {
 		t.Fatalf("claimed task should be active (active=%v err=%v)", active, err)
 	}
 
 	// Scoped to the agent, not global.
-	if active, err := s.AgentHasActiveTask("agent-2"); err != nil || active {
+	if active, err := s.AgentHasActiveTask("agent-2", allOrgs); err != nil || active {
 		t.Fatalf("another agent must not see it (active=%v err=%v)", active, err)
 	}
 
 	// And terminal state clears it.
-	if err := s.StartTask(task.ID); err != nil {
+	if err := s.StartTask(task.ID, allOrgs); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CompleteTask(task.ID, map[string]any{"ok": true}); err != nil {
+	if err := s.CompleteTask(task.ID, map[string]any{"ok": true}, allOrgs); err != nil {
 		t.Fatal(err)
 	}
-	if active, err := s.AgentHasActiveTask("agent-1"); err != nil || active {
+	if active, err := s.AgentHasActiveTask("agent-1", allOrgs); err != nil || active {
 		t.Fatalf("completed task must not read as active (active=%v err=%v)", active, err)
 	}
 }
