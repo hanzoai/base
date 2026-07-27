@@ -88,10 +88,10 @@ type WSPresencePayload struct {
 // OpEnvelopes (produced by Document.SealOps); the server never sees
 // plaintext ops.
 type WSCRDTSyncPayload struct {
-	DocID       string               `json:"docId"`
-	Type        string               `json:"type"` // sync_step1, sync_step2, sync_update
-	StateVector crdt.StateVersion    `json:"stateVector,omitempty"`
-	Envelopes   []crdt.OpEnvelope    `json:"envelopes,omitempty"`
+	DocID       string            `json:"docId"`
+	Type        string            `json:"type"` // sync_step1, sync_step2, sync_update
+	StateVector crdt.StateVersion `json:"stateVector,omitempty"`
+	Envelopes   []crdt.OpEnvelope `json:"envelopes,omitempty"`
 }
 
 // wsConn wraps a hijacked net.Conn for WebSocket framing.
