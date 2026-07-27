@@ -320,7 +320,6 @@ func (ds *DurableStore) SignalTask(ctx context.Context, taskID, signalName strin
 	return c.SignalWorkflow(ctx, taskID, "", signalName, data)
 }
 
-// clientForOrgVar extracts the first org from a variadic param.
 // clientFor returns the org's client, or the shared one when unscoped.
 //
 // Was clientForOrgVar — a name whose suffix described the CALLING CONVENTION of
