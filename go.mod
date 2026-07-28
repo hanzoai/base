@@ -1,6 +1,6 @@
 module github.com/hanzoai/base
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/disintegration/imaging v1.6.2
@@ -165,8 +165,8 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/zap-proto/http v0.3.0 // indirect
-	github.com/zap-proto/zip v1.10.0
+	github.com/zap-proto/http v0.3.1 // indirect
+	github.com/zap-proto/zip v1.17.2
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.36.0 // indirect
