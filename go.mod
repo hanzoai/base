@@ -182,3 +182,5 @@ require (
 )
 
 replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.47
+
+exclude github.com/luxfi/genesis v1.5.21
