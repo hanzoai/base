@@ -377,8 +377,8 @@ github.com/luxfi/threshold v1.12.3 h1:CYqcPfzVUs0M/+e/ja1q7aLBZZUi6Rv/XIXR5lrZ7a
 github.com/luxfi/threshold v1.12.3/go.mod h1:xQT8xzmh9pQ1CdBgpl7P3ezXQZcqTPv3tqpIytvuiTA=
 github.com/luxfi/tls v1.1.1 h1:BSZ0gHSp7U8vzlmzx7WSSCz+b7Ky4JtD9HDDhn7vrDg=
 github.com/luxfi/tls v1.1.1/go.mod h1:+5TDy8UtLL+tz124brZzpUDBRj+sKrq0JFqdmpMUHgw=
-github.com/luxfi/vm v1.3.1 h1:rLCbygaajehVkUoJ5czwhpUAJaC5J5okq3p+j2QSPSo=
-github.com/luxfi/vm v1.3.1/go.mod h1:uViH3COP8hhCbj42v1MTohkPCDwYQCZanNIOb/StWqY=
+github.com/luxfi/vm v1.3.1 h1:U2Bv7IDRFv8JtjUARfY53ZnOPRB2iPrPHSMDCQ+T0Js=
+github.com/luxfi/vm v1.3.1/go.mod h1:6YR/uFV2FoofmogQShv+HM7V8alz5rbrQYjp5w0bNVA=
 github.com/luxfi/zap v1.2.6 h1:NBpbm9Gib41Oi/XAkAZKQ3hb+xCafo7JsrUjw+bKiAc=
 github.com/luxfi/zap v1.2.6/go.mod h1:sTAe/AMMamoE85cVoe81+NbqHJkgvqS0LhY9ByHEmr0=
 github.com/luxfi/zapdb v1.10.0 h1:1lLHEmkyC0BucnA/zjQYsMkUVxuEo2vQkEaQGjYfuuc=
