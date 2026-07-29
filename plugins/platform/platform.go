@@ -2,13 +2,13 @@
 //
 // Each org gets isolated collections with prefix-based namespacing.
 // Authentication is handled via Hanzo IAM (hanzo.id) OAuth2 and secrets via
-// Hanzo KMS (kms.hanzo.ai) Universal Auth.
+// KMS over native ZAP — the one secrets store, never anything else.
 //
 // Example:
 //
 //	platform.MustRegister(app, platform.PlatformConfig{
 //		IAMEndpoint:     "https://hanzo.id",
-//		KMSEndpoint:     "https://kms.hanzo.ai",
+//		KMSEndpoint:     "zap.kms.svc.cluster.local:9999",
 //		IAMClientID:     "my-client-id",
 //		IAMClientSecret: "my-client-secret",
 //	})
@@ -44,7 +44,9 @@ type PlatformConfig struct {
 	// IAMEndpoint is the base URL for Hanzo IAM (default: "https://hanzo.id").
 	IAMEndpoint string
 
-	// KMSEndpoint is the base URL for Hanzo KMS (default: "https://kms.hanzo.ai").
+	// KMSEndpoint is the KMS ZAP address — "host:port", "zap://host:port" or
+	// "zap+mdns://_kms._tcp" (default: "zap.kms.svc.cluster.local:9999").
+	// An http(s) URL is rejected at Register: Base speaks native ZAP to KMS.
 	KMSEndpoint string
 
 	// IAMClientID is the OAuth2 client ID for IAM authentication.
@@ -130,10 +132,13 @@ func Register(app core.App, config PlatformConfig) error {
 				"iam.Embed() served by the fused daemon")
 	}
 	if config.KMSEndpoint == "" {
-		config.KMSEndpoint = "https://kms.hanzo.ai"
+		config.KMSEndpoint = defaultKMSEndpoint
 	}
 
-	kmsClient := NewKMSClient(config.KMSEndpoint, "")
+	kmsClient, err := NewKMSClient(config.KMSEndpoint)
+	if err != nil {
+		return err
+	}
 
 	poolConfig := DefaultPoolConfig()
 
@@ -153,6 +158,12 @@ func Register(app core.App, config PlatformConfig) error {
 			return err
 		}
 		return p.ensureSystemCollections()
+	})
+
+	// Terminate: release the long-lived KMS connection.
+	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		kmsClient.Close()
+		return e.Next()
 	})
 
 	// Stamp owner+org on every tenant-collection create from the VALIDATED

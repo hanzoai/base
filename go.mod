@@ -15,7 +15,6 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hanzoai/dbx v1.17.2
-	github.com/hanzoai/kms/sdk/go v1.1.1
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.52.0
@@ -26,6 +25,8 @@ require (
 	github.com/luxfi/cache v1.3.1
 	github.com/luxfi/consensus v1.36.3
 	github.com/luxfi/fhe v1.8.2
+	github.com/luxfi/keys v1.4.1
+	github.com/luxfi/kms v1.11.7
 	github.com/luxfi/log v1.4.3
 	github.com/luxfi/zap v1.2.6
 	github.com/minio/minio-go/v7 v7.0.100
@@ -82,8 +83,6 @@ require (
 	github.com/luxfi/geth v1.20.1 // indirect
 	github.com/luxfi/go-bip32 v1.1.0 // indirect
 	github.com/luxfi/go-bip39 v1.2.0 // indirect
-	github.com/luxfi/keys v1.4.1 // indirect
-	github.com/luxfi/kms v1.11.7 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
 	github.com/luxfi/lens v0.2.1 // indirect
 	github.com/luxfi/magnetar v1.2.3 // indirect
@@ -119,7 +118,6 @@ require (
 	github.com/zap-proto/go v1.3.0 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.42.0 // indirect
-	go.opentelemetry.io/otel/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
