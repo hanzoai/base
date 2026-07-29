@@ -52,12 +52,12 @@ func (f *fakeIAM) callCount(path string) int64 {
 	return atomic.LoadInt64(v.(*int64))
 }
 
-// writeOK writes a Casdoor-style {status, msg, data} envelope.
+// writeOK writes IAM's {status, msg, data} envelope.
 func writeOK(w http.ResponseWriter, data any) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "ok", "data": data})
 }
 
-// writeErr writes a Casdoor-style status:"error" envelope at HTTP 200.
+// writeErr writes IAM's status:"error" envelope at HTTP 200.
 // This is the "already exists" path — IAM returns 200, not 409.
 func writeErr(w http.ResponseWriter, msg string) {
 	_ = json.NewEncoder(w).Encode(map[string]any{"status": "error", "msg": msg})
@@ -232,7 +232,7 @@ func TestEnsureUser_Create(t *testing.T) {
 }
 
 func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
-	// IAM/Casdoor returns HTTP 200 with status:"error" + "X already exists"
+	// IAM returns HTTP 200 with status:"error" + "X already exists"
 	// when the user is already present. EnsureUser must treat this as
 	// idempotent-replay and resolve the user via GET /api/get-user.
 	f := newFakeIAM(t)
@@ -461,7 +461,7 @@ func TestCache_FailedFetch_DoesNotPoisonCache(t *testing.T) {
 // ──────────────────────────────────────────────────────────────────────
 
 // writeUserJSON encodes a user as IAM's /v1/iam/oauth/userinfo response shape
-// (raw user object, not Casdoor envelope).
+// (raw user object, not the {status, msg, data} envelope).
 func writeUserJSON(w http.ResponseWriter, u *iam.User) {
 	_ = json.NewEncoder(w).Encode(u)
 }

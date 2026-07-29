@@ -415,7 +415,7 @@ Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider
 at `/v1/iam/*` instead of reverse-proxying to an external Hanzo IAM.
 Same `@hanzo/iam/browser` PKCE contract from the client's perspective —
 the path doesn't change, only the implementation. We use `/v1/iam`, not
-`/api/iam` — this is NOT Casdoor.
+`/api/iam` — `/v1` is Base's one external prefix.
 
 Surface (minimal viable, NOT a full Hanzo IAM):
 
@@ -445,7 +445,7 @@ external mode uses) and `re.Auth` is set to the matching `_iam_users`
 record, so the standard identity-header pipeline keeps working
 unchanged.
 
-Out of scope (boot against an external Casdoor at `IAM_ENDPOINT` if
+Out of scope (boot against an external Hanzo IAM at `IAM_ENDPOINT` if
 you need any of these): multi-tenant orgs, social federation
 (Google/GitHub/SAML), MFA/OTP, password reset, refresh tokens, fancy
 login UI.

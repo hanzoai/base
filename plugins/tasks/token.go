@@ -23,7 +23,7 @@ import (
 // in-cluster IAM Service: a server-side POST to the public issuer host is 403'd
 // by Cloudflare (edge 1006). The token's iss stays the configured public issuer
 // regardless of the mint URL, matching cloud's validator. AuthStyleInParams puts
-// the credentials in the form body — hanzo.id (Casdoor) does not accept Basic.
+// the credentials in the form body — hanzo.id does not accept Basic.
 //
 // Returns nil when the identity is unconfigured: the caller then dials the engine
 // ungated, correct for a dev/loopback frontend.
