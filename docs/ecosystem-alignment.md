@@ -95,7 +95,7 @@ dbx: snake_case for SQL column mapping.
 | Gateway | host+path routing | N/A | gateway/router_engine.go:29-33 |
 
 Commerce canonical external path: `/v1/<service>/*`.
-Base: `/v1/*` (one path, no env knob, no Casdoor compat).
+Base: `/v1/*` (one path, no env knob, no legacy `/api/*` compat).
 
 #### B2. Error Format
 
