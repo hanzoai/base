@@ -109,7 +109,7 @@ type DurableStore struct {
 func NewDurableStore(addr, namespace string) (*DurableStore, error) {
 	token := iamTokenSource()
 	c, err := client.Dial(client.Options{
-		HostPort:  addr,
+		Address:   addr,
 		Namespace: namespace,
 		Token:     token,
 	})
@@ -169,7 +169,7 @@ func (ds *DurableStore) ClientForOrg(org string) (client.Client, error) {
 	}
 
 	c, err := client.Dial(client.Options{
-		HostPort:  ds.addr,
+		Address:   ds.addr,
 		Namespace: org,
 		Token:     ds.token,
 	})

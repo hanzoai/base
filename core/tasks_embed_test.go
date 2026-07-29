@@ -4,8 +4,7 @@ package core_test
 
 import (
 	"context"
-	"net"
-	"strconv"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -20,9 +19,11 @@ import (
 // upstream temporal.io. The same path Base apps take when they want
 // durable workflows without running a sidecar tasksd container.
 func TestTasksEmbed(t *testing.T) {
-	port := freeTCPPort(t)
+	// A socket, not a port: nothing off this host dials the embedded engine, so
+	// there is no port to allocate and none to collide over.
+	sock := filepath.Join(t.TempDir(), "tasks.sock")
 	t.Setenv("TASKS_EMBED", "true")
-	t.Setenv("TASKS_EMBED_ZAP_PORT", strconv.Itoa(port))
+	t.Setenv("TASKS_EMBED_ADDRESS", sock)
 	t.Setenv("TASKS_NAMESPACE", "default")
 
 	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
@@ -31,7 +32,7 @@ func TestTasksEmbed(t *testing.T) {
 	}
 
 	c, err := client.Dial(client.Options{
-		HostPort:    "127.0.0.1:" + strconv.Itoa(port),
+		Address:     sock,
 		Namespace:   "default",
 		DialTimeout: 3 * time.Second,
 		CallTimeout: 3 * time.Second,
@@ -77,14 +78,4 @@ func TestTasksEmbed(t *testing.T) {
 	if !found {
 		t.Fatalf("workflow %s not in list", run.GetID())
 	}
-}
-
-func freeTCPPort(t *testing.T) int {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	defer l.Close()
-	return l.Addr().(*net.TCPAddr).Port
 }
