@@ -163,6 +163,17 @@ var legacyIdentityHeaders = []string{
 	"X-User-Email",
 	"X-Phone-Number",
 	"X-User-IsAdmin",
+	// Authorization and money. These were MISSING, so a service whose outermost
+	// middleware is this one accepted them from the client: X-User-Permissions
+	// is an authorization bypass, and X-Billing-Account-Id names the account a
+	// request is charged to — a forged payer. They must be stripped here even
+	// though the gateway also strips them, because this list exists precisely
+	// for requests that did not come through the gateway.
+	"X-User-Permissions",
+	"X-User-IsGlobalAdmin",
+	"X-User-Owner",
+	"X-Project-Id",
+	"X-Billing-Account-Id",
 	// Non-canonical legacy identity headers.
 	"X-User-Role",  // singular
 	"X-User-Roles", // plural — renamed to X-Roles
