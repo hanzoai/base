@@ -85,11 +85,10 @@ type PlatformConfig struct {
 	// Deprecated: use PrincipalIsolation. Kept as alias for backward compatibility.
 	OrgIsolation string
 
-	// PrincipalEncryptionKey is the master key for deriving per-principal DEKs.
-	// Used for both Liquid SQL encryption AND S3 SSE-C key derivation.
-	// Each org gets: HMAC-SHA256(masterKey, orgSlug)
-	// Each user gets: HMAC-SHA256(masterKey, orgSlug:userId)
-	// If empty, encryption is disabled (dev mode).
+	// PrincipalEncryptionKey is the master key per-principal keys are derived
+	// from, by github.com/hanzoai/cek — see OrgDB.OrgDEK and OrgDB.UserDEK for
+	// the namespace each one uses. It must be 32 bytes, which is what a master
+	// key from KMS is. If empty, encryption is disabled (dev mode).
 	PrincipalEncryptionKey string
 
 	// Deprecated: use PrincipalEncryptionKey.
@@ -335,10 +334,6 @@ func Register(app core.App, config PlatformConfig) error {
 		isolation := config.PrincipalIsolation
 		if isolation == "" {
 			isolation = config.OrgIsolation // backward compat
-		}
-		encKey := config.PrincipalEncryptionKey
-		if encKey == "" {
-			encKey = config.OrgEncryptionKey
 		}
 		if isolation == "sqlite" || isolation == "postgres" {
 			e.Router.Bind(&hook.Handler[*core.RequestEvent]{

@@ -120,9 +120,8 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 			"user_id": userID,
 			"org_id":  p.config.OrgID,
 			"key_hierarchy": map[string]string{
-				"master_kek": "HSM / K-Chain ML-KEM (never exported)",
-				"org_kek":    fmt.Sprintf("HMAC-SHA256(master, vault:org:%s)", p.config.OrgID),
-				"user_dek":   fmt.Sprintf("HMAC-SHA256(orgKEK, vault:user:%s)", userID),
+				"master_key": "HSM / K-Chain ML-KEM (never exported)",
+				"user_dek":   fmt.Sprintf("cek.DeriveKey(master, org/%s/%s, %q)", p.config.OrgID, userID, userSubsystem),
 				"encryption": "AES-256-GCM per entry",
 			},
 		})

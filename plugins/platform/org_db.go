@@ -1,8 +1,6 @@
 package platform
 
 import (
-	"crypto/hkdf"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -10,6 +8,8 @@ import (
 	"sync"
 
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/cek"
+	"github.com/hanzoai/namespace"
 )
 
 // OrgDB manages per-org AND per-user SQLite databases.
@@ -19,13 +19,16 @@ import (
 //	{DataDir}/orgs/{orgSlug}/org.db              ← org-level shared data
 //	{DataDir}/orgs/{orgSlug}/users/{userId}/data.db  ← per-user PII + keys
 //
-// Each file is independently encrypted with a unique DEK:
+// Each file gets its own key, derived by github.com/hanzoai/cek from the master
+// key and the namespace naming whose data it is:
 //
-//	org DEK  = HMAC-SHA256(masterKey, orgSlug)
-//	user DEK = HMAC-SHA256(masterKey, orgSlug + ":" + userId)
+//	org DEK  = cek.DeriveKey(master, org/{orgSlug},           "org")
+//	user DEK = cek.DeriveKey(master, org/{orgSlug}/{userId},  "user")
 //
-// Zero data commingling — org data, user PII, and keys are all in separate
-// files with separate encryption keys.
+// Zero data commingling — org data and user PII live in separate files under
+// separate keys. TestOrgDB_DEK_IsCEKDerivation holds these two lines to the
+// code, because a comment about a derivation cannot fail when the derivation
+// drifts and this package has been wrong that way before.
 type OrgDB struct {
 	app       core.App
 	masterKey string
@@ -78,14 +81,38 @@ func (t *OrgDB) OrgDBPath(orgSlug string) string {
 	return filepath.Join(t.OrgDir(orgSlug), "org.db")
 }
 
-// OrgDEK derives the org-level data encryption key using HKDF (RFC 5869).
-// Go 1.26+ stdlib crypto/hkdf — proper key derivation, not raw HMAC.
-func (t *OrgDB) OrgDEK(orgSlug string) string {
+// The subsystem each key belongs to. One store is one subsystem, so these name
+// what the file holds rather than who it is for — who is the namespace.
+const (
+	orgDEKSubsystem  = "org"
+	userDEKSubsystem = "user"
+)
+
+// dek derives ns's key for subsystem with github.com/hanzoai/cek, the one key
+// derivation in the platform.
+//
+// An empty master key is dev mode: no key, and no encryption, so the caller
+// gets "" and no error. A master key of any OTHER wrong length is a
+// misconfiguration and is reported, because a key that quietly becomes no key
+// is how data ends up in the clear while the deployment believes otherwise.
+func (t *OrgDB) dek(ns namespace.Namespace, subsystem string) (string, error) {
 	if t.masterKey == "" {
-		return ""
+		return "", nil
 	}
-	key, _ := hkdf.Key(sha256.New, []byte(t.masterKey), []byte(orgSlug), "org-dek", 32)
-	return hex.EncodeToString(key)
+	key, err := cek.DeriveKey([]byte(t.masterKey), ns, subsystem)
+	if err != nil {
+		return "", fmt.Errorf("platform: derive %s key: %w", subsystem, err)
+	}
+	return hex.EncodeToString(key), nil
+}
+
+// OrgDEK derives the org-level data encryption key.
+func (t *OrgDB) OrgDEK(orgSlug string) (string, error) {
+	ns, err := namespace.Org(orgSlug)
+	if err != nil {
+		return "", err
+	}
+	return t.dek(ns, orgDEKSubsystem)
 }
 
 // ProvisionOrg creates the org directory and org-level database.
@@ -126,14 +153,23 @@ func (t *OrgDB) UserDBPath(orgSlug, userId string) string {
 	return filepath.Join(t.UserDir(orgSlug, userId), "data.db")
 }
 
-// UserDEK derives the per-user data encryption key using HKDF (RFC 5869).
-// Different from the org DEK — user PII gets a user-specific key.
-func (t *OrgDB) UserDEK(orgSlug, userId string) string {
-	if t.masterKey == "" {
-		return ""
+// UserDEK derives the per-user data encryption key. User PII gets its own key,
+// separate from the org's.
+//
+// The org rides in the namespace alongside the user, so acme/alice and
+// globex/alice stay different keys even where two orgs use the same user id.
+//
+// namespace.Of is the door here, rather than OrgProject, because these ids are
+// already slugs by this package's own contract — validateSlug, and the org's
+// directory is named with the raw slug. Sanitizing here and not there would key
+// a file by one rendering of a name and place it by another; erroring instead
+// keeps the key and the path reading the same string.
+func (t *OrgDB) UserDEK(orgSlug, userId string) (string, error) {
+	ns, err := namespace.Of(orgSlug + "/" + userId)
+	if err != nil {
+		return "", err
 	}
-	key, _ := hkdf.Key(sha256.New, []byte(t.masterKey), []byte(orgSlug+":"+userId), "user-dek", 32)
-	return hex.EncodeToString(key)
+	return t.dek(ns, userDEKSubsystem)
 }
 
 // ProvisionUser creates the per-user directory and database.
