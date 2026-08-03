@@ -7,12 +7,11 @@
 // Architecture:
 //
 //	Cloud HSM / K-Chain ML-KEM
-//	  └── Master KEK (unwrapped via HSM or threshold decryption)
-//	        └── Org KEK = HMAC-SHA256(master, "vault:org:" + orgID)
-//	              └── User DEK = HMAC-SHA256(orgKEK, "vault:user:" + userID)
-//	                    └── SQLite shard (AES-256-GCM encrypted)
-//	                          └── CRDT sync via ZAP (conflict-free merge)
-//	                                └── Merkle root anchored to chain
+//	  └── Master key (unwrapped via HSM or threshold decryption)
+//	        └── User DEK = cek.DeriveKey(master, org/{orgID}/{userID}, "vault")
+//	              └── SQLite shard (AES-256-GCM encrypted)
+//	                    └── CRDT sync via ZAP (conflict-free merge)
+//	                          └── Merkle root anchored to chain
 //
 // Usage:
 //
@@ -32,9 +31,7 @@ package vault
 import (
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/hmac"
 	"crypto/rand"
-	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -43,6 +40,8 @@ import (
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
+	"github.com/hanzoai/cek"
+	"github.com/hanzoai/namespace"
 	luxlog "github.com/luxfi/log"
 )
 
@@ -92,7 +91,6 @@ func Register(app core.App, config Config) error {
 	p := &plugin{
 		app:    app,
 		config: config,
-		orgKEK: deriveOrgKEK(config.MasterKey, config.OrgID),
 		shards: make(map[string]*UserShard),
 		logger: luxlog.New("component", "vault"),
 	}
@@ -125,7 +123,6 @@ func Register(app core.App, config Config) error {
 type plugin struct {
 	app    core.App
 	config Config
-	orgKEK []byte // 32-byte org-level key encryption key
 	shards map[string]*UserShard
 	mu     sync.RWMutex
 	logger luxlog.Logger
@@ -155,7 +152,10 @@ func (p *plugin) GetShard(userID string) (*UserShard, error) {
 		return shard, nil
 	}
 
-	dek := deriveUserDEK(p.orgKEK, userID)
+	dek, err := vaultKey(p.config.MasterKey, p.config.OrgID, userID, userSubsystem)
+	if err != nil {
+		return nil, err
+	}
 	dbPath := filepath.Join(p.config.DataDir, p.config.OrgID, userID+".db")
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0700); err != nil {
@@ -185,29 +185,47 @@ func (p *plugin) closeAll() {
 
 // ─── Key Derivation ──────────────────────────────────────────────────────────
 //
-// KEK/DEK hierarchy:
-//   Master KEK (from HSM or K-Chain ML-KEM threshold unwrap)
-//     → Org KEK = HMAC-SHA256(masterKEK, "vault:org:" + orgID)
-//       → User DEK = HMAC-SHA256(orgKEK, "vault:user:" + userID)
-//         → Per-entry: AES-256-GCM with random 12-byte nonce
+// One derivation, github.com/hanzoai/cek, from the master key and the namespace
+// naming whose data the shard holds:
 //
-// Properties:
-//   - Compromising one user's DEK does not reveal other users' DEKs
-//   - Org KEK can be rotated without re-encrypting all user data
-//     (re-derive DEKs from new org KEK, re-encrypt shard headers only)
-//   - Master KEK never touches disk (held in HSM or threshold-reconstructed)
-//   - Each SQLite shard is independently encrypted — no shared ciphertext
+//	user shard   = cek.DeriveKey(master, org/{orgID}/{userID},  "vault")
+//	shared vault = cek.DeriveKey(master, org/{orgID}/{vaultID}, "vault-shared")
+//
+// There is no intermediate org KEK any more. It was there to be rotatable
+// without re-encrypting user data, nothing ever rotated it, and what it did in
+// practice was give this plugin a second key derivation of its own. The org is
+// in the namespace instead, so two orgs that use the same user id still get
+// different keys — which is the property the hierarchy was really providing.
+//
+// Properties that remain:
+//   - Compromising one user's DEK does not reveal any other user's DEK
+//   - The master key never touches disk (HSM or threshold-reconstructed)
+//   - Each shard is independently encrypted — no shared ciphertext
+const (
+	userSubsystem   = "vault"
+	sharedSubsystem = "vault-shared"
+)
 
-func deriveOrgKEK(masterKey []byte, orgID string) []byte {
-	mac := hmac.New(sha256.New, masterKey)
-	mac.Write([]byte("vault:org:" + orgID))
-	return mac.Sum(nil)
-}
-
-func deriveUserDEK(orgKEK []byte, userID string) []byte {
-	mac := hmac.New(sha256.New, orgKEK)
-	mac.Write([]byte("vault:user:" + userID))
-	return mac.Sum(nil)
+// vaultKey derives the key for one member of an org — a user, or a shared vault
+// — from the master key. name rides in the namespace with orgID rather than in
+// the subsystem, so the key is bound to the org that owns it.
+//
+// OrgProject is the door here, rather than namespace.Of, because these ids are
+// DIDs ("did:lux:user:alice") chosen elsewhere, and a namespace segment is
+// [a-z0-9][a-z0-9_-]* — a DID's colons are not legal in one. OrgProject folds
+// each half through Sanitize, which is INJECTIVE, so two distinct DIDs cannot
+// land on one key however they are spelled. A lossy fold here would be two
+// users sharing a vault.
+func vaultKey(master []byte, orgID, name, subsystem string) ([]byte, error) {
+	ns, err := namespace.OrgProject(orgID, name)
+	if err != nil {
+		return nil, fmt.Errorf("vault: %w", err)
+	}
+	key, err := cek.DeriveKey(master, ns, subsystem)
+	if err != nil {
+		return nil, fmt.Errorf("vault: derive %s key: %w", subsystem, err)
+	}
+	return key, nil
 }
 
 // Encrypt encrypts plaintext with the user's DEK using AES-256-GCM.

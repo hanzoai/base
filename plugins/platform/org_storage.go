@@ -1,11 +1,12 @@
 package platform
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+
+	"github.com/hanzoai/cek"
+	"github.com/hanzoai/namespace"
 )
 
 // OrgStorage manages per-org and per-user S3 bucket isolation.
@@ -55,27 +56,45 @@ func (s *OrgStorage) UserPrefix(orgSlug, userId string) string {
 	return fmt.Sprintf("orgs/%s/users/%s/", orgSlug, userId)
 }
 
+// s3Subsystem is the store these keys encrypt. Which entity's objects they
+// encrypt is the namespace's job, not the subsystem's, so one name serves both
+// the org and the user key.
+const s3Subsystem = "s3"
+
+// sseKey derives ns's SSE-C key with github.com/hanzoai/cek — the same
+// derivation as OrgDB's database keys, differing only in the subsystem, so an
+// org's objects and its database do not share a key. Base64 because that is the
+// encoding S3 wants in the SSE-C header; the key itself is the usual 32 bytes.
+func (s *OrgStorage) sseKey(ns namespace.Namespace) (string, error) {
+	if s.MasterKey == "" {
+		return "", nil
+	}
+	key, err := cek.DeriveKey([]byte(s.MasterKey), ns, s3Subsystem)
+	if err != nil {
+		return "", fmt.Errorf("platform: derive s3 key: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(key), nil
+}
+
 // OrgSSEKey derives a per-org SSE-C encryption key (32 bytes, base64-encoded).
 // Used as the SSE-C CustomerKey header for server-side encryption.
-func (s *OrgStorage) OrgSSEKey(orgSlug string) string {
-	if s.MasterKey == "" {
-		return ""
+func (s *OrgStorage) OrgSSEKey(orgSlug string) (string, error) {
+	ns, err := namespace.Org(orgSlug)
+	if err != nil {
+		return "", err
 	}
-	mac := hmac.New(sha256.New, []byte(s.MasterKey))
-	mac.Write([]byte("s3:org:" + orgSlug))
-	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	return s.sseKey(ns)
 }
 
 // UserSSEKey derives a per-user SSE-C encryption key (32 bytes, base64-encoded).
-// Each user's objects are encrypted with a unique key — even if the bucket is shared,
-// objects cannot be decrypted without the user-specific key.
-func (s *OrgStorage) UserSSEKey(orgSlug, userId string) string {
-	if s.MasterKey == "" {
-		return ""
+// Each user's objects are encrypted with a unique key — even if the bucket is
+// shared, objects cannot be decrypted without the user-specific key.
+func (s *OrgStorage) UserSSEKey(orgSlug, userId string) (string, error) {
+	ns, err := namespace.Of(orgSlug + "/" + userId)
+	if err != nil {
+		return "", err
 	}
-	mac := hmac.New(sha256.New, []byte(s.MasterKey))
-	mac.Write([]byte("s3:user:" + orgSlug + ":" + userId))
-	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	return s.sseKey(ns)
 }
 
 // BucketPolicy returns a MinIO/S3 bucket policy JSON that enforces per-org

@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/domodwyer/mailyak/v3 v3.6.2
-	github.com/dop251/goja v0.0.0-20260607120635-348e6bea910d
+	github.com/dop251/goja v0.0.0-20260627200808-0b76000cabdb
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	github.com/evanw/esbuild v0.28.1
 	github.com/fatih/color v1.19.0
@@ -17,7 +17,7 @@ require (
 	github.com/hanzoai/dbx v1.17.2
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.52.4
+	github.com/hanzoai/tasks v1.52.9
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
@@ -27,7 +27,7 @@ require (
 	github.com/luxfi/fhe v1.8.2
 	github.com/luxfi/keys v1.4.1
 	github.com/luxfi/kms v1.11.7
-	github.com/luxfi/log v1.4.3
+	github.com/luxfi/log v1.5.0
 	github.com/luxfi/zap v1.2.7
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
@@ -64,8 +64,11 @@ require (
 	github.com/gtank/ristretto255 v0.2.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
+	github.com/hanzoai/authz v1.10.29 // indirect
+	github.com/hanzoai/cek v0.2.3 // indirect
 	github.com/hanzoai/csqlite v0.1.0 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
+	github.com/hanzoai/namespace v1.2.0 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
@@ -146,7 +149,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hanzoai/orm v0.6.16
 	github.com/hanzoai/replicate v0.9.5
-	github.com/hanzoai/sqlite v0.4.0
+	github.com/hanzoai/sqlite v0.5.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -168,7 +171,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/zap-proto/http v0.3.1 // indirect
-	github.com/zap-proto/zip v1.17.2
+	github.com/zap-proto/zip v1.18.1
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.37.0 // indirect

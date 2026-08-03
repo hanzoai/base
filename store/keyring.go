@@ -272,6 +272,18 @@ func (kr *Keyring) sidecarGet(sk string) (blob []byte, ok bool, err error) {
 // WK = HKDF-SHA256(secret=KEK_org, salt=domain, info=objectKey). The objectKey
 // (which begins with the orgID and encodes scope + tenant id) binds the
 // wrapping key to exactly one DB, so distinct tenants derive distinct keys.
+//
+// This is deliberately NOT github.com/hanzoai/cek, which is the one key
+// derivation everywhere else in this repo. cek answers "what key does this
+// namespace's database have", and it answers it by derivation alone: no
+// wrapping, and nothing stored. This key answers a different question. What
+// encrypts the DB here is a RANDOM age identity, generated once and kept only
+// in wrapped form, so no derivation can reproduce it — and that is what makes
+// Rotate cheap: a new org KEK re-wraps one sidecar instead of rewriting every
+// byte of ciphertext. The secret is also a per-org KMS KEK rather than one
+// master, so separation lives in the key material here and in the namespace
+// there. Two different shapes; the HKDF calls are not even parameter-wise
+// interchangeable (this one salts, cek does not). Do not "unify" them.
 func deriveWrapKey(ctx context.Context, root RootSource, k Key) ([]byte, error) {
 	kek, err := root.OrgRoot(ctx, k.OrgID)
 	if err != nil {
