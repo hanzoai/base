@@ -14,8 +14,10 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/hanzoai/cek v0.2.3
 	github.com/hanzoai/dbx v1.17.2
 	github.com/hanzoai/ltx v0.5.1
+	github.com/hanzoai/namespace v1.2.0
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.52.9
 	github.com/hanzoai/tygoja v0.0.2
@@ -55,7 +57,6 @@ require (
 	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/utils/v2 v2.0.4 // indirect
@@ -65,10 +66,8 @@ require (
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
 	github.com/hanzoai/authz v1.10.29 // indirect
-	github.com/hanzoai/cek v0.2.3 // indirect
 	github.com/hanzoai/csqlite v0.1.0 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
-	github.com/hanzoai/namespace v1.2.0 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
