@@ -112,11 +112,31 @@ func TestOrgDB_ValidSlugs(t *testing.T) {
 
 // --- DEK derivation ---
 
+// mustOrgDEK and mustUserDEK keep the assertions below about the keys rather
+// than about error plumbing.
+func mustOrgDEK(t *testing.T, db *OrgDB, org string) string {
+	t.Helper()
+	dek, err := db.OrgDEK(org)
+	if err != nil {
+		t.Fatalf("OrgDEK(%q): %v", org, err)
+	}
+	return dek
+}
+
+func mustUserDEK(t *testing.T, db *OrgDB, org, user string) string {
+	t.Helper()
+	dek, err := db.UserDEK(org, user)
+	if err != nil {
+		t.Fatalf("UserDEK(%q, %q): %v", org, user, err)
+	}
+	return dek
+}
+
 func TestOrgDB_OrgDEK_Deterministic(t *testing.T) {
 	db, _ := testOrgDB(t)
 
-	dek1 := db.OrgDEK("acme")
-	dek2 := db.OrgDEK("acme")
+	dek1 := mustOrgDEK(t, db, "acme")
+	dek2 := mustOrgDEK(t, db, "acme")
 
 	if dek1 != dek2 {
 		t.Fatal("OrgDEK should be deterministic for same input")
@@ -129,8 +149,8 @@ func TestOrgDB_OrgDEK_Deterministic(t *testing.T) {
 func TestOrgDB_OrgDEK_UniquePerOrg(t *testing.T) {
 	db, _ := testOrgDB(t)
 
-	dek1 := db.OrgDEK("acme")
-	dek2 := db.OrgDEK("globex")
+	dek1 := mustOrgDEK(t, db, "acme")
+	dek2 := mustOrgDEK(t, db, "globex")
 
 	if dek1 == dek2 {
 		t.Fatal("different orgs should have different DEKs")
@@ -140,9 +160,9 @@ func TestOrgDB_OrgDEK_UniquePerOrg(t *testing.T) {
 func TestOrgDB_UserDEK_UniquePerUser(t *testing.T) {
 	db, _ := testOrgDB(t)
 
-	dek1 := db.UserDEK("acme", "user-001")
-	dek2 := db.UserDEK("acme", "user-002")
-	dek3 := db.UserDEK("globex", "user-001")
+	dek1 := mustUserDEK(t, db, "acme", "user-001")
+	dek2 := mustUserDEK(t, db, "acme", "user-002")
+	dek3 := mustUserDEK(t, db, "globex", "user-001")
 
 	if dek1 == dek2 {
 		t.Fatal("different users in same org should have different DEKs")
@@ -155,11 +175,11 @@ func TestOrgDB_UserDEK_UniquePerUser(t *testing.T) {
 func TestOrgDB_DEK_OrgVsUser_Different(t *testing.T) {
 	db, _ := testOrgDB(t)
 
-	orgDEK := db.OrgDEK("acme")
-	userDEK := db.UserDEK("acme", "acme") // same string as org slug
+	orgDEK := mustOrgDEK(t, db, "acme")
+	userDEK := mustUserDEK(t, db, "acme", "acme") // same string as org slug
 
 	if orgDEK == userDEK {
-		t.Fatal("org DEK and user DEK should differ even with same input (different HKDF info)")
+		t.Fatal("org DEK and user DEK should differ even with the same input (different namespace and subsystem)")
 	}
 }
 
@@ -168,11 +188,26 @@ func TestOrgDB_DEK_EmptyMasterKey(t *testing.T) {
 	app := &mockApp{dataDir: dir}
 	db := NewOrgDB(app, "") // no master key
 
-	if dek := db.OrgDEK("acme"); dek != "" {
+	if dek := mustOrgDEK(t, db, "acme"); dek != "" {
 		t.Fatalf("expected empty DEK with no master key, got %s", dek)
 	}
-	if dek := db.UserDEK("acme", "user-001"); dek != "" {
+	if dek := mustUserDEK(t, db, "acme", "user-001"); dek != "" {
 		t.Fatalf("expected empty DEK with no master key, got %s", dek)
+	}
+}
+
+// A master key of the wrong length must be an error, not silently no key. This
+// is the fail-open case: a deployment that sets a 31-byte key would otherwise
+// write plaintext while believing it had encryption.
+func TestOrgDB_DEK_WrongLengthMasterKey(t *testing.T) {
+	app := &mockApp{dataDir: t.TempDir()}
+	db := NewOrgDB(app, "too-short")
+
+	if _, err := db.OrgDEK("acme"); err == nil {
+		t.Fatal("expected an error from a master key that is not 32 bytes")
+	}
+	if _, err := db.UserDEK("acme", "user-001"); err == nil {
+		t.Fatal("expected an error from a master key that is not 32 bytes")
 	}
 }
 

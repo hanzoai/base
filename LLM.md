@@ -126,9 +126,8 @@ The server is a relay/index/cache layer, not the owner of truth.
 | Plugin | Path | Purpose |
 |--------|------|---------|
 | vault | plugins/vault/ | Per-user encrypted SQLite shards, DEK/KEK, CRDT sync, chain anchor |
-| kms | plugins/kms/ | Client-side KMS integration (talks to K-Chain or cloud HSM) |
 | zap | plugins/zap/ | ZAP transport (8.7us latency) |
-| platform | plugins/platform/ | Hanzo platform integration |
+| platform | plugins/platform/ | Hanzo platform integration — orgs, IAM, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
 | functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
@@ -415,7 +414,7 @@ Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider
 at `/v1/iam/*` instead of reverse-proxying to an external Hanzo IAM.
 Same `@hanzo/iam/browser` PKCE contract from the client's perspective —
 the path doesn't change, only the implementation. We use `/v1/iam`, not
-`/api/iam` — this is NOT Casdoor.
+`/api/iam` — `/v1` is Base's one external prefix.
 
 Surface (minimal viable, NOT a full Hanzo IAM):
 
@@ -445,7 +444,7 @@ external mode uses) and `re.Auth` is set to the matching `_iam_users`
 record, so the standard identity-header pipeline keeps working
 unchanged.
 
-Out of scope (boot against an external Casdoor at `IAM_ENDPOINT` if
+Out of scope (boot against an external Hanzo IAM at `IAM_ENDPOINT` if
 you need any of these): multi-tenant orgs, social federation
 (Google/GitHub/SAML), MFA/OTP, password reset, refresh tokens, fancy
 login UI.

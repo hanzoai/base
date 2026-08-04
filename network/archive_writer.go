@@ -15,8 +15,8 @@ import (
 )
 
 // uploader is the minimal put/get/list surface every backend must
-// expose to the shared writer loop. S3 and GCS implement it in their
-// own files; the loop itself knows nothing about the underlying SDK.
+// expose to the shared writer loop. S3 implements it in its own file;
+// the loop itself knows nothing about the underlying SDK.
 type uploader interface {
 	put(ctx context.Context, key string, body []byte) error
 	get(ctx context.Context, key string) ([]byte, error)
@@ -47,8 +47,8 @@ type segmentPending struct {
 	data     []byte
 }
 
-// archiveWriter is the shared goroutine-per-shard pipeline that both
-// the S3 and GCS backends sit behind.
+// archiveWriter is the shared goroutine-per-shard pipeline that the S3
+// backend sits behind.
 type archiveWriter struct {
 	up  uploader
 	cfg ArchiveConfig

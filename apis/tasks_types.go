@@ -4,10 +4,10 @@ package apis
 type TaskCreateRequest struct {
 	SpaceID      string            `json:"space_id"`
 	Title        string            `json:"title"`
-	Name         string            `json:"name"`                    // alias for title
-	Queue        string            `json:"queue"`                   // alias for space_id
+	Name         string            `json:"name"`  // alias for title
+	Queue        string            `json:"queue"` // alias for space_id
 	Description  string            `json:"description"`
-	Priority     int               `json:"priority"`                // 0=low, 1=normal, 2=high, 3=critical
+	Priority     int               `json:"priority"` // 0=low, 1=normal, 2=high, 3=critical
 	AssignedTo   string            `json:"assigned_to"`
 	WorkflowID   string            `json:"workflow_id"`
 	ParentTaskID string            `json:"parent_task_id"`
@@ -16,9 +16,9 @@ type TaskCreateRequest struct {
 	Input        map[string]any    `json:"input,omitempty"`
 	MaxRetries   int               `json:"max_retries"`
 	TimeoutSecs  int               `json:"timeout_secs"`
-	Timeout      string            `json:"timeout,omitempty"`       // e.g. "1h", "30m" (parsed if timeout_secs=0)
+	Timeout      string            `json:"timeout,omitempty"` // e.g. "1h", "30m" (parsed if timeout_secs=0)
 	Metadata     map[string]string `json:"metadata,omitempty"`
-	Retry        *RetryConfig      `json:"retry,omitempty"`         // alternative retry config
+	Retry        *RetryConfig      `json:"retry,omitempty"` // alternative retry config
 }
 
 // RetryConfig controls retry behavior for a task.
@@ -61,7 +61,7 @@ type TaskProgressRequest struct {
 // TaskNextRequest is the body for POST /v1/tasks/next.
 type TaskNextRequest struct {
 	SpaceID string `json:"space_id"`
-	Queue   string `json:"queue"`    // alias for space_id
+	Queue   string `json:"queue"` // alias for space_id
 	AgentID string `json:"agent_id"`
 }
 
@@ -74,11 +74,11 @@ type TaskSignalRequest struct {
 // WorkflowCreateRequest is the body for POST /v1/tasks/workflows.
 type WorkflowCreateRequest struct {
 	SpaceID     string              `json:"space_id"`
-	Queue       string              `json:"queue"`       // alias for space_id
+	Queue       string              `json:"queue"` // alias for space_id
 	Name        string              `json:"name"`
 	Description string              `json:"description"`
 	Tasks       []TaskCreateRequest `json:"tasks"`
-	Steps       []TaskCreateRequest `json:"steps"`       // alias for tasks
-	Parallel    bool                `json:"parallel"`    // fan-out mode
+	Steps       []TaskCreateRequest `json:"steps"`    // alias for tasks
+	Parallel    bool                `json:"parallel"` // fan-out mode
 	Metadata    map[string]string   `json:"metadata"`
 }

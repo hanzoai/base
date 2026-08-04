@@ -15,12 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"strconv"
-
 	"github.com/fatih/color"
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/cron"
-	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/logger"
@@ -28,7 +24,9 @@ import (
 	"github.com/hanzoai/base/tools/routine"
 	"github.com/hanzoai/base/tools/store"
 	"github.com/hanzoai/base/tools/subscriptions"
+	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 	tasksembed "github.com/hanzoai/tasks/pkg/tasks"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/semaphore"
@@ -219,30 +217,40 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 	// Tasks transport selection (in priority order):
 	//   1. TASKS_EMBED=true — boot pkg/tasks.Embed in-process; the
 	//      tasks daemon runs INSIDE the Base binary, ZAP-listened on
-	//      TASKS_EMBED_ZAP_PORT (default 9999). Workflow execution,
-	//      schedules, namespaces — all native, no external daemon,
-	//      no gRPC, no temporal.io.
+	//      TASKS_EMBED_ADDRESS. A filesystem path binds a unix socket,
+	//      which is the right shape for a listener nothing off this host
+	//      ever dials and needs no port to allocate or collide over;
+	//      anything else is host:port. Workflow execution, schedules,
+	//      namespaces — all native, no external daemon, no gRPC, no
+	//      temporal.io.
 	//   2. TASKS_ZAP — direct ZAP dial to a remote Hanzo Tasks daemon
 	//   3. TASKS_URL — HTTP fallback to a remote Hanzo Tasks daemon
 	//   4. (none) — local goroutine timer mode (dev fallback, no
 	//      durability)
 	zapAddr := os.Getenv("TASKS_ZAP")
 	if os.Getenv("TASKS_EMBED") == "true" && zapAddr == "" {
-		port := 9999
-		if p := os.Getenv("TASKS_EMBED_ZAP_PORT"); p != "" {
-			if n, err := strconv.Atoi(p); err == nil {
-				port = n
+		// Default the socket under THIS app's data dir, not a shared temp dir. A
+		// fixed fleet-wide path is a collision: two Base processes on one host
+		// would fight over one listener and all but the first would come up with
+		// no durable engine at all — the same failure a fixed default PORT had,
+		// one layer down. Naming it after whose it is makes that impossible.
+		addr := os.Getenv("TASKS_EMBED_ADDRESS")
+		if addr == "" {
+			dir := config.DataDir
+			if dir == "" {
+				dir = os.TempDir()
 			}
+			addr = filepath.Join(dir, "tasks.sock")
 		}
 		// Boot the in-process tasks daemon. The handle is held on the
 		// app for clean shutdown; the client below dials it via ZAP.
 		// Errors are non-fatal — Base falls through to remote/local
 		// fallback so a misconfigured embed never bricks the app.
 		if srv, err := tasksembed.Embed(context.Background(), tasksembed.EmbedConfig{
-			ZAPPort:   port,
+			Address:   addr,
 			Namespace: os.Getenv("TASKS_NAMESPACE"),
 		}); err == nil {
-			zapAddr = "127.0.0.1:" + strconv.Itoa(port)
+			zapAddr = srv.Address()
 			defer func() { _ = srv }() // hold a reference; actual stop wired below
 		}
 	}

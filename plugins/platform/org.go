@@ -129,7 +129,7 @@ func (s *OrgService) GetCreds(orgId, provider string) map[string]string {
 
 // fetchCredsFromKMS tries to fetch credentials from KMS for known key names.
 func (s *OrgService) fetchCredsFromKMS(orgId, provider string) map[string]string {
-	if s.kms == nil || s.kms.baseURL == "" {
+	if !s.kms.configured() {
 		return nil
 	}
 
@@ -178,7 +178,7 @@ func (s *OrgService) SetCreds(orgId, provider string, creds map[string]string) e
 	if orgId == "" || provider == "" {
 		return fmt.Errorf("org: orgId and provider are required")
 	}
-	if s.kms == nil || s.kms.baseURL == "" {
+	if !s.kms.configured() {
 		return fmt.Errorf("org: KMS not configured")
 	}
 

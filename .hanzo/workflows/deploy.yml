@@ -16,6 +16,10 @@ name: deploy
 on:
   push:
     branches: [main]
+    # A `v*` tag is a RELEASE and must publish an image named after it.
+    # Without this the builder answered only to branch pushes, so `git tag`
+    # published nothing and ghcr.io/hanzoai/base could carry no version.
+    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
@@ -32,7 +36,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: meta
-        run: echo "tag=sha-$(echo "$GITHUB_SHA" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+        run: |
+          # A tag push publishes the TAG; a branch push publishes an immutable
+          # sha-<7>. Both are traceable; only the first is deployable, because
+          # the estate guards require semver (or a digest) in any manifest.
+          case "$GITHUB_REF" in
+            refs/tags/v*) tag="${GITHUB_REF#refs/tags/}" ;;
+            *)            tag="sha-$(echo "$GITHUB_SHA" | cut -c1-7)" ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
         with: { driver: docker-container, driver-opts: network=host }

@@ -5,7 +5,8 @@
 // proxy forwards it to the configured IAM_ENDPOINT — Hanzo's hanzo.id,
 // an enterprise Hanzo IAM, or an in-process iam.Embed() served by the
 // fused daemon. Base is a pure IAM client; whichever IAM answers is
-// opaque to the client. Routes are /v1/iam/*, never the legacy Casdoor prefix.
+// opaque to the client. The mount is /v1/iam, never /api/* — /v1 is
+// Base's one external prefix.
 
 package platform
 

@@ -4,7 +4,7 @@
 // SDK exposes the 5 primitives that any app needs:
 //
 //  1. Identity  — OpenUser, bind device, resolve DID
-//  2. KeyAccess — GetShardKey, unwrap DEK, rotation
+//  2. KeyAccess — derive the shard's DEK from the master key (see vaultKey)
 //  3. LocalDB   — OpenShard, read/write encrypted SQLite
 //  4. Sync      — PushOps, PullOps, Merge (CRDT over ZAP)
 //  5. Anchor    — CommitAnchor, merkle root to chain, audit proof
@@ -51,10 +51,9 @@ type SDKConfig struct {
 
 // Vault is the top-level SDK handle. One per app process.
 type Vault struct {
-	config  SDKConfig
-	orgKEK  []byte
-	users   map[string]*Session
-	mu      sync.RWMutex
+	config SDKConfig
+	users  map[string]*Session
+	mu     sync.RWMutex
 }
 
 // Open creates a new Vault instance.
@@ -67,7 +66,6 @@ func Open(cfg SDKConfig) (*Vault, error) {
 	}
 	return &Vault{
 		config: cfg,
-		orgKEK: deriveOrgKEK(cfg.MasterKEK, cfg.OrgID),
 		users:  make(map[string]*Session),
 	}, nil
 }
@@ -79,7 +77,6 @@ func (v *Vault) Close() {
 	for _, s := range v.users {
 		s.close()
 	}
-	clear(v.orgKEK)
 	v.users = nil
 }
 
@@ -95,16 +92,19 @@ func (v *Vault) OpenUser(userID string) (*Session, error) {
 		return s, nil
 	}
 
-	dek := deriveUserDEK(v.orgKEK, userID)
+	dek, err := vaultKey(v.config.MasterKEK, v.config.OrgID, userID, userSubsystem)
+	if err != nil {
+		return nil, err
+	}
 	s := &Session{
-		userID:  userID,
-		orgID:   v.config.OrgID,
-		dek:     dek,
-		dataDir: v.config.DataDir,
+		userID:   userID,
+		orgID:    v.config.OrgID,
+		dek:      dek,
+		dataDir:  v.config.DataDir,
 		chainRPC: v.config.ChainRPC,
-		store:   make(map[string][]byte), // in-memory for v1; SQLite in v2
-		oplog:   make([]Op, 0),
-		version: make(map[string]uint64),
+		store:    make(map[string][]byte), // in-memory for v1; SQLite in v2
+		oplog:    make([]Op, 0),
+		version:  make(map[string]uint64),
 	}
 
 	v.users[userID] = s
@@ -290,8 +290,9 @@ func (s *Session) close() {
 
 // ─── Shared Vaults ───────────────────────────────────────────────────────────
 
-// SharedSession is a multi-member vault derived from the org KEK + vaultID.
-// Members list controls who can access. Each member decrypts with the shared DEK.
+// SharedSession is a multi-member vault, keyed by its own vaultID rather than
+// by any one member. The members list controls who can access it; each member
+// decrypts with the shared DEK.
 type SharedSession struct {
 	Session
 	vaultID string
@@ -299,7 +300,8 @@ type SharedSession struct {
 }
 
 // OpenSharedVault creates a shared vault accessible by the listed members.
-// The DEK is derived from orgKEK + vaultID (not any single user).
+// Its key comes from the vaultID, not from any single member, so membership can
+// change without the key changing.
 func (v *Vault) OpenSharedVault(vaultID string, members []string) (*SharedSession, error) {
 	if vaultID == "" {
 		return nil, fmt.Errorf("vault: vaultID required")
@@ -308,10 +310,10 @@ func (v *Vault) OpenSharedVault(vaultID string, members []string) (*SharedSessio
 		return nil, fmt.Errorf("vault: at least one member required")
 	}
 
-	// Shared DEK = HMAC-SHA256(orgKEK, "vault:shared:" + vaultID)
-	mac := hmac.New(sha256.New, v.orgKEK)
-	mac.Write([]byte("vault:shared:" + vaultID))
-	dek := mac.Sum(nil)
+	dek, err := vaultKey(v.config.MasterKEK, v.config.OrgID, vaultID, sharedSubsystem)
+	if err != nil {
+		return nil, err
+	}
 
 	memberSet := make(map[string]bool, len(members))
 	for _, m := range members {

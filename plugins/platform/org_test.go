@@ -1,9 +1,7 @@
 package platform
 
 import (
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
+	"context"
 	"os"
 	"testing"
 )
@@ -18,7 +16,7 @@ func TestOrgServiceGetCreds_EnvFallback(t *testing.T) {
 	}()
 
 	s := &OrgService{
-		kms:    NewKMSClient("", ""), // no KMS configured
+		kms:    mustKMS(t, ""), // no KMS configured
 		config: PlatformConfig{},
 	}
 
@@ -36,7 +34,7 @@ func TestOrgServiceGetCreds_EnvFallback(t *testing.T) {
 
 func TestOrgServiceGetCreds_Empty(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -48,7 +46,7 @@ func TestOrgServiceGetCreds_Empty(t *testing.T) {
 
 func TestOrgServiceGetCreds_EmptyArgs(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -61,29 +59,14 @@ func TestOrgServiceGetCreds_EmptyArgs(t *testing.T) {
 }
 
 func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
-	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		if r.Header.Get("Authorization") != "Bearer test-token" {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
-		}
-		// Canonical KMS surface: /v1/kms/orgs/{org}/secrets/{path}/{name}.
-		// orgId=org-1, provider=commerce, name=api_key → path=commerce,
-		// last segment=api_key.
-		if r.URL.Path == "/v1/kms/orgs/org-1/secrets/commerce/api_key" {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"secret": map[string]string{"value": "kms-key-abc"},
-			})
-			return
-		}
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer server.Close()
+	f := withFakeKMS(t)
+	// The org is a path segment: "orgs/{org}/{provider}" + the key name.
+	if err := f.PutAt(context.Background(), "orgs/org-1/commerce", "api_key", "prod", "kms-key-abc"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
 
-	kms := NewKMSClient(server.URL, "test-token")
 	s := &OrgService{
-		kms:    kms,
+		kms:    mustKMS(t, "kms.test:9999"),
 		config: PlatformConfig{},
 	}
 
@@ -95,7 +78,7 @@ func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
 		t.Errorf("expected api_key=kms-key-abc, got %q", creds["api_key"])
 	}
 
-	firstCallCount := callCount
+	firstCallCount := len(f.reads)
 
 	// Second call should be cached.
 	creds2 := s.GetCreds("org-1", "commerce")
@@ -105,7 +88,7 @@ func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
 	if creds2["api_key"] != "kms-key-abc" {
 		t.Errorf("expected cached api_key=kms-key-abc, got %q", creds2["api_key"])
 	}
-	if callCount != firstCallCount {
+	if len(f.reads) != firstCallCount {
 		t.Error("expected cached result, but KMS was called again")
 	}
 }
@@ -115,7 +98,7 @@ func TestOrgServiceInvalidateCreds(t *testing.T) {
 	defer os.Unsetenv("KYC_API_KEY")
 
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -140,7 +123,7 @@ func TestOrgServiceInvalidateCreds(t *testing.T) {
 
 func TestOrgServiceSetCreds_NoKMS(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -152,7 +135,7 @@ func TestOrgServiceSetCreds_NoKMS(t *testing.T) {
 
 func TestOrgServiceSetCreds_EmptyArgs(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("http://example.com", "tok"),
+		kms:    mustKMS(t, "kms.test:9999"),
 		config: PlatformConfig{},
 	}
 
@@ -166,7 +149,7 @@ func TestOrgServiceSetCreds_EmptyArgs(t *testing.T) {
 
 func TestOrgServiceGetCustomer_NilArgs(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -180,7 +163,7 @@ func TestOrgServiceGetCustomer_NilArgs(t *testing.T) {
 
 func TestOrgServiceProvisionCustomer_EmptyArgs(t *testing.T) {
 	s := &OrgService{
-		kms:    NewKMSClient("", ""),
+		kms:    mustKMS(t, ""),
 		config: PlatformConfig{},
 	}
 
@@ -232,4 +215,13 @@ func TestHeaderOrgID(t *testing.T) {
 	if expected != "X-Org-Id" {
 		t.Errorf("expected X-Org-Id, got %q", expected)
 	}
+}
+
+func mustKMS(t *testing.T, endpoint string) *KMSClient {
+	t.Helper()
+	c, err := NewKMSClient(endpoint)
+	if err != nil {
+		t.Fatalf("NewKMSClient(%q): %v", endpoint, err)
+	}
+	return c
 }

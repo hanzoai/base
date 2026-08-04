@@ -20,6 +20,15 @@ import (
 // connection must block on a busy DB before journal_mode=WAL is set) in the
 // ACTIVE backend's DSN syntax, so the pragmas apply on both backends; a
 // single-form DSN would be silently dropped by the other backend.
+//
+// VerifySQLiteMathFunctions runs once per process and refuses a build whose
+// linked SQLite cannot answer the search layer's geoDistance filter, so a
+// deficient binary dies here rather than at a customer's failed search. See
+// sqlite_math.go.
 func DefaultDBConnect(dbPath string) (*dbx.DB, error) {
+	if err := VerifySQLiteMathFunctions(); err != nil {
+		return nil, err
+	}
+
 	return dbx.Open("sqlite", sqlite.PragmaDSN(dbPath, sqlite.DefaultPragmas))
 }
