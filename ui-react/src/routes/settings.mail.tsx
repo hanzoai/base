@@ -100,12 +100,8 @@ function MailSettings() {
                                 key={ t.key }
                                 type="button"
                                 onClick={ () => { setActiveTemplate(t.key); reset(); } }
-                                className={
-                                    'rounded px-3 py-1 text-xs transition-colors ' +
-                                    (activeTemplate === t.key
-                                        ? 'bg-neutral-700 text-neutral-100'
-                                        : 'text-neutral-400 hover:bg-neutral-800')
-                                }
+                                className="chip"
+                                data-active={ activeTemplate === t.key ? 'true' : undefined }
                             >
                                 { t.label }
                             </button>

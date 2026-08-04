@@ -181,7 +181,7 @@ function RateLimitsSettings() {
 
                 <div className="card muted small">
                     <p>Label format (resolved in order):</p>
-                    <ol className="list-decimal pl-4 leading-relaxed">
+                    <ol>
                         <li>Exact tag: <code>users:create</code></li>
                         <li>Wildcard tag: <code>*:create</code></li>
                         <li>METHOD + exact path: <code>POST /v1/collections</code></li>

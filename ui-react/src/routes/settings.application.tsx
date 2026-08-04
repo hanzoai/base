@@ -112,8 +112,8 @@ function Application() {
 
             <SectionCard title="Batch requests">
                 <p className="muted small">
-                    Clients can bundle multiple API calls into one HTTP request against
-                    <code className="mx-1">/v1/batch</code>. Limits apply to the bundle
+                    Clients can bundle multiple API calls into one HTTP request against{ ' ' }
+                    <code>/v1/batch</code>. Limits apply to the bundle
                     size; each sub-request still uses its own auth and rate limit.
                 </p>
 
