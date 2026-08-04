@@ -345,7 +345,7 @@ ol {
 .textarea {
   width: 100%;
   padding: var(--space-2);
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-control);
   border-radius: var(--radius-md);
   background: var(--surface-1);
   color: var(--foreground);
@@ -408,7 +408,7 @@ input[type='checkbox'] {
 
 .btn--outline {
   background: transparent;
-  border-color: var(--border-strong);
+  border-color: var(--border-control);
   color: var(--foreground);
   font-weight: var(--weight-normal);
 }
@@ -445,7 +445,7 @@ input[type='checkbox'] {
 .btn--add {
   width: 100%;
   background: transparent;
-  border: 1px dashed var(--border-strong);
+  border: 1px dashed var(--border-control);
   color: var(--text-helper);
   font-weight: var(--weight-normal);
 }
@@ -750,11 +750,18 @@ textarea.cell__edit {
   pointer-events: none;
 }
 
-/* The mail-template preview: a light-on-dark iframe keeps its own white page. */
+/* The mail-template preview: a light-on-dark iframe keeps its own white page.
+ * Hence the one border in this sheet that is not a token. Every boundary in the
+ * dark theme is cut from white alpha, and a border composites over its own
+ * element's background (border-box is the default clip) — so --border-strong
+ * here would be white-on-white and draw literally nothing. A light ground takes
+ * a light ground's edge: this is the value --border-strong itself carries in the
+ * design system's light theme, used because this panel IS light, on a dark page.
+ */
 .preview {
   flex: 1;
   overflow: auto;
-  border: 1px solid var(--border-strong);
+  border: 1px solid rgb(0 0 0 / 0.16);
   border-radius: var(--radius-md);
   background: #fff;
 }
