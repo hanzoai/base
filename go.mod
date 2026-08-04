@@ -5,7 +5,7 @@ go 1.26.5
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/domodwyer/mailyak/v3 v3.6.2
-	github.com/dop251/goja v0.0.0-20260607120635-348e6bea910d
+	github.com/dop251/goja v0.0.0-20260627200808-0b76000cabdb
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	github.com/evanw/esbuild v0.28.1
 	github.com/fatih/color v1.19.0
@@ -14,11 +14,12 @@ require (
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/hanzoai/cek v0.2.3
 	github.com/hanzoai/dbx v1.17.2
-	github.com/hanzoai/kms/sdk/go v1.1.1
 	github.com/hanzoai/ltx v0.5.1
+	github.com/hanzoai/namespace v1.2.0
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.52.0
+	github.com/hanzoai/tasks v1.52.9
 	github.com/hanzoai/tygoja v0.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
@@ -26,18 +27,20 @@ require (
 	github.com/luxfi/cache v1.3.1
 	github.com/luxfi/consensus v1.36.3
 	github.com/luxfi/fhe v1.8.2
-	github.com/luxfi/log v1.4.3
-	github.com/luxfi/zap v1.2.6
+	github.com/luxfi/keys v1.4.1
+	github.com/luxfi/kms v1.11.7
+	github.com/luxfi/log v1.5.0
+	github.com/luxfi/zap v1.2.7
 	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.11.0
 	go.starlark.net v0.0.0-20260326113308-fadfc96def35
-	golang.org/x/crypto v0.53.0
+	golang.org/x/crypto v0.54.0
 	golang.org/x/image v0.38.0
 	golang.org/x/net v0.56.0
 	golang.org/x/oauth2 v0.36.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.22.0
 	rogchap.com/v8go v0.9.0
 )
 
@@ -54,7 +57,6 @@ require (
 	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/utils/v2 v2.0.4 // indirect
@@ -63,9 +65,10 @@ require (
 	github.com/gtank/ristretto255 v0.2.0 // indirect
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
+	github.com/hanzoai/authz v1.10.29 // indirect
 	github.com/hanzoai/csqlite v0.1.0 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
-	github.com/hanzoai/sqlcipher v0.1.0 // indirect
+	github.com/hanzoai/sqlcipher v0.1.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
@@ -82,8 +85,6 @@ require (
 	github.com/luxfi/geth v1.20.1 // indirect
 	github.com/luxfi/go-bip32 v1.1.0 // indirect
 	github.com/luxfi/go-bip39 v1.2.0 // indirect
-	github.com/luxfi/keys v1.4.1 // indirect
-	github.com/luxfi/kms v1.11.7 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
 	github.com/luxfi/lens v0.2.1 // indirect
 	github.com/luxfi/magnetar v1.2.3 // indirect
@@ -94,7 +95,7 @@ require (
 	github.com/luxfi/sampler v1.1.0 // indirect
 	github.com/luxfi/threshold v1.12.3 // indirect
 	github.com/luxfi/tls v1.1.1 // indirect
-	github.com/luxfi/vm v1.3.4 // indirect
+	github.com/luxfi/vm v1.3.2 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
@@ -126,6 +127,10 @@ require (
 	google.golang.org/api v0.275.0 // indirect
 	google.golang.org/genproto v0.0.0-20260406210006-6f92a3bedf2d // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
+	modernc.org/libc v1.72.3 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.11.0 // indirect
+	modernc.org/sqlite v1.51.0 // indirect
 )
 
 require (
@@ -137,13 +142,13 @@ require (
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
-	github.com/google/pprof v0.0.0-20260302011040-a15ffb7f9dcc // indirect
-	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 // indirect
+	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hanzoai/orm v0.6.16
 	github.com/hanzoai/replicate v0.9.5
-	github.com/hanzoai/sqlite v0.3.2
+	github.com/hanzoai/sqlite v0.5.0
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -164,15 +169,15 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/zap-proto/http v0.3.0 // indirect
-	github.com/zap-proto/zip v1.10.0
+	github.com/zap-proto/http v0.3.1 // indirect
+	github.com/zap-proto/zip v1.24.2
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
-	golang.org/x/mod v0.36.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
-	golang.org/x/text v0.38.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
-	golang.org/x/tools v0.45.0 // indirect
+	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260615183401-62b3387ff324 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
 	google.golang.org/grpc v1.81.1 // indirect
@@ -181,3 +186,5 @@ require (
 )
 
 replace github.com/mattn/go-sqlite3 => github.com/mattn/go-sqlite3 v1.14.47
+
+exclude github.com/luxfi/genesis v1.5.21

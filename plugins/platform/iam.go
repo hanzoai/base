@@ -395,7 +395,7 @@ type EnsureUserSpec struct {
 }
 
 // normalizePhoneCandidates returns the set of phone shapes IAM might have
-// stored. IAM/Casdoor inconsistently persists phones — some rows include the
+// stored. IAM inconsistently persists phones — some rows include the
 // leading "+", some are raw digits, US numbers sometimes omit the +1 country
 // code. We probe all three shapes to catch either persistence path.
 func normalizePhoneCandidates(phone string) []string {

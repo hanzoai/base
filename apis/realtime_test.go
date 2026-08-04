@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/subscriptions"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 func TestRealtimeConnect(t *testing.T) {

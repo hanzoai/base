@@ -6,19 +6,31 @@
 # binary at compile time (ui-react/embed.go uses //go:embed all:dist).
 # The committed ui-react/dist is the source of truth for CI builds —
 # rebuild it locally with `pnpm --dir ui-react build` before tagging.
-FROM public.ecr.aws/docker/library/golang:1.26.4-alpine AS builder
+FROM public.ecr.aws/docker/library/golang:1.26.5-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
-# Cross-org modules (hanzoai/*, luxfi/*) resolve via AUTHENTICATED GIT, not the
-# public proxy — the SAME path release.yaml's `go test` uses (its own comment:
-# "the proxy holds re-pushed bits for some luxfi tags; git matches go.sum").
-# Some luxfi tags were force-moved, so proxy hashes DON'T match go.sum (which is
-# tidied against git) → a bare-proxy `go mod download` fails with SECURITY ERROR.
-# GOPRIVATE routes those modules `direct`; the mounted gh_token authenticates the
-# fetch. One module-resolution path for test + image (CI passes gh_token; a local
-# build without the secret falls back to ambient git creds / the mod cache).
-ENV GOPRIVATE=github.com/hanzoai/*,github.com/luxfi/*
-ENV GONOSUMDB=github.com/hanzoai/*,github.com/luxfi/*
+# PRIVATE modules (hanzoai/*) resolve via authenticated git; PUBLIC ones
+# (luxfi/*) resolve through the proxy.
+#
+# The comment here used to say the opposite — that go.sum "is tidied against
+# git", so a bare-proxy download would trip SECURITY ERROR. It is the wrong way
+# round, and the build was failing because of it:
+#
+#   verifying github.com/luxfi/vm@v1.3.1/go.mod: checksum mismatch
+#     downloaded: h1:uViH3COP8hh…   (direct git — a re-cut tag)
+#     go.sum:     h1:6YR/uFV2Fo…    (== sum.golang.org, byte for byte)
+#
+# go.sum holds the PROXY hashes. luxfi does force-move tags, which is real, but
+# that is an argument FOR the proxy, not against it: the proxy serves the
+# immutable copy sum.golang.org signed, so re-cutting a tag can no longer change
+# what this image is built from without the checksum saying so. Fetching direct
+# is what silently picks up the moved bits.
+#
+# Checked before making this change: all 40 luxfi modules in this graph are
+# public and resolvable from proxy.golang.org. hanzoai/* (dbx, kms/sdk/go, ltx,
+# pubsub-go, tasks, tygoja) are not, so they stay direct behind the gh_token.
+ENV GOPRIVATE=github.com/hanzoai/*
+ENV GONOSUMDB=github.com/hanzoai/*
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=secret,id=gh_token \

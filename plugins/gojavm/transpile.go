@@ -29,12 +29,12 @@ var esmRe = regexp.MustCompile(`(?m)^\s*(import|export)\b|require\s*\(|module\.e
 // syntax) is wrapped so its top-level function declarations become
 // exports, preserving the legacy authoring style.
 //
-// TODO(zip/runtime): zip's runtime.TranspileToES5 uses esbuild's
+// TODO(zip/js): zip's js.TranspileToES5 uses esbuild's
 // single-file Transform (no Bundle, no multi-file import graph). gojavm
 // needs api.Build with Bundle:true to fold a whole TS backend directory
 // into one program, which zip does not yet expose. When zip grows a
 // bundling Transpile (BundleDir / multi-entry) this esbuild call moves
-// into zip/runtime and gojavm drops its direct esbuild dependency. Until
+// into zip/js and gojavm drops its direct esbuild dependency. Until
 // then the bundle step lives here. Tracked on zap-proto/zip PR #9 (issues
 // disabled there).
 func transpile(dir string, m *extruntime.Manifest) (string, error) {
