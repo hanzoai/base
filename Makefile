@@ -7,6 +7,9 @@
 # 0 is what the Dockerfile sets (pure-Go modernc sqlite); ?= keeps it overridable.
 export CGO_ENABLED ?= 0
 
+# The one entrypoint build links and dev runs, so the two cannot drift.
+MAIN := ./examples/base/main.go
+
 help: ## Show this help.
 	@awk 'BEGIN{FS=":.*##";printf "\nUsage: make <target>\n\nTargets:\n"} /^[a-zA-Z_-]+:.*##/{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
@@ -25,7 +28,13 @@ ui: ## Rebuild the admin SPA into ui-react/dist.
 # the same link the image performs; change the SPA and you run `make ui`
 # yourself, which is what the Dockerfile already tells you to do before tagging.
 build: ## Build ./base — the binary the image ships.
-	go build -o base ./examples/base/main.go
+	go build -o base $(MAIN)
+
+# Base hosts no identity of its own, so it refuses to boot without IAM_ENDPOINT
+# (e.g. IAM_ENDPOINT=https://hanzo.id make dev). serve's --dev is on by default
+# and its data lands in base_/data, which .gitignore already anchors.
+dev: ## Run the server locally (needs IAM_ENDPOINT).
+	go run $(MAIN) serve
 
 lint: ## Lint (golangci-lint).
 	golangci-lint run -c ./golangci.yml ./...
@@ -46,4 +55,4 @@ test-report: ## Run the tests and open an HTML coverage report.
 clean: ## Remove built artifacts.
 	rm -f base coverage.out
 
-.PHONY: help ui build lint test jstypes test-report clean
+.PHONY: help ui build dev lint test jstypes test-report clean
