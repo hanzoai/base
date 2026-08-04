@@ -2,18 +2,6 @@ import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-ro
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { Button } from '~/components/ui/button';
-import { Checkbox } from '~/components/ui/checkbox';
-import { Input } from '~/components/ui/input';
-import { Label } from '~/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select';
-import { Textarea } from '~/components/ui/textarea';
 import { base } from '~/lib/base';
 import { editorKind, isMultiValue, selectValues, toEditorString } from '~/lib/fields';
 import type { CollectionField } from '~/lib/base';
@@ -105,34 +93,32 @@ function RecordEditor() {
     }
   };
 
-  if (collection.isPending) return <Muted>Loading schema…</Muted>;
-  if (collection.error) return <ErrorText error={ collection.error } />;
-  if (!isNew && record.isPending) return <Muted>Loading record…</Muted>;
-  if (!isNew && record.error) return <ErrorText error={ record.error } />;
+  if (collection.isPending) return <div className="muted">Loading schema…</div>;
+  if (collection.error) return <div className="danger">{ String(collection.error) }</div>;
+  if (!isNew && record.isPending) return <div className="muted">Loading record…</div>;
+  if (!isNew && record.error) return <div className="danger">{ String(record.error) }</div>;
 
   return (
-    <form onSubmit={ onSubmit } className="mx-auto flex max-w-2xl flex-col gap-5">
-      <header className="flex items-center gap-2">
-        <Link to="/collections/$id/records" params={{ id }} className="text-muted-foreground hover:text-foreground">
-          { name }
-        </Link>
-        <span className="text-muted-foreground/40">/</span>
-        <h1 className="text-xl font-semibold">{ isNew ? 'New record' : record.data?.id }</h1>
-        <div className="ml-auto flex gap-2">
+    <form onSubmit={ onSubmit } className="page" style={{ maxWidth: '42rem', margin: '0 auto' }}>
+      <header className="page__head">
+        <Link to="/collections/$id/records" params={{ id }} className="muted">{ name }</Link>
+        <span className="muted">/</span>
+        <h1 className="page__title">{ isNew ? 'New record' : record.data?.id }</h1>
+        <div className="row push">
           { !isNew && (
-            <Button type="button" variant="destructive" disabled={ del.isPending } onClick={ () => del.mutate() }>
+            <button type="button" className="btn btn--danger" disabled={ del.isPending } onClick={ () => del.mutate() }>
               { del.isPending ? 'Deleting…' : 'Delete' }
-            </Button>
+            </button>
           ) }
-          <Button type="submit" disabled={ save.isPending }>
+          <button type="submit" className="btn" disabled={ save.isPending }>
             { save.isPending ? 'Saving…' : isNew ? 'Create' : 'Save' }
-          </Button>
+          </button>
         </div>
       </header>
 
-      { error && <p className="text-sm text-destructive">{ error }</p> }
+      { error && <p className="danger">{ error }</p> }
 
-      <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-6">
+      <div className="card stack">
         { !isNew && record.data && <ReadonlyRow label="id" value={ record.data.id } mono /> }
 
         { editable.map((field) => (
@@ -146,19 +132,22 @@ function RecordEditor() {
         )) }
 
         { isAuth && (
-          <div className="flex flex-col gap-1.5">
-            <Label>{ isNew ? 'Password' : 'New password (blank keeps current)' }</Label>
-            <Input
+          <label className="field">
+            <span className="field__label">
+              { isNew ? 'Password' : 'New password (blank keeps current)' }
+            </span>
+            <input
               type="password"
+              className="input"
               autoComplete="new-password"
               value={ password }
               onChange={ (e) => setPassword(e.target.value) }
             />
-          </div>
+          </label>
         ) }
 
         { !isNew && record.data && (
-          <div className="grid grid-cols-2 gap-4 border-t border-border pt-4">
+          <div className="grid">
             { (collection.data?.fields ?? [])
               .filter((f) => f.type === 'autodate')
               .map((f) => <ReadonlyRow key={ f.name } label={ f.name } value={ String(record.data?.[f.name] ?? '—') } />) }
@@ -184,27 +173,25 @@ function FieldEditor({
 
   if (kind === 'bool') {
     return (
-      <label className="flex items-center gap-2 text-sm">
-        <Checkbox checked={ Boolean(value) } onCheckedChange={ (c) => onChange(Boolean(c)) } />
-        <FieldLabel field={ field } inline />
+      <label className="field field--inline">
+        <input type="checkbox" checked={ Boolean(value) } onChange={ (e) => onChange(e.target.checked) } />
+        <FieldLabel field={ field } />
       </label>
     );
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <label className="field">
       <FieldLabel field={ field } />
       { kind === 'select' && !isMultiValue(field) ? (
-        <Select value={ String(value ?? '') } onValueChange={ onChange }>
-          <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-          <SelectContent>
-            { selectValues(field).map((o) => <SelectItem key={ o } value={ o }>{ o }</SelectItem>) }
-          </SelectContent>
-        </Select>
+        <select className="select" value={ String(value ?? '') } onChange={ (e) => onChange(e.target.value) }>
+          <option value="">Select…</option>
+          { selectValues(field).map((o) => <option key={ o } value={ o }>{ o }</option>) }
+        </select>
       ) : kind === 'textarea' || kind === 'json' ? (
-        <Textarea
+        <textarea
           rows={ kind === 'json' ? 5 : 4 }
-          className={ kind === 'json' ? 'font-mono text-xs' : '' }
+          className={ kind === 'json' ? 'textarea textarea--mono' : 'textarea' }
           value={ asText(value, field) }
           placeholder={ kind === 'json' ? '{ }' : '' }
           onChange={ (e) => onChange(e.target.value) }
@@ -214,53 +201,43 @@ function FieldEditor({
           type="file"
           multiple={ isMultiValue(field) }
           onChange={ (e) => onFiles(e.target.files ? Array.from(e.target.files) : []) }
-          className="text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1 file:text-sm file:text-foreground"
+          className="muted"
         />
       ) : (
-        <Input
+        <input
+          className="input"
           type={ kind === 'number' ? 'number' : kind === 'date' ? 'datetime-local' : 'text' }
           step={ kind === 'number' ? 'any' : undefined }
           placeholder={ kind === 'relation' ? 'record id(s), comma-separated' : '' }
           value={ asText(value, field) }
-          onChange={ (e) => onChange(kind === 'number' ? e.target.value : e.target.value) }
+          onChange={ (e) => onChange(e.target.value) }
         />
       ) }
-    </div>
+    </label>
   );
 }
 
-function FieldLabel({ field, inline }: { field: CollectionField; inline?: boolean }) {
+function FieldLabel({ field }: { field: CollectionField }) {
   return (
-    <span className={ inline ? 'text-sm text-foreground' : 'flex items-center gap-1.5' }>
-      <span className="text-sm font-medium">{ field.name }</span>
-      <span className="text-[10px] uppercase text-muted-foreground/60">{ field.type }</span>
-      { field.system && <span className="text-[10px] text-muted-foreground/60">system</span> }
+    <span className="row row--tight">
+      <span>{ field.name }</span>
+      <span className="type-tag">{ field.type }</span>
+      { field.system && <span className="type-tag">system</span> }
     </span>
   );
 }
 
 function ReadonlyRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[10px] uppercase text-muted-foreground/60">{ label }</span>
-      <span className={ mono ? 'font-mono text-sm text-muted-foreground' : 'text-sm text-muted-foreground' }>
-        { value }
-      </span>
+    <div className="field">
+      <span className="type-tag">{ label }</span>
+      <span className={ mono ? 'mono muted' : 'muted' }>{ value }</span>
     </div>
   );
 }
 
-function Muted({ children }: { children: React.ReactNode }) {
-  return <div className="text-sm text-muted-foreground">{ children }</div>;
-}
-
-function ErrorText({ error }: { error: unknown }) {
-  return <div className="text-sm text-destructive">{ String(error) }</div>;
-}
-
 function defaultForKind(field: CollectionField): unknown {
   switch (editorKind(field)) {
-    case 'number': return '';
     case 'bool': return false;
     default: return '';
   }

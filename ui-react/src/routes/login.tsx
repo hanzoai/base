@@ -1,7 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useState } from 'react';
 
-import { Button } from '~/components/ui/button';
 import { base } from '~/lib/base';
 import { iam } from '~/lib/iam';
 
@@ -26,20 +25,20 @@ function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8">
-        <div className="mb-6 flex items-center gap-2">
-          <img src="/icon.svg" alt="Base" className="h-6 w-6" />
-          <h1 className="text-lg font-semibold text-foreground">Sign in to Base</h1>
+    <div className="shell shell--centered">
+      <div className="panel stack">
+        <div className="row">
+          <img src="/icon.svg" alt="Base" width={ 24 } height={ 24 } />
+          <h1 className="page__title">Sign in to Base</h1>
         </div>
-        <p className="mb-6 text-sm text-muted-foreground">
+        <p className="muted">
           Base uses Hanzo IAM for authentication. Sign in with your Hanzo
           account to reach the admin.
         </p>
-        { error && <p className="mb-4 text-sm text-destructive">{ error }</p> }
-        <Button onClick={ signIn } isLoading={ busy } disabled={ busy } className="w-full">
+        { error && <p className="danger">{ error }</p> }
+        <button type="button" onClick={ signIn } disabled={ busy } className="btn">
           { busy ? 'Redirecting…' : 'Sign in with Hanzo' }
-        </Button>
+        </button>
       </div>
     </div>
   );

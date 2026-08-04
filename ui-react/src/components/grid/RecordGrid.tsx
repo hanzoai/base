@@ -1,20 +1,12 @@
-// RecordGrid — a Twenty-grade editable data grid. Two-tier keyboard cursor
-// (arrows move the active cell; Enter / typing enters edit mode), sortable
-// columns, row selection, per-row actions. Cells own the display/edit split
-// (EditableCell); the grid owns the cursor and the commit fan-out.
-import { ArrowDown, ArrowUp, ChevronsUpDown, MoreHorizontal } from 'lucide-react';
+// RecordGrid — an editable data grid. Two-tier keyboard cursor (arrows move the
+// active cell; Enter / typing enters edit mode), sortable columns, row selection,
+// per-row actions. Cells own the display/edit split (EditableCell); the grid owns
+// the cursor and the commit fan-out.
+import { ArrowDown, ArrowUp, ChevronsUpDown, MoreHorizontal } from '@hanzogui/lucide-icons-2';
+import { DropdownMenu } from '@hanzo/ui';
 import { useCallback, useRef, useState } from 'react';
 
 import { EditableCell } from '~/components/grid/EditableCell';
-import { Checkbox } from '~/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu';
-import { cn } from '~/lib/cn';
 import { isInlineEditable } from '~/lib/fields';
 import type { CollectionField, RecordModel } from '~/lib/base';
 
@@ -83,15 +75,16 @@ export function RecordGrid(props: RecordGridProps) {
       role="grid"
       tabIndex={ 0 }
       onKeyDown={ onKeyDown }
-      className="overflow-auto rounded-lg border border-border outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className="table-wrap"
     >
-      <table className="w-full border-collapse text-sm">
-        <thead className="sticky top-0 z-10 bg-card">
-          <tr className="border-b border-border">
-            <th className="w-10 px-3 py-2">
-              <Checkbox
+      <table className="table">
+        <thead>
+          <tr>
+            <th className="gutter">
+              <input
+                type="checkbox"
                 checked={ allSelected }
-                onCheckedChange={ onToggleAll }
+                onChange={ onToggleAll }
                 disabled={ records.length === 0 }
                 aria-label="Select all"
               />
@@ -99,27 +92,22 @@ export function RecordGrid(props: RecordGridProps) {
             { fields.map((f) => (
               <SortHeader key={ f.id } field={ f } sort={ sort } onSort={ onSort } />
             )) }
-            <th className="w-10" />
+            <th className="gutter" />
           </tr>
         </thead>
         <tbody>
           { records.map((record, r) => (
-            <tr
-              key={ record.id }
-              className={ cn(
-                'border-b border-border/60 last:border-0 hover:bg-accent/40',
-                selected.has(record.id) && 'bg-accent/30',
-              ) }
-            >
-              <td className="px-3">
-                <Checkbox
+            <tr key={ record.id } data-selected={ selected.has(record.id) ? 'true' : undefined }>
+              <td className="gutter">
+                <input
+                  type="checkbox"
                   checked={ selected.has(record.id) }
-                  onCheckedChange={ () => onToggleSelect(record.id) }
+                  onChange={ () => onToggleSelect(record.id) }
                   aria-label="Select row"
                 />
               </td>
               { fields.map((field, c) => (
-                <td key={ field.id } className="max-w-[22rem] p-0">
+                <td key={ field.id } className="cell">
                   <EditableCell
                     record={ record }
                     field={ field }
@@ -132,7 +120,7 @@ export function RecordGrid(props: RecordGridProps) {
                   />
                 </td>
               )) }
-              <td className="px-1">
+              <td className="gutter">
                 <RowActions
                   isView={ props.isView }
                   onEdit={ () => props.onEditRecord(record) }
@@ -144,9 +132,7 @@ export function RecordGrid(props: RecordGridProps) {
           )) }
           { records.length === 0 && (
             <tr>
-              <td colSpan={ cols + 2 } className="px-3 py-16 text-center text-muted-foreground">
-                No records yet.
-              </td>
+              <td colSpan={ cols + 2 } className="empty">No records yet.</td>
             </tr>
           ) }
         </tbody>
@@ -167,22 +153,21 @@ function SortHeader({
   const asc = sort === field.name;
   const desc = sort === `-${field.name}`;
   // Numeric headers right-align to sit over their right-aligned tabular cells.
-  const numeric = field.type === 'number';
+  const numeric = field.type === 'number' ? 'true' : undefined;
   return (
-    <th className={ cn('whitespace-nowrap px-3 py-2 font-medium text-muted-foreground', numeric ? 'text-right' : 'text-left') }>
-      <button
-        type="button"
-        onClick={ () => onSort(field.name) }
-        className={ cn('inline-flex items-center gap-1 hover:text-foreground', numeric && 'flex-row-reverse') }
-      >
+    <th data-numeric={ numeric }>
+      <button type="button" onClick={ () => onSort(field.name) } className="th-sort" data-numeric={ numeric }>
         <span>{ field.name }</span>
-        <span className="text-[10px] uppercase text-muted-foreground/60">{ field.type }</span>
-        { asc ? <ArrowUp className="size-3" /> : desc ? <ArrowDown className="size-3" /> : <ChevronsUpDown className="size-3 opacity-40" /> }
+        <span className="type-tag">{ field.type }</span>
+        { asc ? <ArrowUp size={ 12 } /> : desc ? <ArrowDown size={ 12 } /> : <ChevronsUpDown size={ 12 } opacity={ 0.4 } /> }
       </button>
     </th>
   );
 }
 
+// `items` is DropdownMenu's declarative form — the menu builds itself out of the
+// same compound parts a hand-written tree would use, so the row's actions are
+// stated as data rather than as markup.
 function RowActions({
   isView,
   onEdit,
@@ -195,18 +180,20 @@ function RowActions({
   onDelete: () => void;
 }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring">
-        <MoreHorizontal className="size-4" />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem onSelect={ onEdit }>Open</DropdownMenuItem>
-        { !isView && <DropdownMenuItem onSelect={ onDuplicate }>Duplicate</DropdownMenuItem> }
-        { !isView && <DropdownMenuSeparator /> }
-        { !isView && (
-          <DropdownMenuItem destructive onSelect={ onDelete }>Delete</DropdownMenuItem>
-        ) }
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <DropdownMenu
+      trigger={
+        <button type="button" className="icon-btn" aria-label="Row actions">
+          <MoreHorizontal size={ 16 } />
+        </button>
+      }
+      items={ [
+        { key: 'open', label: 'Open', onSelect: onEdit },
+        ...(isView ? [] : [
+          { key: 'duplicate', label: 'Duplicate', onSelect: onDuplicate },
+          { type: 'separator' as const, key: 'sep' },
+          { key: 'delete', label: 'Delete', destructive: true, onSelect: onDelete },
+        ]),
+      ] }
+    />
   );
 }

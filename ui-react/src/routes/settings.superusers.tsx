@@ -17,9 +17,6 @@ interface ChangePasswordForm {
     passwordConfirm: string;
 }
 
-const inputClass = 'rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm';
-const btnPrimary = 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50';
-
 function SuperusersSettings() {
     const qc = useQueryClient();
     const [changingPw, setChangingPw] = useState<string | null>(null);
@@ -50,32 +47,32 @@ function SuperusersSettings() {
     });
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="page">
             <SectionCard title="Superusers" description="Manage superuser accounts.">
-                { superusers.isPending && <div className="text-sm text-neutral-400">Loading...</div> }
-                { superusers.error && <div className="text-sm text-red-400">{ String(superusers.error) }</div> }
+                { superusers.isPending && <div className="muted">Loading...</div> }
+                { superusers.error && <div className="danger">{ String(superusers.error) }</div> }
 
                 { superusers.data && (
-                    <table className="mb-4 w-full text-sm">
-                        <thead className="text-left text-xs uppercase tracking-wider text-neutral-500">
+                    <table className="table">
+                        <thead>
                             <tr>
-                                <th className="py-2">Email</th>
-                                <th className="py-2">ID</th>
-                                <th className="py-2">Created</th>
-                                <th className="py-2 text-right">Actions</th>
+                                <th>Email</th>
+                                <th>ID</th>
+                                <th>Created</th>
+                                <th align="right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             { superusers.data.map((su) => (
-                                <tr key={ su.id } className="border-t border-neutral-800">
-                                    <td className="py-2 font-medium">{ String(su.email ?? '') }</td>
-                                    <td className="py-2 text-xs text-neutral-500">{ su.id }</td>
-                                    <td className="py-2 text-xs text-neutral-500">{ su.created }</td>
-                                    <td className="py-2 text-right">
-                                        <div className="flex items-center justify-end gap-2">
+                                <tr key={ su.id }>
+                                    <td>{ String(su.email ?? '') }</td>
+                                    <td className="muted small">{ su.id }</td>
+                                    <td className="muted small">{ su.created }</td>
+                                    <td align="right">
+                                        <div className="row">
                                             <button
                                                 onClick={ () => setChangingPw(changingPw === su.id ? null : su.id) }
-                                                className="text-xs text-indigo-400 hover:text-indigo-300"
+                                                className="link small"
                                             >
                                                 { changingPw === su.id ? 'Cancel' : 'Change password' }
                                             </button>
@@ -84,7 +81,7 @@ function SuperusersSettings() {
                                                     if (confirm(`Delete superuser "${su.email}"?`)) deleteMutation.mutate(su.id);
                                                 } }
                                                 disabled={ deleteMutation.isPending }
-                                                className="text-xs text-red-400 hover:text-red-300 disabled:text-neutral-600"
+                                                className="link link--danger small"
                                             >
                                                 Delete
                                             </button>
@@ -102,29 +99,29 @@ function SuperusersSettings() {
                     </table>
                 ) }
 
-                { deleteMutation.error && <div className="mb-2 text-xs text-red-400">{ deleteMutation.error.message }</div> }
+                { deleteMutation.error && <div className="danger small">{ deleteMutation.error.message }</div> }
             </SectionCard>
 
             <SectionCard title="Create superuser" description="Add a new superuser account.">
-                <form onSubmit={ submitCreate((d) => createMutation.mutate(d)) } className="flex flex-col gap-3 max-w-md">
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Email</span>
-                        <input { ...regCreate('email', { required: true }) } type="email" className={ inputClass } />
+                <form onSubmit={ submitCreate((d) => createMutation.mutate(d)) } className="stack">
+                    <label className="field">
+                        <span className="field__label">Email</span>
+                        <input { ...regCreate('email', { required: true }) } type="email" className="input" />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Password</span>
-                        <input { ...regCreate('password', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className={ inputClass } />
+                    <label className="field">
+                        <span className="field__label">Password</span>
+                        <input { ...regCreate('password', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className="input" />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Confirm password</span>
-                        <input { ...regCreate('passwordConfirm', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className={ inputClass } />
+                    <label className="field">
+                        <span className="field__label">Confirm password</span>
+                        <input { ...regCreate('passwordConfirm', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className="input" />
                     </label>
-                    <div className="flex items-center gap-2 pt-1">
-                        <button type="submit" disabled={ !fsCreate.isDirty || createMutation.isPending } className={ btnPrimary }>
+                    <div className="row">
+                        <button type="submit" disabled={ !fsCreate.isDirty || createMutation.isPending } className="btn">
                             { createMutation.isPending ? 'Creating...' : 'Create superuser' }
                         </button>
-                        { createMutation.isSuccess && <span className="text-xs text-green-400">Created.</span> }
-                        { createMutation.error && <span className="text-xs text-red-400">{ createMutation.error.message }</span> }
+                        { createMutation.isSuccess && <span className="ok small">Created.</span> }
+                        { createMutation.error && <span className="danger small">{ createMutation.error.message }</span> }
                     </div>
                 </form>
             </SectionCard>
@@ -147,21 +144,21 @@ function ChangePasswordPanel({ superuserId, onDone }: { superuserId: string; onD
     return (
         <form
             onSubmit={ handleSubmit((d) => mutation.mutate(d)) }
-            className="mt-2 flex flex-col gap-2 rounded border border-neutral-700 bg-neutral-900 p-3 text-left"
+            className="card stack stack--tight"
         >
-            <label className="flex flex-col gap-1 text-sm">
-                <span className="text-neutral-400">New password</span>
-                <input { ...register('password', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className={ inputClass } />
+            <label className="field">
+                <span className="field__label">New password</span>
+                <input { ...register('password', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className="input" />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
-                <span className="text-neutral-400">Confirm</span>
-                <input { ...register('passwordConfirm', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className={ inputClass } />
+            <label className="field">
+                <span className="field__label">Confirm</span>
+                <input { ...register('passwordConfirm', { required: true, minLength: 10 }) } type="password" autoComplete="new-password" className="input" />
             </label>
-            <div className="flex items-center gap-2">
-                <button type="submit" disabled={ !formState.isDirty || mutation.isPending } className={ btnPrimary }>
+            <div className="row">
+                <button type="submit" disabled={ !formState.isDirty || mutation.isPending } className="btn">
                     { mutation.isPending ? 'Saving...' : 'Update password' }
                 </button>
-                { mutation.error && <span className="text-xs text-red-400">{ mutation.error.message }</span> }
+                { mutation.error && <span className="danger small">{ mutation.error.message }</span> }
             </div>
         </form>
     );

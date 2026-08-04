@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 
 import { base } from '~/lib/base';
 
+// A log line's level is the one place this admin colours by meaning rather than
+// by rank, so it maps to the design system's state hues, not to a palette.
+const LEVEL_CLASS: Record<string, string> = { ERROR: 'danger', WARN: 'warn' };
+
 function Logs() {
   const [ filter, setFilter ] = useState('');
   const [ page, setPage ] = useState(1);
@@ -27,42 +31,42 @@ function Logs() {
   }, [ page ]);
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">Logs</h1>
-        <input
-          value={ filter }
-          onChange={ (e) => { setFilter(e.target.value); setPage(1); } }
-          placeholder="Filter message…"
-          className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm"
-        />
+    <div className="page">
+      <header className="page__head">
+        <h1 className="page__title">Logs</h1>
+        <div className="search push">
+          <input
+            value={ filter }
+            onChange={ (e) => { setFilter(e.target.value); setPage(1); } }
+            placeholder="Filter message…"
+            className="input"
+          />
+        </div>
       </header>
 
-      <ul className="flex flex-col gap-1 font-mono text-xs">
+      <ul className="stack stack--tight mono">
         { logs.data?.items.map((l) => (
-          <li key={ l.id } className="flex gap-3 text-neutral-300">
-            <span className="shrink-0 w-44 text-neutral-500">{ l.created }</span>
-            <span className={
-              l.level === 'ERROR' ? 'text-red-400' :
-                l.level === 'WARN' ? 'text-yellow-400' :
-                  'text-neutral-300'
-            }>{ l.level }</span>
+          <li key={ l.id } className="row">
+            <span className="muted num">{ l.created }</span>
+            <span className={ LEVEL_CLASS[l.level] ?? '' }>{ l.level }</span>
             <span className="truncate">{ l.message }</span>
           </li>
         )) }
       </ul>
 
-      <footer className="flex items-center gap-2 text-sm">
+      <footer className="row">
         <button
+          type="button"
           onClick={ () => setPage((p) => Math.max(1, p - 1)) }
           disabled={ page === 1 }
-          className="rounded border border-neutral-700 px-2 py-1 disabled:opacity-30"
+          className="btn btn--outline btn--sm"
         >Prev</button>
-        <span className="text-neutral-400">page { page }</span>
+        <span className="muted">page { page }</span>
         <button
+          type="button"
           onClick={ () => setPage((p) => p + 1) }
           disabled={ !logs.data || logs.data.items.length < 50 }
-          className="rounded border border-neutral-700 px-2 py-1 disabled:opacity-30"
+          className="btn btn--outline btn--sm"
         >Next</button>
       </footer>
     </div>

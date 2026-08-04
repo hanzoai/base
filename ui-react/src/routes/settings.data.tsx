@@ -8,11 +8,6 @@ import { SectionCard } from '~/components/SectionCard';
 
 type CollectionRecord = CollectionModel & Record<string, unknown>;
 
-const inputClass = 'rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm w-full';
-const btnPrimary = 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50';
-const btnSecondary = 'rounded border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800';
-const btnWarning = 'rounded bg-yellow-600 px-4 py-1.5 text-sm font-medium hover:bg-yellow-500 disabled:opacity-50';
-
 function DataSettings() {
     const qc = useQueryClient();
     const fileRef = useRef<HTMLInputElement>(null);
@@ -120,24 +115,24 @@ function DataSettings() {
         },
     });
 
-    if (collections.isPending) return <div className="text-sm text-neutral-400">Loading...</div>;
+    if (collections.isPending) return <div className="muted">Loading...</div>;
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="page">
             <SectionCard title="Export collections" description="Download your collection schemas as JSON.">
-                <div className="mb-3 flex items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm">
+                <div className="row">
+                    <label className="field field--inline">
                         <input
                             type="checkbox"
                             checked={ allSelected }
                             onChange={ toggleAll }
-                            className="accent-indigo-500"
+                            
                         />
-                        <span className="text-neutral-400">Select all ({ allCollections.length })</span>
+                        <span className="field__label">Select all ({ allCollections.length })</span>
                     </label>
                 </div>
 
-                <div className="mb-4 flex flex-wrap gap-1.5">
+                <div className="row row--wrap row--tight">
                     { allCollections.map((c) => (
                         <label
                             key={ c.id }
@@ -152,25 +147,25 @@ function DataSettings() {
                                 type="checkbox"
                                 checked={ selected.has(c.id) }
                                 onChange={ () => toggleOne(c.id) }
-                                className="accent-indigo-500"
+                                
                             />
                             { c.name }
                         </label>
                     )) }
                 </div>
 
-                <div className="flex gap-2">
-                    <button onClick={ exportJson } disabled={ selected.size === 0 } className={ btnPrimary }>
+                <div className="row">
+                    <button onClick={ exportJson } disabled={ selected.size === 0 } className="btn">
                         Download JSON
                     </button>
-                    <button onClick={ copyExport } disabled={ selected.size === 0 } className={ btnSecondary }>
+                    <button onClick={ copyExport } disabled={ selected.size === 0 } className="btn btn--outline">
                         Copy to clipboard
                     </button>
                 </div>
             </SectionCard>
 
             <SectionCard title="Import collections" description="Upload a JSON schema to create or update collections.">
-                <div className="mb-3 flex items-center gap-3">
+                <div className="row">
                     <input
                         ref={ fileRef }
                         type="file"
@@ -178,10 +173,10 @@ function DataSettings() {
                         onChange={ handleFileLoad }
                         className="hidden"
                     />
-                    <button onClick={ () => fileRef.current?.click() } className={ btnSecondary }>
+                    <button onClick={ () => fileRef.current?.click() } className="btn btn--outline">
                         Load from file
                     </button>
-                    <span className="text-xs text-neutral-500">or paste JSON below</span>
+                    <span className="muted small">or paste JSON below</span>
                 </div>
 
                 <textarea
@@ -190,53 +185,53 @@ function DataSettings() {
                     rows={ 10 }
                     spellCheck={ false }
                     placeholder="[{ &quot;id&quot;: &quot;...&quot;, &quot;name&quot;: &quot;...&quot;, ... }]"
-                    className={ inputClass + ' font-mono text-xs' }
+                    className="input input--mono"
                 />
 
-                { importError && <div className="mt-2 text-xs text-red-400">{ importError }</div> }
+                { importError && <div className="danger small">{ importError }</div> }
 
                 { importParsed.length > 0 && (
-                    <div className="mt-4">
-                        <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                    <div className="stack">
+                        <h4 className="eyebrow">
                             Detected changes
                         </h4>
-                        <ul className="flex flex-col gap-1 text-sm">
+                        <ul className="field">
                             { toAdd.map((c) => (
-                                <li key={ c.id } className="flex items-center gap-2">
-                                    <span className="rounded bg-green-900 px-1.5 py-0.5 text-xs text-green-300">Add</span>
+                                <li key={ c.id } className="row">
+                                    <span className="tag ok">Add</span>
                                     <span>{ c.name }</span>
-                                    <span className="text-xs text-neutral-600">{ c.id }</span>
+                                    <span className="muted small">{ c.id }</span>
                                 </li>
                             )) }
                             { toUpdate.map((c) => (
-                                <li key={ c.id } className="flex items-center gap-2">
-                                    <span className="rounded bg-yellow-900 px-1.5 py-0.5 text-xs text-yellow-300">Update</span>
+                                <li key={ c.id } className="row">
+                                    <span className="tag warn">Update</span>
                                     <span>{ c.name }</span>
-                                    <span className="text-xs text-neutral-600">{ c.id }</span>
+                                    <span className="muted small">{ c.id }</span>
                                 </li>
                             )) }
                         </ul>
                     </div>
                 ) }
 
-                <div className="mt-4 flex items-center gap-2">
+                <div className="row">
                     <button
                         onClick={ () => importMutation.mutate() }
                         disabled={ importParsed.length === 0 || importMutation.isPending }
-                        className={ btnWarning }
+                        className="btn btn--outline"
                     >
                         { importMutation.isPending ? 'Importing...' : 'Apply import' }
                     </button>
                     { importJson && (
                         <button
                             onClick={ () => { setImportJson(''); setImportParsed([]); setImportError(''); } }
-                            className="text-xs text-neutral-500 hover:text-neutral-300"
+                            className="link small"
                         >
                             Clear
                         </button>
                     ) }
-                    { importMutation.isSuccess && <span className="text-xs text-green-400">Imported.</span> }
-                    { importMutation.error && <span className="text-xs text-red-400">{ importMutation.error.message }</span> }
+                    { importMutation.isSuccess && <span className="ok small">Imported.</span> }
+                    { importMutation.error && <span className="danger small">{ importMutation.error.message }</span> }
                 </div>
             </SectionCard>
         </div>
