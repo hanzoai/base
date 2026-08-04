@@ -1,59 +1,59 @@
-# Base Admin UI (embedded)
+# Base Admin UI
 
-This package embeds the Base admin SPA via `//go:embed all:dist`. The
-binary serves `dist/` at `/_/` when `BASE_ENABLE_ADMIN_UI=1`.
+The Base admin SPA. Source is `./src`; `pnpm build` writes `./dist`, and
+`embed.go` compiles that into the Base binary with `//go:embed all:dist`,
+which the server mounts at `/_/` when `BASE_ENABLE_ADMIN_UI=1`.
 
-The SPA itself is **not built here**. Source lives in
-`~/work/hanzo/gui/apps/admin-base` (Hanzo GUI v7 + Vite). Build there
-and sync the result with the script in this repo.
+`dist/` is committed so `go build` is hermetic — CI compiles the binary
+without a Node toolchain. Rebuild it in the same commit as any `src/` change.
 
-## Build & sync
+## Build
 
 ```sh
-# 1. Build the SPA in the gui workspace
-cd ../gui/apps/admin-base
-bun run build
-
-# 2. Sync into ./dist (this directory) for go:embed
-cd -
-scripts/sync-admin-ui.sh
+pnpm install
+pnpm build      # tsc --noEmit && vite build  ->  ./dist
+pnpm dev        # vite, proxying /v1 to a local Base on :8090
 ```
 
-The sync writes a `.sync-stamp` so binaries can be traced back to the
-source commit.
+Two env knobs, both set at build time and both mirrored by the Go server:
+
+| Env | Default | Read by |
+|---|---|---|
+| `BASE_ADMIN_UI_PATH` | `/_/` | Vite `base` + the Go static mount |
+| `VITE_IAM_URL` / `VITE_IAM_CLIENT_ID` | `https://hanzo.id` / `hanzo-base` | `src/lib/iam.ts` |
 
 ## Stack
 
-| Layer | Stack |
+One framework, all platforms. No Tailwind, no Radix, no shadcn.
+
+| Layer | What |
 |---|---|
-| Framework | React 19 |
-| Bundler | Vite 8 |
-| Router | react-router-dom 7 |
-| Data | `useFetch` from `@hanzogui/admin/data` |
-| UI kit | Hanzo GUI v7 (`hanzogui` umbrella + `@hanzogui/admin` chrome) |
-| Auth | Base `_superusers` token in localStorage; `useAuth` hook |
+| Framework | React 19 + TanStack Router (file-based, `src/routes/**`) + TanStack Query |
+| Bundler | Vite 6 |
+| Components | `@hanzo/ui` on `@hanzo/gui` — the cross-platform primitives, same import on web/native/desktop |
+| Icons | `@hanzogui/lucide-icons-2` |
+| Styling | `src/index.css`: `@hanzo/design` tokens (plain CSS custom properties) + ~30 class names for the things this admin has |
+| Data | One `/v1` fetch layer (`src/lib/api.ts`) behind a `base.collection(x).method()` facade (`src/lib/base-client.ts`); realtime is `/v1/realtime` SSE |
+| Auth | Hanzo IAM, OAuth2 PKCE via `@hanzo/iam` (`src/lib/iam.ts`). No local password — the fork retired `_superusers` password auth and the server 404s `auth-with-password` for every collection |
 
-## Pages shipped
+Where the line falls: overlays (dialog, dropdown) are `@hanzo/ui` components,
+because they carry a11y, focus management and placement that CSS cannot. Every
+other surface is a class in `index.css`. A route says what a thing IS.
 
-| Page | Path | File |
-|---|---|---|
-| Login | `/_/login` | `gui/apps/admin-base/src/pages/Login.tsx` |
-| Collections | `/_/collections` | `Collections.tsx` |
-| Records | `/_/collections/:id/records` | `Records.tsx` |
-| Logs | `/_/logs` | `Logs.tsx` |
-| Settings · SMTP | `/_/settings/smtp` | `SettingsSmtp.tsx` |
-| Settings · Rate limits | `/_/settings/rate-limits` | `SettingsRateLimits.tsx` |
-| Settings · Tokens | `/_/settings/tokens` | `SettingsTokens.tsx` |
+## Verifying a change
 
-Auth, OAuth2, Backups, Mail templates, Superusers, Export/Import, SQL
-runner, and Realtime inspector are not yet ported.
+`pnpm build` going green does **not** prove a visual change worked. `@hanzo/gui`
+drops a prop it does not recognise in silence — no error, no type failure, just
+an unstyled element — and CSS resolves an undefined `var(--x)` to nothing. Both
+layers fail quietly, so run the browser check:
 
-## Why this layout
+```sh
+pnpm smoke      # needs playwright; PLAYWRIGHT=/path/to/playwright/index.mjs
+```
 
-- The SPA shares the `@hanzogui/admin` chrome with `apps/admin-tasks`
-  (and any other admin surface in `apps/admin-*`). One way to build
-  admin UI across tasks/kms/commerce/console/base.
-- `dist/` is committed-tracked at sync time so `go build` is hermetic
-  — CI doesn't need bun installed to compile the binary.
-- The static extractor must run; without resolved theme CSS the runtime
-  `getThemeProxied()` throws "Missing theme" and renders blank.
+It serves the committed `dist/` under `/_/` exactly as the Go server does, stubs
+`/v1`, and gates on: every route paints, every `var(--token)` resolves, zero
+utility-class residue, every control computes real colours and radii, the
+overlays open, and the confirm dialog measures the width `DialogContent maxW`
+asks for. That last one is the shape of the silent-drop bug, so it is asserted,
+not just printed.

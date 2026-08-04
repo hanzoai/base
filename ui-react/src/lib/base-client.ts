@@ -42,18 +42,6 @@ class CollectionHandle {
     const realtimeTopic = !topic || topic === '*' ? this.name : `${this.name}/${topic}`
     return Promise.resolve(api.subscribeRecords(realtimeTopic, cb))
   }
-
-  async authWithPassword(
-    identity: string,
-    password: string,
-  ): Promise<{ token: string; record: Record<string, unknown> }> {
-    const res = await api.request<{ token: string; record: Record<string, unknown> }>(
-      `/v1/collections/${encodeURIComponent(this.name)}/auth-with-password`,
-      { method: 'POST', body: JSON.stringify({ identity, password }) },
-    )
-    api.setAuth(res.token, res.record)
-    return res
-  }
 }
 
 class AuthStore {

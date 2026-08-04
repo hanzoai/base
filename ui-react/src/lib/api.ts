@@ -158,22 +158,6 @@ export interface CronModel {
 }
 
 // ---------------------------------------------------------------------------
-// Auth
-// ---------------------------------------------------------------------------
-
-export async function authWithPassword(identity: string, password: string) {
-  const res = await request<{ token: string; record: Record<string, unknown> }>(
-    '/v1/collections/_superusers/auth-with-password',
-    {
-      method: 'POST',
-      body: JSON.stringify({ identity, password }),
-    },
-  )
-  setAuth(res.token, res.record)
-  return res
-}
-
-// ---------------------------------------------------------------------------
 // Collections
 // ---------------------------------------------------------------------------
 
