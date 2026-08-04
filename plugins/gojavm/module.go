@@ -6,20 +6,20 @@ import (
 	"fmt"
 	"sync"
 
-	zipruntime "github.com/zap-proto/zip/runtime"
+	zipjs "github.com/zap-proto/zip/js"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 )
 
 // module is one loaded extension. Its (possibly esbuild-bundled) source
-// is registered as a CommonJS module in zip's shared *runtime.JSRuntime
+// is registered as a CommonJS module in zip's shared *js.JSRuntime
 // at Load time, reachable from JS via require(moduleKey). Each Invoke
 // borrows a pooled VM (inside zip), requires the module, calls the
 // requested export with the JSON-decoded payload, and JSON-encodes the
 // result. There is no per-module goja.Program or VM bookkeeping here any
 // more — zip owns the engine; gojavm owns the manifest + JSON wire.
 type module struct {
-	js      *zipruntime.JSRuntime
+	js      *zipjs.JSRuntime
 	name    string
 	key     string // unique require() key for this module's source
 	exports []string
@@ -44,7 +44,7 @@ func nextModuleKey(name string) string {
 	return fmt.Sprintf("base/ext/%s#%d", name, n)
 }
 
-func newModule(js *zipruntime.JSRuntime, dir string, m *extruntime.Manifest) (*module, error) {
+func newModule(js *zipjs.JSRuntime, dir string, m *extruntime.Manifest) (*module, error) {
 	// transpile reads the entry and, for TS / JSX / ESM, bundles the
 	// whole dependency graph into one CommonJS program via esbuild. Plain
 	// global-function .js is wrapped so its functions become exports.
@@ -75,7 +75,7 @@ func (m *module) Exports() []string { return m.exports }
 // from zip's pool via a single Eval, so require() resolution, the call
 // and the stringify all share one runtime — no cross-VM state.
 //
-// TODO(zip/runtime): zip's JSRuntime.Eval takes no context.Context, so a
+// TODO(zip/js): zip's JSRuntime.Eval takes no context.Context, so a
 // ctx cancel mid-call cannot interrupt the VM here (the previous
 // implementation ran a vm.Interrupt watchdog). Cooperative cancel needs
 // an Eval/Invoke-with-ctx on zip's JSRuntime. Tracked on zap-proto/zip
