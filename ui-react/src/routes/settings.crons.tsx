@@ -19,40 +19,40 @@ function Crons() {
     });
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="stack">
             <header>
-                <h2 className="text-lg font-semibold">Cron jobs</h2>
-                <p className="text-xs text-neutral-400">
+                <h2 className="page__title">Cron jobs</h2>
+                <p className="muted small">
                     Registered app jobs. Each runs on its configured schedule; the
                     "Run now" button triggers the handler out-of-band.
                 </p>
             </header>
 
-            { list.isPending && <div className="text-sm text-neutral-400">Loading…</div> }
-            { list.error && <div className="text-sm text-red-400">{ String(list.error) }</div> }
+            { list.isPending && <div className="muted">Loading…</div> }
+            { list.error && <div className="danger">{ String(list.error) }</div> }
 
             { !list.isPending && list.data?.length === 0 && (
-                <div className="text-sm text-neutral-500">No cron jobs registered.</div>
+                <div className="muted">No cron jobs registered.</div>
             ) }
 
-            <table className="w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-wider text-neutral-500">
+            <table className="table">
+                <thead>
                     <tr>
-                        <th className="py-2">ID</th>
-                        <th className="py-2">Schedule</th>
-                        <th className="py-2" />
+                        <th>ID</th>
+                        <th>Schedule</th>
+                        <th />
                     </tr>
                 </thead>
                 <tbody>
                     { list.data?.map((job) => (
-                        <tr key={ job.id } className="border-t border-neutral-800 hover:bg-neutral-900">
-                            <td className="py-2 font-mono text-xs">{ job.id }</td>
-                            <td className="py-2 font-mono text-xs text-neutral-400">{ job.expression }</td>
-                            <td className="py-2 text-right">
+                        <tr key={ job.id }>
+                            <td className="mono">{ job.id }</td>
+                            <td className="mono muted">{ job.expression }</td>
+                            <td align="right">
                                 <button
                                     onClick={ () => run.mutate(job.id) }
                                     disabled={ run.isPending }
-                                    className="text-xs text-indigo-400 hover:text-indigo-300 disabled:text-neutral-600"
+                                    className="link small"
                                 >
                                     Run now
                                 </button>
@@ -62,7 +62,7 @@ function Crons() {
                 </tbody>
             </table>
 
-            { run.isSuccess && <div className="text-xs text-green-400">Triggered.</div> }
+            { run.isSuccess && <div className="ok small">Triggered.</div> }
         </div>
     );
 }

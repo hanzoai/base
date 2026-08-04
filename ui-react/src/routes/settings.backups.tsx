@@ -22,10 +22,6 @@ interface BackupOptionsForm {
     s3: S3Form;
 }
 
-const inputClass = 'rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm';
-const btnPrimary = 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50';
-const btnSecondary = 'rounded border border-neutral-700 px-3 py-1 text-sm hover:bg-neutral-800 disabled:opacity-50';
-
 function formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -108,76 +104,76 @@ function BackupsSettings() {
         },
     });
 
-    if (settings.isPending) return <div className="text-sm text-neutral-400">Loading...</div>;
+    if (settings.isPending) return <div className="muted">Loading...</div>;
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="page">
             <SectionCard title="Backups" description="Create, restore, download, or delete database backups.">
-                <div className="mb-4 flex items-center gap-2">
+                <div className="row">
                     <input
                         value={ newBackupName }
                         onChange={ (e) => setNewBackupName(e.target.value) }
                         placeholder="backup-name.zip"
-                        className={ inputClass + ' flex-1' }
+                        className="input grow"
                     />
                     <button
                         onClick={ () => createBackup.mutate(newBackupName || `backup-${Date.now()}.zip`) }
                         disabled={ createBackup.isPending }
-                        className={ btnPrimary }
+                        className="btn"
                     >
                         { createBackup.isPending ? 'Creating...' : 'New backup' }
                     </button>
                     <button
                         onClick={ () => void qc.invalidateQueries({ queryKey: ['backups'] }) }
-                        className={ btnSecondary }
+                        className="btn btn--outline"
                     >
                         Refresh
                     </button>
                 </div>
 
-                { createBackup.error && <div className="mb-2 text-xs text-red-400">{ createBackup.error.message }</div> }
+                { createBackup.error && <div className="danger small">{ createBackup.error.message }</div> }
 
-                { backupsList.isPending && <div className="text-sm text-neutral-400">Loading backups...</div> }
+                { backupsList.isPending && <div className="muted">Loading backups...</div> }
 
                 { backupsList.data && backupsList.data.length === 0 && (
-                    <div className="text-sm text-neutral-500">No backups yet.</div>
+                    <div className="muted">No backups yet.</div>
                 ) }
 
                 { backupsList.data && backupsList.data.length > 0 && (
-                    <table className="w-full text-sm">
-                        <thead className="text-left text-xs uppercase tracking-wider text-neutral-500">
+                    <table className="table">
+                        <thead>
                             <tr>
-                                <th className="py-2">Name</th>
-                                <th className="py-2">Size</th>
-                                <th className="py-2 text-right">Actions</th>
+                                <th>Name</th>
+                                <th>Size</th>
+                                <th align="right">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             { backupsList.data.map((b) => (
-                                <tr key={ b.key } className="border-t border-neutral-800 hover:bg-neutral-900">
-                                    <td className="py-2 font-mono text-xs">{ b.key }</td>
-                                    <td className="py-2 text-neutral-400">{ formatBytes(b.size) }</td>
-                                    <td className="py-2 text-right">
-                                        <div className="flex items-center justify-end gap-2">
+                                <tr key={ b.key }>
+                                    <td className="mono">{ b.key }</td>
+                                    <td className="muted">{ formatBytes(b.size) }</td>
+                                    <td align="right">
+                                        <div className="row">
                                             <button
                                                 onClick={ () => downloadBackup.mutate(b.key) }
-                                                className="text-xs text-indigo-400 hover:text-indigo-300"
+                                                className="link small"
                                             >
                                                 Download
                                             </button>
                                             { restoreTarget === b.key ? (
                                                 <>
-                                                    <span className="text-xs text-yellow-400">Confirm restore?</span>
+                                                    <span className="warn small">Confirm restore?</span>
                                                     <button
                                                         onClick={ () => restoreBackup.mutate(b.key) }
                                                         disabled={ restoreBackup.isPending }
-                                                        className="text-xs text-yellow-400 hover:text-yellow-300"
+                                                        className="link small warn"
                                                     >
                                                         Yes
                                                     </button>
                                                     <button
                                                         onClick={ () => setRestoreTarget(null) }
-                                                        className="text-xs text-neutral-500 hover:text-neutral-300"
+                                                        className="link small"
                                                     >
                                                         No
                                                     </button>
@@ -185,7 +181,7 @@ function BackupsSettings() {
                                             ) : (
                                                 <button
                                                     onClick={ () => setRestoreTarget(b.key) }
-                                                    className="text-xs text-yellow-400 hover:text-yellow-300"
+                                                    className="link small warn"
                                                 >
                                                     Restore
                                                 </button>
@@ -195,7 +191,7 @@ function BackupsSettings() {
                                                     if (confirm(`Delete backup "${b.key}"?`)) deleteBackup.mutate(b.key);
                                                 } }
                                                 disabled={ deleteBackup.isPending }
-                                                className="text-xs text-red-400 hover:text-red-300"
+                                                className="link link--danger small"
                                             >
                                                 Delete
                                             </button>
@@ -207,72 +203,72 @@ function BackupsSettings() {
                     </table>
                 ) }
 
-                { restoreBackup.error && <div className="mt-2 text-xs text-red-400">{ restoreBackup.error.message }</div> }
+                { restoreBackup.error && <div className="danger small">{ restoreBackup.error.message }</div> }
             </SectionCard>
 
             <SectionCard title="Backup options" description="Configure auto backups and S3 storage.">
                 <button
                     type="button"
                     onClick={ () => setShowOptions(!showOptions) }
-                    className={ btnSecondary }
+                    className="btn btn--outline"
                 >
                     { showOptions ? 'Hide options' : 'Show options' }
                 </button>
 
                 { showOptions && (
-                    <form onSubmit={ handleSubmit((d) => saveOptions.mutate(d)) } className="mt-4 flex flex-col gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="text-neutral-400">Cron expression (UTC)</span>
-                                <input { ...register('cron') } placeholder="0 0 * * *" className={ inputClass + ' font-mono' } />
-                                <span className="text-xs text-neutral-600">Leave empty to disable auto backups</span>
+                    <form onSubmit={ handleSubmit((d) => saveOptions.mutate(d)) } className="stack">
+                        <div className="grid">
+                            <label className="field">
+                                <span className="field__label">Cron expression (UTC)</span>
+                                <input { ...register('cron') } placeholder="0 0 * * *" className="input input--mono" />
+                                <span className="muted small">Leave empty to disable auto backups</span>
                             </label>
-                            <label className="flex flex-col gap-1 text-sm">
-                                <span className="text-neutral-400">Max auto backups to keep</span>
-                                <input { ...register('cronMaxKeep', { valueAsNumber: true }) } type="number" min="1" className={ inputClass } />
+                            <label className="field">
+                                <span className="field__label">Max auto backups to keep</span>
+                                <input { ...register('cronMaxKeep', { valueAsNumber: true }) } type="number" min="1" className="input" />
                             </label>
                         </div>
 
-                        <label className="flex items-center gap-2 text-sm">
-                            <input { ...register('s3.enabled') } type="checkbox" className="accent-indigo-500" />
+                        <label className="field field--inline">
+                            <input { ...register('s3.enabled') } type="checkbox"  />
                             <span>Store backups in S3 storage</span>
                         </label>
 
                         { s3Enabled && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <label className="flex flex-col gap-1 text-sm col-span-2">
-                                    <span className="text-neutral-400">Endpoint</span>
-                                    <input { ...register('s3.endpoint', { required: true }) } className={ inputClass } />
+                            <div className="grid">
+                                <label className="field span-2">
+                                    <span className="field__label">Endpoint</span>
+                                    <input { ...register('s3.endpoint', { required: true }) } className="input" />
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-neutral-400">Bucket</span>
-                                    <input { ...register('s3.bucket', { required: true }) } className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Bucket</span>
+                                    <input { ...register('s3.bucket', { required: true }) } className="input" />
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-neutral-400">Region</span>
-                                    <input { ...register('s3.region', { required: true }) } className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Region</span>
+                                    <input { ...register('s3.region', { required: true }) } className="input" />
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-neutral-400">Access key</span>
-                                    <input { ...register('s3.accessKey', { required: true }) } className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Access key</span>
+                                    <input { ...register('s3.accessKey', { required: true }) } className="input" />
                                 </label>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    <span className="text-neutral-400">Secret</span>
-                                    <input { ...register('s3.secret', { required: true }) } type="password" className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Secret</span>
+                                    <input { ...register('s3.secret', { required: true }) } type="password" className="input" />
                                 </label>
-                                <label className="col-span-2 flex items-center gap-2 text-sm">
-                                    <input { ...register('s3.forcePathStyle') } type="checkbox" className="accent-indigo-500" />
+                                <label className="field field--inline span-2">
+                                    <input { ...register('s3.forcePathStyle') } type="checkbox"  />
                                     <span>Force path-style addressing</span>
                                 </label>
                             </div>
                         ) }
 
-                        <div className="flex items-center gap-2 pt-2">
-                            <button type="submit" disabled={ !formState.isDirty || saveOptions.isPending } className={ btnPrimary }>
+                        <div className="row">
+                            <button type="submit" disabled={ !formState.isDirty || saveOptions.isPending } className="btn">
                                 { saveOptions.isPending ? 'Saving...' : 'Save options' }
                             </button>
-                            { saveOptions.isSuccess && <span className="text-xs text-green-400">Saved.</span> }
-                            { saveOptions.error && <span className="text-xs text-red-400">{ saveOptions.error.message }</span> }
+                            { saveOptions.isSuccess && <span className="ok small">Saved.</span> }
+                            { saveOptions.error && <span className="danger small">{ saveOptions.error.message }</span> }
                         </div>
                     </form>
                 ) }

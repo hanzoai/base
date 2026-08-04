@@ -22,9 +22,6 @@ const knownProviders = [
     'vk', 'yandex', 'oidc', 'oidc2', 'oidc3',
 ] as const;
 
-const inputClass = 'rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm w-full';
-const btnPrimary = 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50';
-
 function AuthSettings() {
     const qc = useQueryClient();
     const [editing, setEditing] = useState<string | null>(null);
@@ -59,26 +56,26 @@ function AuthSettings() {
     }
 
     if (settings.isPending || authCollections.isPending) {
-        return <div className="text-sm text-neutral-400">Loading...</div>;
+        return <div className="muted">Loading...</div>;
     }
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="page">
             <SectionCard title="OAuth2 providers" description="Configure OAuth2 / OIDC providers for auth collections.">
                 { authCollections.data?.filter((c) => c.type === 'auth').map((col) => {
                     const oauth2 = (col as Record<string, unknown>).oauth2 as { enabled?: boolean; providers?: Array<Record<string, unknown>> } | undefined;
                     const providers = oauth2?.providers ?? [];
 
                     return (
-                        <div key={ col.id } className="mb-6">
-                            <h3 className="mb-2 text-sm font-medium text-neutral-300">
+                        <div key={ col.id } className="stack">
+                            <h3 className="card__title">
                                 { col.name }
-                                <span className="ml-2 text-xs text-neutral-500">
+                                <span className="muted small">
                                     OAuth2 { oauth2?.enabled ? 'enabled' : 'disabled' }
                                 </span>
                             </h3>
 
-                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                            <div className="chips">
                                 { knownProviders.map((provName) => {
                                     const existing = providers.find((p) => p.name === provName);
                                     const configured = existing && (existing.clientId as string);
@@ -120,7 +117,7 @@ function AuthSettings() {
                 }) }
 
                 { (!authCollections.data || authCollections.data.filter((c) => c.type === 'auth').length === 0) && (
-                    <div className="text-sm text-neutral-500">No auth collections found.</div>
+                    <div className="muted">No auth collections found.</div>
                 ) }
             </SectionCard>
         </div>
@@ -196,49 +193,49 @@ function ProviderEditor({
     });
 
     return (
-        <div className="mt-3 rounded border border-neutral-700 bg-neutral-900 p-4">
-            <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-medium">
+        <div className="card stack">
+            <div className="row">
+                <h4>
                     { collectionName } / { providerName }
                 </h4>
-                <button onClick={ onClose } className="text-xs text-neutral-500 hover:text-neutral-300">
+                <button onClick={ onClose } className="link small">
                     Close
                 </button>
             </div>
-            <form onSubmit={ handleSubmit((d) => saveMutation.mutate(d)) } className="flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Client ID</span>
-                        <input { ...register('clientId', { required: true }) } className={ inputClass } />
+            <form onSubmit={ handleSubmit((d) => saveMutation.mutate(d)) } className="stack">
+                <div className="grid">
+                    <label className="field">
+                        <span className="field__label">Client ID</span>
+                        <input { ...register('clientId', { required: true }) } className="input" />
                     </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Client secret</span>
-                        <input { ...register('clientSecret', { required: true }) } type="password" className={ inputClass } />
-                    </label>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Auth URL</span>
-                        <input { ...register('authURL') } className={ inputClass } placeholder="Auto-detected if empty" />
-                    </label>
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="text-neutral-400">Token URL</span>
-                        <input { ...register('tokenURL') } className={ inputClass } placeholder="Auto-detected if empty" />
+                    <label className="field">
+                        <span className="field__label">Client secret</span>
+                        <input { ...register('clientSecret', { required: true }) } type="password" className="input" />
                     </label>
                 </div>
-                <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-neutral-400">User info URL</span>
-                    <input { ...register('userInfoURL') } className={ inputClass } placeholder="Auto-detected if empty" />
+                <div className="grid">
+                    <label className="field">
+                        <span className="field__label">Auth URL</span>
+                        <input { ...register('authURL') } className="input" placeholder="Auto-detected if empty" />
+                    </label>
+                    <label className="field">
+                        <span className="field__label">Token URL</span>
+                        <input { ...register('tokenURL') } className="input" placeholder="Auto-detected if empty" />
+                    </label>
+                </div>
+                <label className="field">
+                    <span className="field__label">User info URL</span>
+                    <input { ...register('userInfoURL') } className="input" placeholder="Auto-detected if empty" />
                 </label>
-                <label className="flex flex-col gap-1 text-sm">
-                    <span className="text-neutral-400">Display name</span>
-                    <input { ...register('displayName') } className={ inputClass } />
+                <label className="field">
+                    <span className="field__label">Display name</span>
+                    <input { ...register('displayName') } className="input" />
                 </label>
-                <div className="flex items-center gap-2 pt-1">
-                    <button type="submit" disabled={ saveMutation.isPending } className={ btnPrimary }>
+                <div className="row">
+                    <button type="submit" disabled={ saveMutation.isPending } className="btn">
                         { saveMutation.isPending ? 'Saving...' : 'Save provider' }
                     </button>
-                    { saveMutation.error && <span className="text-xs text-red-400">{ saveMutation.error.message }</span> }
+                    { saveMutation.error && <span className="danger small">{ saveMutation.error.message }</span> }
                 </div>
             </form>
         </div>

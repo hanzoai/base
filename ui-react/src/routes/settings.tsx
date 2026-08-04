@@ -21,28 +21,21 @@ function SettingsLayout() {
     const currentPath = matches[matches.length - 1]?.pathname ?? '';
 
     return (
-        <div className="flex gap-6">
-            <nav className="w-44 shrink-0">
-                <h1 className="mb-3 text-xl font-semibold">Settings</h1>
-                <ul className="flex flex-col gap-0.5 text-sm">
-                    { navItems.map((item) => (
-                        <li key={ item.to }>
-                            <Link
-                                to={ item.to }
-                                className={
-                                    'block rounded px-2 py-1 ' +
-                                    (currentPath.startsWith(item.to)
-                                        ? 'bg-neutral-800 text-neutral-100'
-                                        : 'text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200')
-                                }
-                            >
-                                { item.label }
-                            </Link>
-                        </li>
-                    )) }
-                </ul>
+        <div className="settings">
+            <nav className="settings__nav">
+                <h1 className="page__title">Settings</h1>
+                { navItems.map((item) => (
+                    <Link
+                        key={ item.to }
+                        to={ item.to }
+                        className="shell__link"
+                        data-active={ currentPath.startsWith(item.to) ? 'true' : undefined }
+                    >
+                        { item.label }
+                    </Link>
+                )) }
             </nav>
-            <div className="min-w-0 flex-1">
+            <div className="grow">
                 <Outlet />
             </div>
         </div>

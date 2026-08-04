@@ -65,31 +65,31 @@ function Application() {
     });
 
     return (
-        <form onSubmit={ handleSubmit((data) => save.mutate(data)) } className="flex flex-col gap-6">
+        <form onSubmit={ handleSubmit((data) => save.mutate(data)) } className="page">
             <SectionCard title="Trusted proxy">
-                <p className="text-xs text-neutral-400">
+                <p className="muted small">
                     When Base sits behind a reverse proxy, it must know which request
                     headers carry the real client IP. Only list headers your proxy is
                     guaranteed to set — trusting a header your proxy doesn't overwrite
                     lets any client spoof its IP.
                 </p>
 
-                <div className="flex flex-col gap-2">
-                    <div className="text-sm text-neutral-400">Trusted IP headers</div>
+                <div className="stack stack--tight">
+                    <div className="muted">Trusted IP headers</div>
                     { headersFA.fields.length === 0 && (
-                        <div className="text-xs text-neutral-500">None. Header-based rate limiting will fall back to RemoteAddr.</div>
+                        <div className="muted small">None. Header-based rate limiting will fall back to RemoteAddr.</div>
                     ) }
                     { headersFA.fields.map((field, i) => (
-                        <div key={ field.id } className="flex items-center gap-2">
+                        <div key={ field.id } className="row">
                             <input
                                 { ...register(`trustedProxy.headers.${ i }` as const) }
                                 placeholder="X-Forwarded-For"
-                                className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm font-mono"
+                                className="input input--mono grow"
                             />
                             <button
                                 type="button"
                                 onClick={ () => headersFA.remove(i) }
-                                className="text-xs text-red-400 hover:text-red-300"
+                                className="link link--danger small"
                             >
                                 Remove
                             </button>
@@ -98,59 +98,59 @@ function Application() {
                     <button
                         type="button"
                         onClick={ () => headersFA.append('' as never) }
-                        className="self-start rounded border border-neutral-700 px-2 py-1 text-xs hover:bg-neutral-800"
+                        className="btn btn--outline btn--sm"
                     >
                         Add header
                     </button>
                 </div>
 
-                <label className="mt-2 flex items-center gap-2 text-sm">
+                <label className="field field--inline">
                     <input type="checkbox" { ...register('trustedProxy.useLeftmostIp') } />
                     <span>Use leftmost IP (vs rightmost) when the header lists multiple</span>
                 </label>
             </SectionCard>
 
             <SectionCard title="Batch requests">
-                <p className="text-xs text-neutral-400">
+                <p className="muted small">
                     Clients can bundle multiple API calls into one HTTP request against
                     <code className="mx-1">/v1/batch</code>. Limits apply to the bundle
                     size; each sub-request still uses its own auth and rate limit.
                 </p>
 
-                <label className="flex items-center gap-2 text-sm">
+                <label className="field field--inline">
                     <input type="checkbox" { ...register('batch.enabled') } />
                     <span>Enable batch endpoint</span>
                 </label>
 
-                <div className={ 'grid grid-cols-2 gap-3 text-sm ' + (batchEnabled ? '' : 'opacity-40 pointer-events-none') }>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-neutral-400">Max requests per bundle</span>
+                <div className="grid" data-disabled={ batchEnabled ? undefined : 'true' }>
+                    <label className="field">
+                        <span className="field__label">Max requests per bundle</span>
                         <input type="number" { ...register('batch.maxRequests', { valueAsNumber: true }) }
-                            className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5" />
+                            className="input" />
                     </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-neutral-400">Timeout (seconds)</span>
+                    <label className="field">
+                        <span className="field__label">Timeout (seconds)</span>
                         <input type="number" { ...register('batch.timeout', { valueAsNumber: true }) }
-                            className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5" />
+                            className="input" />
                     </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-neutral-400">Max body size (bytes, 0=unlimited)</span>
+                    <label className="field">
+                        <span className="field__label">Max body size (bytes, 0=unlimited)</span>
                         <input type="number" { ...register('batch.maxBodySize', { valueAsNumber: true }) }
-                            className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5" />
+                            className="input" />
                     </label>
                 </div>
             </SectionCard>
 
-            <div className="flex items-center gap-3">
+            <div className="row">
                 <button
                     type="submit"
                     disabled={ !formState.isDirty || save.isPending }
-                    className="rounded bg-indigo-600 px-3 py-1.5 text-sm hover:bg-indigo-500 disabled:opacity-50"
+                    className="btn"
                 >
                     { save.isPending ? 'Saving…' : 'Save application settings' }
                 </button>
-                { save.isSuccess && <span className="text-xs text-green-400">Saved.</span> }
-                { save.error && <span className="text-xs text-red-400">{ String(save.error) }</span> }
+                { save.isSuccess && <span className="ok small">Saved.</span> }
+                { save.error && <span className="danger small">{ String(save.error) }</span> }
             </div>
         </form>
     );

@@ -1,3 +1,5 @@
+import { GuiProvider } from '@hanzo/gui';
+import guiConfig from '@hanzo/ui/gui-config';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
 import React from 'react';
@@ -17,7 +19,9 @@ declare module '@tanstack/react-router' {
   }
 }
 
-// Admin ships dark-only, true-black. Pin the theme class on <html> once.
+// Admin ships dark-only, true-black. Pin the theme class on <html> once —
+// @hanzo/design keys its palette off it, and it is the same signal GuiProvider's
+// `defaultTheme` gives the component layer.
 document.documentElement.classList.add('dark');
 
 const queryClient = new QueryClient({
@@ -27,10 +31,14 @@ const queryClient = new QueryClient({
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('root element not found');
 
+// `guiConfig` is @hanzo/ui's own scale — the same one the console and hanzo.ai
+// render against, so this admin cannot drift from them.
 createRoot(rootEl).render(
   <React.StrictMode>
-    <QueryClientProvider client={ queryClient }>
-      <RouterProvider router={ router } />
-    </QueryClientProvider>
+    <GuiProvider config={ guiConfig } defaultTheme="dark">
+      <QueryClientProvider client={ queryClient }>
+        <RouterProvider router={ router } />
+      </QueryClientProvider>
+    </GuiProvider>
   </React.StrictMode>,
 );

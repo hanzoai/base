@@ -1,20 +1,15 @@
-// EditableCell — the display/edit split. A cell renders its value in display
-// mode and, when the grid puts it in edit mode, swaps to a floating editor
-// (Popover) with a single commit/cancel protocol. bool toggles in place.
+// EditableCell — the display/edit split. A cell renders its value; when the grid
+// puts it in edit mode the cell BECOMES its editor, in place, with one
+// commit/cancel protocol. bool toggles without entering edit mode at all.
+//
+// In place, not floating: the editor used to be a Radix Popover anchored to the
+// cell and nudged back over it with `sideOffset={-34}`, which is a floating layer
+// doing an impression of an inline one — it re-implemented the cell's geometry,
+// fought the grid for focus, and needed `onOpenAutoFocus` escapes per field kind.
+// Swapping the cell's own contents costs no positioning, no portal and no
+// focus negotiation, and it is what the grid already looked like it was doing.
 import { useEffect, useRef, useState } from 'react';
 
-import { Checkbox } from '~/components/ui/checkbox';
-import { Input } from '~/components/ui/input';
-import { Popover, PopoverAnchor, PopoverContent } from '~/components/ui/popover';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select';
-import { Textarea } from '~/components/ui/textarea';
-import { cn } from '~/lib/cn';
 import {
   type EditorKind,
   coerceForApi,
@@ -46,9 +41,10 @@ export function EditableCell(props: EditableCellProps) {
   if (kind === 'bool') {
     return (
       <CellShell active={ active } onActivate={ onActivate }>
-        <Checkbox
+        <input
+          type="checkbox"
           checked={ Boolean(value) }
-          onCheckedChange={ (c) => onCommit(Boolean(c)) }
+          onChange={ (e) => onCommit(e.target.checked) }
           aria-label={ field.name }
         />
       </CellShell>
@@ -56,44 +52,41 @@ export function EditableCell(props: EditableCellProps) {
   }
 
   const editable = kind !== 'readonly' && kind !== 'file';
+
+  if (editing && editable) {
+    return (
+      <CellEditor
+        kind={ kind }
+        field={ field }
+        value={ value }
+        onCommit={ (v) => { onCommit(v); onEditEnd(); } }
+        onCancel={ onEditEnd }
+      />
+    );
+  }
+
   const display = formatDisplay(value, field);
   // Numeric columns right-align; numeric + date use tabular figures so digits
-  // line up column-wise (Twenty/Airtable-grade legibility).
+  // line up column-wise.
   const numeric = kind === 'number';
-  const tnum = numeric || kind === 'date';
+  const classes = [
+    'truncate',
+    numeric || kind === 'date' ? 'num' : '',
+    kind === 'json' ? 'mono' : '',
+  ].filter(Boolean).join(' ');
 
   return (
-    <Popover open={ editing } onOpenChange={ (o) => { if (!o) onEditEnd(); } }>
-      <PopoverAnchor asChild>
-        <CellShell
-          active={ active }
-          editable={ editable }
-          numeric={ numeric }
-          onActivate={ onActivate }
-          onEdit={ editable ? onEdit : undefined }
-        >
-          <span className={ cn('block truncate', tnum && 'tabular-nums', kind === 'json' && 'font-mono text-xs') }>
-            { display || <span className="text-muted-foreground/50">—</span> }
-          </span>
-        </CellShell>
-      </PopoverAnchor>
-      { editing && editable && (
-        <PopoverContent
-          align="start"
-          sideOffset={ -34 }
-          className={ cn('w-72 p-0', kind === 'select' && 'w-56') }
-          onOpenAutoFocus={ (e) => { if (kind === 'select') e.preventDefault(); } }
-        >
-          <CellEditor
-            kind={ kind }
-            field={ field }
-            value={ value }
-            onCommit={ (v) => { onCommit(v); onEditEnd(); } }
-            onCancel={ onEditEnd }
-          />
-        </PopoverContent>
-      ) }
-    </Popover>
+    <CellShell
+      active={ active }
+      editable={ editable }
+      numeric={ numeric }
+      onActivate={ onActivate }
+      onEdit={ editable ? onEdit : undefined }
+    >
+      <span className={ classes }>
+        { display || <span className="muted">—</span> }
+      </span>
+    </CellShell>
   );
 }
 
@@ -119,12 +112,10 @@ function CellShell({
       tabIndex={ -1 }
       onMouseDown={ onActivate }
       onDoubleClick={ onEdit }
-      className={ cn(
-        'flex h-9 items-center px-3 text-sm outline-none',
-        numeric && 'justify-end',
-        editable && 'cursor-text',
-        active && 'ring-1 ring-inset ring-ring',
-      ) }
+      className="cell__inner"
+      data-active={ active ? 'true' : undefined }
+      data-editable={ editable ? 'true' : undefined }
+      data-numeric={ numeric ? 'true' : undefined }
     >
       { children }
     </div>
@@ -139,12 +130,21 @@ interface EditorProps {
   onCancel: () => void;
 }
 
+// The `type` a single-line editor needs, per field kind.
+const INPUT_TYPE: Partial<Record<EditorKind, string>> = {
+  number: 'number',
+  date: 'datetime-local',
+};
+
 function CellEditor({ kind, field, value, onCommit, onCancel }: EditorProps) {
   const [draft, setDraft] = useState(() => toEditorString(value, field));
   const [error, setError] = useState('');
-  const firstRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
+  const ref = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(null);
 
-  useEffect(() => { firstRef.current?.focus(); firstRef.current?.select?.(); }, []);
+  useEffect(() => {
+    ref.current?.focus();
+    if (ref.current && 'select' in ref.current) ref.current.select();
+  }, []);
 
   const commit = (raw: unknown) => {
     try {
@@ -154,75 +154,70 @@ function CellEditor({ kind, field, value, onCommit, onCancel }: EditorProps) {
     }
   };
 
+  // One key protocol for every editor kind: Escape cancels, Enter commits —
+  // except in the multiline editors, where Enter is a newline and ⌘/Ctrl↵ commits.
+  const multiline = kind === 'textarea' || kind === 'json';
   const onKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
-    else if (e.key === 'Enter' && kind !== 'textarea' && kind !== 'json') {
-      e.preventDefault();
-      commit(draft);
-    } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      commit(draft);
-    }
+    if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
+    if (e.key !== 'Enter') return;
+    if (multiline && !(e.metaKey || e.ctrlKey)) return;
+    e.preventDefault();
+    commit(draft);
   };
 
   if (kind === 'select' && !isMultiValue(field)) {
-    const opts = selectValues(field);
     return (
-      <Select
+      <select
+        ref={ ref as React.Ref<HTMLSelectElement> }
+        className="cell__edit"
         defaultValue={ String(value ?? '') }
-        onValueChange={ (v) => onCommit(coerceForApi(v, field)) }
-        open
-        onOpenChange={ (o) => { if (!o) onCancel(); } }
+        onChange={ (e) => commit(e.target.value) }
+        onKeyDown={ onKeyDown }
+        onBlur={ onCancel }
       >
-        <SelectTrigger className="border-0 shadow-none focus:ring-0">
-          <SelectValue placeholder="Select…" />
-        </SelectTrigger>
-        <SelectContent>
-          { opts.map((o) => (
-            <SelectItem key={ o } value={ o }>{ o }</SelectItem>
-          )) }
-        </SelectContent>
-      </Select>
+        <option value="">—</option>
+        { selectValues(field).map((o) => (
+          <option key={ o } value={ o }>{ o }</option>
+        )) }
+      </select>
     );
   }
 
-  if (kind === 'textarea' || kind === 'json') {
+  if (multiline) {
     return (
-      <div className="flex flex-col gap-1 p-2">
-        <Textarea
-          ref={ firstRef }
+      <div>
+        <textarea
+          ref={ ref as React.Ref<HTMLTextAreaElement> }
+          className={ kind === 'json' ? 'cell__edit cell__edit--mono' : 'cell__edit' }
           value={ draft }
           onChange={ (e) => { setDraft(e.target.value); setError(''); } }
           onKeyDown={ onKeyDown }
           rows={ 5 }
-          className={ cn('resize-none border-0 shadow-none focus-visible:ring-0', kind === 'json' && 'font-mono text-xs') }
           placeholder={ kind === 'json' ? '{ }' : '' }
         />
-        { error && <span className="px-1 text-xs text-destructive">{ error }</span> }
-        <div className="flex justify-between px-1 text-[11px] text-muted-foreground">
+        <div className="row small muted" style={{ padding: 'var(--space-1) var(--space-3)' }}>
           <span>⌘↵ save · esc cancel</span>
-          <button className="hover:text-foreground" onMouseDown={ (e) => { e.preventDefault(); commit(draft); } }>
+          <button type="button" className="link push" onMouseDown={ (e) => { e.preventDefault(); commit(draft); } }>
             Save
           </button>
         </div>
+        { error && <span className="danger small">{ error }</span> }
       </div>
     );
   }
 
-  // text / number / date / relation / multi-select → single input line.
+  // text / number / date / relation / multi-select → one input line.
   return (
-    <div className="flex flex-col gap-1 p-1.5">
-      <Input
-        ref={ firstRef }
-        value={ draft }
-        onChange={ (e) => setDraft(e.target.value) }
-        onKeyDown={ onKeyDown }
-        onBlur={ () => commit(draft) }
-        type={ kind === 'number' ? 'number' : kind === 'date' ? 'datetime-local' : 'text' }
-        step={ kind === 'number' ? 'any' : undefined }
-        placeholder={ kind === 'relation' ? 'record id(s), comma-separated' : '' }
-        className="h-8 border-0 shadow-none focus-visible:ring-0"
-      />
-    </div>
+    <input
+      ref={ ref as React.Ref<HTMLInputElement> }
+      className="cell__edit"
+      value={ draft }
+      onChange={ (e) => setDraft(e.target.value) }
+      onKeyDown={ onKeyDown }
+      onBlur={ () => commit(draft) }
+      type={ INPUT_TYPE[kind] ?? 'text' }
+      step={ kind === 'number' ? 'any' : undefined }
+      placeholder={ kind === 'relation' ? 'record id(s), comma-separated' : '' }
+    />
   );
 }

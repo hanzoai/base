@@ -1,10 +1,6 @@
 import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, X } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
-
-import { RecordGrid } from '~/components/grid/RecordGrid';
-import { Button } from '~/components/ui/button';
+import { Plus, Search, Trash2, X } from '@hanzogui/lucide-icons-2';
 import {
   Dialog,
   DialogContent,
@@ -12,8 +8,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog';
-import { Input } from '~/components/ui/input';
+} from '@hanzo/ui';
+import { useCallback, useMemo, useState } from 'react';
+
+import { RecordGrid } from '~/components/grid/RecordGrid';
 import { base } from '~/lib/base';
 import type { CollectionField, ListResult, RecordModel } from '~/lib/base';
 
@@ -126,75 +124,73 @@ function RecordsList() {
     [nav, id],
   );
 
-  if (collection.isPending) return <Muted>Loading collection…</Muted>;
-  if (collection.error) return <ErrorText error={ collection.error } />;
+  if (collection.isPending) return <div className="muted">Loading collection…</div>;
+  if (collection.error) return <div className="danger">{ String(collection.error) }</div>;
 
   const total = records.data?.totalItems ?? 0;
   const totalPages = records.data?.totalPages ?? 0;
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex items-center gap-2">
-        <Link to="/collections/$id" params={{ id }} className="text-muted-foreground hover:text-foreground">
-          { name }
-        </Link>
-        <span className="text-muted-foreground/40">/</span>
-        <h1 className="text-xl font-semibold">Records</h1>
-        <span className="text-sm text-muted-foreground">{ total }</span>
+    <div className="page">
+      <header className="page__head">
+        <Link to="/collections/$id" params={{ id }} className="muted">{ name }</Link>
+        <span className="muted">/</span>
+        <h1 className="page__title">Records</h1>
+        <span className="muted">{ total }</span>
         { !isView && (
-          <Button
-            size="sm"
-            className="ml-auto"
+          <button
+            type="button"
+            className="btn btn--sm push"
             onClick={ () => nav({ to: '/collections/$id/records/$recordId', params: { id, recordId: '_new' } }) }
           >
-            <Plus /> New record
-          </Button>
+            <Plus size={ 14 } /> New record
+          </button>
         ) }
       </header>
 
       <form
         onSubmit={ (e) => { e.preventDefault(); setFilter(filterInput); setPage(1); } }
-        className="flex items-center gap-2"
+        className="row"
       >
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <div className="search grow">
+          <Search size={ 16 } />
+          <input
             value={ filterInput }
             onChange={ (e) => setFilterInput(e.target.value) }
             placeholder={ 'Filter — e.g. status = "done"' }
-            className="pl-8 font-mono"
+            className="input input--mono"
           />
         </div>
-        <Button type="submit" variant="secondary" size="sm">Filter</Button>
+        <button type="submit" className="btn btn--outline btn--sm">Filter</button>
         { filter && (
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
+            className="btn btn--ghost btn--sm"
             onClick={ () => { setFilter(''); setFilterInput(''); setPage(1); } }
           >
-            <X /> Clear
-          </Button>
+            <X size={ 14 } /> Clear
+          </button>
         ) }
       </form>
 
       { selected.size > 0 && (
-        <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2 text-sm">
-          <span className="text-muted-foreground">{ selected.size } selected</span>
-          <Button variant="ghost" size="sm" onClick={ () => setSelected(new Set()) }>Deselect</Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="ml-auto text-destructive hover:text-destructive"
+        <div className="list__row">
+          <span className="muted">{ selected.size } selected</span>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={ () => setSelected(new Set()) }>
+            Deselect
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm push danger"
             onClick={ () => setConfirm({ ids: [...selected], label: `${selected.size} record(s)` }) }
           >
-            <Trash2 /> Delete selected
-          </Button>
+            <Trash2 size={ 14 } /> Delete selected
+          </button>
         </div>
       ) }
 
-      { records.isPending && <Muted>Loading records…</Muted> }
-      { records.error && <ErrorText error={ records.error } /> }
+      { records.isPending && <div className="muted">Loading records…</div> }
+      { records.error && <div className="danger">{ String(records.error) }</div> }
 
       { records.data && (
         <RecordGrid
@@ -214,45 +210,38 @@ function RecordsList() {
       ) }
 
       { totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 text-sm">
-          <Button variant="outline" size="sm" disabled={ page <= 1 } onClick={ () => setPage((p) => p - 1) }>
+        <div className="row" style={{ justifyContent: 'center' }}>
+          <button type="button" className="btn btn--outline btn--sm" disabled={ page <= 1 } onClick={ () => setPage((p) => p - 1) }>
             Prev
-          </Button>
-          <span className="text-muted-foreground">Page { page } of { totalPages }</span>
-          <Button variant="outline" size="sm" disabled={ page >= totalPages } onClick={ () => setPage((p) => p + 1) }>
+          </button>
+          <span className="muted">Page { page } of { totalPages }</span>
+          <button type="button" className="btn btn--outline btn--sm" disabled={ page >= totalPages } onClick={ () => setPage((p) => p + 1) }>
             Next
-          </Button>
+          </button>
         </div>
       ) }
 
-      <Dialog open={ confirm !== null } onOpenChange={ (o) => { if (!o) setConfirm(null); } }>
-        <DialogContent className="max-w-sm">
+      <Dialog open={ confirm !== null } onOpenChange={ (o: boolean) => { if (!o) setConfirm(null); } }>
+        <DialogContent maxW={ 384 }>
           <DialogHeader>
             <DialogTitle>Delete { confirm?.label }?</DialogTitle>
             <DialogDescription>This cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={ () => setConfirm(null) }>Cancel</Button>
-            <Button
-              variant="destructive"
+            <button type="button" className="btn btn--ghost" onClick={ () => setConfirm(null) }>Cancel</button>
+            <button
+              type="button"
+              className="btn btn--danger"
               disabled={ del.isPending }
               onClick={ () => confirm && del.mutate(confirm.ids) }
             >
               { del.isPending ? 'Deleting…' : 'Delete' }
-            </Button>
+            </button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
-
-function Muted({ children }: { children: React.ReactNode }) {
-  return <div className="text-sm text-muted-foreground">{ children }</div>;
-}
-
-function ErrorText({ error }: { error: unknown }) {
-  return <div className="text-sm text-destructive">{ String(error) }</div>;
 }
 
 export const Route = createFileRoute('/collections_/$id_/records')({

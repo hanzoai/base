@@ -134,34 +134,31 @@ function CollectionEditor() {
     }, [fieldArray]);
 
     // Loading / error
-    if (collection.isPending) return <div className="text-sm text-neutral-400">Loading...</div>;
-    if (collection.error) return <div className="text-sm text-red-400">{String(collection.error)}</div>;
+    if (collection.isPending) return <div className="muted">Loading...</div>;
+    if (collection.error) return <div className="danger">{String(collection.error)}</div>;
 
     const isSystem = collection.data?.system ?? false;
     const isView = collection.data?.type === 'view';
 
     return (
-        <form onSubmit={form.handleSubmit(handleSave)} className="flex flex-col gap-4">
+        <form onSubmit={form.handleSubmit(handleSave)} className="page">
             {/* Header */}
-            <header className="flex items-center gap-3">
-                <h1 className="text-xl font-semibold">
-                    Edit collection
-                </h1>
+            <header className="page__head">
+                <h1 className="page__title">Edit collection</h1>
                 <input
                     {...form.register('name', { required: true })}
                     disabled={isSystem}
-                    className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm font-medium"
+                    className="input"
+                    style={{ width: '14rem' }}
                 />
-                <span className="rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-400">
-                    {collection.data?.type}
-                </span>
-                <div className="ml-auto flex gap-2">
+                <span className="tag">{collection.data?.type}</span>
+                <div className="row push">
                     {!isSystem && (
                         <button
                             type="button"
                             onClick={handleDelete}
                             disabled={del.isPending}
-                            className="rounded bg-red-900/50 px-3 py-1 text-sm text-red-300 hover:bg-red-900 disabled:opacity-50"
+                            className="btn btn--danger btn--sm"
                         >
                             Delete
                         </button>
@@ -169,19 +166,17 @@ function CollectionEditor() {
                     <button
                         type="submit"
                         disabled={!form.formState.isDirty || save.isPending}
-                        className="rounded bg-indigo-600 px-3 py-1 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
+                        className="btn btn--sm"
                     >
                         {save.isPending ? 'Saving...' : 'Save'}
                     </button>
                 </div>
             </header>
 
-            {save.error && (
-                <div className="text-sm text-red-400">{String(save.error)}</div>
-            )}
+            {save.error && <div className="danger">{String(save.error)}</div>}
 
             {/* Tabs */}
-            <div className="flex gap-1 border-b border-neutral-800">
+            <div className="tabs">
                 <TabButton active={activeTab === 'fields'} onClick={() => setActiveTab('fields')}>
                     {isView ? 'Query' : 'Fields'}
                 </TabButton>
@@ -195,32 +190,30 @@ function CollectionEditor() {
 
             {/* Fields tab */}
             {activeTab === 'fields' && (
-                <div className="flex flex-col gap-2">
-                    {fieldArray.fields.map((field, idx) => {
-                        if (field._toDelete) return null;
-                        return (
-                            <FieldRow
-                                key={field._rhfId}
-                                index={idx}
-                                register={form.register}
-                                isSystem={field.system}
-                                onRemove={() => {
-                                    if (field.id) {
-                                        // Mark for server-side deletion
-                                        form.setValue(`fields.${idx}._toDelete`, true, { shouldDirty: true });
-                                    } else {
-                                        fieldArray.remove(idx);
-                                    }
-                                }}
-                            />
-                        );
-                    })}
+                <div className="stack stack--tight">
+                    <div className="list">
+                        {fieldArray.fields.map((field, idx) => {
+                            if (field._toDelete) return null;
+                            return (
+                                <FieldRow
+                                    key={field._rhfId}
+                                    index={idx}
+                                    register={form.register}
+                                    isSystem={field.system}
+                                    onRemove={() => {
+                                        if (field.id) {
+                                            // Mark for server-side deletion
+                                            form.setValue(`fields.${idx}._toDelete`, true, { shouldDirty: true });
+                                        } else {
+                                            fieldArray.remove(idx);
+                                        }
+                                    }}
+                                />
+                            );
+                        })}
+                    </div>
                     {!isView && (
-                        <button
-                            type="button"
-                            onClick={handleAddField}
-                            className="w-full rounded border border-dashed border-neutral-700 py-2 text-sm text-neutral-400 hover:border-neutral-500 hover:text-neutral-200"
-                        >
+                        <button type="button" onClick={handleAddField} className="btn btn--add">
                             + Add field
                         </button>
                     )}
@@ -237,7 +230,7 @@ function CollectionEditor() {
 
             {/* Rules tab */}
             {activeTab === 'rules' && (
-                <div className="flex flex-col gap-3">
+                <div className="stack">
                     <RuleField label="List/Search rule" name="listRule" register={form.register} />
                     <RuleField label="View rule" name="viewRule" register={form.register} />
                     {!isView && (
@@ -247,7 +240,7 @@ function CollectionEditor() {
                             <RuleField label="Delete rule" name="deleteRule" register={form.register} />
                         </>
                     )}
-                    <p className="text-xs text-neutral-500">
+                    <p className="muted small">
                         Leave a rule empty to require superuser access. Use filter syntax to restrict access.
                     </p>
                 </div>
@@ -266,15 +259,7 @@ function TabButton({ active, onClick, children }: {
     children: React.ReactNode;
 }) {
     return (
-        <button
-            type="button"
-            onClick={onClick}
-            className={`px-3 py-2 text-sm ${
-                active
-                    ? 'border-b-2 border-indigo-500 text-neutral-100'
-                    : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-        >
+        <button type="button" onClick={onClick} className="tab" data-active={active ? 'true' : undefined}>
             {children}
         </button>
     );
@@ -287,39 +272,30 @@ function FieldRow({ index, register, isSystem, onRemove }: {
     onRemove: () => void;
 }) {
     return (
-        <div className="flex items-center gap-2 rounded border border-neutral-800 p-2">
+        <div className="list__row">
             <input
                 {...register(`fields.${index}.name`, { required: true })}
                 disabled={isSystem}
                 placeholder="Field name"
-                className="w-40 rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm"
+                className="input"
+                style={{ width: '10rem' }}
             />
-            <select
-                {...register(`fields.${index}.type`)}
-                disabled={isSystem}
-                className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm"
-            >
+            <select {...register(`fields.${index}.type`)} disabled={isSystem} className="select" style={{ width: '8rem' }}>
                 {FIELD_TYPES.map((t) => (
                     <option key={t} value={t}>{t}</option>
                 ))}
             </select>
-            <label className="flex items-center gap-1 text-xs text-neutral-400">
+            <label className="field field--inline small muted">
                 <input type="checkbox" {...register(`fields.${index}.hidden`)} disabled={isSystem} />
                 Hidden
             </label>
-            <label className="flex items-center gap-1 text-xs text-neutral-400">
+            <label className="field field--inline small muted">
                 <input type="checkbox" {...register(`fields.${index}.presentable`)} disabled={isSystem} />
                 Presentable
             </label>
-            {isSystem && (
-                <span className="text-xs text-neutral-500">system</span>
-            )}
+            {isSystem && <span className="muted small">system</span>}
             {!isSystem && (
-                <button
-                    type="button"
-                    onClick={onRemove}
-                    className="ml-auto text-xs text-red-400 hover:text-red-300"
-                >
+                <button type="button" onClick={onRemove} className="link link--danger small push">
                     Remove
                 </button>
             )}
@@ -333,12 +309,12 @@ function RuleField({ label, name, register }: {
     register: ReturnType<typeof useForm<CollectionFormValues>>['register'];
 }) {
     return (
-        <label className="flex flex-col gap-1">
-            <span className="text-xs text-neutral-400">{label}</span>
+        <label className="field">
+            <span className="field__label">{label}</span>
             <input
                 {...register(name)}
                 placeholder='e.g. @request.auth.id != ""'
-                className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm font-mono"
+                className="input input--mono"
             />
         </label>
     );
@@ -362,33 +338,23 @@ function IndexesPanel({ indexes, onChange }: {
     }, [indexes, onChange]);
 
     return (
-        <div className="flex flex-col gap-2">
+        <div className="stack stack--tight">
             {indexes.map((idx, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                    <code className="flex-1 rounded bg-neutral-900 px-2 py-1 font-mono text-xs">
-                        {idx}
-                    </code>
-                    <button
-                        type="button"
-                        onClick={() => handleRemove(i)}
-                        className="text-xs text-red-400 hover:text-red-300"
-                    >
+                <div key={i} className="row">
+                    <code className="code grow">{idx}</code>
+                    <button type="button" onClick={() => handleRemove(i)} className="link link--danger small">
                         Remove
                     </button>
                 </div>
             ))}
-            <div className="flex gap-2">
+            <div className="row">
                 <input
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     placeholder="CREATE INDEX idx_name ON tablename (column)"
-                    className="flex-1 rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-sm font-mono"
+                    className="input input--mono grow"
                 />
-                <button
-                    type="button"
-                    onClick={handleAdd}
-                    className="rounded bg-neutral-800 px-3 py-1 text-sm hover:bg-neutral-700"
-                >
+                <button type="button" onClick={handleAdd} className="btn btn--outline">
                     Add
                 </button>
             </div>

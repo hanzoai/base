@@ -41,14 +41,6 @@ const templateOptions = [
     { label: 'Login alert', value: 'login-alert' },
 ];
 
-function labelClass(sub?: boolean) {
-    return 'flex flex-col gap-1 text-sm' + (sub ? ' text-neutral-400' : '');
-}
-
-const inputClass = 'rounded border border-neutral-700 bg-neutral-900 px-2 py-1.5 text-sm';
-const btnPrimary = 'rounded bg-indigo-600 px-4 py-1.5 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50';
-const btnSecondary = 'rounded border border-neutral-700 px-4 py-1.5 text-sm hover:bg-neutral-800 disabled:opacity-50';
-
 function SmtpSettings() {
     const qc = useQueryClient();
     const [testOpen, setTestOpen] = useState(false);
@@ -111,117 +103,117 @@ function SmtpSettings() {
         })();
     }
 
-    if (settings.isPending) return <div className="text-sm text-neutral-400">Loading...</div>;
-    if (settings.error) return <div className="text-sm text-red-400">{ String(settings.error) }</div>;
+    if (settings.isPending) return <div className="muted">Loading...</div>;
+    if (settings.error) return <div className="danger">{ String(settings.error) }</div>;
 
     return (
-        <div className="flex flex-col gap-6">
+        <div className="page">
             <SectionCard title="Sender" description="Default sender name and address for outgoing emails.">
-                <form onSubmit={ submitMeta(() => {}) } className="grid grid-cols-2 gap-4">
-                    <label className={ labelClass() }>
-                        <span className="text-neutral-400">Sender name</span>
-                        <input { ...regMeta('senderName', { required: true }) } className={ inputClass } />
+                <form onSubmit={ submitMeta(() => {}) } className="grid">
+                    <label className="field">
+                        <span className="field__label">Sender name</span>
+                        <input { ...regMeta('senderName', { required: true }) } className="input" />
                     </label>
-                    <label className={ labelClass() }>
-                        <span className="text-neutral-400">Sender address</span>
-                        <input { ...regMeta('senderAddress', { required: true }) } type="email" className={ inputClass } />
+                    <label className="field">
+                        <span className="field__label">Sender address</span>
+                        <input { ...regMeta('senderAddress', { required: true }) } type="email" className="input" />
                     </label>
                 </form>
             </SectionCard>
 
             <SectionCard title="SMTP" description="Configure SMTP mail server for sending emails.">
-                <form onSubmit={ submitSmtp(handleSave) } className="flex flex-col gap-4">
-                    <label className="flex items-center gap-2 text-sm">
-                        <input { ...regSmtp('enabled') } type="checkbox" className="accent-indigo-500" />
+                <form onSubmit={ submitSmtp(handleSave) } className="stack">
+                    <label className="field field--inline">
+                        <input { ...regSmtp('enabled') } type="checkbox"  />
                         <span>Use SMTP mail server (recommended)</span>
                     </label>
 
                     { smtpEnabled && (
                         <>
-                            <div className="grid grid-cols-4 gap-4">
-                                <label className={ labelClass() + ' col-span-2' }>
-                                    <span className="text-neutral-400">Host</span>
-                                    <input { ...regSmtp('host', { required: true }) } className={ inputClass } />
+                            <div className="grid" style={{ '--cols': 4 } as React.CSSProperties}>
+                                <label className="field span-2">
+                                    <span className="field__label">Host</span>
+                                    <input { ...regSmtp('host', { required: true }) } className="input" />
                                 </label>
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">Port</span>
-                                    <input { ...regSmtp('port', { required: true, valueAsNumber: true }) } type="number" className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Port</span>
+                                    <input { ...regSmtp('port', { required: true, valueAsNumber: true }) } type="number" className="input" />
                                 </label>
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">TLS</span>
-                                    <select { ...regSmtp('tls') } className={ inputClass }>
+                                <label className="field">
+                                    <span className="field__label">TLS</span>
+                                    <select { ...regSmtp('tls') } className="input">
                                         <option value="">Auto (StartTLS)</option>
                                         <option value="true">Always</option>
                                     </select>
                                 </label>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">Username</span>
-                                    <input { ...regSmtp('username') } className={ inputClass } />
+                            <div className="grid">
+                                <label className="field">
+                                    <span className="field__label">Username</span>
+                                    <input { ...regSmtp('username') } className="input" />
                                 </label>
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">Password</span>
-                                    <input { ...regSmtp('password') } type="password" className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">Password</span>
+                                    <input { ...regSmtp('password') } type="password" className="input" />
                                 </label>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">AUTH method</span>
-                                    <select { ...regSmtp('authMethod') } className={ inputClass }>
+                            <div className="grid">
+                                <label className="field">
+                                    <span className="field__label">AUTH method</span>
+                                    <select { ...regSmtp('authMethod') } className="input">
                                         { authMethods.map((m) => (
                                             <option key={ m.value } value={ m.value }>{ m.label }</option>
                                         )) }
                                     </select>
                                 </label>
-                                <label className={ labelClass() }>
-                                    <span className="text-neutral-400">EHLO/HELO domain</span>
-                                    <input { ...regSmtp('localName') } placeholder="localhost" className={ inputClass } />
+                                <label className="field">
+                                    <span className="field__label">EHLO/HELO domain</span>
+                                    <input { ...regSmtp('localName') } placeholder="localhost" className="input" />
                                 </label>
                             </div>
                         </>
                     ) }
 
-                    <div className="flex items-center gap-2 pt-2">
-                        <button type="submit" disabled={ !fsSmtp.isDirty || saveMutation.isPending } className={ btnPrimary }>
+                    <div className="row">
+                        <button type="submit" disabled={ !fsSmtp.isDirty || saveMutation.isPending } className="btn">
                             { saveMutation.isPending ? 'Saving...' : 'Save changes' }
                         </button>
-                        { saveMutation.isSuccess && <span className="text-xs text-green-400">Saved.</span> }
-                        { saveMutation.error && <span className="text-xs text-red-400">{ saveMutation.error.message }</span> }
+                        { saveMutation.isSuccess && <span className="ok small">Saved.</span> }
+                        { saveMutation.error && <span className="danger small">{ saveMutation.error.message }</span> }
                     </div>
                 </form>
             </SectionCard>
 
             <SectionCard title="Test email" description="Send a test email to verify your SMTP configuration.">
-                <button type="button" onClick={ () => setTestOpen(!testOpen) } className={ btnSecondary }>
+                <button type="button" onClick={ () => setTestOpen(!testOpen) } className="btn btn--outline">
                     { testOpen ? 'Hide test form' : 'Send test email' }
                 </button>
                 { testOpen && (
-                    <form onSubmit={ submitTest((d) => testMutation.mutate(d)) } className="mt-4 flex flex-col gap-3">
-                        <div className="grid grid-cols-2 gap-4">
-                            <label className={ labelClass() }>
-                                <span className="text-neutral-400">To email</span>
-                                <input { ...regTest('toEmail', { required: true }) } type="email" className={ inputClass } />
+                    <form onSubmit={ submitTest((d) => testMutation.mutate(d)) } className="stack">
+                        <div className="grid">
+                            <label className="field">
+                                <span className="field__label">To email</span>
+                                <input { ...regTest('toEmail', { required: true }) } type="email" className="input" />
                             </label>
-                            <label className={ labelClass() }>
-                                <span className="text-neutral-400">Template</span>
-                                <select { ...regTest('template') } className={ inputClass }>
+                            <label className="field">
+                                <span className="field__label">Template</span>
+                                <select { ...regTest('template') } className="input">
                                     { templateOptions.map((t) => (
                                         <option key={ t.value } value={ t.value }>{ t.label }</option>
                                     )) }
                                 </select>
                             </label>
                         </div>
-                        <label className={ labelClass() }>
-                            <span className="text-neutral-400">Auth collection</span>
-                            <input { ...regTest('collection') } className={ inputClass } placeholder="_superusers" />
+                        <label className="field">
+                            <span className="field__label">Auth collection</span>
+                            <input { ...regTest('collection') } className="input" placeholder="_superusers" />
                         </label>
-                        <div className="flex items-center gap-2">
-                            <button type="submit" disabled={ fsTest.isSubmitting || testMutation.isPending } className={ btnPrimary }>
+                        <div className="row">
+                            <button type="submit" disabled={ fsTest.isSubmitting || testMutation.isPending } className="btn">
                                 { testMutation.isPending ? 'Sending...' : 'Send' }
                             </button>
                             { testStatus && (
-                                <span className={ 'text-xs ' + (testMutation.isError ? 'text-red-400' : 'text-green-400') }>
+                                <span className={ testMutation.isError ? 'danger small' : 'ok small' }>
                                     { testStatus }
                                 </span>
                             ) }

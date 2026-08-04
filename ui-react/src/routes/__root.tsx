@@ -1,5 +1,5 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { Database, LayoutDashboard, ScrollText, Settings } from 'lucide-react';
+import { Database, LayoutDashboard, ScrollText, Settings } from '@hanzogui/lucide-icons-2';
 
 import { useAuth } from '~/hooks/useAuth';
 
@@ -16,36 +16,36 @@ function RootLayout() {
   const { isAuthenticated, record, signOut } = useAuth();
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="shell">
       { isAuthenticated && (
-        <aside className="flex w-56 flex-col border-r border-border p-3">
-          <div className="mb-6 flex items-center gap-2 px-2 pt-1">
-            <img src="/icon.svg" alt="Base" className="size-6" />
-            <span className="font-semibold">Base</span>
+        <aside className="shell__nav">
+          <div className="shell__brand">
+            <img src="/icon.svg" alt="Base" />
+            <span>Base</span>
           </div>
-          <nav className="flex flex-col gap-0.5 text-sm">
+          <nav className="stack stack--tight">
             { NAV.map(({ to, label, icon: Icon, exact }) => (
               <Link
                 key={ to }
                 to={ to }
+                className="shell__link"
                 activeOptions={ exact ? { exact: true } : undefined }
-                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                activeProps={{ className: 'flex items-center gap-2 rounded-md px-2 py-1.5 bg-accent text-foreground' }}
+                activeProps={{ 'data-active': 'true' }}
               >
-                <Icon className="size-4" />
+                <Icon size={ 16 } />
                 { label }
               </Link>
             )) }
           </nav>
-          <div className="mt-auto px-2 text-xs text-muted-foreground">
+          <div className="shell__foot">
             <div className="truncate">{ String(record?.email ?? '') }</div>
-            <button onClick={ signOut } className="mt-1 hover:text-foreground">
+            <button type="button" onClick={ signOut } className="link">
               Sign out
             </button>
           </div>
         </aside>
       ) }
-      <main className="flex-1 overflow-auto p-6">
+      <main className="shell__main">
         <Outlet />
       </main>
     </div>

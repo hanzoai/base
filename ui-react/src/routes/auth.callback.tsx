@@ -49,17 +49,15 @@ function AuthCallback() {
   }, [nav]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-8 text-center">
+    <div className="shell shell--centered">
+      <div className="panel stack" style={{ textAlign: 'center' }}>
         { error ? (
           <>
-            <p className="mb-4 text-sm text-destructive">{ error }</p>
-            <a href={ `${import.meta.env.BASE_URL}login` } className="text-sm text-primary underline-offset-4 hover:underline">
-              Back to sign in
-            </a>
+            <p className="danger">{ error }</p>
+            <a href={ `${import.meta.env.BASE_URL}login` }>Back to sign in</a>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">Completing sign-in…</p>
+          <p className="muted">Completing sign-in…</p>
         ) }
       </div>
     </div>
