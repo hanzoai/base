@@ -29,7 +29,7 @@ One framework, all platforms. No Tailwind, no Radix, no shadcn.
 | Layer | What |
 |---|---|
 | Framework | React 19 + TanStack Router (file-based, `src/routes/**`) + TanStack Query |
-| Bundler | Vite 6 |
+| Bundler | Vite 8 (rolldown) |
 | Components | `@hanzo/ui` on `@hanzo/gui` — the cross-platform primitives, same import on web/native/desktop |
 | Icons | `@hanzogui/lucide-icons-2` |
 | Styling | `src/index.css`: `@hanzo/design` tokens (plain CSS custom properties) + ~30 class names for the things this admin has |
