@@ -1,12 +1,12 @@
 // Package gojavm adapts zip's embedded JavaScript runtime
-// (github.com/zap-proto/zip/runtime) to base's extruntime.Runtime SPI, so
+// (github.com/zap-proto/zip/js) to base's extruntime.Runtime SPI, so
 // a manifest with `"runtime": "goja"` loads here. There is now exactly
-// ONE goja engine in the Hanzo stack — zip's *runtime.JSRuntime — and
+// ONE goja engine in the Hanzo stack — zip's *js.JSRuntime — and
 // base, cloud and every other zip consumer share it. gojavm is the thin
 // extruntime projection of that engine: it owns manifest loading,
 // TS/JSX/ESM bundling (esbuild, see transpile.go) and the JSON-bytes
 // Invoke wire; the VM pool, host-fn registration and per-request VM
-// isolation all live in zip/runtime.
+// isolation all live in zip/js.
 //
 // This is the lightweight JS option — pure Go, no cgo, shares the host
 // heap. Use it when you don't need a hard sandbox.
@@ -14,7 +14,7 @@
 // It sits alongside plugins/jsvm (the hook-style goja host for .base.js
 // hook files). Extension directories with extension.json + runtime=goja
 // go through here; hook files still go through jsvm. Collapsing jsvm onto
-// zip/runtime as well is tracked separately — it needs base's host-API
+// zip/js as well is tracked separately — it needs base's host-API
 // binds surface lifted into zip first.
 package gojavm
 
@@ -24,7 +24,7 @@ import (
 	"os"
 	"strconv"
 
-	zipruntime "github.com/zap-proto/zip/runtime"
+	zipjs "github.com/zap-proto/zip/js"
 
 	"github.com/hanzoai/base/plugins/extruntime"
 )
@@ -36,7 +36,7 @@ import (
 const defaultPoolSize = 8
 
 // NewRuntime constructs a goja-backed extruntime.Runtime. The goja engine
-// is zip's *runtime.JSRuntime; one process-wide pool is shared by every
+// is zip's *js.JSRuntime; one process-wide pool is shared by every
 // module this runtime loads. require()/console/process are provided by
 // zip's VM provisioning, so migrated TypeScript backends that
 // `require(...)`, `console.log(...)` or read `process.env` run unchanged.
@@ -48,19 +48,19 @@ func NewRuntime() extruntime.Runtime {
 		}
 	}
 
-	rt, err := zipruntime.NewJSRuntime(zipruntime.JSOptions{PoolSize: size})
+	rt, err := zipjs.NewJSRuntime(zipjs.JSOptions{PoolSize: size})
 	if err != nil {
 		// NewJSRuntime only fails if a host fn / module fails to bind; we
 		// register none here, so this is unreachable in practice. Fall
 		// back to a default runtime rather than panic at package use.
-		rt, _ = zipruntime.NewJSRuntime(zipruntime.JSOptions{})
+		rt, _ = zipjs.NewJSRuntime(zipjs.JSOptions{})
 	}
 
 	return &gojaRuntime{js: rt}
 }
 
 type gojaRuntime struct {
-	js *zipruntime.JSRuntime
+	js *zipjs.JSRuntime
 }
 
 func (*gojaRuntime) Name() string { return "goja" }
