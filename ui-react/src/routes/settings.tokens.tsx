@@ -91,12 +91,8 @@ function TokenSettings() {
                             key={ t.key }
                             type="button"
                             onClick={ () => setActiveToken(t.key) }
-                            className={
-                                'rounded px-3 py-1 text-xs transition-colors ' +
-                                (activeToken === t.key
-                                    ? 'bg-neutral-700 text-neutral-100'
-                                    : 'text-neutral-400 hover:bg-neutral-800')
-                            }
+                            className="chip"
+                            data-active={ activeToken === t.key ? 'true' : undefined }
                         >
                             { t.label }
                         </button>
@@ -119,7 +115,7 @@ function TokenSettings() {
                     { tokenConfig?.secret && (
                         <div className="field field--inline">
                             <span className="field__label">Secret:</span>
-                            <code className="code">
+                            <code>
                                 { tokenConfig.secret.slice(0, 8) }...
                             </code>
                         </div>

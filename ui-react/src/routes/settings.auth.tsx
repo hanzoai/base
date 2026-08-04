@@ -86,12 +86,9 @@ function AuthSettings() {
                                             key={ provName }
                                             type="button"
                                             onClick={ () => setEditing(editing === key ? null : key) }
-                                            className={
-                                                'rounded border px-3 py-2 text-xs transition-colors ' +
-                                                (configured
-                                                    ? 'border-green-700 bg-green-900/30 text-green-300 hover:bg-green-900/50'
-                                                    : 'border-neutral-700 text-neutral-400 hover:bg-neutral-800')
-                                            }
+                                            className="chip"
+                                            data-active={ editing === key ? 'true' : undefined }
+                                            data-configured={ configured ? 'true' : undefined }
                                         >
                                             { provName }
                                         </button>

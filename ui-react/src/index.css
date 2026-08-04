@@ -34,6 +34,27 @@ body {
   height: 100dvh;
 }
 
+/*
+ * Element defaults. Writing `<code>` IS asking for code styling, so it carries
+ * its own rule rather than a class every site has to remember — seven of the
+ * nine in this admin had none. Same for `<ol>`: the reset drops the markers,
+ * and the only ordered list here (the rate-limit label precedence) is numbered
+ * because the order is the meaning.
+ */
+code {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-1);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-xs);
+}
+
+ol {
+  padding-left: var(--space-5);
+  line-height: var(--leading-relaxed);
+  list-style: decimal;
+}
+
 /* ─── shell ──────────────────────────────────────────────────────────────── */
 
 .shell {
@@ -666,14 +687,6 @@ textarea.cell__edit {
   white-space: nowrap;
 }
 
-.code {
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--surface-1);
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
-  font-size: var(--text-xs);
-}
-
 /* The single centred panel a signed-out page is. */
 .panel {
   width: 100%;
@@ -689,6 +702,46 @@ textarea.cell__edit {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
   gap: var(--space-2);
+}
+
+/*
+ * One selectable chip: the OAuth provider, the token type, the mail template,
+ * the collection to export. State rides `data-active`, the same attribute
+ * `.tab` and the grid's selected row already use — one way to say "this one".
+ * `data-configured` is a second, orthogonal fact only the provider picker has
+ * (the provider HAS credentials, whether or not it is the open one).
+ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-helper);
+  font: inherit;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+
+.chip:hover {
+  background: var(--surface-3);
+  color: var(--foreground);
+}
+
+.chip[data-active='true'] {
+  border-color: var(--primary);
+  background: var(--surface-3);
+  color: var(--foreground);
+}
+
+.chip[data-configured='true'] {
+  border-color: var(--state-online);
+  color: var(--state-online);
 }
 
 /* A group whose control is inert until its parent switch is on. */

@@ -341,7 +341,7 @@ function IndexesPanel({ indexes, onChange }: {
         <div className="stack stack--tight">
             {indexes.map((idx, i) => (
                 <div key={i} className="row">
-                    <code className="code grow">{idx}</code>
+                    <code className="grow">{idx}</code>
                     <button type="button" onClick={() => handleRemove(i)} className="link link--danger small">
                         Remove
                     </button>

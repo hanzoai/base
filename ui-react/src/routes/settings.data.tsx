@@ -136,18 +136,13 @@ function DataSettings() {
                     { allCollections.map((c) => (
                         <label
                             key={ c.id }
-                            className={
-                                'flex items-center gap-1.5 rounded border px-2 py-1 text-xs cursor-pointer ' +
-                                (selected.has(c.id)
-                                    ? 'border-indigo-600 bg-indigo-900/20 text-indigo-300'
-                                    : 'border-neutral-700 text-neutral-400 hover:bg-neutral-800')
-                            }
+                            className="chip"
+                            data-active={ selected.has(c.id) ? 'true' : undefined }
                         >
                             <input
                                 type="checkbox"
                                 checked={ selected.has(c.id) }
                                 onChange={ () => toggleOne(c.id) }
-                                
                             />
                             { c.name }
                         </label>
