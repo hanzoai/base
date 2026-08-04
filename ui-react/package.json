@@ -6,6 +6,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build",
+    "smoke": "node smoke.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

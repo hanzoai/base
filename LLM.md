@@ -471,51 +471,79 @@ Env matrix:
 `BASE_NODE_ID` is the bare hostname; `isSelfPeer` matches on the first DNS
 label so the transport never dials itself.
 
-## Admin UI (ui-react) — @hanzo/ui true-black rebuild + Twenty-grade grid
+## Admin UI (ui-react) — on @hanzo/ui + @hanzo/gui, 8.x
 
 The admin (`ui-react/`, React 19 + TanStack Router, embedded via `embed.go`
-`//go:embed all:dist`, built with `pnpm --dir ui-react build`) is rebuilt on the
-**@hanzo/ui true-black design system** with a Twenty-caliber inline-editable
-record grid. Verified end-to-end in a browser against a real `/v1` server:
-inline text edit (floating editor) and bool toggle both persist.
+`//go:embed all:dist`, built with `pnpm --dir ui-react build`) runs the Hanzo 8.x
+stack: **`@hanzo/ui` components on `@hanzo/gui`**, the cross-platform substrate,
+with a true-black token sheet. **No Tailwind, no Radix, no shadcn** — the
+`tailwind.config.cjs`, `postcss.config.cjs`, `src/lib/cn.ts` and the ten
+vendored `src/components/ui/*` primitives are all gone.
 
-### @hanzo/ui consumability verdict (settled empirically)
-- **Pin `@hanzo/ui@^5.7.1`** (shadcn/Tailwind/Radix, compiled dist). NOT
-  `@hanzo/ui@8` / `@luxfi/ui@7` — those are the `@hanzo/gui` (Tamagui) line:
-  raw-TS entry + a Tamagui compiler peer, not a clean Vite drop-in.
-- The `@hanzo/ui` **barrel is NOT Vite-consumable**: `dist/index.mjs` hard-imports
-  `next/image`, `next/link`, cmdk, sonner, vaul, react-resizable-panels. Granular
-  subpaths resolve but several components are coupled to bespoke `@hanzo/ui` theme
-  classes (`h-input`, `bg-bg-secondary`), which clash with a true-black shadcn token
-  scheme. So we adopt the **token table + vendored shadcn primitives** in
-  `src/components/ui/*` (the pattern @hanzo/ui's own `templates/vite-app` uses).
-- Wiring: Tailwind v3 + `tailwind.config.cjs` (shadcn HSL token map, `darkMode:['class']`,
-  Basel/Geist fonts, `content` scans `node_modules/@hanzo/ui/dist`), `src/index.css`
-  token vars with true-black `.dark{--background:0 0% 0%}` + gui surface ladder
-  (#0a0a0a/#171717/#1f1f1f), self-hosted Basel + Geist Mono. `.dark` pinned on `<html>`;
-  router `basepath` bound to `import.meta.env.BASE_URL` (= `BASE_ADMIN_UI_PATH`).
+The old note here recorded the opposite verdict (pin `@hanzo/ui@^5.7.1`, adopt
+vendored shadcn, wire Tailwind v3) and named packages by their pre-8.x names.
+Both are obsolete: `hanzogui` is now **`@hanzo/gui`**, `hanzogui-loader` is
+**`@hanzogui/loader`**, and the 8.x line IS a clean Vite consumer.
+
+### The two layers, and where the line falls
+- **Overlays are components.** Dialog and DropdownMenu come from `@hanzo/ui`,
+  because they carry a11y, focus management and placement that CSS cannot.
+- **Everything else is CSS.** `src/index.css` imports `@hanzo/design/styles.css`
+  for tokens and the self-hosted Geist/Geist Mono faces, then defines ~30 class
+  names for the things this admin has (`.shell`, `.panel`, `.btn`, `.field`,
+  `.table`, `.chip`). It replaced ~220 utility classes pasted across 30 files and
+  four duplicated style constants. Nothing invents a colour, size or radius —
+  every value is a token, so a brand fork retunes the admin for free.
+- Vite needs exactly two settings for gui: alias `react-native` →
+  `react-native-web`, and `.web.*` first in `resolve.extensions`. `src/gui-env.d.ts`
+  registers the v5 config so gui's shorthand style props type-check (the v5
+  config sets `onlyShorthandStyleProps`, so the shorthands ARE the API).
+- `.dark` pinned on `<html>`; router `basepath` bound to `import.meta.env.BASE_URL`
+  (= `BASE_ADMIN_UI_PATH`).
+
+### A green build does not prove a visual change (read before editing UI)
+`@hanzo/gui` **drops a prop it does not recognise in silence** — no error, no type
+failure, just an unstyled element — and CSS resolves an undefined `var(--x)` to
+nothing. Both layers fail quietly, so `pnpm build` going green proves nothing
+about what renders. `ui-react/smoke.mjs` (`pnpm --dir ui-react smoke`, needs
+playwright) is the check that catches silence: it serves the committed `dist/`
+under `/_/` exactly as the Go server does, stubs `/v1`, and gates on every route
+painting, every `var(--token)` resolving, zero utility-class residue, every
+control computing real colours and radii, the overlays opening, and the confirm
+dialog measuring the width `DialogContent maxW` asks for. Measure the dialog
+**after** the enter animation — gui applies the content's style classes a frame
+late, and reading the box early reports ~viewport width, which looks exactly like
+the dropped-prop failure it is meant to catch.
 
 ### API layer
 - One `/v1` fetch layer (`src/lib/api.ts`) + `BaseClient` object facade
   (`src/lib/base-client.ts`) exposing `base.collection(x).method()` / `settings` /
   `authStore`. Realtime = `/v1/realtime` SSE. The old `"/base"` SDK import is gone.
 
-### Auth is IAM-native (confirmed in source + empirically)
+### Auth is IAM-native
 - This fork **retires local `_superusers` password auth**: no `superuser` CLI, no
-  password field, `auth-with-password` route unbound → 404 (or 410-Gone→IAM in
-  external-only mode). Admin is meant to authenticate via **IAM PKCE**
-  (`/v1/iam/oauth/authorize`, proxied by the platform plugin), HIP-0111.
-- **Open (top phased item):** `src/routes/login.tsx` + `api.authWithPassword` still
-  target the retired `_superusers/auth-with-password`. Rewire to `@hanzo/iam` PKCE.
-  For local testing without IAM, mint a superuser token via
+  password field, `auth-with-password` unbound → 404 for every collection
+  (`apis/middlewares_test.go`).
+- `src/routes/login.tsx` signs in through **IAM OAuth2 PKCE** via the `@hanzo/iam`
+  SPA SDK (`src/lib/iam.ts`), completing at `/auth/callback`; the IAM access-token
+  JWT rides as the Base `/v1` bearer and Base validates it against IAM's JWKS.
+  HIP-0111. The client-side `authWithPassword` helpers that still called the
+  retired endpoint are deleted — nothing in the admin can reach it.
+- For local testing without IAM, mint a superuser token via
   `record.NewAuthToken()` and set `localStorage.base_auth_token`.
 
-### Phased convergence (remaining views onto @hanzo/ui true-black)
-Done: login, records grid, record editor, collections list, root sidebar.
-Next, behind the working routes, component-by-component:
-1. IAM PKCE login (replaces retired password auth) — unblocks real login.
-2. `collections_.$id` schema editor (still raw inputs + react-hook-form) → @hanzo/ui.
-3. `settings.*` (11 pages) + `logs` → @hanzo/ui (Input/Select/Switch/Table).
-4. Grid depth: rich relation picker (fetch related presentable), column
+### Build notes
+- `dist/` is committed so `go build` is hermetic — CI compiles the binary with no
+  Node toolchain. Rebuild it in the same commit as any `src/` change.
+- TypeScript **7.0.2** (the native Go compiler; `tsc` and `tsgo` are the same
+  binary). Do NOT add `@typescript/native-preview` — it is 7.0.0-dev, behind
+  stable.
+- `scripts/sync-admin-ui.sh` is gone. It synced a bundle built externally in
+  `gui/apps/admin-base`; the SPA is built in this repo now, so the sync path was
+  a second way to do one thing.
+
+### Next
+1. `collections_.$id` schema editor is raw inputs + react-hook-form on the class
+   sheet; a real field-type editor is the open piece.
+2. Grid depth: rich relation picker (fetch related presentable), column
    show/hide + width, saved views/filters (system collections exist), CSV export.
-5. Retire `scripts/sync-admin-ui.sh` (obsolete `gui/apps/admin-base` sync path).

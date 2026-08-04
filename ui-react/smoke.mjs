@@ -31,6 +31,14 @@ const css = fs.readFileSync(new URL('./src/index.css', import.meta.url), 'utf8')
 const tokens = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]))]
   .filter((t) => t !== '--gap' && t !== '--cols')
 
+// Read the width the confirm dialog asks for out of the route that asks for it,
+// so this check cannot drift from the source it is checking.
+const DIALOG_MAX_W = Number(
+  fs.readFileSync(new URL('./src/routes/collections_.$id_.records.tsx', import.meta.url), 'utf8')
+    .match(/<DialogContent maxW=\{\s*(\d+)\s*\}/)?.[1],
+)
+if (!DIALOG_MAX_W) throw new Error('smoke: could not read DialogContent maxW from the records route')
+
 // --- the stub server -------------------------------------------------------
 const collection = {
   id: 'c1', name: 'posts', type: 'base', system: false,
@@ -107,17 +115,30 @@ const errors = []
 page.on('pageerror', (e) => errors.push(`${page.url().split('/_')[1]}: ${e.message}`))
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`${page.url().split('/_')[1]}: ${m.text()}`) })
 
-// Signed in as a superuser, so the guarded routes render instead of bouncing.
-// `collectionName` is load-bearing: the /settings guard keys the superuser off
-// it (AuthStore.isSuperuser), exactly as the IAM callback sets it.
-await page.goto(`${origin}/login`)
+const painted = {}
+const styles = { unresolved: [], utilityClasses: [], computed: {} }
+
+// Signed OUT first: /login is the only route that renders `.panel` (with
+// /auth/callback), and every later navigation carries the token, so the sign-in
+// card is the one surface a signed-in pass can never see. Look at it here.
+await page.goto(`${origin}/login`, { waitUntil: 'domcontentloaded' })
+await page.waitForFunction(() => (document.getElementById('root')?.innerText ?? '').trim().length > 0, { timeout: 15000 })
+painted['/login (signed out)'] = (await page.locator('#root').innerText()).replace(/\s+/g, ' ').trim().slice(0, 72) || 'BLANK'
+styles.computed.panel = await page.evaluate(() => {
+  const el = document.querySelector('.panel')
+  if (!el) return null
+  const cs = getComputedStyle(el)
+  return { backgroundColor: cs.backgroundColor, borderColor: cs.borderColor, borderRadius: cs.borderRadius, padding: cs.padding }
+})
+
+// Now signed in as a superuser, so the guarded routes render instead of
+// bouncing. `collectionName` is load-bearing: the /settings guard keys the
+// superuser off it (AuthStore.isSuperuser), exactly as the IAM callback sets it.
 await page.evaluate(() => {
   localStorage.setItem('base_auth_token', 'smoke')
   localStorage.setItem('base_auth_record', JSON.stringify({ id: 's1', email: 'z@hanzo.ai', collectionName: '_superusers' }))
 })
 
-const painted = {}
-const styles = { unresolved: [], utilityClasses: [], computed: {} }
 for (const route of routes) {
   // Not `networkidle`: the record grid holds an SSE stream open, so the network
   // is never idle. Wait for paint, then let the stubbed queries settle.
@@ -157,7 +178,9 @@ for (const route of routes) {
   }, tokens)
   styles.unresolved.push(...seen.unresolved)
   styles.utilityClasses.push(...seen.utilityClasses)
-  for (const [k, v] of Object.entries(seen.computed)) if (v && !styles.computed[k]) styles.computed[k] = v
+  // Record the key even when the control was absent here, so a control absent
+  // from EVERY route surfaces as an unprobed null rather than vanishing.
+  for (const [k, v] of Object.entries(seen.computed)) if (!styles.computed[k]) styles.computed[k] = v
 }
 styles.unresolved = [...new Set(styles.unresolved)]
 
@@ -172,29 +195,43 @@ await page.goto(`${origin}/collections/c1/records`, { waitUntil: 'domcontentload
 await page.getByLabel('Row actions').first().click()
 overlays.menuItems = await page.getByText('Duplicate', { exact: true }).count()
 await page.getByText('Delete', { exact: true }).first().click()
-const dialog = page.getByText('Delete record "r1"?', { exact: true })
-overlays.dialogVisible = await dialog.isVisible().catch(() => false)
+const panel = page.getByRole('dialog').first()
+overlays.dialogVisible = await panel.waitFor({ state: 'visible', timeout: 5000 }).then(() => true, () => false)
 // The panel itself, not an inner box: `DialogContent maxW={384}` is a gui
-// shorthand, and a shorthand gui does not recognise is dropped in silence.
+// shorthand, and a shorthand gui does not recognise is dropped in silence —
+// the dialog still opens, just at the full-width default. So measure it, and
+// measure it AFTER the enter animation: gui applies the content's style classes
+// a frame late, and reading the box before they land reports the pre-animation
+// width (~viewport), which looks exactly like the dropped-prop failure.
+overlays.dialogMaxW = DIALOG_MAX_W
 overlays.dialogWidth = overlays.dialogVisible
-  ? Math.round((await page.getByRole('dialog').first().boundingBox())?.width ?? 0)
+  ? await page.evaluate(async () => {
+      const el = document.querySelector('[role="dialog"]')
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      return Math.round(el.getBoundingClientRect().width)
+    })
   : null
 
 await browser.close()
 server.close()
 
 const blank = Object.entries(painted).filter(([, v]) => v === 'BLANK').map(([k]) => k)
+// A control probed as `null` was never on screen — the check for it did not
+// pass, it did not run. Report that as loudly as a wrong value.
+const unprobed = Object.entries(styles.computed).filter(([, v]) => !v).map(([k]) => k)
 console.log(JSON.stringify({
   routes: painted,
   blank,
   unresolvedTokens: styles.unresolved,
   utilityClasses: [...new Set(styles.utilityClasses)],
+  unprobed,
   computed: styles.computed,
   overlays,
   errors: [...new Set(errors)],
 }, null, 1))
 
 const ok = !blank.length && !styles.unresolved.length && !styles.utilityClasses.length && !errors.length
-  && overlays.menuItems > 0 && overlays.dialogVisible
+  && !unprobed.length && overlays.menuItems > 0 && overlays.dialogVisible
+  && overlays.dialogWidth === overlays.dialogMaxW
 console.log(ok ? 'SMOKE OK' : 'SMOKE FAILED')
 process.exit(ok ? 0 : 1)
