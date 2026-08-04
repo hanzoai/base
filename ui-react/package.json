@@ -27,13 +27,12 @@
   "devDependencies": {
     "@hanzogui/core": "^8.0.0",
     "@hanzogui/web": "^8.0.0",
-    "@tanstack/router-plugin": "^1.87.0",
+    "@tanstack/router-plugin": "^1.168.23",
     "@types/node": "^22.5.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "esbuild": "^0.25.0",
+    "@vitejs/plugin-react": "^6.0.5",
     "typescript": "^7.0.2",
-    "vite": "^6.0.0"
+    "vite": "^8.2.0"
   }
 }
