@@ -26,6 +26,16 @@
 # cgo, 24 FAIL; with CGO_ENABLED=0, 64 ok. The gate has to build the binary the
 # repo actually publishes, or it is testing a program we do not ship.
 #
+# GOEXPERIMENT=jsonv2 ON EVERY GATE, for exactly the same reason and learned the
+# expensive way. The Dockerfile has set it since 05fbe4ff, so `encoding/json` in
+# the published binary is the v2 implementation while the gate tested v1 — two
+# different decoders, one of them never exercised. They disagree: v1 resolves an
+# Unmarshaler only on a type that has methods, v2 resolves it on the element, so
+# `type alias *Collection` decoded under v1 and recursed forever under v2. Base
+# 0.39.16 crash-looped ~95 minutes on a stack overflow that TestCollectionUnmarshalJSON
+# already covered and the gate could not see. The gate has to run the decoder the
+# repo actually publishes, or it is testing a program we do not ship.
+#
 # GOWORK=off for the same class of reason: a go.work in a parent directory would
 # silently change which modules resolve, and CI must read this repo's go.mod.
 test:
@@ -34,7 +44,7 @@ test:
     # message instead of surfacing as a wall of package-level noise under vet.
     run: |
       set -e
-      export GOWORK=off CGO_ENABLED=0
+      export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go build ./...
   - name: go-vet
     # This was RED on main and had been for as long as there was no gate. The
@@ -45,14 +55,14 @@ test:
     # is honest again.
     run: |
       set -e
-      export GOWORK=off CGO_ENABLED=0
+      export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go vet ./...
   - name: go-test
     # The whole tree, not a named list — an allowlist stops covering whatever is
     # added after it is written. 64 packages carry tests; 24 have none and say so.
     run: |
       set -e
-      export GOWORK=off CGO_ENABLED=0
+      export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go test -count=1 ./...
 
 images:
