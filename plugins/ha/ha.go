@@ -75,11 +75,22 @@ func Register(app core.App) {
 	})
 }
 
-// forwardToWriter is middleware that 307s mutating HTTP to the pinned writer.
+// ownerKey is the ownership unit a request addresses.
+//
+// X-Org-Id, because that is already the hash input the store's consistency model
+// names ("gateway-side sticky-session affinity (consistent hash on X-Org-Id)").
+// The difference is WHERE it is hashed: this asks ha.Owner in-process, so
+// ownership no longer depends on an edge that has to be deployed and configured
+// to agree. An absent header is the org-wide unit, "" — one owner for the whole
+// app, which is exactly the behaviour this plugin had for every request before.
+func ownerKey(r *http.Request) string { return r.Header.Get("X-Org-Id") }
+
+// forwardToWriter is middleware that 307s mutating HTTP to the key's owner.
 func forwardToWriter(p WriterProvider) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if isMutating(e.Request.Method) && !p.IsWriter() {
-			target := p.RedirectTarget()
+		key := ownerKey(e.Request)
+		if isMutating(e.Request.Method) && !p.IsWriter(key) {
+			target := p.RedirectTarget(key)
 			if target == "" {
 				http.Error(e.Response, "no writer available", http.StatusServiceUnavailable)
 				return nil

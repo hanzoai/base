@@ -67,6 +67,7 @@ require (
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
 	github.com/hanzoai/authz v1.10.29 // indirect
 	github.com/hanzoai/csqlite v0.1.0 // indirect
+	github.com/hanzoai/ha v0.2.0 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
