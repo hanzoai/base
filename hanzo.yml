@@ -1,0 +1,99 @@
+# Hanzo Base — the ONE file that says how this repo builds, gates and ships.
+#
+# The only workflow is `.hanzo/workflows/cicd.yml`, ~10 lines that import
+# hanzoai/ci. Everything real is here, and platform.hanzo.ai reads this same
+# file, so there is one description of this build rather than one per front door.
+#
+# It replaces `.hanzo/workflows/deploy.yml`, which was a hand-rolled copy of
+# three things the reusable already does — buildx, the ghcr login, and the
+# post-push "does the manifest actually resolve" check. What that file did NOT
+# do is gate anything: this repo is 64 Go packages with tests and CI ran none of
+# them, so `go vet` had been failing on `main` and nobody could see it.
+
+# Tests run DIRECTLY on the runner, not inside the image build, and hanzoai/ci
+# provisions the toolchain from go.mod (1.26.5) plus a C compiler.
+#
+# CGO_ENABLED=0 ON EVERY GATE, because that is how Base ships — the Dockerfile
+# builds `CGO_ENABLED=0` and the pure-Go modernc SQLite that comes with it. With
+# cgo ON the runner links a system SQLite instead, and Base refuses to start:
+#
+#   base: the SQLite engine linked into this binary has no math functions
+#   (no such function: acos) — search filters using geoDistance would fail at
+#   query time. Rebuild with CGO_ENABLED=0 (how Base ships)
+#
+# That is `tests.NewTestApp()` returning an error, so every suite that needs an
+# app panics on the nil — 24 of 64 packages, all with one cause. Measured: with
+# cgo, 24 FAIL; with CGO_ENABLED=0, 64 ok. The gate has to build the binary the
+# repo actually publishes, or it is testing a program we do not ship.
+#
+# GOWORK=off for the same class of reason: a go.work in a parent directory would
+# silently change which modules resolve, and CI must read this repo's go.mod.
+test:
+  - name: go-build
+    # First and cheapest. A compile error fails here in seconds with one clear
+    # message instead of surfacing as a wall of package-level noise under vet.
+    run: |
+      set -e
+      export GOWORK=off CGO_ENABLED=0
+      go build ./...
+  - name: go-vet
+    # This was RED on main and had been for as long as there was no gate. The
+    # cause was one line in tools/router/unmarshal_request_data_test.go: a
+    # deliberately unexported field carrying a `json` tag the code under test
+    # never reads (UnmarshalRequestData defaults structTagKey to "form"). The
+    # `form` tag it does read is untouched, so the assertion is unchanged and vet
+    # is honest again.
+    run: |
+      set -e
+      export GOWORK=off CGO_ENABLED=0
+      go vet ./...
+  - name: go-test
+    # The whole tree, not a named list — an allowlist stops covering whatever is
+    # added after it is written. 64 packages carry tests; 24 have none and say so.
+    run: |
+      set -e
+      export GOWORK=off CGO_ENABLED=0
+      go test -count=1 ./...
+
+images:
+  - name: base
+    context: .
+    dockerfile: Dockerfile
+    repo: ghcr.io/hanzoai/base
+    # amd64 only, exactly what deploy.yml built. The cluster has no arm64 nodes,
+    # and adding an arch here means QEMU-emulating a full Go build for consumers
+    # that do not exist yet. Add linux/arm64 when something pulls it.
+    platforms: [linux/amd64]
+    # NOTE on the version this publishes: a `v*` tag IS the version and is
+    # published verbatim (v1.5.16 + the 1.5.16 alias). A branch build derives the
+    # next patch above what ghcr already carries, via hanzoai/ci's bin/imgver —
+    # so main stops publishing only `sha-<short>`, which is what left this image
+    # with no deployable tag between releases. `sha-<short>-amd64` is still
+    # published beside it for forensics.
+    #
+    # The Dockerfile's `--mount=type=secret,id=gh_token` needs no declaration
+    # here: the reusable passes the KMS git token to buildx under exactly that
+    # id, which is the same credential deploy.yml passed as secrets.GH_PAT. It is
+    # what authenticates the private hanzoai/* module reads (dbx, kms/sdk/go,
+    # ltx, pubsub-go, tasks, tygoja); the 40 luxfi/* modules come from the proxy.
+
+# No `deploy:` ON PURPOSE, and this is a transcription of what deploy.yml
+# already said, not a new policy.
+#
+# Base does not run anywhere as itself. `ghcr.io/hanzoai/base` is a base image
+# other products embed, and each pins its own tag AND digest in a reviewed
+# hanzoai/universe change:
+#
+#   hanzo/platform          base:1.3.0    (BASE_ENABLE_ADMIN_UI=1)
+#   hanzo/hanzo-app-base    base:0.39.16
+#   hanzo/cal               base:cal-a2b6ce3
+#   superbase               base:1.3.2 via SUPERBASE_BASE_IMAGE_TAG
+#
+# base.hanzo.ai itself is served by ghcr.io/hanzoai/superbase, which embeds
+# github.com/hanzoai/base/ui-react at its own go.mod pin — so it does not move
+# when this image does, and curling that host proves nothing about this build.
+#
+# Four consumers on four different tags is precisely why choosing which one runs
+# is a reviewed change and not a CI side effect. cd.hanzo.ai's selfHeal would
+# revert a direct patch inside minutes anyway. CI's job ends at "the tag exists
+# and resolves".
