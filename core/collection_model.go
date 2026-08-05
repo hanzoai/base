@@ -521,7 +521,7 @@ func (m *Collection) unmarshalRawOptions() error {
 // For new/"blank" Collection models it replaces the model with a factory
 // instance and then unmarshal the provided data one on top of it.
 func (m *Collection) UnmarshalJSON(b []byte) error {
-	type alias *Collection
+	type alias Collection // prevent recursion
 
 	// initialize the default fields
 	// (e.g. in case the collection was NOT created using the designated factories)
@@ -539,7 +539,7 @@ func (m *Collection) UnmarshalJSON(b []byte) error {
 		*m = *blank
 	}
 
-	return json.Unmarshal(b, alias(m))
+	return json.Unmarshal(b, (*alias)(m))
 }
 
 // MarshalJSON implements the [json.Marshaler] interface.
