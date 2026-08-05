@@ -613,18 +613,10 @@ func TestEvict_SurfacesUploadError(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Lock the bucket so Upload fails. fileblob writes a tempfile inside
-	// the destination directory and renames it — chmod 0500 on the dir
-	// that holds the target prevents both file creation and rename.
-	targetDir := filepath.Join(bucketDir, "acme", "users")
-	// The directory may not exist yet (no prior upload). Create it.
-	if err := os.MkdirAll(targetDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(targetDir, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(targetDir, 0o700) })
+	// Break the bucket so Upload fails: fileblob has to create the
+	// directory that holds the target, and a regular file sitting at that
+	// path makes it ENOTDIR.
+	poisonUploadPath(t, bucketDir, "acme", "users")
 
 	k := store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}
 	err = s.Evict(context.Background(), k)
@@ -653,14 +645,7 @@ func TestClose_AggregatesUploadFailures(t *testing.T) {
 	}
 
 	// Poison every upload target.
-	targetDir := filepath.Join(bucketDir, "acme", "users")
-	if err := os.MkdirAll(targetDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(targetDir, 0o500); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(targetDir, 0o700) })
+	poisonUploadPath(t, bucketDir, "acme", "users")
 
 	err := s.Close(context.Background())
 	if err == nil {
@@ -733,22 +718,14 @@ func TestEvictionReturnsError_RecoversOnRetry(t *testing.T) {
 	}
 
 	targetDir := filepath.Join(bucketDir, "acme", "users")
-	if err := os.MkdirAll(targetDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(targetDir, 0o500); err != nil {
-		t.Fatal(err)
-	}
+	clearPoison := poisonUploadPath(t, bucketDir, "acme", "users")
 
 	k := store.Key{OrgID: "acme", UserID: "alice", Scope: store.ScopeUser}
 	if err := s.Evict(context.Background(), k); !errors.Is(err, store.ErrUploadFailed) {
 		t.Fatalf("first Evict should fail: %v", err)
 	}
 
-	// Clear the poisoning.
-	if err := os.Chmod(targetDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
+	clearPoison()
 
 	// A retry succeeds; data is now durable.
 	if err := s.Evict(context.Background(), k); err != nil {
@@ -783,6 +760,38 @@ func TestKey_Valid_RejectsLongSlug(t *testing.T) {
 }
 
 // helpers
+
+// poisonUploadPath makes every upload under bucketDir/parts… fail, for any
+// uid, by putting a regular FILE where fileblob needs a directory: its
+// os.MkdirAll(filepath.Dir(path)) then returns ENOTDIR.
+//
+// The obvious alternative — chmod 0500 on the target directory — does
+// NOTHING when the tests run as root, which is exactly how CI runs them (the
+// runner's GOPATH is /root/go). Root bypasses the DAC write check, the upload
+// succeeds, and the test fails asserting on an error that never came. ENOTDIR
+// is enforced by the kernel against root as well, so the injected failure is
+// the same one everywhere.
+//
+// Returns the clear func; calling it lets the next upload succeed.
+func poisonUploadPath(t *testing.T, bucketDir string, parts ...string) (clear func()) {
+	t.Helper()
+	p := filepath.Join(append([]string{bucketDir}, parts...)...)
+	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(p); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte("not a directory"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return func() {
+		t.Helper()
+		if err := os.Remove(p); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
 
 func fileExists(t *testing.T, path string) bool {
 	t.Helper()
