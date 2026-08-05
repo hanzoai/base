@@ -249,6 +249,8 @@ github.com/hanzoai/csqlite v0.1.0 h1:suwC3dh0INlfP/U0Es6cDf6JNQ+2+GVLLATPWCUux6k
 github.com/hanzoai/csqlite v0.1.0/go.mod h1:H31a/O6VXuklR9UBkgY++bmAK5uzVfXPqU0F6P9Wsos=
 github.com/hanzoai/dbx v1.17.2 h1:EBADhGuOMxCsc4eHj5cJmtE9c7tSKaviyl8URx31NOQ=
 github.com/hanzoai/dbx v1.17.2/go.mod h1:u7f8kFoy1tS6YRzVNEurA/NlkRF9Uq9ZhDEqOchFtSM=
+github.com/hanzoai/ha v0.2.0 h1:zgIbr3mjeuFfF26lkIKf/47ZM5kYBubWIPjEA24Yu7g=
+github.com/hanzoai/ha v0.2.0/go.mod h1:7G+gwkCWNpVsioNpKpK+x6ECoUYY2N/m/rlgPbxCqrA=
 github.com/hanzoai/ltx v0.5.1 h1:jWamJSHg1RtvcarevSJ/W5lyPJfRB4vBYXDuxyyOup0=
 github.com/hanzoai/ltx v0.5.1/go.mod h1:rWgoDyQiB5d+GOGYncKrQu6uS7Gnoh0xlm1hCU5rq5E=
 github.com/hanzoai/lz4/v4 v4.1.22 h1:NjK1Umwaxb5lnoFB44iGPtGj58y/PLucNcCc2gE8q4I=

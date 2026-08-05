@@ -7,10 +7,11 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/hanzoai/ha"
 	"time"
 
 	luxlog "github.com/luxfi/log"
@@ -19,22 +20,45 @@ import (
 // StaticWriter always routes writes to a fixed URL.
 type StaticWriter struct{ Target string }
 
-func (s *StaticWriter) IsWriter() bool         { return s.Target == "" }
-func (s *StaticWriter) RedirectTarget() string { return s.Target }
+func (s *StaticWriter) IsWriter(string) bool         { return s.Target == "" }
+func (s *StaticWriter) RedirectTarget(string) string { return s.Target }
 
 // WriterProvider abstracts writer-pin strategies.
+//
+// Both methods take the ownership KEY, because ownership is per tenant, not per
+// process: store.Key.String() ("org/apps/a/projects/p") names one SQLite file,
+// and SQLite's single-writer constraint is per FILE. A process-wide writer would
+// pin every tenant's writes to one node — correct, and a bottleneck that grows
+// with tenant count.
 type WriterProvider interface {
-	IsWriter() bool
-	RedirectTarget() string
+	IsWriter(key string) bool
+	RedirectTarget(key string) string
 }
 
-// QuasarWriter pins one node as the SQLite writer using Quasar-style
-// deterministic ranking over a heartbeat-based alive set.
+// QuasarWriter pins ONE node per KEY as that key's SQLite writer, over a
+// heartbeat-based live set.
 //
-// Quasar consensus is leaderless — all nodes are equal validators. But SQLite
-// has a single-writer constraint, so we rank alive peers by NodeID and pin the
-// lowest-sorted as the writer. All others are replicas that 307 mutating HTTP
-// to the writer and apply change-sets via async replication.
+// Quasar consensus is leaderless — all nodes are equal validators — and SQLite's
+// single-writer constraint is per FILE, not per process. So ownership is per key
+// (store.Key.String() names one file) and comes from ha.Owner: Rendezvous (HRW)
+// weight over the live members, computed identically on every node from the same
+// membership without asking anyone. A node that does not own a key 307s mutating
+// HTTP to the one that does, and applies change-sets via async replication.
+//
+// It previously ranked the live set by NodeID and pinned the lowest-sorted as the
+// writer for EVERYTHING. That is correct for SQLite and wrong for a fleet: every
+// tenant's writes land on one node, and a rolling restart hands the whole write
+// load to whoever sorts first next. HRW spreads ownership and moves only the keys
+// a departing node owned, so losing one of N relocates 1/N of the tenants.
+//
+// WHAT THIS DOES NOT YET DO. Heartbeat liveness cannot make a deposed or
+// partitioned owner STOP writing, so two nodes with different views of the live
+// set can each believe they own a key. store/multitenant.go documents that window
+// honestly ("during an HPA rebalance a (short) single-writer window may overlap
+// across pods; ops MUST drain before scaling"). Closing it needs ha.Leases: the
+// owner stamps a monotone Round onto each write and the store refuses any round
+// below the highest it has admitted, which makes a deposed writer harmless
+// instead of merely unlikely. The election is now the shape that accepts it.
 //
 // Transport: HTTP /_ha/heartbeat by default. Compose with plugins/zap for
 // sub-ms ZAP transport (the ZAP plugin provides mDNS discovery + binary
@@ -47,11 +71,11 @@ type QuasarWriter struct {
 	mu        sync.RWMutex
 	alive     map[string]time.Time // nodeID -> last heartbeat
 	urls      map[string]string    // nodeID -> advertised base URL
-	target    string               // current writer URL
 	closeCh   chan struct{}
 	ready     chan struct{}
 	readyOnce sync.Once
 	started   atomic.Bool
+	lastSize  atomic.Int32 // last logged live-member count
 }
 
 type QuasarConfig struct {
@@ -94,25 +118,51 @@ func (w *QuasarWriter) start() {
 }
 
 func (w *QuasarWriter) Close()                   { close(w.closeCh) }
-func (w *QuasarWriter) Ready() <-chan struct{}    { return w.ready }
-func (w *QuasarWriter) IsWriter() bool           { return w.writerID() == w.cfg.NodeID }
-func (w *QuasarWriter) RedirectTarget() string   { w.mu.RLock(); defer w.mu.RUnlock(); return w.target }
+func (w *QuasarWriter) Ready() <-chan struct{}   { return w.ready }
+func (w *QuasarWriter) IsWriter(key string) bool { return w.writerID(key) == w.cfg.NodeID }
 
-func (w *QuasarWriter) writerID() string {
+// RedirectTarget is the owner's advertised URL for key — empty when no member
+// owns it, which the caller MUST treat as "no writer" rather than "me".
+func (w *QuasarWriter) RedirectTarget(key string) string {
+	o, ok := ha.Owner(key, w.members())
+	if !ok {
+		return ""
+	}
+	return o.Addr
+}
+
+// members is the live, writer-eligible set: every node whose heartbeat is inside
+// the lease timeout. This is the ONLY thing heartbeats decide now — liveness.
+// WHO writes is ha.Owner's answer, computed identically on every node.
+func (w *QuasarWriter) members() []ha.Member {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	now := time.Now()
-	ids := make([]string, 0, len(w.alive))
+	out := make([]ha.Member, 0, len(w.alive))
 	for id, last := range w.alive {
 		if now.Sub(last) <= w.cfg.LeaseTimeout {
-			ids = append(ids, id)
+			out = append(out, ha.Member{ID: id, Addr: w.urls[id]})
 		}
 	}
-	if len(ids) == 0 {
-		return w.cfg.NodeID
+	return out
+}
+
+// writerID names the owner of key by Rendezvous (HRW) weight over the live set.
+//
+// It replaced `sort.Strings(alive); return alive[0]`, which made the
+// lowest-sorted node the writer for EVERY tenant — one hotspot, and a rolling
+// restart that hands the whole write load to whichever node sorts first next.
+// HRW spreads ownership across the set and moves only the keys a departing node
+// owned, so losing one node relocates 1/N of the tenants instead of all of them.
+//
+// Deterministic and order-independent, so every node reaches the same answer
+// from the same membership without asking anyone.
+func (w *QuasarWriter) writerID(key string) string {
+	o, ok := ha.Owner(key, w.members())
+	if !ok {
+		return w.cfg.NodeID // fail to SELF only when the set is empty
 	}
-	sort.Strings(ids)
-	return ids[0]
+	return o.ID
 }
 
 func (w *QuasarWriter) loop() {
@@ -138,30 +188,20 @@ func (w *QuasarWriter) loop() {
 			}
 			wg.Wait()
 
-			writerID := w.writerID()
-			target := w.targetFor(writerID)
-
-			w.mu.Lock()
-			if target != w.target {
-				luxlog.Info("ha: writer changed", "from", w.target, "to", target, "writer", writerID)
+			// Liveness only. There is no longer ONE writer to cache: ownership is
+			// per key, so RedirectTarget(key) computes it from the live set on
+			// demand. Caching a single target here is what made every tenant's
+			// writes land on one node.
+			//
+			// MEMBERSHIP is what to log now, and it is the more useful signal: it
+			// is the input every node hashes, so two nodes disagreeing about it is
+			// the one way they can disagree about an owner.
+			if n := len(w.members()); n != int(w.lastSize.Swap(int32(n))) {
+				luxlog.Info("ha: membership changed", "live", n, "self", w.cfg.NodeID)
 			}
-			w.target = target
-			w.mu.Unlock()
 			w.readyOnce.Do(func() { close(w.ready) })
 		}
 	}
-}
-
-func (w *QuasarWriter) targetFor(id string) string {
-	if id == w.cfg.NodeID {
-		return w.cfg.LocalTarget
-	}
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-	if u, ok := w.urls[id]; ok {
-		return u
-	}
-	return w.cfg.LocalTarget
 }
 
 func (w *QuasarWriter) beat(client *http.Client, peer string) {
