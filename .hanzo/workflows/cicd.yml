@@ -1,0 +1,44 @@
+name: CI/CD
+
+# The caller, and deliberately nothing else: triggers plus the import. All real
+# config is the repo-root hanzo.yml, which platform.hanzo.ai reads too.
+#
+# `.hanzo/workflows`, NOT `.github/workflows`, and the difference is whether
+# anything runs at all:
+#
+#   * github.com has ZERO self-hosted runners for this org
+#     (/orgs/hanzoai/actions/runners -> total_count 0), so a job asking for
+#     `hanzo-build-linux-amd64` there is never claimed. An unclaimable job does
+#     not fail — it waits out the 24h timeout while the next push queues behind
+#     it. Silence, not an error.
+#   * The `git-runner` StatefulSet registers against the FORGE only
+#     (GIT_INSTANCE_URL=http://hanzo-git.hanzo.svc), and that is the pool which
+#     actually advertises that label.
+#   * Gitea collects workflows from the FIRST of WORKFLOW_DIRS present in the
+#     commit (modules/actions/workflows.go, listWorkflowsInDirs breaks on the
+#     first hit). `.hanzo/workflows` already existed here, so on this forge the
+#     whole of `.github/workflows` was already dark.
+#
+# The `uses:` path points at .hanzo/workflows for the same reason: reusables
+# resolve through services/actions.ResolveUses, which enforces the WORKFLOW_DIRS
+# allowlist on the referenced path too. hanzoai/ci publishes build.yml at both
+# paths from the same tag, byte-identical apart from the path each names for
+# itself, so this is the same pipeline at the same @v1.
+
+on:
+  push:
+    branches: [main]
+    # A `v*` tag is a RELEASE and publishes an image named after it, verbatim.
+    # Without this, `git tag` publishes nothing and this image carries no version.
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cicd:
+    uses: hanzoai/ci/.hanzo/workflows/build.yml@v1
+    secrets: inherit

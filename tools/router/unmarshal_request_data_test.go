@@ -451,7 +451,16 @@ func TestUnmarshalRequestDataUnexportedFields(t *testing.T) {
 
 		unexported string
 		// to ensure that the reflection doesn't take tags with higher priority than the exported state
-		unexportedWithTag string `form:"unexportedWithTag" json:"unexportedWithTag"`
+		//
+		// The tag is `form` ONLY. UnmarshalRequestData is called below with an
+		// empty structTagKey, which defaults to "form" — that is the one tag the
+		// code under test ever reads, so it is the one that makes this case mean
+		// what it says. The `json` tag that used to sit beside it was read by
+		// nothing here and was the sole `go vet ./...` failure in the whole
+		// module (structtag: "has json tag but is not exported" — vet's rule is
+		// about encoding/json, which is not in this path at all). Deleting it
+		// keeps the assertion identical and lets vet gate the repo.
+		unexportedWithTag string `form:"unexportedWithTag"`
 	}
 
 	dst := &TestStruct{}
