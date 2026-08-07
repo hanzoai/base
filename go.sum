@@ -245,8 +245,8 @@ github.com/hanzoai/authz v1.10.29 h1:b4vWtI9g4Mvay1zizW7cwly/hDk06r+oAdA/y+317Do
 github.com/hanzoai/authz v1.10.29/go.mod h1:xkzFdiIFx4UQMlU0NkmSRz0dgRQYqSXpKgVjn8ijn3E=
 github.com/hanzoai/cek v0.2.3 h1:wOVav3abWAWiIyqTr9pKK/b4PjUCT1j3mdU5LzKpxSQ=
 github.com/hanzoai/cek v0.2.3/go.mod h1:T9c9qr9x+0kHsk0J57KElY7l2jgWF08onbxZ3ck5nxM=
-github.com/hanzoai/csqlite v0.1.0 h1:suwC3dh0INlfP/U0Es6cDf6JNQ+2+GVLLATPWCUux6k=
-github.com/hanzoai/csqlite v0.1.0/go.mod h1:H31a/O6VXuklR9UBkgY++bmAK5uzVfXPqU0F6P9Wsos=
+github.com/hanzoai/csqlite v0.1.2 h1:4DzdgUfKADhzEP66Y30/HwepuBLrwt7NsemJMfrPGl4=
+github.com/hanzoai/csqlite v0.1.2/go.mod h1:H31a/O6VXuklR9UBkgY++bmAK5uzVfXPqU0F6P9Wsos=
 github.com/hanzoai/dbx v1.17.2 h1:EBADhGuOMxCsc4eHj5cJmtE9c7tSKaviyl8URx31NOQ=
 github.com/hanzoai/dbx v1.17.2/go.mod h1:u7f8kFoy1tS6YRzVNEurA/NlkRF9Uq9ZhDEqOchFtSM=
 github.com/hanzoai/ha v0.2.0 h1:zgIbr3mjeuFfF26lkIKf/47ZM5kYBubWIPjEA24Yu7g=
@@ -265,8 +265,8 @@ github.com/hanzoai/replicate v0.9.5 h1:/1rATcx7mxg5DuT+OjGf2hebkJBB2ihX5N0ZTaBWy
 github.com/hanzoai/replicate v0.9.5/go.mod h1:yCG5zw6sZon+XsZJncNPhBu/vBaHk9UbYK/l8QeQcNk=
 github.com/hanzoai/sqlcipher v0.1.1 h1:GARjSiUEa1lwhd1/f87XRaujZBG5s1ZwxrZW2Es/ADI=
 github.com/hanzoai/sqlcipher v0.1.1/go.mod h1:F0soUYM1i4sawOZUpRvVnWoUayPbeGVlGq01VXy9Aqg=
-github.com/hanzoai/sqlite v0.5.0 h1:1YydiyNAvL+WcXC1lUqZsUDaR4/7YkVb+wZm9qq9DSc=
-github.com/hanzoai/sqlite v0.5.0/go.mod h1:7hlAtZspL0Ggx/j0cSo6npPFtUeikvIxnMDb7yTaJD0=
+github.com/hanzoai/sqlite v0.5.2 h1:hXHOwYi6vm2emrStqfIvahx8qUr6v2AFiyWOqsTtc8w=
+github.com/hanzoai/sqlite v0.5.2/go.mod h1:6MOvr13PLL+ajbg6SGf1nSvqDsCNzKIvwrLo429LFUY=
 github.com/hanzoai/tasks v1.52.9 h1:HneORQe/7KF5orVirmHfweFMFTMeuAmRRj8daUhqQQM=
 github.com/hanzoai/tasks v1.52.9/go.mod h1:2GdohcUvJa39vef4Y1xYys90iUDCEuadbQjO4XAEqR8=
 github.com/hanzoai/tygoja v0.0.2 h1:0wb1nm+k8LYfLDWdiiqQtKyVGEAXkuSlBpH3g/lUsIE=
