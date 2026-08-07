@@ -16,6 +16,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hanzoai/cek v0.2.3
 	github.com/hanzoai/dbx v1.17.2
+	github.com/hanzoai/ha v0.2.0
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/namespace v1.2.0
 	github.com/hanzoai/pubsub-go v1.0.0
@@ -66,8 +67,7 @@ require (
 	github.com/hablullah/go-hijri v1.0.2 // indirect
 	github.com/hablullah/go-juliandays v1.0.0 // indirect
 	github.com/hanzoai/authz v1.10.29 // indirect
-	github.com/hanzoai/csqlite v0.1.0 // indirect
-	github.com/hanzoai/ha v0.2.0 // indirect
+	github.com/hanzoai/csqlite v0.1.2 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
@@ -149,7 +149,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0 // indirect
 	github.com/hanzoai/orm v0.6.16
 	github.com/hanzoai/replicate v0.9.5
-	github.com/hanzoai/sqlite v0.5.0
+	github.com/hanzoai/sqlite v0.5.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
