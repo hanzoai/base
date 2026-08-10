@@ -9,35 +9,29 @@
 FROM public.ecr.aws/docker/library/golang:1.26.5-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
-# PRIVATE modules (hanzoai/*) resolve via authenticated git; PUBLIC ones
-# (luxfi/*) resolve through the proxy.
+# Every module in this graph is public, so the download is the proxy verified
+# against go.sum — no credential, no direct git.
 #
-# The comment here used to say the opposite — that go.sum "is tidied against
-# git", so a bare-proxy download would trip SECURITY ERROR. It is the wrong way
-# round, and the build was failing because of it:
+# go.sum holds the PROXY hashes, and fetching direct is what silently picks up a
+# moved tag:
 #
 #   verifying github.com/luxfi/vm@v1.3.1/go.mod: checksum mismatch
 #     downloaded: h1:uViH3COP8hh…   (direct git — a re-cut tag)
 #     go.sum:     h1:6YR/uFV2Fo…    (== sum.golang.org, byte for byte)
 #
-# go.sum holds the PROXY hashes. luxfi does force-move tags, which is real, but
-# that is an argument FOR the proxy, not against it: the proxy serves the
-# immutable copy sum.golang.org signed, so re-cutting a tag can no longer change
-# what this image is built from without the checksum saying so. Fetching direct
-# is what silently picks up the moved bits.
+# luxfi does force-move tags, which is real, but that is an argument FOR the
+# proxy: it serves the immutable copy sum.golang.org signed, so re-cutting a tag
+# can no longer change what this image is built from without the checksum saying
+# so.
 #
-# Checked before making this change: all 40 luxfi modules in this graph are
-# public and resolvable from proxy.golang.org. hanzoai/* (dbx, kms/sdk/go, ltx,
-# pubsub-go, tasks, tygoja) are not, so they stay direct behind the gh_token.
-ENV GOPRIVATE=github.com/hanzoai/*
-ENV GONOSUMDB=github.com/hanzoai/*
+# GOPRIVATE=github.com/hanzoai/* sat here, forcing hanzoai/* direct and
+# unverified on the claim that they were private. Four of them — ltx, lz4,
+# replicate, tygoja — had been moved to another org and the builder could not
+# read them at all, which is what broke this image. A public module cannot
+# depend on a private one, so those four went back to hanzoai public; with
+# nothing private left in the graph, the token and the two knobs have no job.
 COPY go.mod go.sum ./
-RUN --mount=type=cache,target=/go/pkg/mod \
-    --mount=type=secret,id=gh_token \
-    if [ -s /run/secrets/gh_token ]; then \
-      git config --global url."https://x-access-token:$(cat /run/secrets/gh_token)@github.com/".insteadOf "https://github.com/"; \
-    fi && \
-    go mod download
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
 
 # Per SCALE_STANDARD.md §2 — every Go production Dockerfile that
