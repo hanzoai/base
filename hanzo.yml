@@ -81,11 +81,10 @@ images:
     # with no deployable tag between releases. `sha-<short>-amd64` is still
     # published beside it for forensics.
     #
-    # The Dockerfile's `--mount=type=secret,id=gh_token` needs no declaration
-    # here: the reusable passes the KMS git token to buildx under exactly that
-    # id, which is the same credential deploy.yml passed as secrets.GH_PAT. It is
-    # what authenticates the private hanzoai/* module reads (dbx, kms/sdk/go,
-    # ltx, pubsub-go, tasks, tygoja); the 40 luxfi/* modules come from the proxy.
+    # The build takes no git credential. Every module in this graph is public,
+    # so `go mod download` is the public proxy verified against go.sum. The
+    # reusable still offers buildx a `gh_token` secret; this Dockerfile does not
+    # mount it, and BuildKit ignores a secret nothing asks for.
 
 # No `deploy:` ON PURPOSE, and this is a transcription of what deploy.yml
 # already said, not a new policy.
