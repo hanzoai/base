@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/hanzos3/go"
+	"github.com/hanzos3/go/pkg/credentials"
 )
 
 // s3Archive is the S3/MinIO-protocol backend. It works against AWS S3,
