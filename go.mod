@@ -22,6 +22,7 @@ require (
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.52.9
 	github.com/hanzoai/tygoja v0.0.2
+	github.com/hanzos3/go v1.0.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/luxfi/age v1.6.0
@@ -32,7 +33,6 @@ require (
 	github.com/luxfi/kms v1.11.7
 	github.com/luxfi/log v1.5.0
 	github.com/luxfi/zap v1.2.7
-	github.com/minio/minio-go/v7 v7.0.100
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.11.0
@@ -70,6 +70,8 @@ require (
 	github.com/hanzoai/csqlite v0.1.2 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
+	github.com/hanzos3/crc64nvme v1.1.2 // indirect
+	github.com/hanzos3/md5-simd v1.1.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
 	github.com/klauspost/compress v1.18.6 // indirect
@@ -100,8 +102,6 @@ require (
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
-	github.com/minio/crc64nvme v1.1.1 // indirect
-	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/nats-io/nats.go v1.50.0 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
