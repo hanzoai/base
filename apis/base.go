@@ -24,6 +24,13 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 		event.Request = r
 		event.App = app
 
+		// The Base the process serves from, remembered before anything can move
+		// the request onto a tenant's. Both are Bases and until now only one of
+		// them had a name, so whatever asked for "the app" got whichever one the
+		// credential had chosen — which is the right answer for a tenant's data
+		// and the wrong one for a limit on the process's own front door.
+		event.Set(requestEventKeyDeployment, app)
+
 		return event, nil
 	})
 
