@@ -90,12 +90,13 @@ func TestRestApiList(t *testing.T) {
 		{
 			// An unsatisfiable window is refused rather than rounded, so a caller
 			// never receives real rows for a range it did not ask for.
-			Name:            "an offset off a page boundary is refused",
-			Method:          http.MethodGet,
-			URL:             "/rest/v1/demo2?limit=25&offset=30",
-			ExpectedStatus:  400,
-			ExpectedContent: []string{`page boundary`},
-			ExpectedEvents:  map[string]int{"*": 0},
+			Name:               "an offset off a page boundary is refused",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?limit=25&offset=30",
+			ExpectedStatus:     400,
+			ExpectedContent:    []string{`"code":"PGRST100"`, `page boundary`},
+			NotExpectedContent: []string{`"data":{}`, `"status":400`},
+			ExpectedEvents:     map[string]int{"*": 0},
 		},
 		{
 			// THE test whose absence hid a bug that made every filtered read a
@@ -166,12 +167,13 @@ func TestRestApiList(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:            "an unknown operator is refused",
-			Method:          http.MethodGet,
-			URL:             "/rest/v1/demo2?title=matches.x",
-			ExpectedStatus:  400,
-			ExpectedContent: []string{`unknown operator`},
-			ExpectedEvents:  map[string]int{"*": 0},
+			Name:               "an unknown operator is refused",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?title=matches.x",
+			ExpectedStatus:     400,
+			ExpectedContent:    []string{`"code":"PGRST100"`, `unknown operator`},
+			NotExpectedContent: []string{`"data":{}`, `"status":400`},
+			ExpectedEvents:     map[string]int{"*": 0},
 		},
 	}
 
