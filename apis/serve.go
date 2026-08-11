@@ -92,7 +92,21 @@ func Serve(app core.App, config ServeConfig) error {
 	// dashboard. Production services are headless APIs — no UI surface exposed.
 	if os.Getenv("BASE_ENABLE_ADMIN_UI") != "1" {
 		baseRouter.GET("/{path...}", func(e *core.RequestEvent) error {
-			return e.JSON(http.StatusNotFound, map[string]string{"error": "admin UI disabled"})
+			// Two different questions land here and they want different answers.
+			// A browser navigating to the dashboard is asking about the admin,
+			// and naming the switch is the useful reply. Everything else asked
+			// for a path that does not exist — and answering THAT with "admin UI
+			// disabled" sends the reader after a setting which has nothing to do
+			// with the failure. It is what a caller of /api/platform/... was
+			// told: a route that was never implemented reported itself as a
+			// disabled dashboard, so the search started in the wrong place.
+			if strings.Contains(e.Request.Header.Get("Accept"), "text/html") {
+				return e.JSON(http.StatusNotFound, map[string]string{
+					"error": "this deployment serves no admin UI; set BASE_ENABLE_ADMIN_UI=1 to enable it",
+				})
+			}
+
+			return e.NotFoundError("", nil)
 		})
 	} else {
 		// indexFallback=true so deep links (settings/auth, records/...) hit
