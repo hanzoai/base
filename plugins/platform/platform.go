@@ -502,14 +502,16 @@ func (p *plugin) ensureMembersCollection() error {
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	api := r.Group("/v1/platform")
 
-	// Org CRUD
-	api.POST("/orgs", p.handleCreateOrg)
+	// ORGS AND MEMBERSHIPS ARE IAM'S. Base READS them and never writes them:
+	// minting an org here made a second registry with its own slug rules and its
+	// own uniqueness check, so two systems both believed they owned the noun and
+	// the one a token was issued against was not necessarily the one Base knew.
+	//
+	// IAM already answers both questions — /v1/iam/organizations owns the org, and
+	// a validated token carries the caller's memberships (IAMUser.OrgIDs), so the
+	// read needs no call at all. Create, delete and invite live at IAM.
 	api.GET("/orgs", p.handleListOrgs)
 	api.GET("/orgs/{id}", p.handleGetOrg)
-	api.DELETE("/orgs/{id}", p.handleDeleteOrg)
-
-	// Member management
-	api.POST("/orgs/{id}/members", p.handleInviteMember)
 
 	// Compliance (optional — only registered if endpoint configured)
 	if p.compliance != nil && p.compliance.Enabled() {
@@ -525,133 +527,24 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 // Route handlers
 // --------------------------------------------------------------------------
 
-func (p *plugin) handleCreateOrg(e *core.RequestEvent) error {
-	user, err := p.requireAuth(e)
-	if err != nil {
-		return err
-	}
-
-	var body struct {
-		Name string `json:"name"`
-		Slug string `json:"slug"`
-	}
-	if err := e.BindBody(&body); err != nil {
-		return e.BadRequestError("Invalid request body.", err)
-	}
-
-	body.Name = strings.TrimSpace(body.Name)
-	body.Slug = strings.TrimSpace(body.Slug)
-
-	if body.Name == "" || body.Slug == "" {
-		return e.BadRequestError("name and slug are required", nil)
-	}
-	if !isValidSlug(body.Slug) {
-		return e.BadRequestError("slug must be lowercase alphanumeric with hyphens, no leading/trailing hyphen", nil)
-	}
-
-	// Check slug uniqueness.
-	existing, _ := p.app.FindFirstRecordByData(collectionOrgs, "slug", body.Slug)
-	if existing != nil {
-		return e.BadRequestError("slug already in use", nil)
-	}
-
-	// The canonical Hanzo KMS surface (`/v1/kms/orgs/{org}/secrets/...`)
-	// does not require a per-org bootstrap call — the URL segment IS
-	// the org. The Infisical-era CreateOrgProject() that lived here
-	// targeted the dead `/api/v2/workspace/environments` route. Drop
-	// the call; orgs come into existence the moment a secret is
-	// written under their path.
-	var kmsProjectId string
-
-	// Create org record.
-	col, err := p.app.FindCollectionByNameOrId(collectionOrgs)
-	if err != nil {
-		return e.InternalServerError("_orgs collection not found", err)
-	}
-
-	org := core.NewRecord(col)
-	org.Set("name", body.Name)
-	org.Set("slug", body.Slug)
-	org.Set("ownerId", user.ID)
-	org.Set("iamOrgId", "")
-	org.Set("kmsProjectId", kmsProjectId)
-
-	if err := p.app.Save(org); err != nil {
-		return e.InternalServerError("failed to create org", err)
-	}
-
-	// Create owner membership.
-	if err := addMember(p.app, org.Id, user.ID, RoleOwner); err != nil {
-		_ = p.app.Delete(org)
-		return e.InternalServerError("failed to create owner membership", err)
-	}
-
-	// Create org collections from templates.
-	if len(p.config.DefaultTemplates) > 0 {
-		if err := CreateOrgCollections(p.app, body.Slug, p.config.DefaultTemplates); err != nil {
-			p.app.Logger().Warn("failed to create org collections",
-				"slug", body.Slug,
-				"error", err.Error(),
-			)
-		}
-	}
-
-	return e.JSON(http.StatusCreated, map[string]any{
-		"id":           org.Id,
-		"name":         body.Name,
-		"slug":         body.Slug,
-		"kmsProjectId": kmsProjectId,
-	})
-}
-
 func (p *plugin) handleListOrgs(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
 	}
-
-	// Find all memberships for this user.
-	members, err := p.app.FindRecordsByFilter(
-		collectionOrgMembers,
-		"userId = {:userId}",
-		"",
-		0, 0,
-		map[string]any{"userId": user.ID},
-	)
-	if err != nil {
-		return e.InternalServerError("failed to query memberships", err)
+	// The caller's orgs come from the validated token — IAM puts the membership
+	// on it, so this needs no local table and no call back to IAM. The local
+	// membership rows this used to read were a copy that could disagree with the
+	// token a request actually arrived on.
+	out := make([]map[string]any, 0, len(user.OrgIDs))
+	for _, id := range user.OrgIDs {
+		if id == "" {
+			continue
+		}
+		out = append(out, map[string]any{"id": id, "slug": id})
 	}
-
-	if len(members) == 0 {
-		return e.JSON(http.StatusOK, []any{})
-	}
-
-	orgIds := make([]string, 0, len(members))
-	rolesByOrg := make(map[string]string, len(members))
-	for _, m := range members {
-		oid := m.GetString("orgId")
-		orgIds = append(orgIds, oid)
-		rolesByOrg[oid] = m.GetString("role")
-	}
-
-	orgs, err := p.app.FindRecordsByIds(collectionOrgs, orgIds)
-	if err != nil {
-		return e.InternalServerError("failed to fetch orgs", err)
-	}
-
-	result := make([]map[string]any, 0, len(orgs))
-	for _, o := range orgs {
-		result = append(result, map[string]any{
-			"id":   o.Id,
-			"name": o.GetString("name"),
-			"slug": o.GetString("slug"),
-			"role": rolesByOrg[o.Id],
-		})
-	}
-
-	return e.JSON(http.StatusOK, result)
+	return e.JSON(http.StatusOK, out)
 }
-
 func (p *plugin) handleGetOrg(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
@@ -682,124 +575,6 @@ func (p *plugin) handleGetOrg(e *core.RequestEvent) error {
 	})
 }
 
-func (p *plugin) handleDeleteOrg(e *core.RequestEvent) error {
-	user, err := p.requireAuth(e)
-	if err != nil {
-		return err
-	}
-
-	orgId := e.Request.PathValue("id")
-	if orgId == "" {
-		return e.BadRequestError("missing org id", nil)
-	}
-
-	org, err := p.app.FindRecordById(collectionOrgs, orgId)
-	if err != nil {
-		return e.NotFoundError("org not found", err)
-	}
-
-	// Owner only.
-	if org.GetString("ownerId") != user.ID {
-		return e.ForbiddenError("only the owner can delete an org", nil)
-	}
-
-	slug := org.GetString("slug")
-
-	// Delete all org-prefixed collections.
-	prefix := OrgPrefix(slug)
-	allCollections, err := p.app.FindAllCollections()
-	if err == nil {
-		for _, col := range allCollections {
-			if strings.HasPrefix(col.Name, prefix) {
-				if delErr := p.app.Delete(col); delErr != nil {
-					p.app.Logger().Warn("failed to delete org collection",
-						"collection", col.Name,
-						"error", delErr.Error(),
-					)
-				}
-			}
-		}
-	}
-
-	// Delete all memberships.
-	memberships, _ := p.app.FindRecordsByFilter(
-		collectionOrgMembers,
-		"orgId = {:orgId}",
-		"", 0, 0,
-		map[string]any{"orgId": orgId},
-	)
-	for _, m := range memberships {
-		_ = p.app.Delete(m)
-	}
-
-	// Delete org record.
-	if err := p.app.Delete(org); err != nil {
-		return e.InternalServerError("failed to delete org", err)
-	}
-
-	return e.JSON(http.StatusOK, map[string]bool{"deleted": true})
-}
-
-func (p *plugin) handleInviteMember(e *core.RequestEvent) error {
-	user, err := p.requireAuth(e)
-	if err != nil {
-		return err
-	}
-
-	orgId := e.Request.PathValue("id")
-	if orgId == "" {
-		return e.BadRequestError("missing org id", nil)
-	}
-
-	// Require admin or owner.
-	if !checkAccess(p.app, orgId, user.ID, "admin") {
-		return e.ForbiddenError("only owners and admins can invite members", nil)
-	}
-
-	var body struct {
-		UserID string `json:"userId"`
-		Role   string `json:"role"`
-	}
-	if err := e.BindBody(&body); err != nil {
-		return e.BadRequestError("invalid request body", err)
-	}
-
-	body.UserID = strings.TrimSpace(body.UserID)
-	body.Role = strings.TrimSpace(body.Role)
-
-	if body.UserID == "" {
-		return e.BadRequestError("userId is required", nil)
-	}
-
-	// Validate role.
-	validRoles := map[string]bool{RoleAdmin: true, RoleMember: true, RoleViewer: true}
-	if !validRoles[body.Role] {
-		body.Role = RoleMember
-	}
-
-	// Check if already a member.
-	existing, _ := findMembership(p.app, body.UserID, orgId)
-	if existing != nil {
-		return e.BadRequestError("user is already a member of this org", nil)
-	}
-
-	if err := addMember(p.app, orgId, body.UserID, body.Role); err != nil {
-		return e.InternalServerError("failed to add member", err)
-	}
-
-	return e.JSON(http.StatusCreated, map[string]any{
-		"orgId":  orgId,
-		"userId": body.UserID,
-		"role":   body.Role,
-	})
-}
-
-// --------------------------------------------------------------------------
-// Auth helper
-// --------------------------------------------------------------------------
-
-// requireAuth extracts and validates the Bearer token. Checks Base built-in
-// auth first, then falls back to IAM token validation.
 func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 	// If Base already authenticated the user, use that.
 	if e.Auth != nil {
