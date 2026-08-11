@@ -90,9 +90,18 @@ func (e *Event) SetCookie(cookie *http.Cookie) {
 //
 // Note that if you are behind reverse proxy(ies), this method returns
 // the IP of the last connecting proxy.
+//
+// An address that does not parse is reported as no address rather than as the
+// zero Addr, whose expanded spelling is the literal "invalid IP". A transport
+// that carries no socket peer — ZAP, which arrives already terminated — gave
+// every one of its requests that same string, so anything keyed on the client
+// counted the whole leg as one client.
 func (e *Event) RemoteIP() string {
 	ip, _, _ := net.SplitHostPort(e.Request.RemoteAddr)
-	parsed, _ := netip.ParseAddr(ip)
+	parsed, err := netip.ParseAddr(ip)
+	if err != nil {
+		return ""
+	}
 	return parsed.StringExpanded()
 }
 

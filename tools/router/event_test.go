@@ -193,8 +193,8 @@ func TestEventRemoteIP(t *testing.T) {
 		remoteAddr string
 		expected   string
 	}{
-		{"", "invalid IP"},
-		{"1.2.3.4", "invalid IP"},
+		{"", ""},
+		{"1.2.3.4", ""}, // no port, so nothing to split — an address it cannot read is no address
 		{"1.2.3.4:8090", "1.2.3.4"},
 		{"[0000:0000:0000:0000:0000:0000:0000:0002]:80", "0000:0000:0000:0000:0000:0000:0000:0002"},
 		{"[::2]:80", "0000:0000:0000:0000:0000:0000:0000:0002"}, // should always return the expanded version

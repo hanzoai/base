@@ -13,6 +13,11 @@ import (
 // Common request store keys used by the middlewares and api handlers.
 const (
 	RequestEventKeyInfoContext = "infoContext"
+
+	// RequestEventKeyDeployment carries the Base the process serves from, put
+	// on every request by the router's event factory before anything can move
+	// it onto a tenant's. Read it through [RequestEvent.Deployment].
+	RequestEventKeyDeployment = "__deployment"
 )
 
 // RequestEvent defines the Base router handler event.
@@ -28,17 +33,43 @@ type RequestEvent struct {
 	mu sync.Mutex
 }
 
+// Deployment is the Base the process serves from.
+//
+// It is not e.App, which answers a different question — which Base this
+// request's records are in — and moves onto a tenant's the moment a credential
+// names an org. Anything that is a property of the process rather than of a
+// tenant's data reads it here: the rate limit and its counters, the activity
+// log, the batch size, and which proxy headers are believed. Asking e.App for
+// those let a tenant answer a question about the deployment, and a Base that
+// has just been opened answers with the zero value.
+//
+// Falling back to e.App keeps a request built outside the router — a test, a
+// batch child — reading the only Base it knows.
+func (e *RequestEvent) Deployment() App {
+	if app, ok := e.Get(RequestEventKeyDeployment).(App); ok && app != nil {
+		return app
+	}
+	return e.App
+}
+
 // RealIP returns the "real" IP address from the configured trusted proxy headers.
 //
 // If Settings.TrustedProxy is not configured or the found IP is empty,
 // it fallbacks to e.RemoteIP().
+//
+// Which proxies are believed is the deployment's answer and never a tenant's.
+// Only a superuser writes settings and a tenant's Base has no superuser, so a
+// tenant's TrustedProxy is empty by construction and can never be anything
+// else; reading it there meant that behind an ingress every authenticated
+// request reported the ingress address, and everything keyed on the client —
+// the rate limit above all — put the whole estate in one bucket.
 //
 // NB!
 // Be careful when used in a security critical context as it relies on
 // the trusted proxy to be properly configured and your app to be accessible only through it.
 // If you are not sure, use e.RemoteIP().
 func (e *RequestEvent) RealIP() string {
-	settings := e.App.Settings()
+	settings := e.Deployment().Settings()
 
 	for _, h := range settings.TrustedProxy.Headers {
 		headerValues := e.Request.Header.Values(h)

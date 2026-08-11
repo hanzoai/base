@@ -92,17 +92,24 @@ func (brs batchRequestsForm) validate() error {
 // json under the @jsonPayload field and file keys need to follow the
 // pattern "requests.N.fileField" or  requests[N].fileField.
 func batchTransaction(e *core.RequestEvent) error {
-	maxRequests := e.App.Settings().Batch.MaxRequests
-	if !e.App.Settings().Batch.Enabled || maxRequests <= 0 {
+	// How many requests one body may carry, how long the transaction may hold
+	// and how large the body may be are all limits on the process, so they come
+	// from the Base it serves from. Reading them off e.App asked the tenant, and
+	// a Base that has just been opened answers Enabled=false — so an operator
+	// who turned batching on had it silently off for everyone with a token.
+	batch := e.Deployment().Settings().Batch
+
+	maxRequests := batch.MaxRequests
+	if !batch.Enabled || maxRequests <= 0 {
 		return e.ForbiddenError("Batch requests are not allowed.", nil)
 	}
 
-	txTimeout := time.Duration(e.App.Settings().Batch.Timeout) * time.Second
+	txTimeout := time.Duration(batch.Timeout) * time.Second
 	if txTimeout <= 0 {
 		txTimeout = 3 * time.Second // for now always limit
 	}
 
-	maxBodySize := e.App.Settings().Batch.MaxBodySize
+	maxBodySize := batch.MaxBodySize
 	if maxBodySize <= 0 {
 		maxBodySize = 128 << 20
 	}
