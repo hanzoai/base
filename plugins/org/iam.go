@@ -1,4 +1,4 @@
-package platform
+package org
 
 import (
 	"bytes"
@@ -38,7 +38,7 @@ const (
 //
 // This is a convenience function that creates a one-off HTTP request. For
 // production use with caching, use the IAMClient returned by NewIAMClient.
-func ValidateIAMToken(token string, config PlatformConfig) (*IAMUser, error) {
+func ValidateIAMToken(token string, config Config) (*IAMUser, error) {
 	endpoint := config.IAMEndpoint
 	if endpoint == "" {
 		endpoint = "https://hanzo.id"
@@ -74,7 +74,7 @@ func ValidateIAMToken(token string, config PlatformConfig) (*IAMUser, error) {
 
 // ExchangeOAuth2Token exchanges an authorization code for tokens using the
 // IAM OAuth2 token endpoint.
-func ExchangeOAuth2Token(code, redirectURI string, config PlatformConfig) (accessToken, refreshToken string, err error) {
+func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, refreshToken string, err error) {
 	endpoint := config.IAMEndpoint
 	if endpoint == "" {
 		endpoint = "https://hanzo.id"

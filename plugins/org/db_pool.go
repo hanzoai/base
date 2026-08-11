@@ -1,4 +1,4 @@
-package platform
+package org
 
 // Pool manager is now in github.com/hanzoai/dbx.
 // This file re-exports the types for backward compatibility

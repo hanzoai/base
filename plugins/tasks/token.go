@@ -18,7 +18,7 @@ import (
 // cloud instead of the retired standalone tasksd.
 //
 // Credentials + endpoint use the canonical base convention, the same env
-// base/plugins/platform reads: $IAM_CLIENT_ID, $IAM_CLIENT_SECRET, and
+// base/plugins/org reads: $IAM_CLIENT_ID, $IAM_CLIENT_SECRET, and
 // $IAM_ENDPOINT (falling back to $IAM_URL). The endpoint MUST resolve to the
 // in-cluster IAM Service: a server-side POST to the public issuer host is 403'd
 // by Cloudflare (edge 1006). The token's iss stays the configured public issuer

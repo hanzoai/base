@@ -17,7 +17,7 @@
 // caller's bare path straight through on the ZAP transport — so on the
 // transport operators are told to use in-cluster, every org read and wrote the
 // same deployment-wide record. ref() below is the one place that mapping lives.
-package platform
+package org
 
 import (
 	"context"

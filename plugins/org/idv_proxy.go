@@ -9,7 +9,7 @@
 // This is independent of where IAM lives — Base is a pure IAM client and
 // proxies to whatever IDV service IDV_ENDPOINT points at.
 
-package platform
+package org
 
 import (
 	"context"

@@ -6,13 +6,13 @@
 //
 // Example:
 //
-//	platform.MustRegister(app, platform.PlatformConfig{
+//	platform.MustRegister(app, platform.Config{
 //		IAMEndpoint:     "https://hanzo.id",
 //		KMSEndpoint:     "zap.kms.svc.cluster.local:9999",
 //		IAMClientID:     "my-client-id",
 //		IAMClientSecret: "my-client-secret",
 //	})
-package platform
+package org
 
 import (
 	"fmt"
@@ -39,8 +39,8 @@ const (
 	RoleViewer = "viewer"
 )
 
-// PlatformConfig defines the configuration for the platform plugin.
-type PlatformConfig struct {
+// Config defines the configuration for the platform plugin.
+type Config struct {
 	// IAMEndpoint is the base URL for Hanzo IAM (default: "https://hanzo.id").
 	IAMEndpoint string
 
@@ -110,7 +110,7 @@ type PlatformConfig struct {
 
 // MustRegister registers the platform plugin to the provided app instance
 // and panics if it fails.
-func MustRegister(app core.App, config PlatformConfig) {
+func MustRegister(app core.App, config Config) {
 	if err := Register(app, config); err != nil {
 		panic(err)
 	}
@@ -122,7 +122,7 @@ func MustRegister(app core.App, config PlatformConfig) {
 // reachable at boot via IAM_ENDPOINT (a hanzo.id base, or an in-process
 // iam.Embed() served by the fused daemon). Base validates IAM JWTs against
 // that endpoint's JWKS; there is no local password / OTP / MFA surface.
-func Register(app core.App, config PlatformConfig) error {
+func Register(app core.App, config Config) error {
 	if config.IAMEndpoint == "" || config.IAMEndpoint == "disabled" || config.IAMEndpoint == "none" {
 		return fmt.Errorf(
 			"platform: IAM_ENDPOINT is required — Hanzo Base is a pure IAM " +
@@ -398,7 +398,6 @@ func Register(app core.App, config PlatformConfig) error {
 		}
 
 		p.registerRoutes(e.Router)
-		p.registerAuthRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
 
 		// /v1/iam mount: transparent reverse proxy to IAM_ENDPOINT so the
@@ -420,7 +419,7 @@ func Register(app core.App, config PlatformConfig) error {
 
 type plugin struct {
 	app        core.App
-	config     PlatformConfig
+	config     Config
 	iam        *IAMClient
 	compliance *ComplianceClient
 	org        *OrgService
@@ -500,8 +499,13 @@ func (p *plugin) ensureMembersCollection() error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/v1/platform")
-
+	// A Base is what an org gets: its own collections, its own files, its own
+	// key. So the resource a client addresses is /v1/bases, and never /v1/orgs —
+	// the org is IAM's noun and Base does not get a second one. It is not
+	// /v1/platform either: that is the PaaS at platform.hanzo.ai, a different
+	// product, and sharing its name here is what made "where are my Bases?"
+	// unanswerable.
+	//
 	// ORGS AND MEMBERSHIPS ARE IAM'S. Base READS them and never writes them:
 	// minting an org here made a second registry with its own slug rules and its
 	// own uniqueness check, so two systems both believed they owned the noun and
@@ -510,16 +514,21 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	// IAM already answers both questions — /v1/iam/organizations owns the org, and
 	// a validated token carries the caller's memberships (IAMUser.OrgIDs), so the
 	// read needs no call at all. Create, delete and invite live at IAM.
-	api.GET("/orgs", p.handleListOrgs)
-	api.GET("/orgs/{id}", p.handleGetOrg)
+	// Declared whole rather than on a group, so the collection root is
+	// /v1/bases and not /v1/bases/ — an empty leaf composes to the trailing
+	// slash, which is an address nobody calls.
+	r.GET(bases, p.handleListOrgs)
+	r.GET(bases+"/{id}", p.handleGetOrg)
 
-	// Compliance (optional — only registered if endpoint configured)
+	// Compliance is its own service domain, a sibling of /v1/iam — not a child
+	// of Base's own resource. Optional: registered only where it is configured.
 	if p.compliance != nil && p.compliance.Enabled() {
-		api.POST("/compliance/application", p.handleCreateComplianceApp)
-		api.POST("/compliance/kyc/{applicationId}", p.handleInitiateKYC)
-		api.GET("/compliance/kyc/{applicationId}", p.handleGetKYCStatus)
-		api.POST("/compliance/screen", p.handleScreenIndividual)
-		api.POST("/compliance/payment/validate", p.handleValidatePayment)
+		c := r.Group("/v1/compliance")
+		c.POST("/application", p.handleCreateComplianceApp)
+		c.POST("/kyc/{applicationId}", p.handleInitiateKYC)
+		c.GET("/kyc/{applicationId}", p.handleGetKYCStatus)
+		c.POST("/screen", p.handleScreenIndividual)
+		c.POST("/payment/validate", p.handleValidatePayment)
 	}
 }
 
