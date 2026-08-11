@@ -153,3 +153,57 @@ func TestAnUncredentialedCallerNamesNoOrg(t *testing.T) {
 		}
 	}
 }
+
+// TestAKeyActsInItsOwnOrg pins the other credential that opens these routes.
+//
+// A service fetching the provider credentials of the org it serves does it with
+// an IAM key, which resolves to one org and no more. The rule reads the org the
+// request acts in and never asks which door set it, so the key path needs no
+// second statement of it — this is the test that the one statement covers both.
+func TestAKeyActsInItsOwnOrg(t *testing.T) {
+	t.Setenv("STRIPE_API_KEY", "alpha-secret")
+
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	iam := newIssuer(t)
+
+	// The half of IAM a key resolves against, beside the JWKS one.
+	keys := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"u_key","name":"keyuser","email":"k@example.test","owner":"alpha"}}`))
+	}))
+	defer keys.Close()
+
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+		t.Fatal(err)
+	}
+	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
+
+	db := NewOrgDB(app, "")
+	for _, org := range []string{"alpha", "beta"} {
+		if _, err := db.ProvisionOrg(org); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mux := serve(t, app)
+
+	code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/creds/stripe", "sk-service", nil)
+	if code != http.StatusOK || !strings.Contains(body, "alpha-secret") {
+		t.Fatalf("a key could not read its own org's credentials: %d %s", code, body)
+	}
+
+	for _, r := range orgRoutes {
+		path := strings.Replace(r.path, "%s", "beta", 1)
+		code, body := call(t, mux, r.method, path, "sk-service", nil)
+		if code != http.StatusForbidden {
+			t.Errorf("%s %s with an alpha key answered %d %s, want 403", r.method, path, code, body)
+		}
+		if strings.Contains(body, "alpha-secret") {
+			t.Errorf("%s %s leaked a credential: %s", r.method, path, body)
+		}
+	}
+}
