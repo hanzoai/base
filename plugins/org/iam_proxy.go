@@ -25,6 +25,12 @@ import (
 // The proxy is opaque — every method, body, query param, and header
 // (except hop-by-hop) passes through. SSE / streaming responses are
 // flushed as bytes arrive.
+// upstreamFor is the address rule, named once so the proxy and its test cannot
+// each hold their own copy of it.
+func upstreamFor(base, path string) string {
+	return strings.TrimRight(base, "/") + path
+}
+
 func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	endpoint := strings.TrimRight(p.config.IAMEndpoint, "/")
 	if endpoint == "" {
@@ -42,13 +48,18 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	client := &http.Client{Timeout: 0}
 
 	handler := func(e *core.RequestEvent) error {
-		// Map /v1/iam/<rest> → ${IAMEndpoint}/<rest>.
-		rest := strings.TrimPrefix(e.Request.URL.Path, "/v1/iam")
-		if rest == "" {
-			rest = "/"
-		}
+		// The path passes through UNCHANGED: /v1/iam/x → ${IAMEndpoint}/v1/iam/x.
+		//
+		// It used to strip /v1/iam and ask the issuer for /x, which is the wrong
+		// address — IAM serves its whole surface UNDER /v1/iam, and every other
+		// consumer in the fleet says so (IAM_KEYS_URL names the full path). The
+		// strip did not fail loudly, because IAM answers an unregistered path
+		// with its own single-page app at 200 text/html: the jwks call came back
+		// a web page, and the studio read the 200 as success. Nothing in a status
+		// code could have caught that, which is why the test beside this asserts
+		// the URL the proxy BUILDS.
 		upstream := *upstreamBase
-		upstream.Path = strings.TrimRight(upstreamBase.Path, "/") + rest
+		upstream.Path = upstreamFor(upstreamBase.Path, e.Request.URL.Path)
 		upstream.RawQuery = e.Request.URL.RawQuery
 
 		req, err := http.NewRequestWithContext(
@@ -76,7 +87,7 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 
 		// SSE / streaming heuristic: use a long-lived client.
 		c := client
-		if !isLikelyStreaming(rest) {
+		if !isLikelyStreaming(e.Request.URL.Path) {
 			c = &http.Client{Timeout: 30 * time.Second}
 		}
 		resp, err := c.Do(req)
