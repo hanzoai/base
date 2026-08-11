@@ -1,7 +1,6 @@
 package zap
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/hanzoai/base/core"
@@ -52,20 +51,35 @@ func MustRegisterWithConfig(app core.App, config Config) {
 }
 
 type plugin struct {
-	app     core.App
-	config  Config
-	node    *zaplib.Node
-	logger  luxlog.Logger
-	handler *handler
+	app    core.App
+	config Config
+	node   *zaplib.Node
+	logger luxlog.Logger
 }
 
-// start brings up the ZAP node and registers its message handlers.
+// start brings up the ZAP node and puts base's HTTP surface on it.
 //
-// httpHandler is base's fully-wrapped HTTP handler (e.Server.Handler — the
-// Router.BuildMux output carrying every middleware and route). It is bridged
-// onto the same node via the canonical luxfi/zap/forward terminal so the ZAP
-// gateway can route /v1/base/* over MsgTypeForward. It may be nil; the bridge
-// then no-ops and the legacy ZAP handlers are unaffected.
+// httpHandler is base's fully-wrapped handler (e.Server.Handler — the
+// Router.BuildMux output carrying every middleware and route). Bridging it via
+// the canonical luxfi/zap/forward terminal is what lets the ZAP gateway route
+// /v1/base/* here, and it is the ONE way in: a request over ZAP passes the same
+// chain as one over HTTP, so it is stripped of its identity headers, verified
+// against IAM, resolved to an org, pointed at that org's Base, and answered
+// under that collection's rules.
+//
+// There were four other message types on this node once — Collections=100,
+// Records=101, Auth=102, Realtime=103 — each calling app.Save and app.Delete
+// straight through. They read no credential, so they were reachable by any peer
+// that could open a socket; they resolved no org, so they served the process's
+// own Base whatever the caller was; and going around the request path meant
+// going around the create hook that stamps owner and org, so what they wrote
+// belonged to nobody. Realtime was the same hole pointed outward: a peer
+// subscribed by name and every record change was pushed to it.
+//
+// Resolving an org from a ZAP envelope instead would have meant verifying a
+// credential in a second place, on a second transport, in this package — which
+// is authentication, and there is one of those in the estate. So they are gone
+// rather than mended. The transport keeps its speed and stops being a door.
 func (p *plugin) start(httpHandler http.Handler) {
 	p.logger = luxlog.New("component", "zap")
 	p.logger.Info("starting ZAP transport", "port", p.config.Port, "nodeID", p.config.NodeID)
@@ -76,62 +90,12 @@ func (p *plugin) start(httpHandler http.Handler) {
 		ServiceType: p.config.ServiceType,
 	})
 
-	p.handler = newHandler(p.app, p.logger)
-
-	// Register message handlers
-	p.node.Handle(MsgTypeCollections, func(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
-		return p.handler.handleCollections(ctx, from, msg)
-	})
-
-	p.node.Handle(MsgTypeRecords, func(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
-		return p.handler.handleRecords(ctx, from, msg)
-	})
-
-	p.node.Handle(MsgTypeAuth, func(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
-		return p.handler.handleAuth(ctx, from, msg)
-	})
-
-	p.node.Handle(MsgTypeRealtime, func(ctx context.Context, from string, msg *zaplib.Message) (*zaplib.Message, error) {
-		return p.handler.handleRealtime(ctx, from, msg)
-	})
-
-	// Canonical HTTP-over-ZAP terminal (MsgTypeForward 0x80) on the same node:
-	// bridges base's fully-wrapped HTTP handler so the ZAP gateway can route
-	// /v1/base/* here. Additive — distinct message type from the handlers above.
 	p.bridgeForward(httpHandler)
 
 	if err := p.node.Start(); err != nil {
 		p.logger.Error("failed to start ZAP node", "error", err)
 		return
 	}
-
-	// Give the handler a reference to the node for push notifications
-	p.handler.setNode(p.node)
-
-	// Hook into app record events for realtime broadcasting
-	p.app.OnRecordAfterCreateSuccess().Bind(&hook.Handler[*core.RecordEvent]{
-		Id: "__zapRealtimeCreate__",
-		Func: func(e *core.RecordEvent) error {
-			p.handler.broadcastEvent(e.Record.Collection().Name, "create", e.Record)
-			return e.Next()
-		},
-	})
-
-	p.app.OnRecordAfterUpdateSuccess().Bind(&hook.Handler[*core.RecordEvent]{
-		Id: "__zapRealtimeUpdate__",
-		Func: func(e *core.RecordEvent) error {
-			p.handler.broadcastEvent(e.Record.Collection().Name, "update", e.Record)
-			return e.Next()
-		},
-	})
-
-	p.app.OnRecordAfterDeleteSuccess().Bind(&hook.Handler[*core.RecordEvent]{
-		Id: "__zapRealtimeDelete__",
-		Func: func(e *core.RecordEvent) error {
-			p.handler.broadcastEvent(e.Record.Collection().Name, "delete", e.Record)
-			return e.Next()
-		},
-	})
 
 	p.logger.Info("ZAP transport listening", "port", p.config.Port, "discovery", p.config.ServiceType)
 }
