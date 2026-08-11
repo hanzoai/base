@@ -3,6 +3,7 @@ package core_test
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -130,18 +131,32 @@ func TestNotifyWatcher_CollectionsUpdate(t *testing.T) {
 		})
 	}
 
-	// create/update/delete app1 collections should trigger a reload in app2
+	// create/update/delete app1 collections should trigger a reload in app2.
+	//
+	// The burst is deliberately larger than the three changes this used to make.
+	// With three, a runner slow enough to split the burst twice produces three
+	// reloads — which is ALSO exactly what no coalescing at all looks like, so
+	// the assertion could not tell a loaded machine from a broken watcher, and
+	// duly failed on a loaded one. A burst this size separates them: splitting a
+	// few times still lands far below the change count, and a watcher that has
+	// stopped debouncing lands on it.
+	const burst = 12
+
+	start := time.Now()
 	dummyCollection := core.NewBaseCollection("test")
 	if err := app1.Save(dummyCollection); err != nil {
 		t.Fatal(err)
 	}
-	dummyCollection.Fields.Add(&core.TextField{Name: "test"})
-	if err := app1.Save(dummyCollection); err != nil {
-		t.Fatal(err)
+	for i := range burst - 2 {
+		dummyCollection.Fields.Add(&core.TextField{Name: fmt.Sprintf("test%d", i)})
+		if err := app1.Save(dummyCollection); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if err := app1.Delete(dummyCollection); err != nil {
 		t.Fatal(err)
 	}
+	spread := time.Since(start)
 
 	// There is no reload hook, so poll instead: wait until at least one reload has
 	// been observed and the count has then stayed stable for a quiescence window,
@@ -168,11 +183,26 @@ func TestNotifyWatcher_CollectionsUpdate(t *testing.T) {
 	if len(nonconcurrentQueries) != 0 {
 		t.Fatalf("reload must use the concurrent (read) pool, not the write pool; got %d write queries (%v)", len(nonconcurrentQueries), nonconcurrentQueries)
 	}
-	// Coalescing invariant: three rapid changes must reload app2 FEWER than three
-	// times — ideally once; a slow runner may split the burst into two. Zero means
-	// app2 never observed the change; three would mean no coalescing at all.
-	if n := len(concurrentQueries); n < 1 || n > 2 {
-		t.Fatalf("expected the change burst to coalesce into 1-2 reloads, got %d (%v)", n, concurrentQueries)
+	// Coalescing invariant, derived from the watcher's own window rather than
+	// guessed. A healthy watcher reloads once per debounce window the burst
+	// actually spanned, plus a trailing one — so the ceiling has to come from how
+	// long the burst took on THIS machine, not from a fixed number.
+	//
+	// A fixed number cannot work here, which is what the earlier "1-2 reloads"
+	// bound kept discovering: reloads track the gaps between writes, gaps track
+	// machine load, so a loaded runner pushes a perfectly healthy watcher past
+	// any constant. Scaling with the measured spread removes machine speed from
+	// the assertion entirely, while a watcher that has stopped debouncing still
+	// emits one reload per change and blows past the ceiling at any speed.
+	maxReloads := int(spread/core.NotifyDebounce) + 1
+	if maxReloads >= burst {
+		t.Skipf("no burst to coalesce: %d changes took %v, i.e. consecutive writes landed "+
+			"further apart than the %v debounce — this machine cannot produce the condition "+
+			"under test", burst, spread, core.NotifyDebounce)
+	}
+	if n := len(concurrentQueries); n < 1 || n > maxReloads {
+		t.Fatalf("expected %d changes spanning %v to coalesce into 1-%d reloads, got %d (%v)",
+			burst, spread, maxReloads, n, concurrentQueries)
 	}
 
 	expectedQuery := "SELECT {{_collections}}.* FROM `_collections` ORDER BY `rowid` ASC"
