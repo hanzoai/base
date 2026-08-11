@@ -2,6 +2,7 @@ package apis_test
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/tests"
@@ -235,6 +236,161 @@ func TestRestApiCount(t *testing.T) {
 				"OnRecordsListRequest": 1,
 				"OnRecordEnrich":       1,
 			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// The write verbs. PostgREST's PATCH and DELETE are FILTERED where Base's are
+// by-id, so these prove the door resolves a filter to rows and then lets Base's
+// own rules decide, rather than reimplementing them.
+func TestRestApiWrites(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			// The catastrophic shape, refused. PostgREST allows an unfiltered
+			// DELETE and postgrest-js sends it without comment, so the first time
+			// anyone learns what it means is after the table is empty.
+			Name:            "an unfiltered delete is refused",
+			Method:          http.MethodDelete,
+			URL:             "/rest/v1/demo2",
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`, `every row`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:            "an unfiltered update is refused the same way",
+			Method:          http.MethodPatch,
+			URL:             "/rest/v1/demo2",
+			Body:            strings.NewReader(`{"title":"x"}`),
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			// The error body is the shape clients branch on: message/details/
+			// hint/code, never Base's {data,message,status}.
+			Name:               "an error carries the fields a client reads",
+			Method:             http.MethodDelete,
+			URL:                "/rest/v1/demo2",
+			ExpectedStatus:     400,
+			ExpectedContent:    []string{`"message"`, `"details"`, `"hint"`, `"code"`},
+			NotExpectedContent: []string{`"data":{}`, `"status":400`},
+			ExpectedEvents:     map[string]int{"*": 0},
+		},
+		{
+			// A filtered write still obeys the collection's own rules: demo1 has
+			// no list rule, so an unauthenticated caller cannot even resolve the
+			// rows, let alone change them.
+			Name:            "a filtered delete on a guarded collection still refuses",
+			Method:          http.MethodDelete,
+			URL:             "/rest/v1/demo1?id=eq.imy661ixudk5izi",
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`Only superusers`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:            "a bulk insert is refused rather than half-applied",
+			Method:          http.MethodPost,
+			URL:             "/rest/v1/demo2",
+			Body:            strings.NewReader(`[{"title":"a"},{"title":"b"}]`),
+			ExpectedStatus:  501,
+			ExpectedContent: []string{`"code":"PGRST100"`, `one object per request`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// The writes that are supposed to WORK, executed end to end. Their absence is
+// exactly what let a broken filter ship green, so the success path is the part
+// that has to be measured rather than reasoned about.
+func TestRestApiWritesThatSucceed(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			// PostgREST returns nothing unless asked, and postgrest-js reads an
+			// empty body as exactly that. 201, no body.
+			Name:           "insert returns 201 and no body by default",
+			Method:         http.MethodPost,
+			URL:            "/rest/v1/demo2",
+			Body:           strings.NewReader(`{"title":"from-rest"}`),
+			ExpectedStatus: 201,
+			ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
+		},
+		{
+			Name:   "insert returns the row when asked",
+			Method: http.MethodPost,
+			URL:    "/rest/v1/demo2",
+			Body:   strings.NewReader(`{"title":"from-rest"}`),
+			Headers: map[string]string{
+				"Prefer": "return=representation",
+			},
+			ExpectedStatus:  201,
+			ExpectedContent: []string{`"title":"from-rest"`},
+			ExpectedEvents:  map[string]int{"OnRecordCreateRequest": 1},
+		},
+		{
+			// .single() on a write: a bare object, not a one-element array. A
+			// server that answers `[{...}]` hands every .single() caller an array
+			// where they wrote data.id.
+			Name:   "insert answers a bare object for .single()",
+			Method: http.MethodPost,
+			URL:    "/rest/v1/demo2",
+			Body:   strings.NewReader(`{"title":"single-rest"}`),
+			Headers: map[string]string{
+				"Prefer": "return=representation",
+				"Accept": "application/vnd.pgrst.object+json",
+			},
+			ExpectedStatus:     201,
+			ExpectedContent:    []string{`"title":"single-rest"`},
+			NotExpectedContent: []string{`[{`},
+			ExpectedEvents:     map[string]int{"OnRecordCreateRequest": 1},
+		},
+		{
+			Name:           "a filtered update changes the rows the filter selects",
+			Method:         http.MethodPatch,
+			URL:            "/rest/v1/demo2?title=eq.test1",
+			Body:           strings.NewReader(`{"title":"renamed"}`),
+			ExpectedStatus: 204,
+			ExpectedEvents: map[string]int{"OnRecordUpdateRequest": 1},
+		},
+		{
+			Name:   "a filtered update returns the changed rows when asked",
+			Method: http.MethodPatch,
+			URL:    "/rest/v1/demo2?title=eq.test1",
+			Body:   strings.NewReader(`{"title":"renamed"}`),
+			Headers: map[string]string{
+				"Prefer": "return=representation",
+			},
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"title":"renamed"`},
+			NotExpectedContent: []string{`"title":"test1"`},
+			ExpectedEvents:     map[string]int{"OnRecordUpdateRequest": 1},
+		},
+		{
+			Name:           "a filtered delete removes them",
+			Method:         http.MethodDelete,
+			URL:            "/rest/v1/demo2?title=eq.test1",
+			ExpectedStatus: 204,
+			ExpectedEvents: map[string]int{"OnRecordDeleteRequest": 1},
+		},
+		{
+			// A filter that selects nothing is a no-op, not an error — and the
+			// count says so.
+			Name:           "a filter that matches nothing changes nothing",
+			Method:         http.MethodDelete,
+			URL:            "/rest/v1/demo2?title=eq.nosuchtitle",
+			ExpectedStatus: 204,
+			ExpectedEvents: map[string]int{"*": 0},
 		},
 	}
 

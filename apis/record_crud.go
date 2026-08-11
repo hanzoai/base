@@ -361,6 +361,10 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			}
 
 			err = execAfterSuccessTx(responseWriteAfterTx, e.App, func() error {
+				if c := restCallOf(e.RequestEvent); c != nil && c.hold {
+					c.rows = append(c.rows, e.Record)
+					return nil
+				}
 				return e.JSON(http.StatusOK, e.Record)
 			})
 			if err != nil {
@@ -500,6 +504,10 @@ func recordUpdate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			}
 
 			err = execAfterSuccessTx(responseWriteAfterTx, e.App, func() error {
+				if c := restCallOf(e.RequestEvent); c != nil && c.hold {
+					c.rows = append(c.rows, e.Record)
+					return nil
+				}
 				return e.JSON(http.StatusOK, e.Record)
 			})
 			if err != nil {
@@ -598,6 +606,9 @@ func recordDelete(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			}
 
 			err = execAfterSuccessTx(responseWriteAfterTx, e.App, func() error {
+				if c := restCallOf(e.RequestEvent); c != nil && c.hold {
+					return nil
+				}
 				return e.NoContent(http.StatusNoContent)
 			})
 			if err != nil {

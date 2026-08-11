@@ -1,8 +1,10 @@
 package apis
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -38,6 +40,9 @@ import (
 func bindRestApi(app core.App, rg *router.Router[*core.RequestEvent]) {
 	sub := rg.Group("/rest/v1")
 	sub.GET("/{collection}", restList)
+	sub.POST("/{collection}", restCreate)
+	sub.PATCH("/{collection}", restUpdate)
+	sub.DELETE("/{collection}", restDelete)
 }
 
 // restWire marks a request as arriving on the PostgREST door. It is a context
@@ -51,6 +56,15 @@ type restWireKey struct{}
 // against the collection's own field resolver.
 type restCall struct {
 	preds []restPredicate
+
+	// hold suppresses the per-record response write so a filtered write that
+	// touches N rows answers ONCE. Base's write handlers are by-id and each
+	// writes its own response; PostgREST's PATCH and DELETE are filtered, so the
+	// door drives those handlers per row and renders the whole set itself.
+	hold bool
+
+	// rows are what those per-record writes would have rendered, in order.
+	rows []*core.Record
 }
 
 // wantsRest reports whether this request arrived on the PostgREST door.
@@ -414,4 +428,234 @@ func restSort(order string) (string, error) {
 		}
 	}
 	return strings.Join(terms, ","), nil
+}
+
+// --- writes -----------------------------------------------------------------
+//
+// PostgREST's writes are FILTERED where Base's are by-id: PATCH /posts?id=eq.7
+// updates every row the filter selects, and Base's handler updates the one row
+// its path names. So the door resolves the filter to rows first and then drives
+// Base's own handler once per row, which is what keeps the create/update/delete
+// RULES doing the deciding — a write that reimplemented them would be a second
+// answer to who may change a row.
+//
+// Rows are resolved through the same list read a GET does, so a caller can only
+// touch what they can already see; the per-row handler then applies the write
+// rule on top. Visibility and mutation stay two separate questions.
+
+// restBodyLimit bounds how many rows one filtered write may touch. PostgREST has
+// no such bound and neither does postgrest-js, which is how an unfiltered DELETE
+// empties a table. Refusing past a ceiling turns the catastrophic case into an
+// error someone reads.
+const restWriteCeiling = 500
+
+// restCreate inserts one row. A bulk insert (a JSON array body) is refused
+// rather than looped: PostgREST inserts an array in ONE statement, so a partial
+// failure rolls the whole thing back, and looping would half-apply it and report
+// success for the rows that landed. Base's own batch plane is the honest home
+// for that, and it ships disabled.
+func restCreate(e *core.RequestEvent) error {
+	body, err := io.ReadAll(io.LimitReader(e.Request.Body, 1<<20))
+	if err != nil {
+		return restError(e, http.StatusBadRequest, "PGRST102", "unreadable request body", err.Error())
+	}
+	if bytes.HasPrefix(bytes.TrimLeft(body, " \t\r\n"), []byte("[")) {
+		return restError(e, http.StatusNotImplemented, "PGRST100",
+			"inserting several rows in one request is not supported here",
+			"send one object per request; a true bulk insert has to be one statement to roll back as one")
+	}
+	e.Request.Body = io.NopCloser(bytes.NewReader(body))
+
+	call := &restCall{hold: true}
+	e.Request = e.Request.WithContext(context.WithValue(e.Request.Context(), restWireKey{}, call))
+
+	if err := recordCreate(true, nil)(e); err != nil {
+		return err
+	}
+
+	if restWantsObject(e) && len(call.rows) != 1 {
+		return restError(e, http.StatusNotAcceptable, "PGRST116",
+			"JSON object requested, multiple (or no) rows returned",
+			fmt.Sprintf("Results contain %d rows, application/vnd.pgrst.object+json requires 1 row", len(call.rows)))
+	}
+	if !restReturns(e) {
+		return e.NoContent(http.StatusCreated)
+	}
+	if restWantsObject(e) {
+		return e.JSON(http.StatusCreated, call.rows[0])
+	}
+	return e.JSON(http.StatusCreated, call.rows)
+}
+
+// restUpdate applies one patch to every row a filter selects.
+func restUpdate(e *core.RequestEvent) error {
+	return restWriteOverRows(e, func(e *core.RequestEvent, id string) error {
+		e.Request.SetPathValue("id", id)
+		return recordUpdate(true, nil)(e)
+	})
+}
+
+// restDelete removes every row a filter selects.
+func restDelete(e *core.RequestEvent) error {
+	return restWriteOverRows(e, func(e *core.RequestEvent, id string) error {
+		e.Request.SetPathValue("id", id)
+		return recordDelete(true, nil)(e)
+	})
+}
+
+// restWriteOverRows is the shared body of the two filtered writes: resolve the
+// filter to ids, refuse the shapes that are too dangerous to guess at, then run
+// the per-row handler with its own response held back so the door answers once.
+func restWriteOverRows(e *core.RequestEvent, apply func(*core.RequestEvent, string) error) error {
+	collection, err := e.App.FindCachedCollectionByNameOrId(e.Request.PathValue("collection"))
+	if err != nil || collection == nil {
+		return e.NotFoundError("Missing collection context.", err)
+	}
+
+	preds, err := restPredicates(e.Request.URL.Query())
+	if err != nil {
+		return restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
+	}
+	// An unfiltered PATCH or DELETE means every row. PostgREST allows it and the
+	// client sends it without comment, so the first time anyone discovers it is
+	// after the table is empty. This refuses instead, and says how to mean it.
+	if len(preds) == 0 {
+		return restError(e, http.StatusBadRequest, "PGRST100",
+			"a filtered write needs a filter; add one (e.g. ?id=eq.<id>) to say which rows you mean",
+			"without a filter this would touch every row in the table")
+	}
+
+	ids, err := restMatchingIDs(e, collection, preds)
+	if err != nil {
+		return err
+	}
+
+	call := &restCall{preds: preds, hold: true}
+	e.Request = e.Request.WithContext(context.WithValue(e.Request.Context(), restWireKey{}, call))
+
+	for _, id := range ids {
+		if err := apply(e, id); err != nil {
+			return err
+		}
+	}
+
+	return restWriteRender(e, call.rows, len(ids))
+}
+
+// restMatchingIDs resolves a filter to the ids of the rows it selects, through
+// the same list rule a GET obeys.
+func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []restPredicate) ([]string, error) {
+	requestInfo, err := e.RequestInfo()
+	if err != nil {
+		return nil, firstApiError(err, e.BadRequestError("", err))
+	}
+
+	if collection.ListRule == nil && !requestInfo.HasSuperuserAuth() {
+		return nil, e.ForbiddenError("Only superusers can perform this action.", nil)
+	}
+	if err := checkForSuperuserOnlyRuleFields(requestInfo); err != nil {
+		return nil, err
+	}
+
+	q := e.App.RecordQuery(collection)
+	resolver := core.NewRecordFieldResolver(e.App, collection, requestInfo, true)
+	resolver.SetAllowHiddenFields(requestInfo.HasSuperuserAuth())
+
+	if !requestInfo.HasSuperuserAuth() && collection.ListRule != nil && *collection.ListRule != "" {
+		expr, err := search.FilterData(*collection.ListRule).BuildExpr(resolver)
+		if err != nil {
+			return nil, err
+		}
+		q.AndWhere(expr)
+	}
+
+	where, err := restWhere(resolver, preds)
+	if err != nil {
+		return nil, e.BadRequestError(err.Error(), err)
+	}
+	if where != nil {
+		q.AndWhere(where)
+	}
+	if err := resolver.UpdateQuery(q); err != nil {
+		return nil, err
+	}
+
+	records := []*core.Record{}
+	if err := q.Limit(restWriteCeiling + 1).All(&records); err != nil {
+		return nil, firstApiError(err, e.InternalServerError("Failed to resolve the affected rows.", err))
+	}
+	if len(records) > restWriteCeiling {
+		return nil, restError(e, http.StatusBadRequest, "PGRST100",
+			fmt.Sprintf("this filter selects more than %d rows", restWriteCeiling),
+			"narrow the filter, or make the change in batches")
+	}
+
+	ids := make([]string, 0, len(records))
+	for _, r := range records {
+		ids = append(ids, r.Id)
+	}
+	return ids, nil
+}
+
+// restFault is PostgREST's error body. The field names are not decoration: a
+// client BRANCHES on `code` (PGRST1xx, or a raw SQLSTATE like 23505 for a unique
+// violation), and postgrest-js recovers a zero-row .maybeSingle() write by
+// string-matching `details` for "0 rows". Base's own {data,message,status} body
+// carries neither, so on that body every `error.code === '23505'` branch in a
+// migrated app is dead and every maybeSingle write surfaces an error where
+// Supabase returns {data: null, error: null}.
+type restFault struct {
+	Message string `json:"message"`
+	Details string `json:"details"`
+	Hint    string `json:"hint"`
+	Code    string `json:"code"`
+}
+
+func restError(e *core.RequestEvent, status int, code, message, details string) error {
+	return e.JSON(status, restFault{Message: message, Details: details, Code: code})
+}
+
+// restWantsObject reports whether the caller asked for a bare object rather than
+// an array — .single(), and .maybeSingle() on anything but a GET.
+func restWantsObject(e *core.RequestEvent) bool {
+	return strings.Contains(e.Request.Header.Get("Accept"), "application/vnd.pgrst.object+json")
+}
+
+// restReturns reports what the caller wants back. PostgREST returns nothing
+// unless asked, and postgrest-js reads an empty body as exactly that.
+func restReturns(e *core.RequestEvent) bool {
+	for _, raw := range e.Request.Header.Values("Prefer") {
+		if strings.Contains(raw, "return=representation") {
+			return true
+		}
+	}
+	return false
+}
+
+// restWriteRender answers a filtered write once, whatever it touched.
+//
+// The cardinality rules are the client's, not ours: an Accept of
+// pgrst.object+json is a claim that the write hits exactly one row, and anything
+// else is 406 PGRST116 with the row count in `details` — which is the string the
+// client parses to turn "no rows" back into a null result.
+func restWriteRender(e *core.RequestEvent, rows []*core.Record, affected int) error {
+	if restWantsObject(e) && len(rows) != 1 {
+		return restError(e, http.StatusNotAcceptable, "PGRST116",
+			"JSON object requested, multiple (or no) rows returned",
+			fmt.Sprintf("Results contain %d rows, application/vnd.pgrst.object+json requires 1 row", len(rows)))
+	}
+
+	if !restReturns(e) {
+		e.Response.Header().Set("Content-Range", "*/"+strconv.Itoa(affected))
+		return e.NoContent(http.StatusNoContent)
+	}
+
+	e.Response.Header().Set("Content-Range", "*/"+strconv.Itoa(affected))
+	if restWantsObject(e) {
+		return e.JSON(http.StatusOK, rows[0])
+	}
+	if rows == nil {
+		rows = []*core.Record{}
+	}
+	return e.JSON(http.StatusOK, rows)
 }
