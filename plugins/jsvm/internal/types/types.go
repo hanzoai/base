@@ -1271,8 +1271,8 @@ func main() {
 
 	gen := tygoja.New(tygoja.Config{
 		Packages: map[string][]string{
-			"github.com/go-ozzo/ozzo-validation/v4":             {"Error"},
-			"github.com/hanzoai/dbx":                         {"*"},
+			"github.com/go-ozzo/ozzo-validation/v4":    {"Error"},
+			"github.com/hanzoai/dbx":                   {"*"},
 			"github.com/hanzoai/base/tools/security":   {"*"},
 			"github.com/hanzoai/base/tools/filesystem": {"*"},
 			"github.com/hanzoai/base/tools/template":   {"*"},
@@ -1281,9 +1281,9 @@ func main() {
 			"github.com/hanzoai/base/core":             {"*"},
 			"github.com/hanzoai/base/forms":            {"*"},
 			"github.com/hanzoai/base":                  {"*"},
-			"path/filepath":                                     {"*"},
-			"os":                                                {"*"},
-			"os/exec":                                           {"Command"},
+			"path/filepath":                            {"*"},
+			"os":                                       {"*"},
+			"os/exec":                                  {"Command"},
 		},
 		FieldNameFormatter: func(s string) string {
 			return mapper.FieldName(nil, reflect.StructField{Name: s})

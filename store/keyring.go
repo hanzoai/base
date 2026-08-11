@@ -1,10 +1,10 @@
-// At-rest encryption for the per-tenant SQLite substrate.
+// At-rest encryption for the per-base SQLite substrate.
 //
-// Every byte a tenant's SQLite DB writes to durable storage is encrypted
-// with a key UNIQUE to that tenant's Key tuple (org / app / project / user),
+// Every byte a base's SQLite DB writes to durable storage is encrypted
+// with a key UNIQUE to that base's Key tuple (org / app / project / user),
 // rooted in Hanzo KMS. There is exactly ONE at-rest encryption boundary:
 // luxfi/age (post-quantum hybrid ML-KEM-768 + X25519) — the same primitive
-// hanzoai/vfs and hanzoai/replicate speak — so the tenant key composes across
+// hanzoai/vfs and hanzoai/replicate speak — so the base key composes across
 // the whole-file, block (vfs), and WAL-stream (replicate) paths without ever
 // double-encrypting the same bytes.
 //
@@ -13,7 +13,7 @@
 //	KMS Vault ── OrgRoot(orgID) ─▶ KEK_org          (32 random bytes, per org, in KMS)
 //	                                  │  HKDF-SHA256(salt=domain, info=objectKey)
 //	                                  ▼
-//	                                 WK               (per-tenant wrapping key, ephemeral)
+//	                                 WK               (per-base wrapping key, ephemeral)
 //	                                  │  AES-256-GCM(AAD=objectKey)
 //	                                  ▼
 //	     age Hybrid identity (random per DB) ──wrap──▶ sidecar {objectKey}.agekey
@@ -27,16 +27,16 @@
 //
 // # Isolation invariant (proven in keyring_test.go)
 //
-// The FIRST-line cross-tenant boundary is the request's authenticated
-// claims->OrgID binding, enforced in MultiTenantStore.Get/ForCtx: a caller
-// scoped to org B cannot resolve an org A Key (Get returns ErrCrossTenant).
+// The FIRST-line cross-base boundary is the request's authenticated
+// claims->OrgID binding, enforced in OrgStore.Get/ForCtx: a caller
+// scoped to org B cannot resolve an org A Key (Get returns ErrCrossOrg).
 // Cryptographic separation is the SECOND line, not the first — one shared
 // store process serves many orgs and CAN fetch any org's KEK, so the KEK does
 // not by itself stop a caller who reaches Get with a foreign OrgID. Given
 // correct scoping the crypto then guarantees isolation: KEK_A != KEK_B are
 // distinct KMS secrets, each DB has an independent random age identity, and
 // each sidecar is AAD-bound to its exact objectKey, so no wrapped blob can be
-// replayed across tenants (proven in keyring_test.go).
+// replayed across bases (proven in keyring_test.go).
 
 package store
 
@@ -62,7 +62,7 @@ const (
 	dekKeyLen = 32
 	// wrapHKDFSalt domain-separates the store wrapping-key derivation from
 	// every other HKDF use in the platform. Never reuse across domains.
-	wrapHKDFSalt = "hanzo-base.store.tenant-wrap.v1"
+	wrapHKDFSalt = "hanzo-base.store.base-wrap.v1"
 	// wrapNonceLen is the AES-256-GCM nonce length for the wrap.
 	wrapNonceLen = 12
 	// sidecarSuffix is appended to a Key.ObjectKey() to locate its wrapped
@@ -72,20 +72,20 @@ const (
 
 // ErrNoKeyMaterial is returned when a DB object exists but its wrapped-key
 // sidecar cannot be produced — never silently fall back to plaintext.
-var ErrNoKeyMaterial = errors.New("store: no wrapped key material for tenant")
+var ErrNoKeyMaterial = errors.New("store: no wrapped key material for base")
 
-// TenantKey is the per-tenant at-rest key: a post-quantum hybrid age identity.
+// OrgKey is the per-base at-rest key: a post-quantum hybrid age identity.
 // Recipient encrypts, Identity decrypts. Unique per Key tuple.
-type TenantKey struct {
+type OrgKey struct {
 	Recipient age.Recipient
 	Identity  age.Identity
 }
 
-// KeyProvider yields the per-tenant at-rest key for a Key. Implementations
+// KeyProvider yields the per-base at-rest key for a Key. Implementations
 // MUST return a key unique to k, rooted in KMS, and MUST NOT log key material.
 // Resolve is safe for concurrent use.
 type KeyProvider interface {
-	Resolve(ctx context.Context, k Key) (*TenantKey, error)
+	Resolve(ctx context.Context, k Key) (*OrgKey, error)
 }
 
 // RootSource yields the org-scoped root key (KEK) — the single KMS-rooted
@@ -103,7 +103,7 @@ type Keyring struct {
 	sidecar *filesystem.System
 
 	mu    sync.Mutex
-	cache map[Key]*TenantKey
+	cache map[Key]*OrgKey
 }
 
 // NewKeyring builds a Keyring over a RootSource (KMS) and an object store for
@@ -115,15 +115,15 @@ func NewKeyring(root RootSource, sidecar *filesystem.System) (*Keyring, error) {
 	if sidecar == nil {
 		return nil, errors.New("store: keyring sidecar store is required")
 	}
-	return &Keyring{root: root, sidecar: sidecar, cache: make(map[Key]*TenantKey)}, nil
+	return &Keyring{root: root, sidecar: sidecar, cache: make(map[Key]*OrgKey)}, nil
 }
 
-// Resolve returns the per-tenant key for k, loading-and-unwrapping the existing
+// Resolve returns the per-base key for k, loading-and-unwrapping the existing
 // sidecar or generating-and-wrapping a fresh identity on first use. In normal
 // operation the sidecar is written at first hydrate (before any DB object
 // exists), so a DB object without a sidecar can only be hostile injection —
 // which surfaces downstream as an age-decrypt failure (ErrCorruptDB).
-func (kr *Keyring) Resolve(ctx context.Context, k Key) (*TenantKey, error) {
+func (kr *Keyring) Resolve(ctx context.Context, k Key) (*OrgKey, error) {
 	if err := k.Valid(); err != nil {
 		return nil, fmt.Errorf("store: keyring invalid key %s: %w", k, err)
 	}
@@ -140,7 +140,7 @@ func (kr *Keyring) Resolve(ctx context.Context, k Key) (*TenantKey, error) {
 		return nil, fmt.Errorf("store: keyring load sidecar %s: %w", sk, err)
 	}
 
-	var tk *TenantKey
+	var tk *OrgKey
 	if ok {
 		tk, err = kr.unwrap(ctx, k, blob)
 	} else {
@@ -205,7 +205,7 @@ func (kr *Keyring) Rotate(ctx context.Context, k Key, prevRoot, newRoot RootSour
 
 // generate mints a fresh random hybrid identity, wraps it under the org KEK,
 // and persists the sidecar. Caller holds kr.mu.
-func (kr *Keyring) generate(ctx context.Context, k Key, sk string) (*TenantKey, error) {
+func (kr *Keyring) generate(ctx context.Context, k Key, sk string) (*OrgKey, error) {
 	id, err := age.GenerateHybridIdentity()
 	if err != nil {
 		return nil, fmt.Errorf("store: keyring generate identity: %w", err)
@@ -226,11 +226,11 @@ func (kr *Keyring) generate(ctx context.Context, k Key, sk string) (*TenantKey, 
 	if err := kr.sidecar.Upload(blob, sk); err != nil {
 		return nil, fmt.Errorf("store: keyring persist sidecar %s: %w", sk, err)
 	}
-	return &TenantKey{Recipient: id.Recipient(), Identity: id}, nil
+	return &OrgKey{Recipient: id.Recipient(), Identity: id}, nil
 }
 
 // unwrap decrypts an existing sidecar under the org KEK. Caller holds kr.mu.
-func (kr *Keyring) unwrap(ctx context.Context, k Key, blob []byte) (*TenantKey, error) {
+func (kr *Keyring) unwrap(ctx context.Context, k Key, blob []byte) (*OrgKey, error) {
 	wk, err := deriveWrapKey(ctx, kr.root, k)
 	if err != nil {
 		return nil, err
@@ -247,7 +247,7 @@ func (kr *Keyring) unwrap(ctx context.Context, k Key, blob []byte) (*TenantKey, 
 	if err != nil {
 		return nil, fmt.Errorf("store: keyring parse identity %s: %w", k, err)
 	}
-	return &TenantKey{Recipient: id.Recipient(), Identity: id}, nil
+	return &OrgKey{Recipient: id.Recipient(), Identity: id}, nil
 }
 
 // sidecarGet reads a wrapped-key blob; ok=false (nil err) means absent.
@@ -268,10 +268,10 @@ func (kr *Keyring) sidecarGet(sk string) (blob []byte, ok bool, err error) {
 	return b, true, nil
 }
 
-// deriveWrapKey computes the per-tenant AES-256 wrapping key from the org KEK.
+// deriveWrapKey computes the per-base AES-256 wrapping key from the org KEK.
 // WK = HKDF-SHA256(secret=KEK_org, salt=domain, info=objectKey). The objectKey
-// (which begins with the orgID and encodes scope + tenant id) binds the
-// wrapping key to exactly one DB, so distinct tenants derive distinct keys.
+// (which begins with the orgID and encodes scope + base id) binds the
+// wrapping key to exactly one DB, so distinct bases derive distinct keys.
 //
 // This is deliberately NOT github.com/hanzoai/cek, which is the one key
 // derivation everywhere else in this repo. cek answers "what key does this
@@ -338,9 +338,9 @@ func newGCM(key []byte) (cipher.AEAD, error) {
 	return gcm, nil
 }
 
-// sealDB age-encrypts SQLite bytes to the tenant recipient (the sole at-rest
+// sealDB age-encrypts SQLite bytes to the base recipient (the sole at-rest
 // boundary for the whole-file durable path).
-func sealDB(tk *TenantKey, plain []byte) ([]byte, error) {
+func sealDB(tk *OrgKey, plain []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	w, err := age.Encrypt(&buf, tk.Recipient)
 	if err != nil {
@@ -355,8 +355,8 @@ func sealDB(tk *TenantKey, plain []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// openDBBytes age-decrypts SQLite bytes with the tenant identity.
-func openDBBytes(tk *TenantKey, ciphertext []byte) ([]byte, error) {
+// openDBBytes age-decrypts SQLite bytes with the base identity.
+func openDBBytes(tk *OrgKey, ciphertext []byte) ([]byte, error) {
 	r, err := age.Decrypt(bytes.NewReader(ciphertext), tk.Identity)
 	if err != nil {
 		return nil, fmt.Errorf("store: age decrypt: %w", err)

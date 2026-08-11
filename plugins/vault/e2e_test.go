@@ -131,7 +131,7 @@ func TestE2E_MultiDeviceSync(t *testing.T) {
 	}
 }
 
-func TestE2E_OrgMultiTenant(t *testing.T) {
+func TestE2E_OrgBases(t *testing.T) {
 	masterKey := make([]byte, 32)
 	rand.Read(masterKey)
 

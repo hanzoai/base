@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewTenantRegistry_NilConfig(t *testing.T) {
-	r := NewTenantRegistry(nil)
+	r := NewBases(nil)
 	if r != nil {
 		t.Fatal("expected nil registry for nil config")
 	}
@@ -15,7 +15,7 @@ func TestNewTenantRegistry_NilConfig(t *testing.T) {
 
 func TestTenantRegistry_OrgDB_LazyCreate(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -50,7 +50,7 @@ func TestTenantRegistry_OrgDB_LazyCreate(t *testing.T) {
 
 func TestTenantRegistry_OrgDB_CachesConnection(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -67,7 +67,7 @@ func TestTenantRegistry_OrgDB_CachesConnection(t *testing.T) {
 
 func TestTenantRegistry_OrgDB_Isolation(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -116,7 +116,7 @@ func TestTenantRegistry_OrgDB_Isolation(t *testing.T) {
 
 func TestTenantRegistry_OrgNonconcurrentDB(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -133,7 +133,7 @@ func TestTenantRegistry_OrgNonconcurrentDB(t *testing.T) {
 
 func TestTenantRegistry_InvalidOrgID(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -149,7 +149,7 @@ func TestTenantRegistry_InvalidOrgID(t *testing.T) {
 
 func TestTenantRegistry_ValidOrgIDs(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -165,7 +165,7 @@ func TestTenantRegistry_ValidOrgIDs(t *testing.T) {
 
 func TestTenantRegistry_HasOrg(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -191,7 +191,7 @@ func TestTenantRegistry_MasterKey(t *testing.T) {
 		masterKey[i] = byte(i)
 	}
 
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   t.TempDir(),
 		MasterKey: masterKey,
 		DBConnect: DefaultDBConnect,
@@ -211,7 +211,7 @@ func TestTenantRegistry_MasterKey(t *testing.T) {
 
 func TestTenantRegistry_Close(t *testing.T) {
 	dir := t.TempDir()
-	r := NewTenantRegistry(&TenantConfig{
+	r := NewBases(&BasesConfig{
 		DataDir:   dir,
 		DBConnect: DefaultDBConnect,
 	})
@@ -241,19 +241,19 @@ func TestBaseApp_OrgDB_Disabled(t *testing.T) {
 		t.Fatal(err)
 	}
 	if db != nil {
-		t.Fatal("expected nil db when multi-tenancy disabled")
+		t.Fatal("expected nil db when per-org bases disabled")
 	}
 
-	if app.Tenants() != nil {
-		t.Fatal("expected nil tenants when multi-tenancy disabled")
+	if app.Bases() != nil {
+		t.Fatal("expected nil bases when per-org bases disabled")
 	}
 }
 
 func TestBaseApp_OrgDB_EnabledViaConfig(t *testing.T) {
 	dir := t.TempDir()
 	app := NewBaseApp(BaseAppConfig{
-		DataDir:     dir,
-		MultiTenant: true,
+		DataDir: dir,
+		PerOrg:  true,
 	})
 
 	if err := app.Bootstrap(); err != nil {
@@ -261,8 +261,8 @@ func TestBaseApp_OrgDB_EnabledViaConfig(t *testing.T) {
 	}
 	defer app.ResetBootstrapState()
 
-	if app.Tenants() == nil {
-		t.Fatal("expected non-nil tenants when MultiTenant=true")
+	if app.Bases() == nil {
+		t.Fatal("expected non-nil bases when PerOrg=true")
 	}
 
 	db, err := app.OrgDB("acme")
@@ -308,11 +308,11 @@ func TestBaseApp_OrgDB_EnabledViaMasterKey(t *testing.T) {
 	}
 	defer app.ResetBootstrapState()
 
-	if app.Tenants() == nil {
-		t.Fatal("expected non-nil tenants when MasterKey is set")
+	if app.Bases() == nil {
+		t.Fatal("expected non-nil bases when MasterKey is set")
 	}
 
-	if mk := app.Tenants().MasterKey(); len(mk) != 32 {
+	if mk := app.Bases().MasterKey(); len(mk) != 32 {
 		t.Fatalf("expected 32-byte master key on registry, got %d", len(mk))
 	}
 }
@@ -320,8 +320,8 @@ func TestBaseApp_OrgDB_EnabledViaMasterKey(t *testing.T) {
 func TestBaseApp_OrgDB_IsolationFromMainDB(t *testing.T) {
 	dir := t.TempDir()
 	app := NewBaseApp(BaseAppConfig{
-		DataDir:     dir,
-		MultiTenant: true,
+		DataDir: dir,
+		PerOrg:  true,
 	})
 
 	if err := app.Bootstrap(); err != nil {

@@ -32,12 +32,12 @@ func (p *plugin) handleDeployFunction(e *core.RequestEvent) error {
 		return e.BadRequestError("function name is required", nil)
 	}
 
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
-	qualifiedName := fmt.Sprintf("t-%s-%s", tenantSlug, input.Name)
+	qualifiedName := fmt.Sprintf("t-%s-%s", orgSlug, input.Name)
 
 	// Build deploy request with default env vars
 	envVars := map[string]string{
@@ -53,7 +53,7 @@ func (p *plugin) handleDeployFunction(e *core.RequestEvent) error {
 		Image:     input.Image,
 		Namespace: p.config.FunctionNamespace,
 		Labels: map[string]string{
-			"hanzo.ai/tenant":   tenantSlug,
+			"hanzo.ai/base":     orgSlug,
 			"hanzo.ai/function": input.Name,
 		},
 		EnvVars: envVars,
@@ -75,7 +75,7 @@ func (p *plugin) handleDeployFunction(e *core.RequestEvent) error {
 	record := core.NewRecord(col)
 	record.Set("name", input.Name)
 	record.Set("qualifiedName", qualifiedName)
-	record.Set("tenantId", tenantSlug)
+	record.Set("orgId", orgSlug)
 	record.Set("image", input.Image)
 	record.Set("runtime", input.Runtime)
 	record.Set("handler", input.Handler)
@@ -98,9 +98,9 @@ func (p *plugin) handleListFunctions(e *core.RequestEvent) error {
 		return e.UnauthorizedError("authentication required", nil)
 	}
 
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
 	functions, err := p.listFunctions(p.config.FunctionNamespace)
@@ -108,7 +108,7 @@ func (p *plugin) handleListFunctions(e *core.RequestEvent) error {
 		return e.InternalServerError("failed to list functions", err)
 	}
 
-	prefix := fmt.Sprintf("t-%s-", tenantSlug)
+	prefix := fmt.Sprintf("t-%s-", orgSlug)
 	result := make([]map[string]any, 0)
 	for _, fn := range functions {
 		if strings.HasPrefix(fn.Name, prefix) {
@@ -133,12 +133,12 @@ func (p *plugin) handleGetFunction(e *core.RequestEvent) error {
 	}
 
 	name := e.Request.PathValue("name")
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
-	qualifiedName := fmt.Sprintf("t-%s-%s", tenantSlug, name)
+	qualifiedName := fmt.Sprintf("t-%s-%s", orgSlug, name)
 
 	fn, err := p.getFunction(qualifiedName, p.config.FunctionNamespace)
 	if err != nil {
@@ -167,12 +167,12 @@ func (p *plugin) handleDeleteFunction(e *core.RequestEvent) error {
 	}
 
 	name := e.Request.PathValue("name")
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
-	qualifiedName := fmt.Sprintf("t-%s-%s", tenantSlug, name)
+	qualifiedName := fmt.Sprintf("t-%s-%s", orgSlug, name)
 
 	if err := p.deleteFunction(qualifiedName, p.config.FunctionNamespace); err != nil {
 		return e.InternalServerError("failed to delete function", err)
@@ -201,12 +201,12 @@ func (p *plugin) handleInvokeFunction(e *core.RequestEvent) error {
 	}
 
 	name := e.Request.PathValue("name")
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
-	qualifiedName := fmt.Sprintf("t-%s-%s", tenantSlug, name)
+	qualifiedName := fmt.Sprintf("t-%s-%s", orgSlug, name)
 
 	payload, err := io.ReadAll(e.Request.Body)
 	if err != nil {
@@ -237,12 +237,12 @@ func (p *plugin) handleGetLogs(e *core.RequestEvent) error {
 	}
 
 	name := e.Request.PathValue("name")
-	tenantSlug := e.Auth.GetString("tenantSlug")
-	if tenantSlug == "" {
-		tenantSlug = "default"
+	orgSlug := e.Auth.GetString("orgSlug")
+	if orgSlug == "" {
+		orgSlug = "default"
 	}
 
-	qualifiedName := fmt.Sprintf("t-%s-%s", tenantSlug, name)
+	qualifiedName := fmt.Sprintf("t-%s-%s", orgSlug, name)
 
 	// OpenFaaS CE does not have a native logs endpoint.
 	// Return kubectl command for now; wire to K8s API in future.

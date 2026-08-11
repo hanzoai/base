@@ -78,13 +78,13 @@ type BaseAppConfig struct {
 	// When set, overrides the file-path-based SQLite aux connection.
 	AuxDSN string
 
-	// MultiTenant enables per-org database isolation.
+	// PerOrg enables per-org database isolation.
 	// When true, OrgDB(orgID) returns a separate database per org.
 	// Also enabled automatically when MasterKey is set.
-	MultiTenant bool
+	PerOrg bool
 
 	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
-	// When set, multi-tenancy is automatically enabled and per-org databases
+	// When set, per-org bases is automatically enabled and per-org databases
 	// are encrypted with HKDF-derived keys.
 	// Can be set via MASTER_KEY environment variable (hex-encoded).
 	MasterKey []byte
@@ -107,7 +107,7 @@ type BaseApp struct {
 	nonconcurrentDB     dbx.Builder
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
-	tenants             *TenantRegistry
+	bases               *Bases
 	network             baseNetwork
 
 	// app event hooks
@@ -479,7 +479,7 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
-		app.initTenants()
+		app.initBases()
 
 		if err := app.initLogger(); err != nil {
 			return err
@@ -542,12 +542,12 @@ func (app *BaseApp) ResetBootstrapState() error {
 		*db = nil
 	}
 
-	// Close tenant databases
-	if app.tenants != nil {
-		if err := app.tenants.Close(); err != nil {
+	// Close base databases
+	if app.bases != nil {
+		if err := app.bases.Close(); err != nil {
 			errs = append(errs, err)
 		}
-		app.tenants = nil
+		app.bases = nil
 	}
 
 	if app.network != nil {
@@ -663,26 +663,26 @@ func (app *BaseApp) AuxNonconcurrentDB() dbx.Builder {
 }
 
 // OrgDB returns the data.db builder for a specific org.
-// Returns nil, nil if multi-tenancy is not enabled.
+// Returns nil, nil if per-org bases is not enabled.
 func (app *BaseApp) OrgDB(orgID string) (dbx.Builder, error) {
-	if app.tenants == nil {
+	if app.bases == nil {
 		return nil, nil
 	}
-	return app.tenants.OrgDB(orgID)
+	return app.bases.OrgDB(orgID)
 }
 
 // OrgNonconcurrentDB returns the write-only builder for a specific org.
-// Returns nil, nil if multi-tenancy is not enabled.
+// Returns nil, nil if per-org bases is not enabled.
 func (app *BaseApp) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
-	if app.tenants == nil {
+	if app.bases == nil {
 		return nil, nil
 	}
-	return app.tenants.OrgNonconcurrentDB(orgID)
+	return app.bases.OrgNonconcurrentDB(orgID)
 }
 
-// Tenants returns the TenantRegistry, or nil if multi-tenancy is not enabled.
-func (app *BaseApp) Tenants() *TenantRegistry {
-	return app.tenants
+// Base returns the Bases, or nil if per-org bases is not enabled.
+func (app *BaseApp) Bases() *Bases {
+	return app.bases
 }
 
 // DataDir returns the app data directory path.
@@ -1257,16 +1257,16 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // Helpers
 // -------------------------------------------------------------------
 
-// initTenants initializes the TenantRegistry if multi-tenancy is enabled.
-// Multi-tenancy activates when config.MultiTenant is true OR config.MasterKey is set,
-// OR the MULTI_TENANT env var is "true", OR the MASTER_KEY env var is set.
-func (app *BaseApp) initTenants() {
-	multiTenant := app.config.MultiTenant
+// initBases initializes the Bases if per-org bases is enabled.
+// Multi-per-org isolation activates when config.PerOrg is true OR config.MasterKey is set,
+// OR the MULTI_BASE env var is "true", OR the MASTER_KEY env var is set.
+func (app *BaseApp) initBases() {
+	perOrg := app.config.PerOrg
 	masterKey := app.config.MasterKey
 
 	// Check env vars as fallback
-	if !multiTenant && os.Getenv("MULTI_TENANT") == "true" {
-		multiTenant = true
+	if !perOrg && os.Getenv("MULTI_BASE") == "true" {
+		perOrg = true
 	}
 	if len(masterKey) == 0 {
 		if envKey := os.Getenv("MASTER_KEY"); envKey != "" {
@@ -1277,16 +1277,16 @@ func (app *BaseApp) initTenants() {
 		}
 	}
 
-	// Master key implies multi-tenancy
+	// Master key implies per-org bases
 	if len(masterKey) == 32 {
-		multiTenant = true
+		perOrg = true
 	}
 
-	if !multiTenant {
+	if !perOrg {
 		return
 	}
 
-	app.tenants = NewTenantRegistry(&TenantConfig{
+	app.bases = NewBases(&BasesConfig{
 		DataDir:   app.config.DataDir,
 		MasterKey: masterKey,
 		DBConnect: app.config.DBConnect,

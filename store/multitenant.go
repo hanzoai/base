@@ -1,13 +1,13 @@
-// Package store implements the canonical per-tenant SQLite storage model
+// Package store implements the canonical per-base SQLite storage model
 // described in hanzo/ARCHITECTURE.md §5: a composable org / app / project /
-// user isolation hierarchy (see the tenant-data-hierarchy HIP).
+// user isolation hierarchy (see the base-data-hierarchy HIP).
 //
 // There is exactly one way to fetch the SQLite handle for the current
 // request:
 //
 //	db, err := store.ForCtx(r.Context())
 //
-// Which goes through this package's MultiTenantStore. Behind the scenes the
+// Which goes through this package's OrgStore. Behind the scenes the
 // store hydrates the right DB from object storage, caches it in an LRU, and
 // checkpoints dirty DBs back on eviction / shutdown.
 //
@@ -17,7 +17,7 @@
 //
 // # Consistency model (v1)
 //
-// A single tenant is served by exactly one pod at a time via
+// A single base is served by exactly one pod at a time via
 // gateway-side sticky-session affinity (consistent hash on X-Org-Id). The
 // store does NOT perform object-storage CAS (ETag If-Match) on upload —
 // see [CAS]. During an HPA rebalance a (short) single-writer window may
@@ -47,9 +47,9 @@ import (
 	"github.com/luxfi/cache/lru"
 )
 
-// Key is the tuple that identifies a per-tenant SQLite DB.
+// Key is the tuple that identifies a per-base SQLite DB.
 //
-// The tenant space is a composable hierarchy under one org: an org-wide DB,
+// The base space is a composable hierarchy under one org: an org-wide DB,
 // a per-app DB, a per-app-per-project DB, and a per-user DB. Splitting the
 // space this way lets us keep a single cache and a single object-storage
 // layout for every shape. Scope selects which fields are significant:
@@ -66,7 +66,7 @@ type Key struct {
 	Scope   Scope
 }
 
-// Scope selects which tier of the org's tenant hierarchy a Key addresses.
+// Scope selects which tier of the org's base hierarchy a Key addresses.
 type Scope int
 
 const (
@@ -85,7 +85,7 @@ const CAS = false
 
 // sqliteMagic is the 16-byte SQLite 3 file header. Every valid SQLite file
 // begins with exactly these bytes; empty files are accepted as the "fresh
-// tenant" state. Anything else is rejected on hydrate.
+// base" state. Anything else is rejected on hydrate.
 var sqliteMagic = []byte("SQLite format 3\x00")
 
 // Sentinel errors surfaced to callers. They are errors.Is-comparable and
@@ -105,11 +105,11 @@ var (
 	// ErrClosed is returned when Get is called after Close.
 	ErrClosed = errors.New("store: closed")
 
-	// ErrCrossTenant is returned when an authenticated caller asks for a Key
+	// ErrCrossOrg is returned when an authenticated caller asks for a Key
 	// that does not belong to the caller's org. The claims->OrgID binding is
-	// the first-line cross-tenant boundary; per-org KMS key separation is the
+	// the first-line cross-base boundary; per-org KMS key separation is the
 	// second. errors.Is-comparable.
-	ErrCrossTenant = errors.New("store: cross-tenant access denied")
+	ErrCrossOrg = errors.New("store: cross-base access denied")
 )
 
 // String implements fmt.Stringer for log lines and metric labels.
@@ -179,7 +179,7 @@ func (k Key) Valid() error {
 	return nil
 }
 
-// MaxSlugLen caps every tenant slug length. 128 bytes is generous: IAM ULIDs
+// MaxSlugLen caps every base slug length. 128 bytes is generous: IAM ULIDs
 // are 26 chars, UUIDs 36. A slug longer than this is either a mistake or an
 // attempt to blow up filesystem error messages with attacker-controlled
 // bytes — reject before any FS call.
@@ -187,7 +187,7 @@ const MaxSlugLen = 128
 
 // validateSlug enforces `[a-z0-9_-]+` and length ≤ MaxSlugLen, rejecting
 // path traversal, mixed case, whitespace, and oversized inputs. Every
-// tenant slug (org, app, project, user) lives under this contract in IAM.
+// base slug (org, app, project, user) lives under this contract in IAM.
 func validateSlug(s string) error {
 	if s == "" {
 		return errors.New("empty")
@@ -205,7 +205,7 @@ func validateSlug(s string) error {
 }
 
 // validateSQLiteMagic checks the first 16 bytes of a downloaded blob.
-// Empty blobs are allowed (represents a fresh tenant slot). A non-empty
+// Empty blobs are allowed (represents a fresh base slot). A non-empty
 // blob that doesn't start with the SQLite 3 magic header is rejected as
 // ErrCorruptDB — no handle is opened, no further byte is read.
 func validateSQLiteMagic(header []byte) error {
@@ -227,14 +227,14 @@ func validateSQLiteMagic(header []byte) error {
 // matches core.DefaultDBConnect: WAL, busy_timeout, NORMAL sync, FK on.
 type DBConnect func(path string) (*dbx.DB, error)
 
-// Options configures the MultiTenantStore. All fields have defaults, and the
+// Options configures the OrgStore. All fields have defaults, and the
 // only required one is ObjectStore.
 type Options struct {
 	// ObjectStore is the durable, cross-pod blob store. Production uses
 	// filesystem.NewS3(...) / NewGCS(...); tests can pass filesystem.NewLocal.
 	ObjectStore *filesystem.System
 
-	// Keys provides the per-tenant at-rest encryption key for every DB.
+	// Keys provides the per-base at-rest encryption key for every DB.
 	// REQUIRED — the store never writes plaintext SQLite to durable storage.
 	// Production wires the KMS-rooted Keyring (NewKeyring + kmskeyring.Source).
 	Keys KeyProvider
@@ -275,9 +275,9 @@ type Options struct {
 	OnReapFailure func(Key, error)
 }
 
-// MultiTenantStore owns the per-tenant SQLite universe for one pod.
+// OrgStore owns the per-base SQLite universe for one pod.
 // Safe for concurrent use.
-type MultiTenantStore struct {
+type OrgStore struct {
 	opts Options
 
 	mu      sync.Mutex
@@ -290,8 +290,8 @@ type MultiTenantStore struct {
 	shadow map[Key]struct{}
 
 	// existence is a hash-based bloom filter. Sized for ~10k distinct
-	// tenants per pod with <1% FP. On a miss in existence we still do an
-	// Exists round-trip (FP path); on a hit we skip the RTT for tenants
+	// bases per pod with <1% FP. On a miss in existence we still do an
+	// Exists round-trip (FP path); on a hit we skip the RTT for bases
 	// known to have a DB.
 	existence *bloom.Filter
 
@@ -300,11 +300,11 @@ type MultiTenantStore struct {
 	closed     atomic.Bool
 }
 
-// openDB is the resident state for one tenant SQLite.
+// openDB is the resident state for one base SQLite.
 type openDB struct {
 	key  Key
 	db   *dbx.DB
-	tkey *TenantKey // per-tenant at-rest encryption key (set at hydrate)
+	tkey *OrgKey // per-base at-rest encryption key (set at hydrate)
 
 	// mu guards writes to the DB and to the checkpoint bookkeeping. Reads
 	// through dbx go through sql.DB, which is already safe for concurrent
@@ -319,13 +319,13 @@ type openDB struct {
 	localPath  string
 }
 
-// New constructs a MultiTenantStore with defaults applied.
-func New(opts Options) (*MultiTenantStore, error) {
+// New constructs a OrgStore with defaults applied.
+func New(opts Options) (*OrgStore, error) {
 	if opts.ObjectStore == nil {
 		return nil, errors.New("store: ObjectStore is required")
 	}
 	if opts.Keys == nil {
-		return nil, errors.New("store: Keys (per-tenant encryption) is required")
+		return nil, errors.New("store: Keys (per-base encryption) is required")
 	}
 	if opts.CacheRoot == "" {
 		opts.CacheRoot = "/data/cache"
@@ -357,7 +357,7 @@ func New(opts Options) (*MultiTenantStore, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: bloom: %w", err)
 	}
-	s := &MultiTenantStore{
+	s := &OrgStore{
 		opts:       opts,
 		shadow:     make(map[Key]struct{}, opts.LRUSize),
 		existence:  bf,
@@ -382,7 +382,7 @@ func New(opts Options) (*MultiTenantStore, error) {
 // must have a Claims attached via claims.Inject + claims.RequireGateway.
 //
 // Returns ErrGatewayBypass when identity is missing.
-func (s *MultiTenantStore) ForCtx(ctx context.Context) (*dbx.DB, error) {
+func (s *OrgStore) ForCtx(ctx context.Context) (*dbx.DB, error) {
 	c := claims.FromContext(ctx)
 	if c.OrgID == "" || c.UserID == "" {
 		return nil, claims.ErrGatewayBypass
@@ -391,9 +391,9 @@ func (s *MultiTenantStore) ForCtx(ctx context.Context) (*dbx.DB, error) {
 }
 
 // ForOrg resolves the org-scoped SQLite for the caller. Callers must already
-// be inside the tenant via claims.RequireGateway. Used for org-wide state
+// be inside the base via claims.RequireGateway. Used for org-wide state
 // (org settings, member list) that isn't per-user.
-func (s *MultiTenantStore) ForOrg(ctx context.Context) (*dbx.DB, error) {
+func (s *OrgStore) ForOrg(ctx context.Context) (*dbx.DB, error) {
 	c := claims.FromContext(ctx)
 	if c.OrgID == "" {
 		return nil, claims.ErrGatewayBypass
@@ -402,7 +402,7 @@ func (s *MultiTenantStore) ForOrg(ctx context.Context) (*dbx.DB, error) {
 }
 
 // appCtxKey / projectCtxKey are unexported context keys. App and project are
-// REQUEST scope, not caller identity: per the tenant-data-hierarchy HIP the
+// REQUEST scope, not caller identity: per the base-data-hierarchy HIP the
 // request carries app+project while IAM carries org (via claims). Keeping
 // them out of claims.Claims preserves the canonical 3-header identity
 // contract — the router attaches these the way claims.Inject attaches identity.
@@ -437,7 +437,7 @@ func ProjectFromContext(ctx context.Context) string {
 // ForApp resolves the app-scoped SQLite for the caller's org (per-org app
 // settings). Org comes from IAM (claims); the app slug from the request
 // (WithApp). An absent app composably falls back to the org tier.
-func (s *MultiTenantStore) ForApp(ctx context.Context) (*dbx.DB, error) {
+func (s *OrgStore) ForApp(ctx context.Context) (*dbx.DB, error) {
 	c := claims.FromContext(ctx)
 	if c.OrgID == "" {
 		return nil, claims.ErrGatewayBypass
@@ -453,7 +453,7 @@ func (s *MultiTenantStore) ForApp(ctx context.Context) (*dbx.DB, error) {
 // (operational data: fleets, bots, machines). Org comes from IAM (claims);
 // app+project from the request (WithApp / WithProject). Composable fallback:
 // absent project → app tier, absent app → org tier.
-func (s *MultiTenantStore) ForProject(ctx context.Context) (*dbx.DB, error) {
+func (s *OrgStore) ForProject(ctx context.Context) (*dbx.DB, error) {
 	c := claims.FromContext(ctx)
 	if c.OrgID == "" {
 		return nil, claims.ErrGatewayBypass
@@ -472,18 +472,18 @@ func (s *MultiTenantStore) ForProject(ctx context.Context) (*dbx.DB, error) {
 // Get is the low-level path used by ForCtx / ForOrg / ForApp / ForProject.
 // Exposed so that background jobs (migrations, reports) can resolve a
 // specific key without a synthetic HTTP request.
-func (s *MultiTenantStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
+func (s *OrgStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
 	if err := k.Valid(); err != nil {
 		return nil, fmt.Errorf("store: invalid key %s: %w", k, err)
 	}
 	// Defense in depth (IDOR guard): when the caller carries an authenticated
 	// org (claims), the requested Key MUST belong to that org. This is the
-	// first-line cross-tenant boundary — one shared store process serves many
+	// first-line cross-base boundary — one shared store process serves many
 	// orgs and can fetch any org's KEK, so crypto alone does not stop a caller
 	// who reaches Get with a foreign OrgID. Claim-less internal callers
 	// (background jobs, migrations) are trusted and bypass the check.
 	if c := claims.FromContext(ctx); c.OrgID != "" && c.OrgID != k.OrgID {
-		return nil, fmt.Errorf("store: caller org %q may not access key %s: %w", c.OrgID, k, ErrCrossTenant)
+		return nil, fmt.Errorf("store: caller org %q may not access key %s: %w", c.OrgID, k, ErrCrossOrg)
 	}
 	if s.closed.Load() {
 		return nil, ErrClosed
@@ -506,7 +506,7 @@ func (s *MultiTenantStore) Get(ctx context.Context, k Key) (*dbx.DB, error) {
 // hydrate downloads the DB from object storage (if it exists) and opens it
 // locally. Serialized per-key via the big store mutex, which is fine at the
 // latencies we're playing in (bucket GET + SQLite open).
-func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) {
+func (s *OrgStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -548,7 +548,7 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 		return nil, fmt.Errorf("store: mkdir %s: %w", filepath.Dir(localPath), err)
 	}
 
-	// Resolve the per-tenant at-rest key first: for a fresh tenant this
+	// Resolve the per-base at-rest key first: for a fresh base this
 	// generates+persists the wrapped-key sidecar BEFORE any DB object
 	// exists, so an existing DB object always has a resolvable key.
 	tkey, err := s.opts.Keys.Resolve(ctx, k)
@@ -572,7 +572,7 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 		if derr := decryptFileTo(encPath, localPath, tkey); derr != nil {
 			_ = os.Remove(encPath)
 			_ = os.Remove(localPath)
-			// An object we cannot age-decrypt to this tenant is corrupt or
+			// An object we cannot age-decrypt to this base is corrupt or
 			// hostile — never retry blindly, never open it.
 			return nil, fmt.Errorf("store: decrypt %s: %w", k, errors.Join(derr, ErrCorruptDB))
 		}
@@ -585,7 +585,7 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 			return nil, err
 		}
 	} else {
-		// New tenant. Ensure a fresh local file so SQLite writes succeed
+		// New base. Ensure a fresh local file so SQLite writes succeed
 		// and the first checkpoint creates the object. We do NOT create an
 		// empty object upfront — that races with a concurrent hydrate on
 		// another pod.
@@ -618,7 +618,7 @@ func (s *MultiTenantStore) hydrate(ctx context.Context, k Key) (*dbx.DB, error) 
 // MarkDirty is called by instrumentation / orm hooks when a write occurs.
 // It increments the dirty counter; Checkpoint drains it. Apps that use the
 // default orm integration don't need to call this directly.
-func (s *MultiTenantStore) MarkDirty(k Key, n int) {
+func (s *OrgStore) MarkDirty(k Key, n int) {
 	s.mu.Lock()
 	h, ok := s.handles.Get(k)
 	s.mu.Unlock()
@@ -645,7 +645,7 @@ func (s *MultiTenantStore) MarkDirty(k Key, n int) {
 // The returned error wraps ErrUploadFailed on object-storage failure; the
 // handle is retained in the cache so the next Checkpoint / reap tick can
 // retry without losing local writes that are still durable in the WAL.
-func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
+func (s *OrgStore) Checkpoint(ctx context.Context, k Key) error {
 	s.mu.Lock()
 	h, ok := s.handles.Get(k)
 	s.mu.Unlock()
@@ -684,7 +684,7 @@ func (s *MultiTenantStore) Checkpoint(ctx context.Context, k Key) error {
 // On upload failure: returns ErrUploadFailed and RETAINS the handle in the
 // cache so that (a) the next reap cycle retries, (b) the caller can
 // surface the failure instead of losing the WAL-durable write.
-func (s *MultiTenantStore) Evict(ctx context.Context, k Key) error {
+func (s *OrgStore) Evict(ctx context.Context, k Key) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.flushAndCloseLocked(k)
@@ -703,7 +703,7 @@ func (s *MultiTenantStore) Evict(ctx context.Context, k Key) error {
 // (do NOT remove from cache / shadow). The handle is now marked "still
 // dirty" so the next reap or Checkpoint can retry. This makes eviction
 // idempotent and prevents silent data loss — the exact bug P7-H1 fixed.
-func (s *MultiTenantStore) flushAndCloseLocked(k Key) error {
+func (s *OrgStore) flushAndCloseLocked(k Key) error {
 	h, ok := s.handles.Get(k)
 	if !ok {
 		delete(s.shadow, k)
@@ -744,7 +744,7 @@ func (s *MultiTenantStore) flushAndCloseLocked(k Key) error {
 			} else {
 				// Re-open failed too — drop from LRU so Get will
 				// re-hydrate, but keep shadow so the caller knows
-				// data is in-flight for this tenant.
+				// data is in-flight for this base.
 				s.handles.Delete(k)
 			}
 			return fmt.Errorf("%w: %s: %v", ErrUploadFailed, k, err)
@@ -758,7 +758,7 @@ func (s *MultiTenantStore) flushAndCloseLocked(k Key) error {
 
 // reaperLoop runs in the background, evicting handles that have been idle
 // longer than IdleTTL.
-func (s *MultiTenantStore) reaperLoop() {
+func (s *OrgStore) reaperLoop() {
 	defer s.reaperWg.Done()
 	tick := time.NewTicker(s.opts.IdleTTL / 2)
 	defer tick.Stop()
@@ -780,7 +780,7 @@ func (s *MultiTenantStore) reaperLoop() {
 // runs under a fresh s.mu acquisition — i.e. the lock is released between
 // handles. This bounds the maximum blocking window per Get/ForCtx to a
 // single handle's flush latency instead of the full reap cycle.
-func (s *MultiTenantStore) reapOnce() {
+func (s *OrgStore) reapOnce() {
 	cutoff := s.opts.Now().Add(-s.opts.IdleTTL)
 
 	s.mu.Lock()
@@ -817,8 +817,8 @@ func (s *MultiTenantStore) reapOnce() {
 // each key with a fresh per-key lock. This bounds the shutdown window to
 // sum-of-per-handle-latencies instead of holding s.mu for the entire
 // drain. Upload failures are AGGREGATED into the returned error so ops
-// can see exactly which tenants did not make it to durable storage.
-func (s *MultiTenantStore) Close(ctx context.Context) error {
+// can see exactly which bases did not make it to durable storage.
+func (s *OrgStore) Close(ctx context.Context) error {
 	if !s.closed.CompareAndSwap(false, true) {
 		return nil
 	}
@@ -853,7 +853,7 @@ func (s *MultiTenantStore) Close(ctx context.Context) error {
 // logReapFailure is a hookable point for structured reap-failure logging.
 // Default: no-op (the Prometheus counter in a follow-up slice will record
 // this). Exposed as a method so tests can inject an observer.
-func (s *MultiTenantStore) logReapFailure(k Key, err error) {
+func (s *OrgStore) logReapFailure(k Key, err error) {
 	if s.opts.OnReapFailure != nil {
 		s.opts.OnReapFailure(k, err)
 	}
@@ -861,7 +861,7 @@ func (s *MultiTenantStore) logReapFailure(k Key, err error) {
 
 // downloadTo fetches obj into localPath atomically (write-then-rename).
 // Returns the ETag when available.
-func (s *MultiTenantStore) downloadTo(ctx context.Context, objKey, localPath string) (string, error) {
+func (s *OrgStore) downloadTo(ctx context.Context, objKey, localPath string) (string, error) {
 	r, err := s.opts.ObjectStore.GetReader(objKey)
 	if err != nil {
 		return "", fmt.Errorf("store: open reader %s: %w", objKey, err)
@@ -900,7 +900,7 @@ func defaultConnect(path string) (*dbx.DB, error) {
 }
 
 // verifySQLiteFile reads the first 16 bytes of path and passes them to
-// validateSQLiteMagic. Empty files are accepted (fresh-tenant path).
+// validateSQLiteMagic. Empty files are accepted (fresh-base path).
 func verifySQLiteFile(path string) error {
 	f, err := os.Open(path)
 	if err != nil {
@@ -911,7 +911,7 @@ func verifySQLiteFile(path string) error {
 	n, err := io.ReadFull(f, buf[:])
 	switch {
 	case err == io.EOF:
-		// Zero bytes — fresh tenant slot.
+		// Zero bytes — fresh base slot.
 		return nil
 	case err == io.ErrUnexpectedEOF:
 		// Short but non-empty: not a valid SQLite file.
@@ -926,8 +926,8 @@ func verifySQLiteFile(path string) error {
 }
 
 // decryptFileTo reads the age-encrypted DB at encPath, decrypts it with the
-// tenant key, and writes the plaintext atomically to plainPath.
-func decryptFileTo(encPath, plainPath string, tk *TenantKey) error {
+// base key, and writes the plaintext atomically to plainPath.
+func decryptFileTo(encPath, plainPath string, tk *OrgKey) error {
 	ciphertext, err := os.ReadFile(encPath)
 	if err != nil {
 		return fmt.Errorf("store: read enc %s: %w", encPath, err)

@@ -68,4 +68,3 @@ func collectionSchemaCmd(clientFn func() *Client, formatFn func() Format) *cobra
 		},
 	}
 }
-

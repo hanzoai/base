@@ -181,7 +181,7 @@ type ORSetElement struct {
 // Elements can be added and removed without conflicts.
 // Concurrent add + remove: the add wins (add-wins semantics).
 type ORSet struct {
-	mu     sync.RWMutex
+	mu sync.RWMutex
 	// elements maps a string key to a map of unique tags.
 	// Each add generates a unique tag; remove deletes all known tags.
 	elems  map[string]map[string]any // key -> {tag -> value}

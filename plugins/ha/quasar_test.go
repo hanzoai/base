@@ -9,7 +9,7 @@ import (
 )
 
 // anyKey is the org-wide ownership unit ("" — no X-Org-Id), the key a request
-// carries when it addresses the app rather than one tenant.
+// carries when it addresses the app rather than one base.
 const anyKey = ""
 
 func TestQuasarWriter_SingleNodeIsWriter(t *testing.T) {
@@ -85,7 +85,7 @@ func TestQuasarWriter_OwnershipSpreadsAcrossMembers(t *testing.T) {
 	mine := 0
 	const n = 200
 	for i := 0; i < n; i++ {
-		if n1.w.IsWriter(fmt.Sprintf("tenant-%d", i)) {
+		if n1.w.IsWriter(fmt.Sprintf("base-%d", i)) {
 			mine++
 		}
 	}
@@ -109,7 +109,7 @@ func TestQuasarWriter_LeaseExpiry(t *testing.T) {
 	}
 	key := ""
 	for i := 0; i < 200; i++ {
-		k := fmt.Sprintf("tenant-%d", i)
+		k := fmt.Sprintf("base-%d", i)
 		if n2.w.RedirectTarget(k) == n1.url {
 			key = k
 			break

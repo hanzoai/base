@@ -3,13 +3,13 @@
 // the shared semantics implemented identically across all 5 runtime
 // fixtures (see goja-js/validate.js for the canonical reference):
 //
-//   in:    {"email": "Foo@Example.COM ", "age": 25}
-//   ok:    {"ok": true, "email": "foo@example.com", "age": 25}
-//   err:   {"ok": false, "error": "input must be an object"}
-//   err:   {"ok": false, "error": "email required"}
-//   err:   {"ok": false, "error": "age out of range"}
-//   err:   {"ok": false, "error": "email shape"}
-//   err:   {"ok": false, "error": "email domain"}
+//	in:    {"email": "Foo@Example.COM ", "age": 25}
+//	ok:    {"ok": true, "email": "foo@example.com", "age": 25}
+//	err:   {"ok": false, "error": "input must be an object"}
+//	err:   {"ok": false, "error": "email required"}
+//	err:   {"ok": false, "error": "age out of range"}
+//	err:   {"ok": false, "error": "email shape"}
+//	err:   {"ok": false, "error": "email domain"}
 package nativego
 
 import (

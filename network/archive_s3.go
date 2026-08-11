@@ -22,8 +22,8 @@ import (
 //  2. IAM / IRSA / Workload Identity chain (credentials.IAM).
 //
 // Endpoint resolution:
-//  - AWS_ENDPOINT_URL set      → that endpoint (MinIO / hanzoai/s3).
-//  - AWS_ENDPOINT_URL unset    → s3.<region>.amazonaws.com default.
+//   - AWS_ENDPOINT_URL set      → that endpoint (MinIO / hanzoai/s3).
+//   - AWS_ENDPOINT_URL unset    → s3.<region>.amazonaws.com default.
 //
 // Both paths honour AWS_REGION (defaults to us-east-1).
 type s3Archive struct {

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/ganigeorgiev/fexpr"
-	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/orm/query"
 )
 
 func TestTokenFunctionsGeoDistance(t *testing.T) {

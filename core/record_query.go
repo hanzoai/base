@@ -8,12 +8,12 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/search"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/dbx"
 )
 
 var recordProxyType = reflect.TypeOf((*RecordProxy)(nil)).Elem()

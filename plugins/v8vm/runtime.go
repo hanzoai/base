@@ -18,11 +18,11 @@ import (
 
 // Defaults — tuned for short-lived per-request JS hooks.
 const (
-	defaultHeapMBMax   = 256
-	defaultHeapMBInit  = 64
-	defaultPoolSize    = 8
-	envHeapMBMax       = "BASE_V8VM_HEAP_MB_MAX"
-	envPoolSize        = "BASE_V8VM_POOL_SIZE"
+	defaultHeapMBMax  = 256
+	defaultHeapMBInit = 64
+	defaultPoolSize   = 8
+	envHeapMBMax      = "BASE_V8VM_HEAP_MB_MAX"
+	envPoolSize       = "BASE_V8VM_POOL_SIZE"
 )
 
 // NewRuntime returns a v8go-backed Runtime. One Isolate is shared across

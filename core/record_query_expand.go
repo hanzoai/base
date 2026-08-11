@@ -6,9 +6,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/dbx"
 )
 
 // ExpandFetchFunc defines the function that is used to fetch the expanded relation records.

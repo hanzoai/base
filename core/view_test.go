@@ -6,9 +6,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/dbx"
 )
 
 func ensureNoTempViews(app core.App, t *testing.T) {

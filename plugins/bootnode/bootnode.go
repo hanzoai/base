@@ -3,7 +3,7 @@
 //
 // It consolidates the blockchain developer platform — multi-network OAuth,
 // project API keys, team management, and 1-click network/node/key
-// provisioning — onto Base's IAM + tenant infrastructure. Identity is owned by
+// provisioning — onto Base's IAM + base infrastructure. Identity is owned by
 // Hanzo IAM (reused via github.com/hanzoai/base/iam); per-org and per-user data
 // isolation come from the platform plugin's PrincipalIsolation="sqlite" mode;
 // billing is wired through the commerce plugin's Client interface.

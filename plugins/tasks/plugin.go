@@ -57,7 +57,7 @@ type Config struct {
 //		Durable: tasks.DurableConfig{
 //			Enabled:   true,
 //			Address:   "tasks.hanzo.ai:7233",
-//			Namespace: "org-acme",  // multi-tenant: org ID
+//			Namespace: "org-acme",  // per-org: org ID
 //		},
 //	})
 //

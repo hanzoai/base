@@ -17,7 +17,7 @@
 //
 // Use age for production. Use fhe only where a third party must
 // merge ciphertexts without holding the key — sealed auctions,
-// cross-tenant aggregation — and the workload budget is measured
+// cross-base aggregation — and the workload budget is measured
 // in minutes per operation.
 //
 // Delegates to luxfi/fhe for TFHE key material and homomorphic

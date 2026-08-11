@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
+	"github.com/hanzoai/orm/query"
 	"golang.org/x/sync/errgroup"
 )
 

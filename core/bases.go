@@ -9,7 +9,7 @@ import (
 	"github.com/hanzoai/dbx"
 )
 
-// TenantRegistry manages per-org SQLite databases with lazy open and
+// Bases manages per-org SQLite databases with lazy open and
 // optional per-principal encryption via HKDF-derived keys.
 //
 // Directory layout:
@@ -20,25 +20,25 @@ import (
 // Each org database is independently encrypted when a master key is set.
 // The registry is safe for concurrent use.
 //
-// Activation: TenantRegistry is nil on BaseApp unless MULTI_TENANT=true
-// or MASTER_KEY is set. All existing single-tenant behavior is unaffected.
-type TenantRegistry struct {
+// Activation: Bases is nil on BaseApp unless MULTI_BASE=true
+// or MASTER_KEY is set. All existing single-org behavior is unaffected.
+type Bases struct {
 	dataDir   string
 	masterKey []byte // 32-byte master key, nil if encryption disabled
 	connect   DBConnectFunc
 
 	mu  sync.RWMutex
-	dbs map[string]*tenantDBs
+	dbs map[string]*baseDBs
 }
 
-// tenantDBs holds the concurrent and nonconcurrent dbx.Builder for one org.
-type tenantDBs struct {
+// baseDBs holds the concurrent and nonconcurrent dbx.Builder for one org.
+type baseDBs struct {
 	concurrent    dbx.Builder
 	nonconcurrent dbx.Builder
 }
 
-// TenantConfig configures the TenantRegistry.
-type TenantConfig struct {
+// BasesConfig configures the Bases.
+type BasesConfig struct {
 	// DataDir is the base data directory. Org databases live under {DataDir}/orgs/{orgID}/.
 	DataDir string
 
@@ -49,8 +49,8 @@ type TenantConfig struct {
 	DBConnect DBConnectFunc
 }
 
-// NewTenantRegistry creates a TenantRegistry. Returns nil if config is nil.
-func NewTenantRegistry(config *TenantConfig) *TenantRegistry {
+// NewBases creates a Bases. Returns nil if config is nil.
+func NewBases(config *BasesConfig) *Bases {
 	if config == nil {
 		return nil
 	}
@@ -58,11 +58,11 @@ func NewTenantRegistry(config *TenantConfig) *TenantRegistry {
 	if connect == nil {
 		connect = DefaultDBConnect
 	}
-	return &TenantRegistry{
+	return &Bases{
 		dataDir:   config.DataDir,
 		masterKey: config.MasterKey,
 		connect:   connect,
-		dbs:       make(map[string]*tenantDBs),
+		dbs:       make(map[string]*baseDBs),
 	}
 }
 
@@ -83,7 +83,7 @@ func validateOrgID(id string) error {
 }
 
 // orgDir returns the directory for an org's databases.
-func (r *TenantRegistry) orgDir(orgID string) string {
+func (r *Bases) orgDir(orgID string) string {
 	return filepath.Join(r.dataDir, "orgs", orgID)
 }
 
@@ -91,9 +91,9 @@ func (r *TenantRegistry) orgDir(orgID string) string {
 // Opens the database lazily on first access and caches it.
 // The returned builder routes SELECTs to the concurrent pool
 // and writes to the nonconcurrent pool (same pattern as BaseApp.DB()).
-func (r *TenantRegistry) OrgDB(orgID string) (dbx.Builder, error) {
+func (r *Bases) OrgDB(orgID string) (dbx.Builder, error) {
 	if err := validateOrgID(orgID); err != nil {
-		return nil, fmt.Errorf("tenant: %w", err)
+		return nil, fmt.Errorf("base: %w", err)
 	}
 
 	// Fast path: read lock
@@ -115,14 +115,14 @@ func (r *TenantRegistry) OrgDB(orgID string) (dbx.Builder, error) {
 
 	dir := r.orgDir(orgID)
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		return nil, fmt.Errorf("tenant: create dir %q: %w", dir, err)
+		return nil, fmt.Errorf("base: create dir %q: %w", dir, err)
 	}
 
 	dbPath := filepath.Join(dir, "data.db")
 
 	concurrent, err := r.connect(dbPath)
 	if err != nil {
-		return nil, fmt.Errorf("tenant: open concurrent db for org %q: %w", orgID, err)
+		return nil, fmt.Errorf("base: open concurrent db for org %q: %w", orgID, err)
 	}
 	concurrent.DB().SetMaxOpenConns(DefaultDataMaxOpenConns)
 	concurrent.DB().SetMaxIdleConns(DefaultDataMaxIdleConns)
@@ -130,12 +130,12 @@ func (r *TenantRegistry) OrgDB(orgID string) (dbx.Builder, error) {
 	nonconcurrent, err := r.connect(dbPath)
 	if err != nil {
 		concurrent.Close()
-		return nil, fmt.Errorf("tenant: open nonconcurrent db for org %q: %w", orgID, err)
+		return nil, fmt.Errorf("base: open nonconcurrent db for org %q: %w", orgID, err)
 	}
 	nonconcurrent.DB().SetMaxOpenConns(1)
 	nonconcurrent.DB().SetMaxIdleConns(1)
 
-	r.dbs[orgID] = &tenantDBs{
+	r.dbs[orgID] = &baseDBs{
 		concurrent:    concurrent,
 		nonconcurrent: nonconcurrent,
 	}
@@ -145,9 +145,9 @@ func (r *TenantRegistry) OrgDB(orgID string) (dbx.Builder, error) {
 
 // OrgNonconcurrentDB returns the write-only (single connection) builder for an org.
 // Opens the database lazily on first access.
-func (r *TenantRegistry) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
+func (r *Bases) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
 	if err := validateOrgID(orgID); err != nil {
-		return nil, fmt.Errorf("tenant: %w", err)
+		return nil, fmt.Errorf("base: %w", err)
 	}
 
 	// Ensure the org is opened (OrgDB handles lazy init)
@@ -161,12 +161,14 @@ func (r *TenantRegistry) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
 }
 
 // MasterKey returns the configured master key (may be nil).
-func (r *TenantRegistry) MasterKey() []byte {
-	out := make([]byte, len(r.masterKey)); copy(out, r.masterKey); return out
+func (r *Bases) MasterKey() []byte {
+	out := make([]byte, len(r.masterKey))
+	copy(out, r.masterKey)
+	return out
 }
 
 // HasOrg checks if a database for the given org exists on disk.
-func (r *TenantRegistry) HasOrg(orgID string) bool {
+func (r *Bases) HasOrg(orgID string) bool {
 	if err := validateOrgID(orgID); err != nil {
 		return false
 	}
@@ -176,7 +178,7 @@ func (r *TenantRegistry) HasOrg(orgID string) bool {
 }
 
 // Close closes all open org databases and clears the cache.
-func (r *TenantRegistry) Close() error {
+func (r *Bases) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

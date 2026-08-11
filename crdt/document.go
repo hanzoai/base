@@ -56,7 +56,7 @@ func (v StateVersion) Merge(other StateVersion) StateVersion {
 type FieldType uint8
 
 const (
-	FieldTypeText      FieldType = iota // RGA
+	FieldTypeText       FieldType = iota // RGA
 	FieldTypeCounter                     // PNCounter
 	FieldTypeSet                         // ORSet
 	FieldTypeRegister                    // LWWRegister
@@ -72,13 +72,13 @@ type Operation struct {
 
 // DocumentSnapshot is the serializable state of a Document.
 type DocumentSnapshot struct {
-	ID       string                          `json:"id"`
-	Version  StateVersion                    `json:"version"`
-	Texts    map[string]*textSnapshot        `json:"texts,omitempty"`
-	Counters map[string]*counterSnapshot     `json:"counters,omitempty"`
-	Sets     map[string]*setSnapshot         `json:"sets,omitempty"`
-	Regs     map[string]*registerSnapshot    `json:"registers,omitempty"`
-	MVRegs   map[string]*mvRegisterSnapshot  `json:"mvRegisters,omitempty"`
+	ID       string                         `json:"id"`
+	Version  StateVersion                   `json:"version"`
+	Texts    map[string]*textSnapshot       `json:"texts,omitempty"`
+	Counters map[string]*counterSnapshot    `json:"counters,omitempty"`
+	Sets     map[string]*setSnapshot        `json:"sets,omitempty"`
+	Regs     map[string]*registerSnapshot   `json:"registers,omitempty"`
+	MVRegs   map[string]*mvRegisterSnapshot `json:"mvRegisters,omitempty"`
 }
 
 type textSnapshot struct {
@@ -87,10 +87,10 @@ type textSnapshot struct {
 }
 
 type textNodeSnapshot struct {
-	ID       RGAID  `json:"id"`
-	ParentID RGAID  `json:"parentId"`
-	Char     rune   `json:"char"`
-	Deleted  bool   `json:"deleted"`
+	ID       RGAID `json:"id"`
+	ParentID RGAID `json:"parentId"`
+	Char     rune  `json:"char"`
+	Deleted  bool  `json:"deleted"`
 }
 
 type counterSnapshot struct {
@@ -141,12 +141,12 @@ type AnchorStatus struct {
 // Document is a container for multiple named CRDT fields,
 // representing a collaborative document.
 type Document struct {
-	mu       sync.RWMutex
-	id       string
-	nodeID   NodeID
-	version  StateVersion
-	seq      uint64
-	privacy  Privacy
+	mu      sync.RWMutex
+	id      string
+	nodeID  NodeID
+	version StateVersion
+	seq     uint64
+	privacy Privacy
 
 	// anchor lifecycle
 	anchorer       Anchorer
@@ -156,7 +156,7 @@ type Document struct {
 	anchorStatus   AnchorStatus
 	anchorMu       sync.RWMutex
 
-	texts   map[string]*RGA
+	texts    map[string]*RGA
 	counters map[string]*PNCounter
 	sets     map[string]*ORSet
 	regs     map[string]*LWWRegister

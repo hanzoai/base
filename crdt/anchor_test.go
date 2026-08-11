@@ -604,8 +604,8 @@ func TestCloseOnDecodedDocument(t *testing.T) {
 
 // failingAnchorer always fails Submit, used to test backoff behavior.
 type failingAnchorer struct {
-	mu        sync.Mutex
-	submitCt  int
+	mu          sync.Mutex
+	submitCt    int
 	submitTimes []time.Time
 }
 

@@ -45,8 +45,8 @@ func TestCronSetTimezone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.SetTimezone(tz)   // must not panic
-	c.SetTimezone(nil)  // must not panic
+	c.SetTimezone(tz)  // must not panic
+	c.SetTimezone(nil) // must not panic
 }
 
 func TestCronAddAndRemove(t *testing.T) {

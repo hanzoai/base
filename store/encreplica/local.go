@@ -68,7 +68,7 @@ func (b *LocalBlobs) Delete(_ context.Context, key string) error {
 	return err
 }
 
-// DeleteAll removes every blob for this tenant.
+// DeleteAll removes every blob for this base.
 func (b *LocalBlobs) DeleteAll(_ context.Context) error {
 	err := os.RemoveAll(b.root)
 	if os.IsNotExist(err) {

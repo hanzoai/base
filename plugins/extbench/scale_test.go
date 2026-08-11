@@ -2,7 +2,7 @@
 // runtime hold, and at what marginal cost per module / per concurrent
 // invocation?" The existing bench_test.go measures a single warm
 // module's throughput; this file measures fan-out — many modules, many
-// tenants, many concurrent goroutines all hitting the same engine.
+// bases, many concurrent goroutines all hitting the same engine.
 //
 // All five scale sections live in this one file because they share
 // fixture-cloning helpers and the per-runtime registry. Run with:
@@ -65,11 +65,11 @@ var (
 	// the marginal-memory section reports the per-module cost there.
 	modScalePointsPy = []int{1, 10, 100}
 
-	tenantPoints     = []int{10, 100, 1000}
-	concurrencyPts   = []int{10, 100, 1000, 10000}
-	poolSizes        = []int{1, 4, 16, 64, 256}
-	goroutineHogN    = 1000
-	coldStartLoadsN  = 100
+	orgPoints       = []int{10, 100, 1000}
+	concurrencyPts  = []int{10, 100, 1000, 10000}
+	poolSizes       = []int{1, 4, 16, 64, 256}
+	goroutineHogN   = 1000
+	coldStartLoadsN = 100
 
 	// v8go-specific concurrency cap. Running M>=100 concurrent goroutines
 	// against one shared isolate triggers an upstream V8 fatal (observed
@@ -82,14 +82,14 @@ var (
 // ---------- runtime registry ----------
 //
 // One entry per runtime under test, with the fixture name we copy into
-// each tenant directory. Native is special — its module is registered
+// each base directory. Native is special — its module is registered
 // via init() in fixtures/native-go and the manifest has no `module`
 // field, so we register a unique handler per cloned name.
 
 type rtSpec struct {
-	name     string
-	factory  func() extruntime.Runtime
-	fixture  string
+	name    string
+	factory func() extruntime.Runtime
+	fixture string
 	// modulePoints picks the scale-point set for this runtime — some
 	// engines genuinely can't reach 10000 in a sane time.
 	modulePoints []int
@@ -150,21 +150,21 @@ func runtimeSpecs() []rtSpec {
 	return specs
 }
 
-// ---------- tenant cloning ----------
+// ---------- base cloning ----------
 //
-// Each "tenant" needs an extension.json with a UNIQUE name so the
+// Each "base" needs an extension.json with a UNIQUE name so the
 // runtime treats it as a separate module. For native we also register
 // the handler under that name. JS/wasm fixtures share the source
 // artifact by symlink so we don't duplicate 12 KB of wasm 10000 times.
 
-// cloneTenants creates n temp directories, each containing a manifest
+// cloneBases creates n temp directories, each containing a manifest
 // with a unique extension name plus a symlink to the source module
 // file. For native we register validate under each cloned name. Returns
 // the list of directories and a cleanup func.
 //
 // On Windows symlinks need admin; we'd fall back to file copy. Base
 // targets linux/darwin so the symlink path is fine.
-func cloneTenants(tb testing.TB, spec rtSpec, n int) ([]string, func()) {
+func cloneBases(tb testing.TB, spec rtSpec, n int) ([]string, func()) {
 	tb.Helper()
 	srcDir := fixtureDir(spec.fixture)
 	if srcDir == "" {
@@ -188,9 +188,9 @@ func cloneTenants(tb testing.TB, spec rtSpec, n int) ([]string, func()) {
 		tdir := filepath.Join(root, fmt.Sprintf("t-%06d", i))
 		if err := os.Mkdir(tdir, 0o755); err != nil {
 			cleanup()
-			tb.Fatalf("mkdir tenant: %v", err)
+			tb.Fatalf("mkdir base: %v", err)
 		}
-		// Write per-tenant manifest with unique Name.
+		// Write per-base manifest with unique Name.
 		manifest := fmt.Sprintf(`{
   "name": %q,
   "runtime": %q,
@@ -228,10 +228,10 @@ func cloneTenants(tb testing.TB, spec rtSpec, n int) ([]string, func()) {
 // linux it is in KB. rssBytes normalizes.
 
 type memSample struct {
-	HeapInuse uint64
-	HeapAlloc uint64
-	Sys       uint64
-	RSS       uint64
+	HeapInuse    uint64
+	HeapAlloc    uint64
+	Sys          uint64
+	RSS          uint64
 	NumGoroutine int
 }
 
@@ -280,7 +280,7 @@ func steadyMem(field func(memSample) uint64) func() uint64 {
 
 // ---------- helpers ----------
 
-// loadAll loads every tenant module and returns the slice + a cleanup
+// loadAll loads every base module and returns the slice + a cleanup
 // that closes them all. If any load fails we record how far we got
 // and return the partial list along with the error — the caller
 // decides whether that's "study done" or "abort this subtest".
@@ -333,7 +333,7 @@ func BenchmarkScale_PerModuleMemory(b *testing.B) {
 				b.Run(fmt.Sprintf("N=%d", n), func(b *testing.B) {
 					b.N = 1
 					rt := spec.factory()
-					dirs, cleanup := cloneTenants(b, spec, n)
+					dirs, cleanup := cloneBases(b, spec, n)
 					defer cleanup()
 					defer rt.Close()
 
@@ -364,29 +364,29 @@ func BenchmarkScale_PerModuleMemory(b *testing.B) {
 	}
 }
 
-// ---------- 2) per-tenant concurrent invocation fan-out ----------
+// ---------- 2) per-base concurrent invocation fan-out ----------
 
-func BenchmarkScale_TenantFanout(b *testing.B) {
+func BenchmarkScale_BaseFanout(b *testing.B) {
 	for _, spec := range runtimeSpecs() {
 		spec := spec
 		b.Run(spec.name, func(b *testing.B) {
 			if !spec.available() {
 				b.Skip("runtime not available")
 			}
-			for _, t := range tenantPoints {
+			for _, t := range orgPoints {
 				t := t
-				// Cap tenant count to what the runtime is known to
+				// Cap base count to what the runtime is known to
 				// support — same modulePoints cap as section 1.
 				maxN := spec.modulePoints[len(spec.modulePoints)-1]
 				if t > maxN {
 					continue
 				}
-				b.Run(fmt.Sprintf("tenants=%d", t), func(b *testing.B) {
+				b.Run(fmt.Sprintf("bases=%d", t), func(b *testing.B) {
 					b.N = 1
-					runTenantFanout(b, spec, t)
+					runBaseFanout(b, spec, t)
 				})
 			}
-			// Pool-size elbow study: only at 1000 tenants, only for
+			// Pool-size elbow study: only at 1000 bases, only for
 			// pooled runtimes. We toggle the pool by setting the env
 			// var before constructing the runtime. Best-effort: if
 			// the runtime ignores the env (native, v8go), the same
@@ -396,36 +396,36 @@ func BenchmarkScale_TenantFanout(b *testing.B) {
 			}
 			for _, ps := range poolSizes {
 				ps := ps
-				b.Run(fmt.Sprintf("pool=%d/tenants=1000", ps), func(b *testing.B) {
+				b.Run(fmt.Sprintf("pool=%d/bases=1000", ps), func(b *testing.B) {
 					b.N = 1
 					_, old := setPoolEnv(spec.name, ps)
 					defer restorePoolEnv(spec.name, old)
-					runTenantFanout(b, spec, 1000)
+					runBaseFanout(b, spec, 1000)
 				})
 			}
 		})
 	}
 }
 
-func runTenantFanout(b *testing.B, spec rtSpec, tenants int) {
+func runBaseFanout(b *testing.B, spec rtSpec, bases int) {
 	rt := spec.factory()
-	dirs, cleanup := cloneTenants(b, spec, tenants)
+	dirs, cleanup := cloneBases(b, spec, bases)
 	defer cleanup()
 	defer rt.Close()
 
 	mods, err := loadAll(rt, dirs)
 	if err != nil {
-		b.Logf("SCALE\ttenant-fanout\t%s\ttenants=%d\tFAIL loaded=%d err=%v",
-			spec.name, tenants, len(mods), err)
+		b.Logf("SCALE	base-fanout\t%s	bases=%d\tFAIL loaded=%d err=%v",
+			spec.name, bases, len(mods), err)
 		closeAll(mods)
 		return
 	}
 	defer closeAll(mods)
 
-	// One concurrent invocation per tenant. Each goroutine calls its
+	// One concurrent invocation per base. Each goroutine calls its
 	// own module's Invoke once; we measure wall time + per-call
 	// latency + peak memory mid-flight via a 50ms ticker.
-	latencies := make([]time.Duration, tenants)
+	latencies := make([]time.Duration, bases)
 	var wg sync.WaitGroup
 	var stopMon = make(chan struct{})
 	var peakRSS atomic.Uint64
@@ -450,7 +450,7 @@ func runTenantFanout(b *testing.B, spec rtSpec, tenants int) {
 	}()
 
 	wallStart := time.Now()
-	for i := 0; i < tenants; i++ {
+	for i := 0; i < bases; i++ {
 		i := i
 		wg.Add(1)
 		go func() {
@@ -480,8 +480,8 @@ func runTenantFanout(b *testing.B, spec rtSpec, tenants int) {
 	p99 := percentile(clean, 0.99)
 	p999 := percentile(clean, 0.999)
 
-	fmt.Printf("SCALE\ttenant-fanout\t%s\ttenants=%d\twall=%s\tp50=%s\tp99=%s\tp999=%s\terrs=%d\tpeak_rss=%d\n",
-		spec.name, tenants, wall, p50, p99, p999, errs, peakRSS.Load())
+	fmt.Printf("SCALE	base-fanout\t%s	bases=%d\twall=%s\tp50=%s\tp99=%s\tp999=%s\terrs=%d\tpeak_rss=%d\n",
+		spec.name, bases, wall, p50, p99, p999, errs, peakRSS.Load())
 }
 
 // ---------- 3) sustained high concurrency on ONE module ----------
@@ -495,7 +495,7 @@ func BenchmarkScale_OneModuleConcurrency(b *testing.B) {
 			}
 			rt := spec.factory()
 			defer rt.Close()
-			dirs, cleanup := cloneTenants(b, spec, 1)
+			dirs, cleanup := cloneBases(b, spec, 1)
 			defer cleanup()
 			mods, err := loadAll(rt, dirs)
 			if err != nil {
@@ -585,7 +585,7 @@ func BenchmarkScale_GoroutineCost(b *testing.B) {
 			}
 			rt := spec.factory()
 			defer rt.Close()
-			dirs, cleanup := cloneTenants(b, spec, 1)
+			dirs, cleanup := cloneBases(b, spec, 1)
 			defer cleanup()
 			mods, err := loadAll(rt, dirs)
 			if err != nil {
@@ -609,7 +609,7 @@ func BenchmarkScale_GoroutineCost(b *testing.B) {
 			// the combination of (a) prior subtests building up V8
 			// state and (b) any non-trivial parallel goroutine count
 			// in this section. Even N=50 crashed after the earlier
-			// per-module/tenant/concurrency subtests had run. The
+			// per-module/base/concurrency subtests had run. The
 			// recordable answer is the threshold: v8go cannot sustain
 			// >~10 concurrent goroutines on a shared isolate after a
 			// few thousand invocations of prior accumulated state.
@@ -672,7 +672,7 @@ func BenchmarkScale_ColdPoolStartup(b *testing.B) {
 			n := coldStartLoadsN
 			rt := spec.factory()
 			defer rt.Close()
-			dirs, cleanup := cloneTenants(b, spec, n)
+			dirs, cleanup := cloneBases(b, spec, n)
 			defer cleanup()
 
 			t0 := time.Now()

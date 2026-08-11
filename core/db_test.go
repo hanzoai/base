@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/dbx"
 )
 
 func TestGenerateDefaultRandomId(t *testing.T) {

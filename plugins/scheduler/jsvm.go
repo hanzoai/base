@@ -154,7 +154,7 @@ func RegisterJSVM(app core.App, vm *goja.Runtime) {
 var (
 	errMissingFunctionName = &schedulerError{"scheduleAfter/scheduleAt requires a non-empty functionName"}
 	errMissingTimestamp    = &schedulerError{"scheduleAt requires a non-empty ISO date string"}
-	errMissingScheduledId = &schedulerError{"cancelScheduled requires a non-empty scheduled record id"}
+	errMissingScheduledId  = &schedulerError{"cancelScheduled requires a non-empty scheduled record id"}
 )
 
 type schedulerError struct {

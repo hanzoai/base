@@ -17,8 +17,6 @@ import (
 // to a replica whose document is configured with age privacy.
 // non-plaintext. Current code (resolveOps) silently accepts them.
 
-
-// 
 func TestTagSpoofPlaintextOnAgeDoc(t *testing.T) {
 	id, err := age.GenerateX25519Identity()
 	if err != nil {
@@ -73,13 +71,10 @@ func TestWrongKeySameTag(t *testing.T) {
 // // Same key K used for doc A and doc B. Envelope sealed for A can be
 // applied to B because OpEnvelope has no doc-id binding.
 
-
 // dispatches to sm.HandleSync. It does NOT check privacy at all.
 // If the underlying doc has age privacy, the bridge bypasses it by
 // sending bare Ops through HandleSync.
 
-
-// 
 func TestConcurrentSealOpsRace(t *testing.T) {
 	id, _ := age.GenerateX25519Identity()
 	priv, _ := NewAgePrivacy(id, []age.Recipient{id.Recipient()})
@@ -115,7 +110,6 @@ func TestConcurrentSealOpsRace(t *testing.T) {
 	}
 }
 
-// 
 func TestEmptyEnvelopesEmptyOps(t *testing.T) {
 	sm := NewSyncManager(nil)
 	sm.GetOrCreateDocument("empty-doc", "server")
@@ -200,8 +194,6 @@ func TestSnapshotBypassesPrivacy(t *testing.T) {
 // // WSCRDTSyncPayload has no Envelopes field. All WS traffic is bare Ops.
 // This means every WS client bypasses Privacy even after resolveOps is
 // fixed, unless the WS handler is also updated.
-
-
 
 // TestBareOpsStillWorkForPlaintextDoc confirms the fix is surgical —
 // plaintext documents continue to accept legacy bare-Ops messages for

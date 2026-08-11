@@ -29,7 +29,7 @@
 // Crash isolation caveat
 // ----------------------
 // A C extension segfault crashes the whole Go process. HIP-0105 marks
-// pyvm as single-tenant deploys only; multi-tenant production should
+// pyvm as single-org deploys only; per-org production should
 // use wazero + a Python compiled to wasm (RustPython / pyodide / cpython
 // wasm32-wasi). See plugins/pyvm/README.md.
 package pyvm
@@ -59,9 +59,9 @@ const (
 )
 
 var (
-	gInit     sync.Once
-	gInitErr  error
-	gGilOff   bool
+	gInit    sync.Once
+	gInitErr error
+	gGilOff  bool
 )
 
 func initPython() error {

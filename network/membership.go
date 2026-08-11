@@ -83,9 +83,9 @@ type dnsMembership struct {
 	resolver Resolver
 	interval time.Duration
 
-	mu       sync.RWMutex
-	members  []NodeID
-	subs     []chan []NodeID
+	mu      sync.RWMutex
+	members []NodeID
+	subs    []chan []NodeID
 
 	ctx    context.Context
 	cancel context.CancelFunc
