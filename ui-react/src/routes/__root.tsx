@@ -1,11 +1,12 @@
 import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
-import { Database, LayoutDashboard, ScrollText, Settings } from '@hanzogui/lucide-icons-2';
+import { Boxes, Database, LayoutDashboard, ScrollText, Settings } from '@hanzogui/lucide-icons-2';
 
 import { useAuth } from '~/hooks/useAuth';
 import { icon } from '../icon'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
+  { to: '/bases', label: 'Bases', icon: Boxes, exact: false },
   { to: '/collections', label: 'Collections', icon: Database, exact: false },
   { to: '/logs', label: 'Logs', icon: ScrollText, exact: false },
   { to: '/settings', label: 'Settings', icon: Settings, exact: false },
