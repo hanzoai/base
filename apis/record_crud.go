@@ -123,6 +123,11 @@ func recordsList(e *core.RequestEvent) error {
 		}
 
 		return execAfterSuccessTx(true, e.App, func() error {
+			// Same read, two wires. The PostgREST door answers a bare array with
+			// the count in Content-Range; Base's own answers the envelope.
+			if wantsRest(e.RequestEvent) {
+				return restRender(e.RequestEvent, e.Records, e.Result.TotalItems, restCount(e.RequestEvent))
+			}
 			return e.JSON(http.StatusOK, e.Result)
 		})
 	})
