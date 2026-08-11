@@ -33,6 +33,24 @@ func upstreamFor(base, path string) string {
 	return strings.TrimRight(base, "/") + path
 }
 
+// climbs reports a path that walks out of the mount it arrived under.
+//
+// A proxy forwards the DECODED path, so %2e%2e arrives here as a literal `..`
+// segment and the upstream normalizes it away — /v1/iam/%2e%2e/x is asked of
+// the issuer as /x, which is not under the mount and is not what the mount
+// means. The refusal is here rather than a re-encoding, because whether an
+// upstream normalizes before or after decoding is the upstream's business and
+// a mount boundary cannot be enforced by guessing which.
+func climbs(path string) bool {
+	for _, segment := range strings.Split(path, "/") {
+		if segment == ".." {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 	endpoint := strings.TrimRight(p.config.IAMEndpoint, "/")
 	if endpoint == "" {
@@ -60,6 +78,10 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		// a web page, and the studio read the 200 as success. Nothing in a status
 		// code could have caught that, which is why the test beside this asserts
 		// the URL the proxy BUILDS.
+		if climbs(e.Request.URL.Path) {
+			return e.BadRequestError("The path leaves the /v1/iam mount.", nil)
+		}
+
 		upstream := *upstreamBase
 		upstream.Path = upstreamFor(upstreamBase.Path, e.Request.URL.Path)
 		upstream.RawQuery = e.Request.URL.RawQuery

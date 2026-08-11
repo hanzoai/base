@@ -133,26 +133,71 @@ schema, settings, backups and logs are process-wide. A token with no membership
 at all is a machine and is refused rather than handed that Base; a machine that
 needs a Base uses an IAM key, which carries a real membership.
 
-**A route that NAMES an org compares, it does not decide.** The seven routes
-under `/v1/bases/{org}` take an org in the path, and the rule for all of them is
-stated once as a middleware on that subtree (`actsInNamedOrg`): the org named
-must be the org the request acts in, which `loadAuthToken` or the key middleware
-already resolved from the verified credential into `apis.RequestEventKeyOrg`.
+**The rule belongs to the ADDRESS, not to the subtree.** Three sentences govern
+everything under `/v1/bases`, and all three are bound on the ROUTER and read the
+path (`actsInNamedOrg`, `publishableReachesNoBase`, `namesItsOwnUser`):
+
+- the org a path names is the org the request acts in, which `loadAuthToken` or
+  the key middleware already resolved from the verified credential into
+  `apis.RequestEventKeyOrg`;
+- a publishable key reaches none of it, refused by KIND and never by method;
+- the user a path names is the caller, unless the credential carries the org
+  rather than a person — an org admin's token, the org's own `sk-` key, or a
+  platform operator.
+
 Refusal is **403 and never 404** — a 404 is an answer about the data, so it tells
 a caller its token reached that org.
 
-Stating it four times is what shipped, and three of the four were wrong.
-`/config` and `/customers` asked nothing; `/creds` asked `checkOrgAccess`, which
-looked the org up in a local `_orgs` table and returned TRUE on a miss — and
-`_orgs` was written by nothing, so it missed always and granted always. `_orgs`,
-`_org_members` and their four helpers are gone: a second answer to "who is in
-this org" that nothing filled, and the emptiness that made it look unused was
-what made it admit everyone.
+This file used to say the rule was stated on the subtree, "which is what makes a
+handler that forgets it impossible to write". That was false. `tools/router`
+inherits middleware down the GROUP tree and not down the URL, so a route
+registered off the router at the identical address carried nothing — and two
+live mechanisms register exactly that way: `/v1/bases` itself, and `jsvm`'s
+`routerAdd`, which takes a path string from an extension and validates none of
+it. It is the address that carries the data, so it has to be the address that
+carries the rule.
+
+Stating it four times is what shipped before that, and three of the four were
+wrong. `/config` and `/customers` asked nothing; `/creds` asked `checkOrgAccess`,
+which looked the org up in a local `_orgs` table and returned TRUE on a miss —
+and `_orgs` was written by nothing, so it missed always and granted always.
+`_orgs`, `_org_members` and their four helpers are gone: a second answer to "who
+is in this org" that nothing filled, and the emptiness that made it look unused
+was what made it admit everyone.
+
+**Publishable means public, not read-only.** A `pk-` key is the one that ships
+inside a web page and travels in `?key=`, so reaching a route with it needs no
+Authorization header at all. The only thing in its way was a check that a
+publishable key may not WRITE, and every read under `/v1/bases` is a GET: the key
+printed in a customer's HTML returned that org's provider credentials and every
+member's billing identity. The method check stays as a floor — a `pk-` key writes
+nothing anywhere — but what it may READ is settled per address.
+
+**A provider name is not a key to the pod environment.** `OrgService.GetCreds`
+used to fall through to `os.Getenv(PROVIDER + "_API_KEY")` whenever KMS held no
+row, which is every org that has not configured that provider — and `provider` is
+a path segment the caller writes. An org could name `openai`, `anthropic` or
+`github` and be handed the DEPLOYMENT's secret for it, the one the KMSSecret CRDs
+inject. The read is KMS or nothing.
 
 Note also what these routes are NOT: `_org_configs` and `_org_customers` are
 shared tables on the platform Base keyed by an `org_id` column, so for them the
 column is the whole boundary, and the rule above is what defends it. Everything
 in `/v1/collections` is defended by the file instead.
+
+`/v1/compliance/*` names no org in its address, so none of the above reaches it
+and it has to ask. It took `applicationId` from the path and called `requireAuth`,
+which answers "is there a caller" and never "is this caller's" — one tenant read
+another's KYC status and started verifications against it. A compliance
+application id is the vendor's, and a bare string in a URL says nothing about who
+created it, so it is recorded on the caller's `_org_customers` row
+(`compliance_application_id`) when the application is created and checked on
+every read. `/screen` and `/payment/validate` have no owned subject at all — the
+subject is a person the org is considering — so what they are scoped to is the
+org doing the asking, and each call still spends a screening on the deployment's
+vendor account. It is registered only where `ComplianceEndpoint` is configured,
+which is nowhere: no deployment sets it, and nothing in `examples/base/main.go`
+reads an env var for it, so the whole surface is unreachable as shipped.
 
 Still open here:
 - `CreateBackup` zips `DataDir`, so the platform Base's backup contains every
@@ -166,13 +211,22 @@ Still open here:
   token with a large membership set) creates Bases by mentioning them.
 - Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
   rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do
-  not follow the request onto a tenant Base.
-- `RealIP` reads `TrustedProxy` off `e.App`, which by then is the tenant's Base,
-  so behind a proxy the rate limiter keys authenticated traffic on the ingress
-  address. Latent — the default is empty on both Bases — and fixing it wants
-  `core.RequestEvent` to distinguish the deployment from the request's Base.
+  not follow the request onto a tenant Base. `OrgService` is deliberately NOT
+  among what `declare` states on a tenant's Base: its methods take an org as an
+  argument and check nothing, so an extension on one tenant's Base could read
+  every other tenant's credentials by naming them.
+- A revoked IAM key still opens its org until its cache entry expires. Tokens and
+  keys now expire on separate clocks, because a token carries its own expiry and
+  a key has none — revocation at IAM is the only thing that ends one — but 30
+  seconds is still a window, and closing it wants IAM to say so rather than Base
+  to guess.
+- `checkRateLimit` allows a request it cannot key. That is reachable now that
+  `RemoteIP` reports no address instead of the literal string `"invalid IP"`,
+  which is what a ZAP-forwarded request has; before, the whole ZAP leg shared one
+  bucket under that constant. Unlimited on an internal mesh terminal beats one
+  shared bucket, but the honest fix is for the forward terminal to carry a client.
 
-### Rate limits belong to the process
+### Rate limits belong to the process, and so does the client key
 
 The limiter runs at priority -1000, after `loadAuthToken` at -1020 has pointed
 the request at its tenant's Base, so reading the limit off `e.App` asked each
@@ -181,11 +235,34 @@ tenant how hard the process may be hit — and a freshly opened Base answers
 were held to the rule; the `*:auth` 2-per-3s default applied to nobody with a
 token.
 
-The Base the process serves from is now named on the request by the router's
-event factory, and the limiter asks for it by name — settings, counters and the
-cleanup cron alike. One policy, one set of counters. Copying the posture onto
-each tenant Base at bootstrap was the alternative and is worse: N copies that
-drift, and per-tenant counters make a limit of 2 mean 2 per org.
+The Base the process serves from is named on the request by the router's event
+factory and read through `core.RequestEvent.Deployment()` — settings, counters
+and the cleanup cron alike. One policy, one set of counters. Copying the posture
+onto each tenant Base at bootstrap was the alternative and is worse: N copies
+that drift, and per-tenant counters make a limit of 2 mean 2 per org.
+
+The rule and the counters moved first and the KEY did not, which turned the fix
+into a cross-tenant denial of service. `checkRateLimit` keys on `RealIP`, and
+`RealIP` asked `e.App` which proxy headers to believe — the tenant's Base, whose
+`TrustedProxy` is empty and can never be anything else, since only a superuser
+writes settings and a tenant's Base has none. So behind an ingress every
+authenticated request fell back to the socket peer, which is the ingress for all
+of them: one bucket for the estate, and any one tenant could spend the whole
+budget and lock out every other. `RealIP` reads the deployment now.
+
+Everything else that answers a question about the process rather than about a
+tenant's data reads the same place: the activity log (which was writing an
+authenticated request's audit row into that tenant's `_logs`, leaving the
+operator's log holding only traffic that never authenticated) and the batch
+limits (whose `Enabled=false` on a fresh tenant Base silently turned batching off
+for everyone with a token).
+
+A log row also carries no credential and names who acted. `logRequest` wrote
+`RequestURI()` whole, so a key arriving in `?key=` — the shape that needs no
+Authorization header — sat in `_logs` in plaintext for `Logs.MaxDays`, was served
+by `GET /v1/logs`, and went into every backup; the query is redacted now. And a
+keyed request set no `e.Auth`, so every action a service key took was attributed
+to nobody at all.
 
 ### Functions — both halves exist, in different packages
 

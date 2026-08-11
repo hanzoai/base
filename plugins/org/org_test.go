@@ -2,33 +2,34 @@ package org
 
 import (
 	"context"
-	"os"
+	"strings"
 	"testing"
 )
 
-func TestOrgServiceGetCreds_EnvFallback(t *testing.T) {
-	// Set env vars for the fallback.
-	os.Setenv("COMMERCE_API_KEY", "test-key-123")
-	os.Setenv("COMMERCE_API_SECRET", "test-secret-456")
-	defer func() {
-		os.Unsetenv("COMMERCE_API_KEY")
-		os.Unsetenv("COMMERCE_API_SECRET")
-	}()
+// TestTheProcessEnvironmentIsNotAnAnswer pins that an org with no KMS row for a
+// provider gets nothing, rather than the deployment's own secret for it.
+//
+// `provider` is a path segment the CALLER writes, so the fallback this replaces
+// — os.Getenv(strings.ToUpper(provider) + "_API_KEY") — turned the credential
+// route into a read of the pod environment: name openai, anthropic or github as
+// your provider and be handed the platform's key for it, which is what the
+// KMSSecret CRDs put there.
+func TestTheProcessEnvironmentIsNotAnAnswer(t *testing.T) {
+	for _, provider := range []string{"commerce", "openai", "anthropic", "github"} {
+		t.Setenv(strings.ToUpper(provider)+"_API_KEY", "the-deployment-key")
+		t.Setenv(strings.ToUpper(provider)+"_API_SECRET", "the-deployment-secret")
+		t.Setenv(strings.ToUpper(provider)+"_WEBHOOK_SECRET", "the-deployment-hmac")
+	}
 
 	s := &OrgService{
-		kms:    mustKMS(t, ""), // no KMS configured
+		kms:    mustKMS(t, ""), // no KMS configured — nothing has a credential
 		config: Config{},
 	}
 
-	creds := s.GetCreds("org-1", "commerce")
-	if creds == nil {
-		t.Fatal("expected env-based creds, got nil")
-	}
-	if creds["api_key"] != "test-key-123" {
-		t.Errorf("expected api_key=test-key-123, got %q", creds["api_key"])
-	}
-	if creds["api_secret"] != "test-secret-456" {
-		t.Errorf("expected api_secret=test-secret-456, got %q", creds["api_secret"])
+	for _, provider := range []string{"commerce", "openai", "anthropic", "github"} {
+		if creds := s.GetCreds("org-1", provider); creds != nil {
+			t.Errorf("%s: an org with no credential was handed %v", provider, creds)
+		}
 	}
 }
 
@@ -94,30 +95,35 @@ func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
 }
 
 func TestOrgServiceInvalidateCreds(t *testing.T) {
-	os.Setenv("KYC_API_KEY", "kyc-key-123")
-	defer os.Unsetenv("KYC_API_KEY")
+	f := withFakeKMS(t)
+	if err := f.PutAt(context.Background(), "orgs/org-1/kyc", "api_key", "prod", "kyc-key-123"); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
 
 	s := &OrgService{
-		kms:    mustKMS(t, ""),
+		kms:    mustKMS(t, "kms.test:9999"),
 		config: Config{},
 	}
 
 	// Populate cache.
 	creds := s.GetCreds("org-1", "kyc")
 	if creds == nil {
-		t.Fatal("expected env creds, got nil")
+		t.Fatal("expected KMS creds, got nil")
 	}
 
-	// Invalidate.
+	before := len(f.reads)
 	s.InvalidateCreds("org-1")
 
-	// Cache should be cleared but env vars still work.
+	// Cache cleared, so the next read goes back to KMS and still answers.
 	creds2 := s.GetCreds("org-1", "kyc")
 	if creds2 == nil {
-		t.Fatal("expected env creds after invalidation, got nil")
+		t.Fatal("expected KMS creds after invalidation, got nil")
 	}
 	if creds2["api_key"] != "kyc-key-123" {
 		t.Errorf("expected api_key=kyc-key-123, got %q", creds2["api_key"])
+	}
+	if len(f.reads) == before {
+		t.Error("invalidation left the cached answer in place")
 	}
 }
 
@@ -174,38 +180,6 @@ func TestOrgServiceProvisionCustomer_EmptyArgs(t *testing.T) {
 	_, err = s.ProvisionCustomer("org-1", "", nil)
 	if err == nil {
 		t.Error("expected error for empty userId")
-	}
-}
-
-func TestFetchCredsFromEnv(t *testing.T) {
-	os.Setenv("TESTPROV_API_KEY", "key1")
-	os.Setenv("TESTPROV_BASE_URL", "https://api.test.com")
-	defer func() {
-		os.Unsetenv("TESTPROV_API_KEY")
-		os.Unsetenv("TESTPROV_BASE_URL")
-	}()
-
-	s := &OrgService{}
-	creds := s.fetchCredsFromEnv("testprov")
-	if creds == nil {
-		t.Fatal("expected env creds, got nil")
-	}
-	if creds["api_key"] != "key1" {
-		t.Errorf("expected api_key=key1, got %q", creds["api_key"])
-	}
-	if creds["base_url"] != "https://api.test.com" {
-		t.Errorf("expected base_url, got %q", creds["base_url"])
-	}
-	if _, ok := creds["api_secret"]; ok {
-		t.Error("did not expect api_secret to be set")
-	}
-}
-
-func TestFetchCredsFromEnv_None(t *testing.T) {
-	s := &OrgService{}
-	creds := s.fetchCredsFromEnv("nonexistent-provider-xyz")
-	if creds != nil {
-		t.Errorf("expected nil for provider with no env vars, got %v", creds)
 	}
 }
 

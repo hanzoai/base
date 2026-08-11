@@ -10,7 +10,6 @@ package org
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -95,7 +94,14 @@ func (s *OrgService) GetConfig(orgId string) map[string]any {
 // Path convention: /orgs/{orgId}/{provider}/{key}
 // Returns map like {"api_key": "...", "api_secret": "...", "base_url": "..."}
 // Cached 5min per (orgId, provider) pair.
-// Falls back to env vars if KMS not configured or secret not found (dev mode).
+//
+// An org that has not configured a provider has no credentials for it, and that
+// is the answer. There used to be a fallback that read
+// os.Getenv(PROVIDER + "_API_KEY") when KMS held no row — and `provider` is a
+// path segment the caller writes, so any org could name openai, anthropic or
+// github and be handed the DEPLOYMENT's key: the process environment, which is
+// where the KMSSecret CRDs put the platform's own secrets. A tenant asked for
+// its own credentials and got the operator's. The read is KMS or nothing.
 func (s *OrgService) GetCreds(orgId, provider string) map[string]string {
 	if orgId == "" || provider == "" {
 		return nil
@@ -113,9 +119,6 @@ func (s *OrgService) GetCreds(orgId, provider string) map[string]string {
 	}
 
 	creds := s.fetchCredsFromKMS(orgId, provider)
-	if creds == nil {
-		creds = s.fetchCredsFromEnv(provider)
-	}
 
 	if creds != nil {
 		s.credsCache.Store(cacheKey, &credsCacheEntry{
@@ -144,26 +147,6 @@ func (s *OrgService) fetchCredsFromKMS(orgId, provider string) map[string]string
 		}
 		if val != "" {
 			creds[key] = val
-		}
-	}
-
-	if len(creds) == 0 {
-		return nil
-	}
-	return creds
-}
-
-// fetchCredsFromEnv falls back to environment variables.
-// Pattern: {PROVIDER}_API_KEY, {PROVIDER}_API_SECRET, etc.
-func (s *OrgService) fetchCredsFromEnv(provider string) map[string]string {
-	prefix := strings.ToUpper(provider) + "_"
-	keys := []string{"API_KEY", "API_SECRET", "BASE_URL", "WEBHOOK_SECRET"}
-	creds := make(map[string]string)
-
-	for _, key := range keys {
-		val := os.Getenv(prefix + key)
-		if val != "" {
-			creds[strings.ToLower(key)] = val
 		}
 	}
 
@@ -206,22 +189,73 @@ func (s *OrgService) InvalidateCreds(orgId string) {
 	})
 }
 
+// customer is the org_customers row for (orgId, userId), the one query that
+// reads it.
+func (s *OrgService) customer(orgId, userId string) (*core.Record, error) {
+	return s.app.FindFirstRecordByFilter(
+		collectionOrgCustomers,
+		"org_id = {:orgId} && user_id = {:userId}",
+		map[string]any{"orgId": orgId, "userId": userId},
+	)
+}
+
 // GetCustomer looks up the org_customers record for (orgId, userId).
 func (s *OrgService) GetCustomer(orgId, userId string) map[string]any {
 	if orgId == "" || userId == "" {
 		return nil
 	}
 
-	record, err := s.app.FindFirstRecordByFilter(
-		collectionOrgCustomers,
-		"org_id = {:orgId} && user_id = {:userId}",
-		map[string]any{"orgId": orgId, "userId": userId},
-	)
+	record, err := s.customer(orgId, userId)
 	if err != nil {
 		return nil
 	}
 
 	return customerRecordToMap(record)
+}
+
+// BindComplianceApp records that a compliance application belongs to one org's
+// user, so that a later read of it can be answered.
+//
+// The vendor's application id is a bare string that arrives in a URL and says
+// nothing about who created it, so without this there is no question to ask and
+// every caller reaches every application.
+func (s *OrgService) BindComplianceApp(orgId, userId, applicationId string) error {
+	if orgId == "" || userId == "" || applicationId == "" {
+		return fmt.Errorf("org: orgId, userId and applicationId are required")
+	}
+
+	if _, err := s.GetOrProvisionCustomer(orgId, userId); err != nil {
+		return err
+	}
+
+	record, err := s.customer(orgId, userId)
+	if err != nil {
+		return fmt.Errorf("org: customer for org=%s user=%s: %w", orgId, userId, err)
+	}
+
+	record.Set(fieldComplianceApp, applicationId)
+
+	return s.app.Save(record)
+}
+
+// ComplianceApp reports which of an org's users holds a compliance
+// application. An org that holds no such application answers false, which is
+// what a caller naming another org's application gets.
+func (s *OrgService) ComplianceApp(orgId, applicationId string) (string, bool) {
+	if orgId == "" || applicationId == "" {
+		return "", false
+	}
+
+	record, err := s.app.FindFirstRecordByFilter(
+		collectionOrgCustomers,
+		"org_id = {:orgId} && "+fieldComplianceApp+" = {:app}",
+		map[string]any{"orgId": orgId, "app": applicationId},
+	)
+	if err != nil {
+		return "", false
+	}
+
+	return record.GetString("user_id"), true
 }
 
 // ProvisionCustomer creates a new customer identity for a user in an org.
@@ -326,6 +360,7 @@ func customerRecordToMap(record *core.Record) map[string]any {
 		"broker_account_id":    record.GetString("broker_account_id"),
 		"commerce_customer_id": record.GetString("commerce_customer_id"),
 		"mpc_vault_id":         record.GetString("mpc_vault_id"),
+		fieldComplianceApp:     record.GetString(fieldComplianceApp),
 		"metadata":             record.Get("metadata"),
 	}
 }
