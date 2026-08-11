@@ -43,6 +43,120 @@ instance. Web5 client runtime at its core.
 
 Not a fork, not a wrapper.
 
+## Program: swap Supabase for one Go binary
+
+The direction, decided 2026-08-11: Base serves the Supabase wire, so a Supabase
+user changes a hostname and their client works. Supabase is roughly seven
+services — PostgREST, GoTrue, Realtime, Storage, Edge Functions, Kong, and a
+Postgres you must run. Base is one binary and a file. Same API, same policies,
+none of the fleet. That is what makes "cheaper" a fact rather than a claim.
+
+| Supabase | Base |
+|---|---|
+| PostgREST | `/rest/v1/{table}` — `apis/rest.go` |
+| GoTrue | Hanzo IAM, the one auth path |
+| Realtime | `/v1/realtime` SSE + ZAP |
+| Storage | `/v1/files` + object storage |
+| Edge Functions (Deno) | `extruntime` in-process — goja / wazero / starlark |
+| Postgres (required) | SQLite by default, Postgres optional via `orm/dialect` |
+| RLS (in the engine) | enforced in Base's query path; see below |
+
+Shipped: the read path. `/rest/v1/{table}` with select, order, limit/offset,
+`Prefer: count=exact` → `Content-Range`, a bare array rather than the
+`{items,page,…}` envelope, and predicates that bind as data rather than render
+into text. It is a second RENDERING of `recordsList`, never a second read — one
+collection lookup, one rule, one field resolver. The test that matters asserts a
+collection with no list rule refuses on both doors.
+
+`/rest/v1` is a NEW mount, not a rename: supabase-js hard-codes that path, so
+nothing that speaks `/v1/collections` breaks. The 23 Go repos embedding Base
+consume Go types, not URLs.
+
+### RLS — the hard part, and one live exposure
+
+Postgres enforces RLS in the engine. SQLite has none, so Base enforces policies
+itself. **Do not delegate to native Postgres RLS on the sql tier**: Base rules
+reference `@request.body.*`, `@request.headers.*`, `@request.method` and
+`:changed`, none of which survive translation into a policy expression; nothing
+pins a connection per request, so `SET LOCAL` is unsafe, and the count and rows
+queries deliberately run concurrently. Base already works hard to make `=`/`!=`
+null-safe identically on both engines — delegating would throw away exactly that.
+One enforcement path in Go. Native RLS is worth enabling only as a backstop
+against connections that are not Base.
+
+What is already right: rules ARE predicates, ANDed into the query before
+pagination and before the count; a joined collection contributes its own list
+rule; `?expand=` applies the related collection's view rule. Base is also
+RLS-on-by-default, which is better than parity.
+
+**Live exposure — `owner = @request.auth.id` leaks to anonymous callers.** With
+no auth, `processRequestAuthField` returns the identifier `NULL`
+(`core/record_field_resolver_runner.go:201`); `isEmptyIdentifier` counts `"null"`
+as empty (`tools/search/filter.go:441`); so `resolveEqualExpr` emits
+`(owner = '' OR owner IS NULL)` (`filter.go:393`). Every row with an empty or
+NULL owner becomes publicly readable. Postgres does the opposite — `= NULL`
+yields NULL and the row is hidden. This is a silent inversion of the single most
+common policy anyone writes. The fix is to stop `@request.auth.*` collapsing to
+empty, and it needs a differential test corpus, because it flips any rule written
+as `@request.auth.id = ""` to mean "allow if anonymous".
+
+**Missing `WITH CHECK` on UPDATE.** `createRule` has true `WITH CHECK` — a CTE
+shadows the table with the would-be row and the rule runs against it
+(`apis/record_crud.go:294-317`). UPDATE has no post-image check, so a ported
+`USING (owner = auth.uid())` lets a user hand their row to someone else. The CTE
+machinery is directly reusable.
+
+Also: `/api/ws` binds subscribe with no auth (harmless while it carries only CRDT
+and presence, catastrophic the moment records go over it); a JWKS validation
+failure still admits a local token for `_superusers`; and the multi-match
+subquery degrades to `0=1`, which fails OPEN under negation.
+
+### Per-tenant storage — the shard is resolved and then dropped
+
+`plugins/org` resolves an org DB, opens a pool, sets `orgDB` on the request — and
+**nothing reads it**. Every `/v1` request goes to the shared `data.db`. Isolation
+today is zero, not weak. `ProvisionOrg` only `MkdirAll`s, so a shard has no
+schema; `OrgDEK`/`UserDEK` have no production callers, so shards are plaintext.
+
+Two consequences to act on before anything else here:
+- Enabling `orm/replicated` before wiring the DEK into the open path streams
+  **plaintext tenant databases** to object storage.
+- `CreateBackup` zips the whole `DataDir`, so one tenant's backup contains every
+  tenant's database.
+
+The primitive to adopt is `orm/db.Namespaces` — one SQLite file per namespace,
+remote as source of truth, bounded open handles, coldest evicted, materialize on
+miss. A namespace is one opaque string, so org/user/project is just more slashes.
+Base carries four competing per-tenant designs today and `store/multitenant.go`
+is 944 lines with zero consumers; adopting `Namespaces` deletes them.
+
+The tenant coordinate belongs in the **subdomain**, verified against a JWT claim,
+mismatch 403 — never a header. Supabase resolves the tenant by routing (a project
+is its own Postgres) and PostgREST itself is single-tenant. Today `plugins/org`
+reads `X-Org-Id` raw, while `tools/claims` documents that header as
+gateway-injected-only. That is the cost argument made concrete: a project is a
+file — kilobytes at rest, one descriptor when hot.
+
+### Functions — both halves exist, in different packages
+
+`jsvm` has every host binding (`$app`, `$http`, `routerAdd`, cron) and no
+invoke-by-name. `gojavm` has `Invoke(ctx, fn, payload)` and no host bindings.
+Neither half is a complete function; joining them is the work, not new invention.
+`extruntime` is a real, tested SPI with three working pure-Go runtimes and is
+used by nothing outside its own tests. Note `jsvm`'s `$os` exposes `exec`,
+`readFile`, `writeFile` and `exit` — whatever a function runtime binds in v1 is
+supported forever, so bind two functions, not `$app`.
+
+### Postgres tier — a real dialect that has never been run
+
+The dialect is `hanzoai/orm/dialect`, not the `core/dialect_postgres.go` this
+file used to name; 15 methods, ~40 call sites, migrations parameterized through
+it. There is no Postgres in CI and no test opens a connection. Known blockers:
+`core/validators/db.go` matches SQLite's `"unique constraint failed"`, so every
+duplicate is a 500 instead of a 400 field error; `db_retry.go` retries only
+SQLite lock messages; and `CreateBackup` archives `DataDir`, which on Postgres
+contains no data.
+
 ## Program: Base as the universal backend (roadmap)
 
 The north star: **anyone can stand up any modern backend on Base** — a CRM, a
@@ -62,7 +176,7 @@ identical across tiers:
 | Tier | Backend | When | Status |
 |------|---------|------|--------|
 | 0 (default) | embedded SQLite / `:memory:` | everything out of box | core `dialect.go` |
-| 1 | `hanzoai/sql` (PostgreSQL) | relational scale, multi-writer | core `dialect_postgres.go` + `db_connect_postgres.go` + `plugins/cloudsql`; **selector SHIPPED** (`BASE_DB_TIER=sql`) |
+| 1 | PostgreSQL | relational scale, multi-writer | dialect is `hanzoai/orm/dialect` (NOT a `core/dialect_postgres.go` — no such file) + `core/db_connect_postgres.go` + `plugins/cloudsql`. Selector shipped (`BASE_DB_TIER=sql`); **never executed — no Postgres in CI, no test opens a connection.** See the blockers above. |
 | 2 | `hanzoai/datastore` | true horizontal OLAP analytics | repo exists; backend adapter = TODO |
 | +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
 
@@ -129,7 +243,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 | org | plugins/org/ | Per-org Bases: orgs read from IAM, per-org encrypted SQLite, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
-| functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
+| functions | plugins/functions/ | OpenFaaS gateway proxy — needs Kubernetes. Deploys a container IMAGE by reference; stores no code, binds no hooks. NOT event workers, whatever this table said before. |
 | jsvm | plugins/jsvm/ | JS hook host (.base.js hook files) — still goja-native |
 | gojavm | plugins/gojavm/ | `runtime: goja` extensions — delegates to zip's JSRuntime |
 
