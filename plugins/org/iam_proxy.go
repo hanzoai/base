@@ -17,7 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/claims"
 	"github.com/hanzoai/base/tools/router"
 )
 
@@ -67,19 +69,23 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		if err != nil {
 			return e.InternalServerError("iam proxy build failed", err)
 		}
-		// Forward all headers except hop-by-hop. Strip client-supplied
-		// identity headers — those are minted from validated auth, not
-		// from request input.
+		// Forward everything except hop-by-hop, then drop every identity
+		// header. Inbound they are a client saying who it is, and this mount
+		// is where a caller asks IAM that very question — so what arrives
+		// here must not be able to answer it. Which headers those are is
+		// tools/claims's to know: naming three of them by hand let the rest
+		// through, and X-User-Permissions among them is an authorization
+		// bypass at whatever answers upstream.
 		for k, v := range e.Request.Header {
 			switch k {
 			case "Connection", "Keep-Alive", "Proxy-Authenticate",
 				"Proxy-Authorization", "Te", "Trailer", "Transfer-Encoding",
-				"Upgrade", "Host",
-				"X-User-Id", "X-Org-Id", "X-User-Email":
+				"Upgrade", "Host":
 				continue
 			}
 			req.Header[k] = v
 		}
+		claims.StripIdentityHeaders(req.Header)
 		// Ensure Host matches upstream (some IdP impls validate it).
 		req.Host = upstreamBase.Host
 		// Disable proxy buffering for SSE-style endpoints.
@@ -122,11 +128,22 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		}
 	}
 
-	r.GET("/v1/iam/{path...}", handler)
-	r.POST("/v1/iam/{path...}", handler)
-	r.PUT("/v1/iam/{path...}", handler)
-	r.PATCH("/v1/iam/{path...}", handler)
-	r.DELETE("/v1/iam/{path...}", handler)
+	// Base does not authenticate a request it does not serve. Everything under
+	// this mount is the issuer's to answer, the caller's identity included, so
+	// the two middlewares that resolve a credential are unbound from it.
+	//
+	// They did more than waste a JWKS round trip. A machine token carries no
+	// membership, so resolving one refused the call with 403 before the proxy
+	// ran — a service could no longer reach IAM through Base at all. And a token
+	// that did carry an org opened that org's Base, running a full migration on
+	// a fresh SQLite file, as a side effect of asking IAM for a token.
+	iam := r.Group("/v1/iam").Unbind(apis.DefaultLoadAuthTokenMiddlewareId, apiKeyAuthId)
+
+	iam.GET("/{path...}", handler)
+	iam.POST("/{path...}", handler)
+	iam.PUT("/{path...}", handler)
+	iam.PATCH("/{path...}", handler)
+	iam.DELETE("/{path...}", handler)
 }
 
 func isLikelyStreaming(path string) bool {
