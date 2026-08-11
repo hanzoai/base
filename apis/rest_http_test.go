@@ -18,7 +18,7 @@ func wantRange(want string) func(t testing.TB, app *tests.TestApp, res *http.Res
 	}
 }
 
-// The PostgREST door over real HTTP, against the same fixtures the collections
+// The this wire door over real HTTP, against the same fixtures the collections
 // door is tested on. The translation tests prove the query maps correctly; these
 // prove the wire — the shape of the body, the count in the header, and above all
 // that the door decides who may read a row exactly as the other one does.
@@ -49,7 +49,7 @@ func TestRestApiList(t *testing.T) {
 		},
 		{
 			// The wire difference: a BARE ARRAY, not {items,page,perPage,...}.
-			// The leading `[{` and the absence of `"items"` are what a Supabase
+			// The leading `[{` and the absence of `"items"` are what a another store
 			// client depends on.
 			Name:           "a public table answers a bare array",
 			Method:         http.MethodGet,
@@ -244,7 +244,7 @@ func TestRestApiCount(t *testing.T) {
 	}
 }
 
-// The write verbs. PostgREST's PATCH and DELETE are FILTERED where Base's are
+// The write verbs. The wire's PATCH and DELETE are FILTERED where Base's are
 // by-id, so these prove the door resolves a filter to rows and then lets Base's
 // own rules decide, rather than reimplementing them.
 func TestRestApiWrites(t *testing.T) {
@@ -252,8 +252,8 @@ func TestRestApiWrites(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			// The catastrophic shape, refused. PostgREST allows an unfiltered
-			// DELETE and postgrest-js sends it without comment, so the first time
+			// The catastrophic shape, refused. this wire allows an unfiltered
+			// DELETE and a REST client sends it without comment, so the first time
 			// anyone learns what it means is after the table is empty.
 			Name:            "an unfiltered delete is refused",
 			Method:          http.MethodDelete,
@@ -317,7 +317,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			// PostgREST returns nothing unless asked, and postgrest-js reads an
+			// this wire returns nothing unless asked, and a REST client reads an
 			// empty body as exactly that. 201, no body.
 			Name:           "insert returns 201 and no body by default",
 			Method:         http.MethodPost,
@@ -423,7 +423,7 @@ func TestRestApiDuplicateIsSQLState23505(t *testing.T) {
 		},
 		{
 			// The same write on Base's own door keeps Base's shape — the
-			// PostgREST body belongs to the PostgREST wire, not to the store.
+			// this wire body belongs to the this wire wire, not to the store.
 			Name:            "the collections door still answers its own shape",
 			Method:          http.MethodPost,
 			URL:             "/v1/collections/demo2/records",
@@ -439,7 +439,7 @@ func TestRestApiDuplicateIsSQLState23505(t *testing.T) {
 	}
 }
 
-// A count query is a HEAD. supabase-js issues one for
+// A count query is a HEAD. a REST client issues one for
 // .select('*', {count: 'exact', head: true}) and reads the total out of
 // Content-Range — the rows are exactly what it does not want.
 func TestRestApiHeadIsTheCountQuery(t *testing.T) {

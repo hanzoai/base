@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// A PostgREST query becomes Base's own, exactly. These are the shapes the Studio
+// A wire query becomes Base's own, exactly. These are the shapes the console
 // grid actually sends, so a regression here is a broken table view.
 //
 // Note what is NOT here any more: an assertion that a filter renders to a STRING.
@@ -94,7 +94,7 @@ func TestRestPredicates(t *testing.T) {
 		in:   "id=in.(a,b,c)",
 		want: []restPredicate{{Col: "id", Op: "in", Vals: []string{"a", "b", "c"}}},
 	}, {
-		name: "the wildcard PostgREST spells with a star becomes SQL's",
+		name: "the wildcard this wire spells with a star becomes SQL's",
 		in:   "name=like.*ace*",
 		want: []restPredicate{{Col: "name", Op: "like", Vals: []string{"%ace%"}}},
 	}, {

@@ -19,31 +19,30 @@ import (
 	"github.com/hanzoai/orm/query"
 )
 
-// The Supabase data wire, served natively at /rest/v1/{table}.
+// The REST data wire: one table per path, filters in the query string.
 //
-// We run their Studio front end, and its whole vocabulary is table/row/column.
-// Base speaks collection/record. Something has to translate, and the only
+// Our console speaks table/row/column. Base speaks collection/record. Something has to translate, and the only
 // question is where: a client-side adapter is a shim every caller carries and
 // every new caller reimplements, so the translation belongs here, once, on the
 // wire the clients already know.
 //
-// It is mounted OUTSIDE the api prefix, at the root, because supabase-js builds
-// its own URL: given a base host it calls /rest/v1/{table} unprompted. Serving
-// exactly that path is what lets a Supabase client point at Base by changing a
-// hostname and nothing else — no adapter, no fork, no per-call rewrite.
+// It is mounted OUTSIDE the api prefix, at the root, because a REST client builds its own URL:
+// given a base host it calls /rest/v1/{table} unprompted. Serving exactly that
+// path is what lets a client reach Base by naming a hostname and nothing else —
+// no adapter, no per-call rewrite.
 //
 // This is a rendering of the SAME read, not a second one. The door rewrites the
 // query into Base's own dialect and then runs recordsList — the same collection
 // lookup, the same rate limit, the same list rule, the same field resolver, the
 // same enrichment and the same timing throttle. Only the final write differs:
-// PostgREST answers a bare array with the count in Content-Range, where Base
-// answers the {items,page,perPage,totalItems,totalPages} envelope. Duplicating
+// This wire answers a bare array with the count in Content-Range, where Base's
+// own answers the {items,page,perPage,totalItems,totalPages} envelope. Duplicating
 // the handler to change one line is how two doors come to disagree about who may
 // read a row, which is the one disagreement that matters.
 func bindRestApi(app core.App, rg *router.Router[*core.RequestEvent]) {
 	sub := rg.Group("/rest/v1")
 	sub.GET("/{collection}", restList)
-	// A count query is a HEAD: supabase-js's .select('*', {count, head: true})
+	// A count query is a HEAD: a REST client's .select('*', {count, head: true})
 	// issues one and reads the total out of Content-Range, because the rows are
 	// exactly what it does not want. Without this the count path 404s while every
 	// other read works, which reads as "counting is broken" rather than "that
@@ -54,7 +53,7 @@ func bindRestApi(app core.App, rg *router.Router[*core.RequestEvent]) {
 	sub.DELETE("/{collection}", restDelete)
 }
 
-// restWire marks a request as arriving on the PostgREST door. It is a context
+// restWire marks a request as arriving on the this wire door. It is a context
 // value rather than a path check because the renderer is deep inside
 // recordsList's event handler, and a path comparison there would be a second
 // copy of the routing decision this file already made.
@@ -68,7 +67,7 @@ type restCall struct {
 
 	// hold suppresses the per-record response write so a filtered write that
 	// touches N rows answers ONCE. Base's write handlers are by-id and each
-	// writes its own response; PostgREST's PATCH and DELETE are filtered, so the
+	// writes its own response; This wire's PATCH and DELETE are filtered, so the
 	// door drives those handlers per row and renders the whole set itself.
 	hold bool
 
@@ -76,7 +75,7 @@ type restCall struct {
 	rows []*core.Record
 }
 
-// wantsRest reports whether this request arrived on the PostgREST door.
+// wantsRest reports whether this request arrived on the this wire door.
 func wantsRest(e *core.RequestEvent) bool {
 	return restCallOf(e) != nil
 }
@@ -86,7 +85,7 @@ func restCallOf(e *core.RequestEvent) *restCall {
 	return c
 }
 
-// restCount reads the Prefer header. PostgREST computes a total only when asked,
+// restCount reads the Prefer header. The wire computes a total only when asked,
 // and Base's search provider likewise skips the count unless it has to — so
 // "count not requested" maps onto skipTotal rather than onto a discarded number.
 func restCount(e *core.RequestEvent) bool {
@@ -113,7 +112,7 @@ func restList(e *core.RequestEvent) error {
 	return restFail(e, recordsList(e))
 }
 
-// restRender writes the PostgREST shape: the rows as a bare array, and the count
+// restRender writes the this wire shape: the rows as a bare array, and the count
 // in Content-Range rather than in the body. A client that asked for no count
 // gets `*/*` — the honest answer, since the total was never computed. Ranges are
 // inclusive and zero-based, so an empty page is `*/N` and not `0--1/N`.
@@ -158,7 +157,7 @@ func restPaging(e *core.RequestEvent) (page int, perPage int) {
 	return page, perPage
 }
 
-// restQuery translates a PostgREST query string into Base's own.
+// restQuery translates a wire query string into Base's own.
 //
 // Every value a caller supplies crosses as a dbx placeholder ({:pN}) with the
 // value in the params map, never spliced into the expression text — the filter
@@ -194,7 +193,7 @@ func restQuery(in url.Values, counted bool) (url.Values, []restPredicate, error)
 		}
 		offset = n
 	}
-	// Base pages; PostgREST takes an arbitrary offset. Where the two agree the
+	// Base pages; the wire takes an arbitrary offset. Where the two agree the
 	// translation is exact. Where they do not, this REFUSES rather than rounding
 	// to the nearest page — a silently shifted window returns real rows for the
 	// wrong range, which reads as data corruption and not as a paging bug.
@@ -230,9 +229,9 @@ type restPredicate struct {
 	Op   string
 	Vals []string
 
-	// Negate carries PostgREST's `not.` PREFIX, which is not an operator: it
+	// Negate carries the wire's `not.` PREFIX, which is not an operator: it
 	// wraps whatever follows. `not.is.null` is how the wire spells IS NOT NULL,
-	// and the Table Editor offers exactly that, so rejecting the prefix would
+	// and the table editor offers exactly that, so rejecting the prefix would
 	// leave a filter the grid can build and the server cannot answer.
 	Negate bool
 }
@@ -244,13 +243,13 @@ var restReserved = map[string]bool{
 	"on_conflict": true, "columns": true,
 }
 
-// restOps maps PostgREST's operator names onto SQL. `in` and `is` are absent
+// restOps maps the wire's operator names onto SQL. `in` and `is` are absent
 // because neither is a binary operator — restWhere expands them.
 //
 // neq is `<>` and not this store's null-safe `IS DISTINCT FROM`. The two return
 // DIFFERENT ROWS against a nullable column: `<>` drops NULLs, the null-safe form
-// keeps them. We serve PostgREST's wire, so a query written against Supabase has
-// to return what Supabase returns; quietly improving on it is how a migrated app
+// keeps them. We serve the wire's wire, so a query written against another store has
+// to return what another store returns; quietly improving on it is how a migrated app
 // starts showing rows the developer filtered out.
 var restOps = map[string]string{
 	"eq":  "=",
@@ -261,7 +260,7 @@ var restOps = map[string]string{
 	"lte": "<=",
 }
 
-// restPredicates reads the column comparisons out of a PostgREST query.
+// restPredicates reads the column comparisons out of a wire query.
 //
 // Column order is sorted because url.Values iterates randomly, and an expression
 // that varies run to run cannot be reproduced from a log.
@@ -298,7 +297,7 @@ func restPredicates(in url.Values) ([]restPredicate, error) {
 				}
 				preds = append(preds, restPredicate{Col: col, Op: op, Vals: vals, Negate: negate})
 			case "like", "ilike":
-				// PostgREST spells the wildcard *, SQL spells it %.
+				// This wire spells the wildcard *, SQL spells it %.
 				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{strings.ReplaceAll(val, "*", "%")}, Negate: negate})
 			default:
 				if _, ok := restOps[op]; !ok {
@@ -405,7 +404,7 @@ func mergeRestParams(sets ...query.Params) query.Params {
 	return out
 }
 
-// restValues splits PostgREST's `in.(a,b,c)` list, tolerating the parentheses
+// restValues splits the wire's `in.(a,b,c)` list, tolerating the parentheses
 // being present or absent and stripping the quotes it uses around a value that
 // contains a comma.
 func restValues(val string) []string {
@@ -431,7 +430,7 @@ func sortStrings(s []string) {
 }
 
 // restSort maps `order=col.asc,other.desc` onto Base's `sort=+col,-other`.
-// A bare column is ascending, which is PostgREST's default and SQL's.
+// A bare column is ascending, which is this wire's default and SQL's.
 func restSort(order string) (string, error) {
 	parts := strings.Split(order, ",")
 	terms := make([]string, 0, len(parts))
@@ -450,7 +449,7 @@ func restSort(order string) (string, error) {
 		case dir == "desc":
 			terms = append(terms, "-"+col)
 		default:
-			// nullsfirst/nullslast ride along in PostgREST; this store has no way
+			// nullsfirst/nullslast ride along on this wire; this store has no way
 			// to express them, and honouring the direction while dropping the
 			// null placement would answer a different question silently.
 			return "", fmt.Errorf("order %q: only asc and desc are supported", raw)
@@ -461,7 +460,7 @@ func restSort(order string) (string, error) {
 
 // --- writes -----------------------------------------------------------------
 //
-// PostgREST's writes are FILTERED where Base's are by-id: PATCH /posts?id=eq.7
+// The wire's writes are FILTERED where Base's are by-id: PATCH /posts?id=eq.7
 // updates every row the filter selects, and Base's handler updates the one row
 // its path names. So the door resolves the filter to rows first and then drives
 // Base's own handler once per row, which is what keeps the create/update/delete
@@ -472,14 +471,13 @@ func restSort(order string) (string, error) {
 // touch what they can already see; the per-row handler then applies the write
 // rule on top. Visibility and mutation stay two separate questions.
 
-// restBodyLimit bounds how many rows one filtered write may touch. PostgREST has
-// no such bound and neither does postgrest-js, which is how an unfiltered DELETE
+// restBodyLimit bounds how many rows one filtered write may touch. The wire states no such bound and no client applies one, which is how an unfiltered DELETE
 // empties a table. Refusing past a ceiling turns the catastrophic case into an
 // error someone reads.
 const restWriteCeiling = 500
 
 // restCreate inserts one row. A bulk insert (a JSON array body) is refused
-// rather than looped: PostgREST inserts an array in ONE statement, so a partial
+// rather than looped: The wire inserts an array in ONE statement, so a partial
 // failure rolls the whole thing back, and looping would half-apply it and report
 // success for the rows that landed. Base's own batch plane is the honest home
 // for that, and it ships disabled.
@@ -545,7 +543,7 @@ func restWriteOverRows(e *core.RequestEvent, apply func(*core.RequestEvent, stri
 	if err != nil {
 		return restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
 	}
-	// An unfiltered PATCH or DELETE means every row. PostgREST allows it and the
+	// An unfiltered PATCH or DELETE means every row. this wire allows it and the
 	// client sends it without comment, so the first time anyone discovers it is
 	// after the table is empty. This refuses instead, and says how to mean it.
 	if len(preds) == 0 {
@@ -626,13 +624,12 @@ func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []
 	return ids, nil
 }
 
-// restFault is PostgREST's error body. The field names are not decoration: a
+// restFault is The wire's error body. The field names are not decoration: a
 // client BRANCHES on `code` (PGRST1xx, or a raw SQLSTATE like 23505 for a unique
-// violation), and postgrest-js recovers a zero-row .maybeSingle() write by
-// string-matching `details` for "0 rows". Base's own {data,message,status} body
+// violation), and a client recovers a zero-row single-row write by string-matching `details` for "0 rows". Base's own {data,message,status} body
 // carries neither, so on that body every `error.code === '23505'` branch in a
 // migrated app is dead and every maybeSingle write surfaces an error where
-// Supabase returns {data: null, error: null}.
+// another store returns {data: null, error: null}.
 type restFault struct {
 	Message string `json:"message"`
 	Details string `json:"details"`
@@ -650,8 +647,8 @@ func restWantsObject(e *core.RequestEvent) bool {
 	return strings.Contains(e.Request.Header.Get("Accept"), "application/vnd.pgrst.object+json")
 }
 
-// restReturns reports what the caller wants back. PostgREST returns nothing
-// unless asked, and postgrest-js reads an empty body as exactly that.
+// restReturns reports what the caller wants back. The wire returns nothing unless asked, and a client reads an empty body as
+// exactly that.
 func restReturns(e *core.RequestEvent) bool {
 	for _, raw := range e.Request.Header.Values("Prefer") {
 		if strings.Contains(raw, "return=representation") {
@@ -689,14 +686,14 @@ func restWriteRender(e *core.RequestEvent, rows []*core.Record, affected int) er
 	return e.JSON(http.StatusOK, rows)
 }
 
-// restFail renders any failure on this door in PostgREST's error shape.
+// restFail renders any failure on this door in the wire's error shape.
 //
 // A client reads `code` and branches on it, so an error that arrives as Base's
 // {data,message,status} is an error the caller cannot act on: every
 // `error.code === '23505'` branch in a migrated app is dead against that body.
 // A unique violation is the one that matters most, because handling a duplicate
 // is ordinary application logic rather than an exceptional case — it becomes 409
-// with the SQLSTATE, which is what postgrest answers and what clients test for.
+// with the SQLSTATE, which is what the wire states and what clients test for.
 func restFail(e *core.RequestEvent, err error) error {
 	if err == nil {
 		return nil
@@ -737,8 +734,7 @@ func restNotUnique(apiErr *router.ApiError) (string, bool) {
 	return "", false
 }
 
-// restCodeFor gives a failure the PGRST code its status implies. PostgREST's own
-// codes are finer than this, but a wrong specific code is worse than an honest
+// restCodeFor gives a failure the PGRST code its status implies. The wire's own codes are finer than this, but a wrong specific code is worse than an honest
 // general one — a client branching on it would take the wrong path.
 func restCodeFor(status int) string {
 	switch status {
