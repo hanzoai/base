@@ -102,7 +102,7 @@ func restCount(e *core.RequestEvent) bool {
 func restList(e *core.RequestEvent) error {
 	q, preds, err := restQuery(e.Request.URL.Query(), restCount(e))
 	if err != nil {
-		return e.BadRequestError(err.Error(), err)
+		return restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
 	}
 
 	e.Request.URL.RawQuery = q.Encode()
@@ -598,7 +598,7 @@ func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []
 
 	where, err := restWhere(resolver, preds)
 	if err != nil {
-		return nil, e.BadRequestError(err.Error(), err)
+		return nil, restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
 	}
 	if where != nil {
 		q.AndWhere(where)
