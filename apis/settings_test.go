@@ -364,16 +364,14 @@ func TestSettingsTestEmail(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"email":{"code":"validation_required"`,
-				`"template":{"code":"validation_required"`,
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},
 		{
-			Name:   "authorized as superuser (verifiation template)",
+			Name:   "authorized as superuser",
 			Method: http.MethodPost,
 			URL:    "/v1/settings/test/email",
 			Body: strings.NewReader(`{
-				"template": "verification",
 				"email": "test@example.com"
 			}`),
 			Headers: map[string]string{
@@ -381,63 +379,26 @@ func TestSettingsTestEmail(t *testing.T) {
 			},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				if app.TestMailer.TotalSend() != 1 {
-					t.Fatalf("[verification] Expected 1 sent email, got %d", app.TestMailer.TotalSend())
+					t.Fatalf("Expected 1 sent email, got %d", app.TestMailer.TotalSend())
 				}
 
-				if len(app.TestMailer.LastMessage().To) != 1 {
-					t.Fatalf("[verification] Expected 1 recipient, got %v", app.TestMailer.LastMessage().To)
+				msg := app.TestMailer.LastMessage()
+
+				if len(msg.To) != 1 || msg.To[0].Address != "test@example.com" {
+					t.Fatalf("Expected the email sent to test@example.com, got %v", msg.To)
 				}
 
-				if app.TestMailer.LastMessage().To[0].Address != "test@example.com" {
-					t.Fatalf("[verification] Expected the email to be sent to %s, got %s", "test@example.com", app.TestMailer.LastMessage().To[0].Address)
-				}
-
-				if !strings.Contains(app.TestMailer.LastMessage().HTML, "Verify") {
-					t.Fatalf("[verification] Expected to sent a verification email, got \n%v\n%v", app.TestMailer.LastMessage().Subject, app.TestMailer.LastMessage().HTML)
+				// The send proves SMTP reaches the address and nothing else —
+				// there is no flow behind it to complete, so no token and no link.
+				if !strings.Contains(msg.HTML, "SMTP settings work") {
+					t.Fatalf("Expected the email to state what it proves, got \n%v\n%v", msg.Subject, msg.HTML)
 				}
 			},
 			ExpectedStatus:  204,
 			ExpectedContent: []string{},
 			ExpectedEvents: map[string]int{
-				"*":                              0,
-				"OnMailerSend":                   1,
-				"OnMailerRecordVerificationSend": 1,
-			},
-		},
-		{
-			Name:   "authorized as superuser (email change)",
-			Method: http.MethodPost,
-			URL:    "/v1/settings/test/email",
-			Body: strings.NewReader(`{
-				"template": "email-change",
-				"email": "test@example.com"
-			}`),
-			Headers: map[string]string{
-				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
-			},
-			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-				if app.TestMailer.TotalSend() != 1 {
-					t.Fatalf("[email-change] Expected 1 sent email, got %d", app.TestMailer.TotalSend())
-				}
-
-				if len(app.TestMailer.LastMessage().To) != 1 {
-					t.Fatalf("[email-change] Expected 1 recipient, got %v", app.TestMailer.LastMessage().To)
-				}
-
-				if app.TestMailer.LastMessage().To[0].Address != "test@example.com" {
-					t.Fatalf("[email-change] Expected the email to be sent to %s, got %s", "test@example.com", app.TestMailer.LastMessage().To[0].Address)
-				}
-
-				if !strings.Contains(app.TestMailer.LastMessage().HTML, "Confirm new email") {
-					t.Fatalf("[email-change] Expected to sent a confirm new email email, got \n%v\n%v", app.TestMailer.LastMessage().Subject, app.TestMailer.LastMessage().HTML)
-				}
-			},
-			ExpectedStatus:  204,
-			ExpectedContent: []string{},
-			ExpectedEvents: map[string]int{
-				"*":                             0,
-				"OnMailerSend":                  1,
-				"OnMailerRecordEmailChangeSend": 1,
+				"*":            0,
+				"OnMailerSend": 1,
 			},
 		},
 	}

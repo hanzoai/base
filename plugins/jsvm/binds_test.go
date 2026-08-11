@@ -788,44 +788,6 @@ func TestDbxBinds(t *testing.T) {
 	}
 }
 
-func TestMailsBindsCount(t *testing.T) {
-	vm := goja.New()
-	mailsBinds(vm)
-
-	testBindsCount(vm, "$mails", 2, t)
-}
-
-func TestMailsBinds(t *testing.T) {
-	app, _ := tests.NewTestApp()
-	defer app.Cleanup()
-
-	record, err := app.FindAuthRecordByEmail("users", "test@example.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	vm := goja.New()
-	baseBinds(vm)
-	mailsBinds(vm)
-	vm.Set("$app", app)
-	vm.Set("record", record)
-
-	_, vmErr := vm.RunString(`
-		$mails.sendRecordVerification($app, record);
-		if (!$app.testMailer.lastMessage().html.includes("/_/#/auth/confirm-verification/")) {
-			throw new Error("Expected record verification email, got:" + JSON.stringify($app.testMailer.lastMessage()))
-		}
-
-		$mails.sendRecordChangeEmail($app, record, "new@example.com");
-		if (!$app.testMailer.lastMessage().html.includes("/_/#/auth/confirm-email-change/")) {
-			throw new Error("Expected record email change email, got:" + JSON.stringify($app.testMailer.lastMessage()))
-		}
-	`)
-	if vmErr != nil {
-		t.Fatal(vmErr)
-	}
-}
-
 func TestSecurityBindsCount(t *testing.T) {
 	vm := goja.New()
 	securityBinds(vm)
@@ -1594,7 +1556,7 @@ func TestHooksBindsCount(t *testing.T) {
 	vm := goja.New()
 	hooksBinds(app, vm, nil)
 
-	testBindsCount(vm, "this", 74, t)
+	testBindsCount(vm, "this", 72, t)
 }
 
 func TestHooksBinds(t *testing.T) {

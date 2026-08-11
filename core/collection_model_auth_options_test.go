@@ -151,26 +151,6 @@ func TestCollectionAuthOptionsValidate(t *testing.T) {
 			},
 			expectedErrors: []string{"fileToken"},
 		},
-
-		// templates
-		{
-			name: "trigger verificationTemplate validations",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.VerificationTemplate.Body = ""
-				return c, nil
-			},
-			expectedErrors: []string{"verificationTemplate"},
-		},
-		{
-			name: "trigger confirmEmailChangeTemplate validations",
-			collection: func(app core.App) (*core.Collection, error) {
-				c := core.NewAuthCollection("new_auth")
-				c.ConfirmEmailChangeTemplate.Body = ""
-				return c, nil
-			},
-			expectedErrors: []string{"confirmEmailChangeTemplate"},
-		},
 	}
 
 	for _, s := range scenarios {
