@@ -838,12 +838,26 @@ func TestIAMSuperuserMirror(t *testing.T) {
 			content: []string{`"totalItems"`, `"_superusers"`},
 		},
 		{
-			name: "a home org of admin is the same membership",
+			// `owner` is the org of the APPLICATION a token was minted through,
+			// so honoring it would hand platform authority to everyone who
+			// signed in through an admin-org app.
+			name: "an app owned by the admin org, signed in to by an ordinary user",
 			claims: jwt.MapClaims{
-				"sub": "admin/root", "owner": "admin", "email": "root@hanzo.ai",
+				"sub": "acme/dev", "owner": "admin", "email": "dev@acme.test",
+				"orgs": []any{map[string]any{"org": "acme", "role": "admin"}},
 			},
-			status:  200,
-			content: []string{`"totalItems"`, `"_superusers"`},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+		{
+			// A client_credentials token carries no membership set at all,
+			// which is how a machine is told apart from a person.
+			name: "a machine token minted by an admin-org client",
+			claims: jwt.MapClaims{
+				"sub": "admin/kms", "owner": "admin", "token_type": "access-token",
+			},
+			status:  403,
+			content: []string{`"status":403`},
 		},
 		{
 			name: "admin of an ordinary org, over every org it administers",

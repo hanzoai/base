@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/hanzoai/authz"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/routine"
 	"github.com/hanzoai/base/tools/security"
-	"github.com/hanzoai/iam/pkg/model"
-	"github.com/hanzoai/iam/pkg/store"
 	"github.com/spf13/cast"
 )
 
@@ -358,7 +358,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// rule engine can evaluate it. No writes to _superusers or users collections.
 
 	collectionName := core.CollectionNameSuperusers
-	if !superuser(owner, claims["orgs"]) {
+	if !platformSudo(claims) {
 		collectionName = "users"
 		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 			collectionName = v
@@ -386,48 +386,39 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	return record, nil
 }
 
-// superuser reports whether a verified IAM token speaks for a member of the
-// reserved admin org — the SuperAdmin scope, and the only claim that mirrors
-// onto _superusers.
+// platformSudo reports whether verified claims carry platform authority — the
+// one cross-tenant scope, and the only thing that mirrors onto _superusers.
 //
-// Two claims carry that one membership. `owner` is the home org, which
-// store.IsSuperAdmin answers directly; `orgs` is the rest of the membership set,
-// and IAM lets only a SuperAdmin put an entry for a reserved org in there
-// (internal/memberships mayGrant), so an entry naming the admin org is IAM
-// stating the caller holds admin-org tenancy.
+// The question is asked, not restated: authz.Claims.PlatformSudo is the estate's
+// published predicate, the same one the gateway mints X-User-IsAdmin from and
+// cloud reads. Base holding a second definition is how platform authority comes
+// to mean two things in two places, so it holds none — it decodes the verified
+// claims through the type the issuer signs and lets that answer.
 //
-// A role of "admin" on an ordinary org is a different, org-scoped question and
-// never answers this one: _superusers is unscoped inside the process — schema,
-// settings, backups and logs are all process-wide, and one process serves every
-// org's Base — so granting it from an org's own admin would hand one tenant
-// authority over the rest.
-func superuser(owner string, orgs any) bool {
-	if store.IsSuperAdmin(owner) {
-		return true
-	}
-	for _, ref := range orgRefs(orgs) {
-		if store.IsSuperAdmin(ref.Org) {
-			return true
-		}
-	}
-	return false
-}
-
-// orgRefs decodes the `orgs` claim through IAM's own claim type, so the JSON
-// contract has one definition rather than a second spelling here. Anything that
-// does not decode yields no memberships.
-func orgRefs(claim any) []model.OrgRef {
-	raw, err := json.Marshal(claim)
+// Notably NOT the `owner` claim. IAM stamps `owner` with the organization of the
+// APPLICATION a token was minted through, not the subject's own, so reading it
+// makes platform authority a property of the app: everyone who signed in through
+// an admin-org application would arrive holding it. The authority is membership
+// of the reserved admin org, which only an existing platform admin can grant.
+//
+// An `admin` role on an ordinary org is a different, org-scoped authority and
+// answers nothing here. _superusers is unscoped inside the process — schema,
+// settings, backups and logs are process-wide, and one process serves many orgs'
+// Bases — so honoring an org's own admin would hand one tenant the rest.
+//
+// Claims that do not decode carry no authority.
+func platformSudo(claims jwt.MapClaims) bool {
+	raw, err := json.Marshal(claims)
 	if err != nil {
-		return nil
+		return false
 	}
 
-	var refs []model.OrgRef
-	if err := json.Unmarshal(raw, &refs); err != nil {
-		return nil
+	var c authz.Claims
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return false
 	}
 
-	return refs
+	return c.PlatformSudo()
 }
 
 // subToRecordID converts an OIDC sub claim (which may be a UUID, slug, or
