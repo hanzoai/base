@@ -19,11 +19,12 @@ import { IAM } from '@hanzo/iam/browser';
 const serverUrl = import.meta.env.VITE_IAM_URL || 'https://hanzo.id';
 const clientId = import.meta.env.VITE_IAM_CLIENT_ID || 'hanzo-base';
 
-// The callback lives under the admin mount (Vite BASE_URL, e.g. `/_/`). The Go
-// static handler serves index.html for unknown deep links, so the SPA router
-// resolves `/_/auth/callback` client-side.
+// Derived from the admin mount (Vite BASE_URL) rather than written out, so the
+// redirect this SPA asks for and the address it is served at cannot disagree —
+// and the issuer must accept whatever comes out. The Go static handler serves
+// index.html for unknown deep links, so the router resolves it client-side.
 function redirectUri(): string {
-  const mount = import.meta.env.BASE_URL; // '/_/' — trailing slash
+  const mount = import.meta.env.BASE_URL; // ends in a slash
   return `${window.location.origin}${mount}auth/callback`;
 }
 

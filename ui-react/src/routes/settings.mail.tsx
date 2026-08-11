@@ -118,7 +118,7 @@ function MailSettings() {
                             </label>
                             <label className="field">
                                 <span className="field__label">Action URL</span>
-                                <input { ...register('actionUrl') } className="input" placeholder="{APP_URL}/_/#/auth/confirm-..." />
+                                <input { ...register('actionUrl') } className="input" placeholder="{APP_URL}" />
                             </label>
                             <label className="field">
                                 <span className="field__label">Body (HTML)</span>
