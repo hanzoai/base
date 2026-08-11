@@ -6,7 +6,7 @@
 //	var creds = org.getCreds(orgId, "commerce")
 //	var config = org.getConfig(orgId)
 //	var customer = org.getCustomer(orgId, userId)
-package platform
+package org
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ const orgCacheTTL = 5 * time.Minute
 type OrgService struct {
 	app    core.App
 	kms    *KMSClient
-	config PlatformConfig
+	config Config
 
 	configCache sync.Map // orgId -> *orgConfigEntry
 	credsCache  sync.Map // "orgId/provider" -> *credsCacheEntry

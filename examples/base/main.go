@@ -17,7 +17,7 @@ import (
 	"github.com/hanzoai/base/plugins/ghupdate"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
-	"github.com/hanzoai/base/plugins/platform"
+	"github.com/hanzoai/base/plugins/org"
 	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
@@ -123,13 +123,13 @@ func main() {
 
 	// Per-org platform (IAM + KMS integration).
 	// PrincipalIsolation="sqlite" gives every org its own encrypted Liquid SQL
-	// database and every user a per-user database (see plugins/platform/org_db.go).
+	// database and every user a per-user database (see plugins/org/org_db.go).
 	// The bootnode plugin's collections are resolved per-org through this.
-	platform.MustRegister(app, platform.PlatformConfig{
+	org.MustRegister(app, org.Config{
 		// Accept the canonical *_ENDPOINT name or the *_URL alias so a
 		// deployment can set either without config drift (one way to
 		// configure Base's upstreams, two accepted spellings). Mirrors the
-		// resolution in plugins/platform/kms_helpers.go.
+		// resolution in plugins/org/kms_helpers.go.
 		IAMEndpoint:            envAny("IAM_ENDPOINT", "IAM_URL"),
 		KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
 		IAMClientID:            os.Getenv("IAM_CLIENT_ID"),

@@ -1,4 +1,4 @@
-package platform
+package org
 
 import (
 	"github.com/hanzoai/base/core"

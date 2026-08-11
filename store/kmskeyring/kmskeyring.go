@@ -10,7 +10,7 @@
 //
 // kmskeyring depends only on the minimal SecretStore contract so the store
 // substrate stays orthogonal to any specific KMS transport. Production wires
-// the canonical Base→KMS facade (plugins/platform.KMSClient) with a trivial
+// the canonical Base→KMS facade (plugins/org.KMSClient) with a trivial
 // adapter:
 //
 //	type kmsAdapter struct{ c *platform.KMSClient }
