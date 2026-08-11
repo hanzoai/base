@@ -423,30 +423,61 @@ the address it is served at and the redirect it asks for cannot disagree.
 The admin is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default — production
 services are headless `/v1` APIs); the `/v1` data plane is always on.
 
-## Storage tier (`BASE_DB_TIER`) — sqlite is the only one that works
+## Storage tier (`BASE_DB_TIER`) — sqlite and sql both run the data plane
 
-`BASE_DB_TIER=sql` opens a PostgreSQL connection and is documented as a
-per-instance upgrade. It is not one yet, and the reason is worth stating rather
-than leaving to be discovered: Base writes SQLite-flavoured SQL directly — 21
-`strftime`, 6 `sqlite_master`, 3 `json_extract`, 3 `json_each` across 39 files
-that build raw queries. Postgres spells all four differently, so the tier
-selects a backend the queries cannot address.
+`BASE_DB_TIER=sql` opens PostgreSQL and serves the whole `/v1` data plane on it:
+migrations, collection DDL, record CRUD, paging, sorting, filtering, the
+per-hour log rollup. Proved by running it — a collection created over the API
+lands as a real table with `text`/`numeric`/`jsonb` columns and its declared
+index, and records list, page, sort, filter, update and delete through the same
+handlers SQLite serves.
 
-There WAS something that looked like the missing piece: `core.SQLDialect`, 345
-lines over three files, 22 methods covering exactly these differences —
-placeholders, `json_extract`, `strftime`, `AUTOINCREMENT`, `RETURNING`. Nothing
-ever called it. Not one caller, in the whole repo, since it was written. It made
-the codebase read as though the abstraction existed, which is the most likely
-reason nobody noticed the tier could not work, so it is gone.
+Nothing in Base branches on the engine. It asks `app.Dialect()`, which resolves
+from the driver the data DB was opened with, for the pieces that differ:
 
-The abstraction to adopt is `hanzoai/orm`, already a dependency (used today only
-in `tools/search` for query building). Its `engine` package opens by driver name
-— `NewEngine(driver, dsn)` — and carries postgres, sqlite and mysql, including
-the `?` to `$N` placeholder rewrite that the dead interface promised. Routing
-Base's raw queries through it is what makes `sql` real; a second hand-rolled
-dialect is what was just deleted.
+| what differs | reached through |
+|---|---|
+| JSON accessors over a column that may hold a bare scalar | `Each`, `Length`, `Extract`, `Array`, `Last`, wrapped for dbx bracketing in `tools/dbutils/json.go` |
+| the schema's own objects | `Catalog()` (type, name, tbl_name, sql) and `Columns()` (tbl_name, cid, name, type, notnull, dflt_value, pk) — every catalog read in `core/db_table.go` |
+| generated values in DDL | `Now()`, `Random(n)`, `Json()`, `Bytes()` |
+| identifier quoting for hand-built index DDL | `Quote()`, used by `dbutils.Index.Build` |
+| what the engine has no equivalent of | `Row()`, `Checkpoint()`, `Format()`, each empty where the feature is absent, so the caller falls back or refuses |
+| what the schema needs before it exists | `Prelude()` — Postgres gets a nondeterministic ICU collation named `nocase`, so `COLLATE NOCASE` means the same thing on both |
 
-No deployment sets the variable, so nothing regresses in the meantime.
+The dialect lives in `hanzoai/orm/dialect`, not here. That is the point: the
+thing this repo must not grow is a second hand-rolled dialect, and the estate's
+relational package is where one belongs. `core.SQLDialect` — 345 lines, 22
+methods, zero callers — was deleted for being exactly that, and it made the
+codebase read as though the abstraction existed, which is the most likely reason
+nobody noticed the tier could not work.
+
+`orm/engine` was not it. That package is an xorm-compatible bean ORM: Session,
+struct tags, reflection over `TableMeta`. Base's collections are defined at
+runtime, so there are no structs to reflect over, and Base's relational plane is
+`hanzoai/dbx` — which `orm/query` re-exports as identity aliases, so Base is
+already on orm's SQL surface under another import path. The one thing `engine`
+has that Base needs, `?` to `$N`, dbx's `PgsqlBuilder` already does. What was
+missing was the spelling of the four functions, and none of it was exported.
+
+Portable spellings that replaced an engine-specific one outright, with no
+dialect involved: the hourly log bucket is `substr(created, 1, 13) || ':00:00'`
+rather than a calendar function, because an instant is stored as text in a fixed
+layout and an index can be built on the substring; equality is
+`IS NOT DISTINCT FROM` rather than SQLite's `IS`; every outer join states a
+condition, because only some engines let one be omitted; an `int64` column is
+`BIGINT`, since `INTEGER` is 32 bits outside SQLite.
+
+Known limit, and it is a type question rather than a spelling one: comparing a
+JSON sub-path to a **number** under Postgres is refused by the engine. The
+extraction yields text and the literal binds as a number, and nothing in the
+filter language says which of the two the comparison meant — SQLite dodges this
+by being dynamically typed. `meta.n = "3"` works; `meta.n = 3` does not.
+
+Also SQLite-only by design, and not on the sql path: the per-tenant `store/`
+databases, the WAL/PITR replication in `network/`, and `hack/pitr-restore.go`.
+The filter language's `strftime()` is refused on an engine that has no such
+function rather than approximated — its format string and its modifiers are
+SQLite's, down to the spelling of a month.
 
 ## SQLite driver — one driver, OUR way (`github.com/hanzoai/sqlite`)
 
