@@ -16,8 +16,13 @@ import (
 //
 // Directory layout:
 //
-//	{DataDir}/orgs/{orgSlug}/org.db              ← org-level shared data
+//	{DataDir}/orgs/{orgSlug}/data.db                 ← the org's Base
 //	{DataDir}/orgs/{orgSlug}/users/{userId}/data.db  ← per-user PII + keys
+//
+// An org's directory is the data dir of a Base, so the file in it is named the
+// way every Base names its data file. It was org.db, which is one name too
+// many: the directory already says whose it is, and the second name made the
+// file look like something other than a Base.
 //
 // Each file gets its own key, derived by github.com/hanzoai/cek from the master
 // key and the namespace naming whose data it is:
@@ -78,7 +83,7 @@ func (t *OrgDB) OrgDir(orgSlug string) string {
 
 // OrgDBPath returns the org-level SQLite database path.
 func (t *OrgDB) OrgDBPath(orgSlug string) string {
-	return filepath.Join(t.OrgDir(orgSlug), "org.db")
+	return filepath.Join(t.OrgDir(orgSlug), "data.db")
 }
 
 // The subsystem each key belongs to. One store is one subsystem, so these name
@@ -115,7 +120,12 @@ func (t *OrgDB) OrgDEK(orgSlug string) (string, error) {
 	return t.dek(ns, orgDEKSubsystem)
 }
 
-// ProvisionOrg creates the org directory and org-level database.
+// ProvisionOrg creates an org's directory and returns it. What goes in it is
+// the Base's business — see [bases.base], which opens one there.
+//
+// It deliberately does not record the org as having a database. It used to,
+// which meant an org counted as provisioned the moment a directory existed and
+// /v1/bases reported a Base that was not there yet.
 func (t *OrgDB) ProvisionOrg(orgSlug string) (string, error) {
 	if err := validateSlug(orgSlug); err != nil {
 		return "", fmt.Errorf("invalid org slug: %w", err)
@@ -129,13 +139,7 @@ func (t *OrgDB) ProvisionOrg(orgSlug string) (string, error) {
 		return "", fmt.Errorf("create org users dir: %w", err)
 	}
 
-	dbPath := t.OrgDBPath(orgSlug)
-
-	t.mu.Lock()
-	t.dbs["org:"+orgSlug] = dbPath
-	t.mu.Unlock()
-
-	return dbPath, nil
+	return dir, nil
 }
 
 // --- Per-user database ---

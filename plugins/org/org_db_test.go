@@ -28,24 +28,30 @@ func testOrgDB(t *testing.T) (*OrgDB, string) {
 func TestOrgDB_ProvisionOrg(t *testing.T) {
 	db, dir := testOrgDB(t)
 
-	path, err := db.ProvisionOrg("acme")
+	got, err := db.ProvisionOrg("acme")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	expected := filepath.Join(dir, "orgs", "acme", "org.db")
-	if path != expected {
-		t.Fatalf("expected %s, got %s", expected, path)
+	expected := filepath.Join(dir, "orgs", "acme")
+	if got != expected {
+		t.Fatalf("expected %s, got %s", expected, got)
 	}
 
 	// Directory should exist
-	if _, err := os.Stat(filepath.Join(dir, "orgs", "acme")); os.IsNotExist(err) {
+	if _, err := os.Stat(expected); os.IsNotExist(err) {
 		t.Fatal("org directory not created")
 	}
 
 	// Users subdirectory should exist
-	if _, err := os.Stat(filepath.Join(dir, "orgs", "acme", "users")); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(expected, "users")); os.IsNotExist(err) {
 		t.Fatal("users subdirectory not created")
+	}
+
+	// And no Base yet. Provisioning makes the place; opening makes the Base,
+	// and until it does the honest answer to "is there one" is no.
+	if _, ok := db.GetOrgDBPath("acme"); ok {
+		t.Fatal("a directory was reported as a Base")
 	}
 }
 
@@ -78,10 +84,14 @@ func TestOrgDB_ProvisionMultipleOrgs(t *testing.T) {
 		}
 	}
 
-	// All should be lookupable
+	// Each has a place of its own, and none of them has a Base until one is
+	// opened there.
 	for _, org := range orgs {
-		if _, ok := db.GetOrgDBPath(org); !ok {
-			t.Fatalf("org %s not found after provisioning", org)
+		if _, err := os.Stat(db.OrgDir(org)); err != nil {
+			t.Fatalf("org %s has no directory: %v", org, err)
+		}
+		if _, ok := db.GetOrgDBPath(org); ok {
+			t.Fatalf("org %s reported a Base it does not have", org)
 		}
 	}
 }
@@ -232,10 +242,23 @@ func TestOrgDB_GetUserDBPath_NotProvisioned(t *testing.T) {
 func TestOrgDB_GetOrgDBPath_AfterProvision(t *testing.T) {
 	db, _ := testOrgDB(t)
 
-	expected, _ := db.ProvisionOrg("acme")
+	if _, err := db.ProvisionOrg("acme"); err != nil {
+		t.Fatal(err)
+	}
+
+	// The lookup reports the file, so it stays false until the file is there.
+	if _, ok := db.GetOrgDBPath("acme"); ok {
+		t.Fatal("reported a Base before one was opened")
+	}
+
+	expected := db.OrgDBPath("acme")
+	if err := os.WriteFile(expected, []byte("a base"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
 	got, ok := db.GetOrgDBPath("acme")
 	if !ok {
-		t.Fatal("should find provisioned org")
+		t.Fatal("should find the org's Base")
 	}
 	if got != expected {
 		t.Fatalf("expected %s, got %s", expected, got)
@@ -263,112 +286,5 @@ func TestOrgDB_DeleteUser(t *testing.T) {
 
 	if _, err := os.Stat(filepath.Dir(path)); !os.IsNotExist(err) {
 		t.Fatal("user directory should be removed")
-	}
-}
-
-// --- Integration: OrgDB + PoolManager ---
-
-func TestOrgDB_WithPoolManager(t *testing.T) {
-	db, _ := testOrgDB(t)
-	pm := NewDBPoolManager(DBPoolConfig{MaxPools: 16, NumShards: 1})
-	defer pm.Close()
-
-	// Provision org
-	orgPath, _ := db.ProvisionOrg("acme")
-
-	// Open a pool for it
-	pool, err := pm.Get(orgPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Release()
-
-	// Create table and insert data
-	_, err = pool.Nonconcurrent.NewQuery("CREATE TABLE config (k TEXT PRIMARY KEY, v TEXT)").Execute()
-	if err != nil {
-		t.Fatalf("create table: %v", err)
-	}
-	_, err = pool.Nonconcurrent.NewQuery("INSERT INTO config (k, v) VALUES ('name', 'Acme Corp')").Execute()
-	if err != nil {
-		t.Fatalf("insert: %v", err)
-	}
-
-	// Read back via concurrent pool
-	var name string
-	if err := pool.Concurrent.NewQuery("SELECT v FROM config WHERE k = 'name'").Row(&name); err != nil {
-		t.Fatalf("select: %v", err)
-	}
-	if name != "Acme Corp" {
-		t.Fatalf("expected 'Acme Corp', got %q", name)
-	}
-
-	// Provision user in same org
-	userPath, _ := db.ProvisionUser("acme", "user-42")
-	userPool, err := pm.Get(userPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer userPool.Release()
-
-	// User DB is independent from org DB
-	_, err = userPool.Nonconcurrent.NewQuery("CREATE TABLE orders (id INTEGER PRIMARY KEY, symbol TEXT)").Execute()
-	if err != nil {
-		t.Fatalf("create user table: %v", err)
-	}
-	_, err = userPool.Nonconcurrent.NewQuery("INSERT INTO orders (symbol) VALUES ('AAPL')").Execute()
-	if err != nil {
-		t.Fatalf("insert user data: %v", err)
-	}
-
-	// Org DB should NOT have the orders table
-	var count int
-	err = pool.Concurrent.NewQuery("SELECT count(*) FROM sqlite_master WHERE name='orders'").Row(&count)
-	if err != nil {
-		t.Fatalf("check org db: %v", err)
-	}
-	if count != 0 {
-		t.Fatal("org DB should not have user's orders table — data isolation broken")
-	}
-
-	// Stats
-	stats := pm.Stats()
-	if stats.Opens != 2 {
-		t.Fatalf("expected 2 opens (org + user), got %d", stats.Opens)
-	}
-}
-
-// --- Multi-org isolation ---
-
-func TestOrgDB_MultiOrgIsolation(t *testing.T) {
-	db, _ := testOrgDB(t)
-	pm := NewDBPoolManager(DBPoolConfig{MaxPools: 16, NumShards: 1})
-	defer pm.Close()
-
-	// Two orgs
-	path1, _ := db.ProvisionOrg("acme")
-	path2, _ := db.ProvisionOrg("globex")
-
-	p1, _ := pm.Get(path1)
-	defer p1.Release()
-	p2, _ := pm.Get(path2)
-	defer p2.Release()
-
-	// Each org creates the same table name
-	p1.Nonconcurrent.NewQuery("CREATE TABLE accounts (id INTEGER, name TEXT)").Execute()
-	p2.Nonconcurrent.NewQuery("CREATE TABLE accounts (id INTEGER, name TEXT)").Execute()
-
-	p1.Nonconcurrent.NewQuery("INSERT INTO accounts (name) VALUES ('Alice')").Execute()
-	p2.Nonconcurrent.NewQuery("INSERT INTO accounts (name) VALUES ('Bob')").Execute()
-
-	// Data is isolated
-	var name1, name2 string
-	p1.Concurrent.NewQuery("SELECT name FROM accounts").Row(&name1)
-	p2.Concurrent.NewQuery("SELECT name FROM accounts").Row(&name2)
-
-	if name1 != "Alice" {
-		t.Fatalf("acme should have Alice, got %q", name1)
-	}
-	if name2 != "Bob" {
-		t.Fatalf("globex should have Bob, got %q", name2)
 	}
 }

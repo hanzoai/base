@@ -111,31 +111,40 @@ and presence, catastrophic the moment records go over it); a JWKS validation
 failure still admits a local token for `_superusers`; and the multi-match
 subquery degrades to `0=1`, which fails OPEN under negation.
 
-### Per-tenant storage — the shard is resolved and then dropped
+### Per-tenant storage — the request reaches the org's Base
 
-`plugins/org` resolves an org DB, opens a pool, sets `orgDB` on the request — and
-**nothing reads it**. Every `/v1` request goes to the shared `data.db`. Isolation
-today is zero, not weak. `ProvisionOrg` only `MkdirAll`s, so a shard has no
-schema; `OrgDEK`/`UserDEK` have no production callers, so shards are plaintext.
+An org's Base is a Base: `{DataDir}/orgs/{org}/data.db`, bootstrapped on first
+use, with its own collections, settings and logs. `loadAuthToken` resolves the
+org from the verified token and points `RequestEvent.App` at that Base before any
+handler runs, so every read and write in `/v1` lands there with no handler
+knowing anything about tenancy. `apis.Bases` is the one lookup from org to Base;
+`plugins/org` registers it, and a deployment that does not has exactly one Base.
 
-Two consequences to act on before anything else here:
-- Enabling `orm/replicated` before wiring the DEK into the open path streams
-  **plaintext tenant databases** to object storage.
-- `CreateBackup` zips the whole `DataDir`, so one tenant's backup contains every
-  tenant's database.
+The org is `authz.Claims` home-first membership, never the `owner` claim — IAM
+stamps `owner` with the org of the APPLICATION a token was minted through, so
+reading it put every tenant of one application on one file. `X-Org-Id` and the
+rest of the identity headers are deleted on ingress by `tools/claims`: inbound
+they are a client asserting an identity. The header is read once first, as the
+org a request SAYS it means, and honored only where the token already carries it
+— naming any other org is 403, because an empty list reads as an empty Base.
 
-The primitive to adopt is `orm/db.Namespaces` — one SQLite file per namespace,
-remote as source of truth, bounded open handles, coldest evicted, materialize on
-miss. A namespace is one opaque string, so org/user/project is just more slashes.
-Base carries four competing per-tenant designs today and `store/multitenant.go`
-is 944 lines with zero consumers; adopting `Namespaces` deletes them.
+The reserved `admin` org's Base is the process's own, since `_superusers`,
+schema, settings, backups and logs are process-wide. A token with no membership
+at all is a machine and is refused rather than handed that Base; a machine that
+needs a Base uses an IAM key, which carries a real membership.
 
-The tenant coordinate belongs in the **subdomain**, verified against a JWT claim,
-mismatch 403 — never a header. Supabase resolves the tenant by routing (a project
-is its own Postgres) and PostgREST itself is single-tenant. Today `plugins/org`
-reads `X-Org-Id` raw, while `tools/claims` documents that header as
-gateway-injected-only. That is the cost argument made concrete: a project is a
-file — kilobytes at rest, one descriptor when hot.
+Still open here:
+- Shards are plaintext. `OrgDEK`/`UserDEK` derive keys nothing opens a file
+  with, so `orm/replicated` would stream plaintext tenant databases to object
+  storage.
+- `CreateBackup` zips `DataDir`, so the platform Base's backup contains every
+  tenant's Base. A tenant's own backup is correctly scoped — its `DataDir` is
+  its own directory.
+- Open Bases are held in a map with no eviction; 2000 orgs is 4000 SQLite
+  handles. `orm/db.Namespaces` is the primitive to adopt when that binds.
+- Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
+  rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do
+  not follow the request onto a tenant Base.
 
 ### Functions — both halves exist, in different packages
 
@@ -456,11 +465,16 @@ registers), `StoreKeyJWKSURL` (external mode), `StoreKeyAuthUsersCollection`
 
 ## One Base per org, one implementation
 
-An org's Base is `{DataDir}/orgs/{org}/org.db`, opened the first time a request
-arrives carrying that org and encrypted under a key derived for it from KMS
-(`plugins/org`). Isolation is physical — a different org is a different file, so
-no query can read across two. There is no create verb: using an org opens its
-Base.
+An org's Base is `{DataDir}/orgs/{org}/data.db`, opened the first time a request
+arrives carrying that org (`plugins/org`). Isolation is physical — a different
+org is a different file, so no query can read across two. There is no create
+verb: using an org opens its Base. The file was `org.db`, which was one name too
+many; the directory already says whose it is, and the second name made a Base
+look like something else.
+
+Physical is all it is so far. The key `OrgDEK` derives from KMS opens nothing —
+the shards are plaintext on disk, and calling them encrypted is what kept anyone
+from noticing.
 
 `/v1/bases` reports what is on disk for each org on the caller's token. It used
 to read the local `_orgs` collection, which IAM owns and Base never writes, so it
