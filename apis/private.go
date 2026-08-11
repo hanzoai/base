@@ -1,6 +1,7 @@
 package apis
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -48,15 +49,15 @@ const privateTable = "_private"
 func ensurePrivateTable(app core.App) error {
 	// Idempotent. Stored in a plain table (not a Base collection) so the rows
 	// stay invisible to the admin UI and the CRUD endpoints.
-	_, err := app.DB().NewQuery(`
+	_, err := app.DB().NewQuery(fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS _private (
 			user_id    TEXT NOT NULL,
 			tag        TEXT NOT NULL,
-			ct         BLOB NOT NULL,
-			updated_at INTEGER NOT NULL,
+			ct         %s NOT NULL,
+			updated_at BIGINT NOT NULL,
 			PRIMARY KEY (user_id, tag)
-		) WITHOUT ROWID
-	`).Execute()
+		)
+	`, app.Dialect().Bytes())).Execute()
 	return err
 }
 

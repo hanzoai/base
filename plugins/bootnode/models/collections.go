@@ -109,8 +109,8 @@ func ensureProjects(app core.App) (*core.Collection, error) {
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE INDEX `idx_%s_owner` ON `%s` (`ownerId`)", Projects, Projects),
-		fmt.Sprintf("CREATE INDEX `idx_%s_org` ON `%s` (`orgId`)", Projects, Projects),
+		fmt.Sprintf("CREATE INDEX idx_%s_owner ON %s (ownerId)", Projects, Projects),
+		fmt.Sprintf("CREATE INDEX idx_%s_org ON %s (orgId)", Projects, Projects),
 	}
 	return c, app.Save(c)
 }
@@ -138,8 +138,8 @@ func ensureAPIKeys(app core.App, projects *core.Collection) (*core.Collection, e
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_hash` ON `%s` (`keyHash`)", APIKeys, APIKeys),
-		fmt.Sprintf("CREATE INDEX `idx_%s_project` ON `%s` (`project`)", APIKeys, APIKeys),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_hash ON %s (keyHash)", APIKeys, APIKeys),
+		fmt.Sprintf("CREATE INDEX idx_%s_project ON %s (project)", APIKeys, APIKeys),
 	}
 	return c, app.Save(c)
 }
@@ -166,7 +166,7 @@ func ensureWebhooks(app core.App, projects *core.Collection) (*core.Collection, 
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE INDEX `idx_%s_project` ON `%s` (`project`)", Webhooks, Webhooks),
+		fmt.Sprintf("CREATE INDEX idx_%s_project ON %s (project)", Webhooks, Webhooks),
 	}
 	return c, app.Save(c)
 }
@@ -188,7 +188,7 @@ func ensureWebhookDeliveries(app core.App, webhooks *core.Collection) (*core.Col
 		&core.AutodateField{Name: "deliveredAt", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE INDEX `idx_%s_webhook` ON `%s` (`webhook`)", WebhookDeliveries, WebhookDeliveries),
+		fmt.Sprintf("CREATE INDEX idx_%s_webhook ON %s (webhook)", WebhookDeliveries, WebhookDeliveries),
 	}
 	return c, app.Save(c)
 }
@@ -213,7 +213,7 @@ func ensureUsage(app core.App, projects *core.Collection) (*core.Collection, err
 		&core.AutodateField{Name: "timestamp", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE INDEX `idx_%s_project_ts` ON `%s` (`project`, `timestamp`)", Usage, Usage),
+		fmt.Sprintf("CREATE INDEX idx_%s_project_ts ON %s (project, timestamp)", Usage, Usage),
 	}
 	return c, app.Save(c)
 }
@@ -237,7 +237,7 @@ func ensureSmartWallets(app core.App, projects *core.Collection) (*core.Collecti
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_address` ON `%s` (`address`)", SmartWallets, SmartWallets),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_address ON %s (address)", SmartWallets, SmartWallets),
 	}
 	return c, app.Save(c)
 }
@@ -262,7 +262,7 @@ func ensureTeamMembers(app core.App, projects *core.Collection) (*core.Collectio
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_project_email` ON `%s` (`project`, `email` COLLATE NOCASE)", TeamMembers, TeamMembers),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_project_email ON %s (project, email COLLATE NOCASE)", TeamMembers, TeamMembers),
 	}
 	return c, app.Save(c)
 }
@@ -313,7 +313,7 @@ func ensureSubscriptions(app core.App, projects *core.Collection) (*core.Collect
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_project` ON `%s` (`project`)", Subscriptions, Subscriptions),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_project ON %s (project)", Subscriptions, Subscriptions),
 	}
 	return c, app.Save(c)
 }
@@ -337,8 +337,8 @@ func ensureOrgClusters(app core.App, projects *core.Collection) (*core.Collectio
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE INDEX `idx_%s_project` ON `%s` (`project`)", OrgClusters, OrgClusters),
-		fmt.Sprintf("CREATE INDEX `idx_%s_cluster` ON `%s` (`clusterId`)", OrgClusters, OrgClusters),
+		fmt.Sprintf("CREATE INDEX idx_%s_project ON %s (project)", OrgClusters, OrgClusters),
+		fmt.Sprintf("CREATE INDEX idx_%s_cluster ON %s (clusterId)", OrgClusters, OrgClusters),
 	}
 	return c, app.Save(c)
 }

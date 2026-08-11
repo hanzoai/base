@@ -27,6 +27,7 @@ func bindCollectionApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 
 func collectionsList(e *core.RequestEvent) error {
 	fieldResolver := search.NewSimpleFieldResolver(
+		e.App.Dialect(),
 		"id", "created", "updated", "name", "system", "type",
 	)
 

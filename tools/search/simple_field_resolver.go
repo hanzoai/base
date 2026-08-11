@@ -7,6 +7,7 @@ import (
 
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/orm/dialect"
 	"github.com/hanzoai/orm/query"
 )
 
@@ -46,6 +47,10 @@ type ResolverResult struct {
 
 // FieldResolver defines an interface for managing search fields.
 type FieldResolver interface {
+	// Dialect returns how the engine the resolved query will run against
+	// spells the SQL that differs between engines.
+	Dialect() dialect.Dialect
+
 	// UpdateQuery allows to updated the provided db query based on the
 	// resolved search fields (eg. adding joins aliases, etc.).
 	//
@@ -62,8 +67,9 @@ type FieldResolver interface {
 //
 // Each `allowedFields` could be a plain string (eg. "name")
 // or a regexp pattern (eg. `^\w+[\w\.]*$`).
-func NewSimpleFieldResolver(allowedFields ...string) *SimpleFieldResolver {
+func NewSimpleFieldResolver(d dialect.Dialect, allowedFields ...string) *SimpleFieldResolver {
 	return &SimpleFieldResolver{
+		dialect:       d,
 		allowedFields: allowedFields,
 	}
 }
@@ -73,7 +79,13 @@ func NewSimpleFieldResolver(allowedFields ...string) *SimpleFieldResolver {
 //
 // If `allowedFields` are empty no fields filtering is applied.
 type SimpleFieldResolver struct {
+	dialect       dialect.Dialect
 	allowedFields []string
+}
+
+// Dialect implements [FieldResolver].
+func (r *SimpleFieldResolver) Dialect() dialect.Dialect {
+	return r.dialect
 }
 
 // UpdateQuery implements `search.UpdateQuery` interface.
@@ -101,7 +113,6 @@ func (r *SimpleFieldResolver) Resolve(field string) (*ResolverResult, error) {
 
 	// treat as json path
 	var jsonPath strings.Builder
-	jsonPath.WriteString("$")
 	for _, part := range parts[1:] {
 		if _, err := strconv.Atoi(part); err == nil {
 			jsonPath.WriteString("[")
@@ -115,9 +126,8 @@ func (r *SimpleFieldResolver) Resolve(field string) (*ResolverResult, error) {
 
 	return &ResolverResult{
 		NullFallback: NullFallbackDisabled,
-		Identifier: fmt.Sprintf(
-			"JSON_EXTRACT([[%s]], '%s')",
-			inflector.Columnify(parts[0]),
+		Identifier: r.dialect.Extract(
+			"[["+inflector.Columnify(parts[0])+"]]",
 			jsonPath.String(),
 		),
 	}, nil

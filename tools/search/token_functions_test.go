@@ -3,6 +3,7 @@ package search
 import (
 	"errors"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"strings"
 	"testing"
 
@@ -152,7 +153,7 @@ func TestTokenFunctionsGeoDistance(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			result, err := fn(s.resolver, s.args...)
+			result, err := fn(dialect.For("sqlite"), s.resolver, s.args...)
 
 			hasErr := err != nil
 			if hasErr != s.expectErr {
@@ -179,6 +180,7 @@ func TestTokenFunctionsGeoDistanceExec(t *testing.T) {
 	}
 
 	result, err := fn(
+		dialect.For("sqlite"),
 		func(t fexpr.Token) (*ResolverResult, error) {
 			placeholder := "t" + security.PseudorandomString(5)
 			return &ResolverResult{Identifier: "{:" + placeholder + "}", Params: map[string]any{placeholder: t.Literal}}, nil
@@ -498,7 +500,7 @@ func TestTokenFunctionsStrftime(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			result, err := fn(s.resolver, s.args...)
+			result, err := fn(dialect.For("sqlite"), s.resolver, s.args...)
 
 			hasErr := err != nil
 			if hasErr != s.expectErr {
@@ -525,6 +527,7 @@ func TestTokenFunctionsStrftimeExec(t *testing.T) {
 	}
 
 	result, err := fn(
+		dialect.For("sqlite"),
 		func(t fexpr.Token) (*ResolverResult, error) {
 			placeholder := "t" + security.PseudorandomString(5)
 			return &ResolverResult{Identifier: "{:" + placeholder + "}", Params: map[string]any{placeholder: t.Literal}}, nil

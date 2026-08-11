@@ -141,11 +141,10 @@ func (app *BaseApp) SyncRecordTableSchema(newCollection *Collection, oldCollecti
 		return txErr
 	}
 
-	// run optimize per the SQLite recommendations
-	// (https://www.sqlite.org/pragma.html#pragma_optimize)
-	_, optimizeErr := app.NonconcurrentDB().NewQuery("PRAGMA optimize").Execute()
+	// refresh the planner's statistics now that the table's shape changed
+	_, optimizeErr := app.NonconcurrentDB().NewQuery(app.Dialect().Optimize()).Execute()
 	if optimizeErr != nil {
-		app.Logger().Warn("Failed to run PRAGMA optimize after record table sync", "error", optimizeErr.Error())
+		app.Logger().Warn("Failed to refresh statistics after record table sync", "error", optimizeErr.Error())
 	}
 
 	return nil
@@ -187,7 +186,7 @@ func normalizeSingleVsMultipleFieldChanges(app App, newCollection *Collection, o
 				SQL  string `db:"sql"`
 			}{}
 			err := txApp.DB().Select("name", "sql").
-				From("sqlite_master").
+				From(txApp.Dialect().Catalog()).
 				AndWhere(dbx.NewExp("sql is not null")).
 				AndWhere(dbx.HashExp{"type": "view"}).
 				All(&views)
@@ -218,56 +217,35 @@ func normalizeSingleVsMultipleFieldChanges(app App, newCollection *Collection, o
 
 			var copyQuery *dbx.Query
 
+			d := txApp.Dialect()
+			old := "[[" + oldTempName + "]]"
+
 			if !isOldMultiple && isNewMultiple {
 				// single -> multiple (convert to array)
 				copyQuery = txApp.DB().NewQuery(fmt.Sprintf(
 					`UPDATE {{%s}} set [[%s]] = (
-							CASE
-								WHEN COALESCE([[%s]], '') = ''
-								THEN '[]'
-								ELSE (
-									CASE
-										WHEN json_valid([[%s]]) AND json_type([[%s]]) == 'array'
-										THEN [[%s]]
-										ELSE json_array([[%s]])
-									END
-								)
-							END
-						)`,
+						CASE WHEN COALESCE(%s, '') = '' THEN '[]' ELSE %s END
+					)`,
 					newCollection.Name,
 					originalName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
+					old,
+					d.Array(old),
 				))
 			} else {
-				// multiple -> single (keep only the last element)
+				// multiple -> single (keep only the last element; wrapping
+				// first is what makes a column that already held a bare
+				// scalar keep its value rather than read as an empty array)
 				//
 				// note: for file fields the actual file objects are not
 				// deleted allowing additional custom handling via migration
 				copyQuery = txApp.DB().NewQuery(fmt.Sprintf(
 					`UPDATE {{%s}} set [[%s]] = (
-						CASE
-							WHEN COALESCE([[%s]], '[]') = '[]'
-							THEN ''
-							ELSE (
-								CASE
-									WHEN json_valid([[%s]]) AND json_type([[%s]]) == 'array'
-									THEN COALESCE(json_extract([[%s]], '$[#-1]'), '')
-									ELSE [[%s]]
-								END
-							)
-						END
+						CASE WHEN COALESCE(%s, '[]') = '[]' THEN '' ELSE %s END
 					)`,
 					newCollection.Name,
 					originalName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
-					oldTempName,
+					old,
+					d.Last(d.Array(old)),
 				))
 			}
 
@@ -345,7 +323,7 @@ func createCollectionIndexes(app App, collection *Collection) error {
 				continue
 			}
 
-			if _, err := txApp.DB().NewQuery(parsed.Build()).Execute(); err != nil {
+			if _, err := txApp.DB().NewQuery(parsed.Build(txApp.Dialect())).Execute(); err != nil {
 				errs[strconv.Itoa(i)] = validation.NewError(
 					"validation_invalid_index_expression",
 					fmt.Sprintf("Failed to create index %s - %v.", parsed.IndexName, err.Error()),

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"slices"
 	"strings"
 	"testing"
@@ -1012,7 +1013,7 @@ func TestFindAuthRecordByEmail(t *testing.T) {
 					}
 
 					collection.RemoveIndex(emailIndex.IndexName)
-					collection.Indexes = append(collection.Indexes, emailIndex.Build())
+					collection.Indexes = append(collection.Indexes, emailIndex.Build(dialect.For("sqlite")))
 					err := app.Save(collection)
 					if err != nil {
 						t.Fatalf("Failed to update email index: %v", err)

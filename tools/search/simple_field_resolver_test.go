@@ -2,6 +2,7 @@ package search_test
 
 import (
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"testing"
 
 	"github.com/hanzoai/base/tools/search"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestSimpleFieldResolverUpdateQuery(t *testing.T) {
-	r := search.NewSimpleFieldResolver("test")
+	r := search.NewSimpleFieldResolver(dialect.For("sqlite"), "test")
 
 	scenarios := []struct {
 		fieldName   string
@@ -44,7 +45,7 @@ func TestSimpleFieldResolverUpdateQuery(t *testing.T) {
 }
 
 func TestSimpleFieldResolverResolve(t *testing.T) {
-	r := search.NewSimpleFieldResolver("test", `^test_regex\d+$`, "Test columnify!", "data.test")
+	r := search.NewSimpleFieldResolver(dialect.For("sqlite"), "test", `^test_regex\d+$`, "Test columnify!", "data.test")
 
 	scenarios := []struct {
 		fieldName   string
@@ -59,7 +60,7 @@ func TestSimpleFieldResolverResolve(t *testing.T) {
 		{"test_regex", true, ""},
 		{"test_regex1", false, "[[test_regex1]]"},
 		{"Test columnify!", false, "[[Testcolumnify]]"},
-		{"data.test", false, "JSON_EXTRACT([[data]], '$.test')"},
+		{"data.test", false, "(CASE WHEN json_valid([[data]]) THEN JSON_EXTRACT([[data]], '$.test') ELSE JSON_EXTRACT(json_object('base', [[data]]), '$.base.test') END)"},
 	}
 
 	for i, s := range scenarios {

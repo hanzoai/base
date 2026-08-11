@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestFilterDataBuildExpr(t *testing.T) {
-	resolver := search.NewSimpleFieldResolver("test1", "test2", "test3", `^test4_\w+$`, `^test5\.[\w\.\:]*\w+$`)
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), "test1", "test2", "test3", `^test4_\w+$`, `^test5\.[\w\.\:]*\w+$`)
 
 	scenarios := []struct {
 		name          string
@@ -56,7 +57,7 @@ func TestFilterDataBuildExpr(t *testing.T) {
 			"empty string vs null",
 			"'' = null && null != ''",
 			false,
-			"('' = '' AND '' IS NOT '')",
+			"('' = '' AND '' IS DISTINCT FROM '')",
 		},
 		{
 			"like with 2 columns",
@@ -98,7 +99,7 @@ func TestFilterDataBuildExpr(t *testing.T) {
 			"nested json no coalesce",
 			"test5.a = test5.b || test5.c != test5.d",
 			false,
-			"(JSON_EXTRACT([[test5]], '$.a') IS JSON_EXTRACT([[test5]], '$.b') OR JSON_EXTRACT([[test5]], '$.c') IS NOT JSON_EXTRACT([[test5]], '$.d'))",
+			"(" + "(CASE WHEN json_valid([[test5]]) THEN JSON_EXTRACT([[test5]], '$.a') ELSE JSON_EXTRACT(json_object('base', [[test5]]), '$.base.a') END)" + " IS NOT DISTINCT FROM " + "(CASE WHEN json_valid([[test5]]) THEN JSON_EXTRACT([[test5]], '$.b') ELSE JSON_EXTRACT(json_object('base', [[test5]]), '$.base.b') END)" + " OR " + "(CASE WHEN json_valid([[test5]]) THEN JSON_EXTRACT([[test5]], '$.c') ELSE JSON_EXTRACT(json_object('base', [[test5]]), '$.base.c') END)" + " IS DISTINCT FROM " + "(CASE WHEN json_valid([[test5]]) THEN JSON_EXTRACT([[test5]], '$.d') ELSE JSON_EXTRACT(json_object('base', [[test5]]), '$.base.d') END)" + ")",
 		},
 		{
 			"macros",
@@ -125,19 +126,19 @@ func TestFilterDataBuildExpr(t *testing.T) {
 			"complex expression",
 			"((test1 > 1) || (test2 != 2)) && test3 ~ '%%example' && test4_sub = null",
 			false,
-			"(([[test1]] > {:TEST} OR [[test2]] IS NOT {:TEST}) AND [[test3]] LIKE {:TEST} ESCAPE '\\' AND ([[test4_sub]] = '' OR [[test4_sub]] IS NULL))",
+			"(([[test1]] > {:TEST} OR [[test2]] IS DISTINCT FROM {:TEST}) AND [[test3]] LIKE {:TEST} ESCAPE '\\' AND ([[test4_sub]] = '' OR [[test4_sub]] IS NULL))",
 		},
 		{
 			"combination of special literals (null, true, false)",
 			"test1=true && test2 != false && null = test3 || null != test4_sub",
 			false,
-			"([[test1]] = 1 AND [[test2]] IS NOT 0 AND ('' = [[test3]] OR [[test3]] IS NULL) OR ('' IS NOT [[test4_sub]] AND [[test4_sub]] IS NOT NULL))",
+			"([[test1]] = 1 AND [[test2]] IS DISTINCT FROM 0 AND ('' = [[test3]] OR [[test3]] IS NULL) OR ('' IS DISTINCT FROM [[test4_sub]] AND [[test4_sub]] IS NOT NULL))",
 		},
 		{
 			"all operators",
 			"(test1 = test2 || test2 != test3) && (test2 ~ 'example' || test2 !~ '%%abc') && 'switch1%%' ~ test1 && 'switch2' !~ test2 && test3 > 1 && test3 >= 0 && test3 <= 4 && 2 < 5",
 			false,
-			"((COALESCE([[test1]], '') = COALESCE([[test2]], '') OR COALESCE([[test2]], '') IS NOT COALESCE([[test3]], '')) AND ([[test2]] LIKE {:TEST} ESCAPE '\\' OR [[test2]] NOT LIKE {:TEST} ESCAPE '\\') AND {:TEST} LIKE ('%' || [[test1]] || '%') ESCAPE '\\' AND {:TEST} NOT LIKE ('%' || [[test2]] || '%') ESCAPE '\\' AND [[test3]] > {:TEST} AND [[test3]] >= {:TEST} AND [[test3]] <= {:TEST} AND {:TEST} < {:TEST})",
+			"((COALESCE([[test1]], '') = COALESCE([[test2]], '') OR COALESCE([[test2]], '') IS DISTINCT FROM COALESCE([[test3]], '')) AND ([[test2]] LIKE {:TEST} ESCAPE '\\' OR [[test2]] NOT LIKE {:TEST} ESCAPE '\\') AND {:TEST} LIKE ('%' || [[test1]] || '%') ESCAPE '\\' AND {:TEST} NOT LIKE ('%' || [[test2]] || '%') ESCAPE '\\' AND [[test3]] > {:TEST} AND [[test3]] >= {:TEST} AND [[test3]] <= {:TEST} AND {:TEST} < {:TEST})",
 		},
 		{
 			"geoDistance function",
@@ -200,7 +201,7 @@ func TestFilterDataBuildExprWithParams(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	resolver := search.NewSimpleFieldResolver(`^test\w+$`)
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), `^test\w+$`)
 
 	filter := search.FilterData(`
 		test1 = {:test1} ||
@@ -247,7 +248,7 @@ func TestFilterDataBuildExprWithParams(t *testing.T) {
 }
 
 func TestFilterDataBuildExprWithLimit(t *testing.T) {
-	resolver := search.NewSimpleFieldResolver(`^\w+$`)
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), `^\w+$`)
 
 	scenarios := []struct {
 		limit       int
@@ -291,7 +292,7 @@ func TestLikeParamsWrapping(t *testing.T) {
 		calledQueries = append(calledQueries, sql)
 	}
 
-	resolver := search.NewSimpleFieldResolver(`^test\w+$`)
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), `^test\w+$`)
 
 	filter := search.FilterData(`
 		test1 ~ {:p1} ||

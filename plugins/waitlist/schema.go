@@ -50,7 +50,7 @@ func (p *plugin) ensureWaitlistsCollection() (*core.Collection, error) {
 		&core.AutodateField{Name: "updatedAt", OnCreate: true, OnUpdate: true},
 	)
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_slug` ON `%s` (`slug`)", name, name),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_slug ON %s (slug)", name, name),
 	}
 	if err := p.app.Save(c); err != nil {
 		return nil, err
@@ -101,9 +101,9 @@ func (p *plugin) ensureEntriesCollection() (*core.Collection, error) {
 	// keyset seek: points DESC (leaderboard order is a forward scan), createdAt
 	// ASC (earlier joiners win ties). waitlist leads so every query is scoped.
 	c.Indexes = types.JSONArray[string]{
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_wl_email` ON `%s` (`waitlist`, `email` COLLATE NOCASE)", name, name),
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_wl_refCode` ON `%s` (`waitlist`, `refCode` COLLATE NOCASE)", name, name),
-		fmt.Sprintf("CREATE INDEX `idx_%s_rank` ON `%s` (`waitlist`, `points` DESC, `createdAt` ASC)", name, name),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_wl_email ON %s (waitlist, email COLLATE NOCASE)", name, name),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_wl_refCode ON %s (waitlist, refCode COLLATE NOCASE)", name, name),
+		fmt.Sprintf("CREATE INDEX idx_%s_rank ON %s (waitlist, points DESC, createdAt ASC)", name, name),
 	}
 	if err := p.app.Save(c); err != nil {
 		return nil, err
@@ -150,9 +150,9 @@ func (p *plugin) ensureEventsCollection(entries *core.Collection) (*core.Collect
 	c.Indexes = types.JSONArray[string]{
 		// The anti-fraud spine: one (entry, dedupKey) can be awarded once. A
 		// partial index so empty-key events (grants) are never blocked.
-		fmt.Sprintf("CREATE UNIQUE INDEX `idx_%s_dedup` ON `%s` (`entry`, `dedupKey`) WHERE `dedupKey` != ''", name, name),
-		fmt.Sprintf("CREATE INDEX `idx_%s_feed` ON `%s` (`waitlist`, `createdAt` DESC)", name, name),
-		fmt.Sprintf("CREATE INDEX `idx_%s_entry` ON `%s` (`entry`)", name, name),
+		fmt.Sprintf("CREATE UNIQUE INDEX idx_%s_dedup ON %s (entry, dedupKey) WHERE [[dedupKey]] != ''", name, name),
+		fmt.Sprintf("CREATE INDEX idx_%s_feed ON %s (waitlist, createdAt DESC)", name, name),
+		fmt.Sprintf("CREATE INDEX idx_%s_entry ON %s (entry)", name, name),
 	}
 	if err := p.app.Save(c); err != nil {
 		return nil, err
