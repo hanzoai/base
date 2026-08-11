@@ -2,6 +2,7 @@ import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 import { Database, LayoutDashboard, ScrollText, Settings } from '@hanzogui/lucide-icons-2';
 
 import { useAuth } from '~/hooks/useAuth';
+import { icon } from '../icon'
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -20,7 +21,7 @@ function RootLayout() {
       { isAuthenticated && (
         <aside className="shell__nav">
           <div className="shell__brand">
-            <img src="/icon.svg" alt="Base" />
+            <img src={icon} alt="Base" />
             <span>Base</span>
           </div>
           <nav className="stack stack--tight">
