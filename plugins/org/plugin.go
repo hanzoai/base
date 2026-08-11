@@ -100,6 +100,20 @@ type Config struct {
 	DefaultTemplates []CollectionTemplate
 }
 
+// principalKey is the master key per-principal DEKs are derived from.
+//
+// PrincipalEncryptionKey is the field the binary sets and OrgEncryptionKey is
+// its deprecated spelling. Reading only the deprecated one meant the key the
+// shipped binary supplies never arrived, masterKey stayed empty, and OrgDEK
+// refused — so per-org encryption could not be turned on even by a deployment
+// that had provided the key.
+func (c Config) principalKey() string {
+	if c.PrincipalEncryptionKey != "" {
+		return c.PrincipalEncryptionKey
+	}
+	return c.OrgEncryptionKey
+}
+
 // MustRegister registers the platform plugin to the provided app instance
 // and panics if it fails.
 func MustRegister(app core.App, config Config) {
@@ -137,7 +151,7 @@ func Register(app core.App, config Config) error {
 		iam:        NewIAMClient(config.IAMEndpoint),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
-		orgDB:      NewOrgDB(app, config.OrgEncryptionKey),
+		orgDB:      NewOrgDB(app, config.principalKey()),
 		jwksURL:    strings.TrimRight(config.IAMEndpoint, "/") + "/v1/iam/.well-known/jwks",
 	}
 	p.bases = newBases(p)
