@@ -82,7 +82,7 @@ function Bases() {
                       and no second sign-in. An org with no Base yet has nothing
                       to open, which is why this is a link rather than a button
                       that would have to explain itself. */}
-                  <a className="btn" href={ `/project/${ encodeURIComponent(b.org) }` }>
+                  <a className="btn" href={ `/studio/project/${ encodeURIComponent(b.org) }` }>
                     { b.exists ? 'Open' : 'Start' }
                   </a>
                 </td>
