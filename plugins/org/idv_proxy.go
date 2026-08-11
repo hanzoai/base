@@ -102,6 +102,12 @@ func (p *plugin) handleIDVProxy(e *core.RequestEvent) error {
 		return e.Error(http.StatusServiceUnavailable, "IDV not configured (set IDV_ENDPOINT)", nil)
 	}
 
+	// Same boundary the IAM proxy states: a decoded `..` segment walks out of
+	// this mount at whatever normalizes upstream.
+	if climbs(e.Request.URL.Path) {
+		return e.Error(http.StatusBadRequest, "The path leaves the "+idvMount+" mount.", nil)
+	}
+
 	upstreamPath := e.Request.URL.Path
 	if upstreamPath == "" {
 		upstreamPath = "/v1/idv/"

@@ -24,12 +24,20 @@ type IAMUser struct {
 	OrgIDs []string `json:"orgIds"`
 }
 
-// Cache parameters. The 5-minute TTL matches the original map+TTL design;
-// 10K is a safe default for the per-base fleet sizes Hanzo runs (each
-// service has its own IAMClient instance and a single token is shared
-// across many requests, so the working set stays well under cap).
+// Cache parameters. 10K is a safe default for the per-base fleet sizes Hanzo
+// runs (each service has its own IAMClient instance and a single token is
+// shared across many requests, so the working set stays well under cap).
+//
+// A token and a key are cached for different lengths because they die
+// differently. A token carries its own expiry and IAM has already refused it by
+// the time one matters, so holding the validation for five minutes costs
+// nothing. A key has no expiry at all — revoking it at IAM is the only way to
+// end it — so every second it is cached is a second a revoked key still opens
+// the org. Singleflight already collapses a burst into one upstream call, so
+// the short window buys promptness rather than costing load.
 const (
 	tokenCacheTTL    = 5 * time.Minute
+	keyCacheTTL      = 30 * time.Second
 	defaultCacheSize = 10_000
 )
 
@@ -116,10 +124,10 @@ func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, 
 
 // IAMClient handles authentication against Hanzo IAM with token caching.
 //
-// Cache: TTL-expirable LRU (hashicorp/golang-lru/v2) shared between
-// ValidateToken (JWT bearer tokens) and ResolveAPIKey (pk-/sk-/hk- API
-// keys). Entries expire after tokenCacheTTL; LRU evicts the oldest entry
-// when the cache is full. No O(n) eviction scans.
+// Cache: a TTL-expirable LRU (hashicorp/golang-lru/v2) per credential kind —
+// ValidateToken reads tokens, ResolveAPIKey reads keys — because the two expire
+// on different clocks. LRU evicts the oldest entry when a cache is full. No
+// O(n) eviction scans.
 //
 // Singleflight: golang.org/x/sync/singleflight coalesces concurrent
 // validation requests for the same token into a single upstream IAM
@@ -130,8 +138,9 @@ type IAMClient struct {
 	baseURL    string
 	httpClient *http.Client
 
-	cache *expirable.LRU[string, *IAMUser]
-	sf    singleflight.Group
+	tokens *expirable.LRU[string, *IAMUser]
+	keys   *expirable.LRU[string, *IAMUser]
+	sf     singleflight.Group
 
 	mu    sync.RWMutex
 	admin AdminCreds
@@ -160,10 +169,8 @@ func NewIAMClientWithCache(baseURL string, cacheSize int) *IAMClient {
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
-		// Single shared cache for JWTs and API keys. Cache key namespacing
-		// is unnecessary: JWT bearer tokens and pk-/sk-/hk- prefixed API
-		// keys live in disjoint string spaces, so collisions are impossible.
-		cache: expirable.NewLRU[string, *IAMUser](cacheSize, nil, tokenCacheTTL),
+		tokens: expirable.NewLRU[string, *IAMUser](cacheSize, nil, tokenCacheTTL),
+		keys:   expirable.NewLRU[string, *IAMUser](cacheSize, nil, keyCacheTTL),
 	}
 }
 
@@ -171,7 +178,7 @@ func NewIAMClientWithCache(baseURL string, cacheSize int) *IAMClient {
 // cached for tokenCacheTTL (5 minutes). Concurrent validations of the same
 // token are coalesced into a single upstream call via singleflight.
 func (c *IAMClient) ValidateToken(token string) (*IAMUser, error) {
-	if user, ok := c.cache.Get(token); ok {
+	if user, ok := c.tokens.Get(token); ok {
 		return user, nil
 	}
 	// Singleflight key namespace: prefix "v:" so a token cannot collide with
@@ -181,19 +188,19 @@ func (c *IAMClient) ValidateToken(token string) (*IAMUser, error) {
 	v, err, _ := c.sf.Do("v:"+token, func() (any, error) {
 		// Re-check cache after acquiring the singleflight slot: a concurrent
 		// caller may have populated it while we were waiting.
-		if user, ok := c.cache.Get(token); ok {
+		if user, ok := c.tokens.Get(token); ok {
 			return user, nil
 		}
 		user, err := c.fetchUserInfo(token)
 		if err != nil {
 			return nil, err
 		}
-		c.cache.Add(token, user)
+		c.tokens.Add(token, user)
 		return user, nil
 	})
 	if err != nil {
 		// Ensure no stale entry persists for this token after a failed fetch.
-		c.cache.Remove(token)
+		c.tokens.Remove(token)
 		return nil, err
 	}
 	return v.(*IAMUser), nil
@@ -228,10 +235,12 @@ func (c *IAMClient) fetchUserInfo(token string) (*IAMUser, error) {
 	return &user, nil
 }
 
-// InvalidateToken removes a token (or API key) from the cache. Safe to call
-// for either JWT bearer tokens or pk-/sk-/hk- API keys — the cache is shared.
+// InvalidateToken drops a credential from the cache. Safe to call for either
+// JWT bearer tokens or pk-/sk-/hk- API keys — a value is only ever in the one
+// cache that holds its kind, and removing what is not there is nothing.
 func (c *IAMClient) InvalidateToken(token string) {
-	c.cache.Remove(token)
+	c.tokens.Remove(token)
+	c.keys.Remove(token)
 }
 
 // ── API Key Resolution (pk-/sk-/hk- keys managed by IAM) ────────────────
@@ -292,23 +301,23 @@ func IsWidgetKey(token string) bool {
 // tokenCacheTTL; concurrent resolves of the same key are coalesced via
 // singleflight.
 func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
-	if user, ok := c.cache.Get(accessKey); ok {
+	if user, ok := c.keys.Get(accessKey); ok {
 		return user, nil
 	}
 	v, err, _ := c.sf.Do("k:"+accessKey, func() (any, error) {
 		// Re-check cache after acquiring the singleflight slot.
-		if user, ok := c.cache.Get(accessKey); ok {
+		if user, ok := c.keys.Get(accessKey); ok {
 			return user, nil
 		}
 		user, err := c.fetchUserByKey(accessKey)
 		if err != nil {
 			return nil, err
 		}
-		c.cache.Add(accessKey, user)
+		c.keys.Add(accessKey, user)
 		return user, nil
 	})
 	if err != nil {
-		c.cache.Remove(accessKey)
+		c.keys.Remove(accessKey)
 		return nil, err
 	}
 	return v.(*IAMUser), nil
