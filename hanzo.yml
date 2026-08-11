@@ -89,20 +89,26 @@ images:
 # No `deploy:` ON PURPOSE, and this is a transcription of what deploy.yml
 # already said, not a new policy.
 #
-# Base does not run anywhere as itself. `ghcr.io/hanzoai/base` is a base image
-# other products embed, and each pins its own tag AND digest in a reviewed
-# hanzoai/universe change:
+# `ghcr.io/hanzoai/base` is a base image other products embed, and it is also
+# what base.hanzo.ai runs. Every consumer pins its own tag AND digest in a
+# reviewed hanzoai/universe change:
 #
+#   base.hanzo.ai           charts/app/values/hanzo/base.yaml
 #   hanzo/platform          base:1.3.0    (BASE_ENABLE_ADMIN_UI=1)
 #   hanzo/hanzo-app-base    base:0.39.16
 #   hanzo/cal               base:cal-a2b6ce3
 #   superbase               base:1.3.2 via SUPERBASE_BASE_IMAGE_TAG
 #
-# base.hanzo.ai itself is served by ghcr.io/hanzoai/superbase, which embeds
-# github.com/hanzoai/base/ui-react at its own go.mod pin — so it does not move
-# when this image does, and curling that host proves nothing about this build.
+# base.hanzo.ai was served by ghcr.io/hanzoai/superbase when this file was
+# written, and the note here said curling that host proved nothing about this
+# build. It was repointed at ghcr.io/hanzoai/base, so the opposite holds now, and
+# it is the only check that shows a build actually reached production: the served
+# HTML names the ui-react bundle by content hash, so it equals the committed
+# ui-react/dist exactly when the tag universe pins is the one built here. Moving
+# the pin from sha-f83f922 to sha-6a9de08 flipped the served bundle inside a
+# minute.
 #
-# Four consumers on four different tags is precisely why choosing which one runs
+# Consumers sitting on different tags is precisely why choosing which one runs
 # is a reviewed change and not a CI side effect. cd.hanzo.ai's selfHeal would
 # revert a direct patch inside minutes anyway. CI's job ends at "the tag exists
 # and resolves".
