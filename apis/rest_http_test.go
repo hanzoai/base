@@ -438,3 +438,49 @@ func TestRestApiDuplicateIsSQLState23505(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// A count query is a HEAD. supabase-js issues one for
+// .select('*', {count: 'exact', head: true}) and reads the total out of
+// Content-Range — the rows are exactly what it does not want.
+func TestRestApiHeadIsTheCountQuery(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "HEAD answers the count in the header and no body",
+			Method: http.MethodHead,
+			URL:    "/rest/v1/demo2",
+			Headers: map[string]string{
+				"Prefer": "count=exact",
+			},
+			ExpectedStatus: 200,
+			AfterTestFunc:  wantRange("0-2/3"),
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       3,
+			},
+		},
+		{
+			// The filter still applies — a count is a read like any other, so it
+			// answers for the rows the filter selects rather than the table.
+			Name:   "a filtered count counts only what matches",
+			Method: http.MethodHead,
+			URL:    "/rest/v1/demo2?title=eq.test2",
+			Headers: map[string]string{
+				"Prefer": "count=exact",
+			},
+			ExpectedStatus: 200,
+			AfterTestFunc:  wantRange("0-0/1"),
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       1,
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
