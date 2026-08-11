@@ -1,12 +1,18 @@
-// Package platform implements a multi-org platform plugin for Hanzo Base.
+// Package org gives one Base process a Base per org.
 //
-// Each org gets isolated collections with prefix-based namespacing.
-// Authentication is handled via Hanzo IAM (hanzo.id) OAuth2 and secrets via
-// KMS over native ZAP — the one secrets store, never anything else.
+// An org's Base is a SQLite file of its own under {DataDir}/orgs/{org}/, opened
+// the first time a request arrives carrying that org and encrypted under a key
+// derived for it from KMS. Isolation is physical: a different org is a
+// different file, so there is no query that can read across two.
 //
-// Example:
+// Orgs and members are IAM's, read off the validated token. This package never
+// writes them — a local copy is a second answer to "who is in this org", and
+// the one a request arrives on wins.
 //
-//	platform.MustRegister(app, platform.Config{
+// It publishes /v1/bases: which Bases the caller can reach, and what state each
+// is in. There is no create verb; using an org opens its Base.
+//
+//	org.MustRegister(app, org.Config{
 //		IAMEndpoint:     "https://hanzo.id",
 //		KMSEndpoint:     "zap.kms.svc.cluster.local:9999",
 //		IAMClientID:     "my-client-id",
@@ -17,6 +23,8 @@ package org
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"slices"
 	"strings"
 
 	"github.com/hanzoai/base/apis"
@@ -517,8 +525,8 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	// Declared whole rather than on a group, so the collection root is
 	// /v1/bases and not /v1/bases/ — an empty leaf composes to the trailing
 	// slash, which is an address nobody calls.
-	r.GET(bases, p.handleListOrgs)
-	r.GET(bases+"/{id}", p.handleGetOrg)
+	r.GET(bases, p.handleListBases)
+	r.GET(bases+"/{id}", p.handleGetBase)
 
 	// Compliance is its own service domain, a sibling of /v1/iam — not a child
 	// of Base's own resource. Optional: registered only where it is configured.
@@ -536,61 +544,95 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 // Route handlers
 // --------------------------------------------------------------------------
 
-func (p *plugin) handleListOrgs(e *core.RequestEvent) error {
+// baseView is what a Base IS to a caller: the org it belongs to, whether one
+// has been opened yet, and how big it has grown.
+//
+// There is no verb to create one. A Base is opened the first time a request
+// arrives carrying its org, so "exists" reports what happened rather than what
+// somebody remembered to provision — which is why this reports a fact from the
+// filesystem and not a row from a table.
+type baseView struct {
+	Org    string `json:"org"`
+	Exists bool   `json:"exists"`
+	Bytes  int64  `json:"bytes,omitempty"`
+}
+
+// base reports one org's Base. An org the caller belongs to that has never been
+// used answers exists:false, which is the honest answer and not an error.
+func (p *plugin) base(org string) baseView {
+	v := baseView{Org: org}
+	path, ok := p.orgDB.GetOrgDBPath(org)
+	if !ok {
+		return v
+	}
+	v.Exists = true
+	if st, err := os.Stat(path); err == nil {
+		v.Bytes = st.Size()
+	}
+	return v
+}
+
+// handleListBases answers which Bases the caller can reach.
+//
+// The orgs come from the validated token — IAM puts the membership on it, so
+// this needs no local table and no call back to IAM. The local membership rows
+// this used to read were a copy that could disagree with the token a request
+// actually arrived on.
+func (p *plugin) handleListBases(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
 	}
-	// The caller's orgs come from the validated token — IAM puts the membership
-	// on it, so this needs no local table and no call back to IAM. The local
-	// membership rows this used to read were a copy that could disagree with the
-	// token a request actually arrived on.
-	out := make([]map[string]any, 0, len(user.OrgIDs))
-	for _, id := range user.OrgIDs {
-		if id == "" {
+
+	out := make([]baseView, 0, len(user.OrgIDs))
+	for _, org := range user.OrgIDs {
+		if org == "" {
 			continue
 		}
-		out = append(out, map[string]any{"id": id, "slug": id})
+		out = append(out, p.base(org))
 	}
+
 	return e.JSON(http.StatusOK, out)
 }
-func (p *plugin) handleGetOrg(e *core.RequestEvent) error {
+
+// handleGetBase answers for one Base.
+//
+// It used to read a record out of the local _orgs collection, which IAM owns
+// and Base never writes — so it answered 404 for every org, including the
+// caller's own. Membership is the token's to state.
+func (p *plugin) handleGetBase(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
 	if err != nil {
 		return err
 	}
 
-	orgId := e.Request.PathValue("id")
-	if orgId == "" {
-		return e.BadRequestError("missing org id", nil)
+	org := e.Request.PathValue("id")
+	if org == "" {
+		return e.BadRequestError("missing org", nil)
 	}
 
-	if !checkAccess(p.app, orgId, user.ID, "read") {
-		return e.ForbiddenError("access denied", nil)
+	if !slices.Contains(user.OrgIDs, org) {
+		return e.ForbiddenError("not a member of "+org, nil)
 	}
 
-	org, err := p.app.FindRecordById(collectionOrgs, orgId)
-	if err != nil {
-		return e.NotFoundError("org not found", err)
-	}
-
-	return e.JSON(http.StatusOK, map[string]any{
-		"id":           org.Id,
-		"name":         org.GetString("name"),
-		"slug":         org.GetString("slug"),
-		"ownerId":      org.GetString("ownerId"),
-		"iamOrgId":     org.GetString("iamOrgId"),
-		"kmsProjectId": org.GetString("kmsProjectId"),
-	})
+	return e.JSON(http.StatusOK, p.base(org))
 }
 
 func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 	// If Base already authenticated the user, use that.
+	//
+	// The memberships come off the request rather than off the record, because a
+	// record holds fields and membership is not one of Base's — IAM signs it onto
+	// the token and resolveJWKSToken puts it here. Omitting it left OrgIDs empty,
+	// so every Base was refused and the list of them came back empty: not "you
+	// have no orgs" but "nobody thought to bring them along".
 	if e.Auth != nil {
+		orgs, _ := e.Get(apis.RequestEventKeyOrgs).([]string)
 		return &IAMUser{
-			ID:    e.Auth.Id,
-			Email: e.Auth.GetString("email"),
-			Name:  e.Auth.GetString("name"),
+			ID:     e.Auth.Id,
+			Email:  e.Auth.GetString("email"),
+			Name:   e.Auth.GetString("name"),
+			OrgIDs: orgs,
 		}, nil
 	}
 

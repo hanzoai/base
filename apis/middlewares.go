@@ -29,6 +29,11 @@ import (
 const (
 	RequestEventKeyLogMeta = "baseLogMeta" // extra data to store with the request activity log
 
+	// RequestEventKeyOrgs carries the org slugs the verified token asserts, as
+	// []string. Set by resolveJWKSToken; read by anything that answers a
+	// per-org question.
+	RequestEventKeyOrgs = "authOrgs"
+
 	requestEventKeyExecStart              = "__execStart"                 // the value must be time.Time
 	requestEventKeySkipSuccessActivityLog = "__skipSuccessActivityLogger" // the value must be bool
 )
@@ -347,18 +352,21 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		name = displayName
 	}
 
+	verified := decode(claims)
+
 	// Store resolved claims on the request for downstream middleware.
 	e.Set("authSub", sub)
 	e.Set("authOwner", owner)
 	e.Set("authEmail", email)
 	e.Set("authName", name)
+	e.Set(RequestEventKeyOrgs, orgsOf(verified))
 
 	// When IAM is active, Base does NOT store user records. IAM is the user store.
 	// We create an ephemeral (unsaved) auth record from JWT claims so Base's
 	// rule engine can evaluate it. No writes to _superusers or users collections.
 
 	collectionName := core.CollectionNameSuperusers
-	if !platformSudo(claims) {
+	if !verified.PlatformSudo() {
 		collectionName = "users"
 		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 			collectionName = v
@@ -407,18 +415,34 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 // Bases — so honoring an org's own admin would hand one tenant the rest.
 //
 // Claims that do not decode carry no authority.
-func platformSudo(claims jwt.MapClaims) bool {
+func decode(claims jwt.MapClaims) *authz.Claims {
 	raw, err := json.Marshal(claims)
 	if err != nil {
-		return false
+		return &authz.Claims{}
 	}
 
 	var c authz.Claims
 	if err := json.Unmarshal(raw, &c); err != nil {
-		return false
+		return &authz.Claims{}
 	}
 
-	return c.PlatformSudo()
+	return &c
+}
+
+// orgsOf is the membership set the token asserts, as plain slugs.
+//
+// It travels on the request because the ephemeral auth record cannot carry it:
+// a record has fields, and membership is not one of Base's. Without it, anything
+// downstream that asks "which orgs is this caller in?" saw an empty set and
+// refused every one of them.
+func orgsOf(c *authz.Claims) []string {
+	orgs := make([]string, 0, len(c.Orgs))
+	for _, m := range c.Orgs {
+		if m.Org != "" {
+			orgs = append(orgs, m.Org)
+		}
+	}
+	return orgs
 }
 
 // subToRecordID converts an OIDC sub claim (which may be a UUID, slug, or
