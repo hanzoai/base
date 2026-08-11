@@ -1,10 +1,18 @@
 package apis_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/base64"
+	"encoding/json"
+	"math/big"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
@@ -764,4 +772,156 @@ func TestExternalAuthOnlySuperuserFallback(t *testing.T) {
 
 		scenario.Test(t)
 	})
+}
+
+// mintIAMToken signs an RS256 JWT over claims and serves the matching JWKS,
+// which is the shape Hanzo IAM puts on the wire.
+func mintIAMToken(t testing.TB, claims jwt.MapClaims) (token, jwksURL string) {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const kid = "iam-test"
+
+	jwks := map[string]any{"keys": []map[string]any{{
+		"kty": "RSA",
+		"kid": kid,
+		"alg": "RS256",
+		"use": "sig",
+		"n":   base64.RawURLEncoding.EncodeToString(key.PublicKey.N.Bytes()),
+		"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.PublicKey.E)).Bytes()),
+	}}}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(jwks)
+	}))
+	t.Cleanup(ts.Close)
+
+	claims["iat"] = time.Now().Unix()
+	claims["exp"] = time.Now().Add(time.Hour).Unix()
+
+	jt := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	jt.Header["kid"] = kid
+
+	signed, err := jt.SignedString(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return signed, ts.URL
+}
+
+func TestIAMSuperuserMirror(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []struct {
+		name    string
+		claims  jwt.MapClaims
+		status  int
+		content []string
+	}{
+		{
+			name: "membership of the reserved admin org",
+			claims: jwt.MapClaims{
+				"sub": "hanzo/z", "owner": "hanzo", "email": "z@hanzo.ai",
+				"orgs": []any{
+					map[string]any{"org": "hanzo", "role": "admin"},
+					map[string]any{"org": "admin", "role": "admin"},
+					map[string]any{"org": "zoo", "role": "admin"},
+				},
+			},
+			status:  200,
+			content: []string{`"totalItems"`, `"_superusers"`},
+		},
+		{
+			name: "a home org of admin is the same membership",
+			claims: jwt.MapClaims{
+				"sub": "admin/root", "owner": "admin", "email": "root@hanzo.ai",
+			},
+			status:  200,
+			content: []string{`"totalItems"`, `"_superusers"`},
+		},
+		{
+			name: "admin of an ordinary org, over every org it administers",
+			claims: jwt.MapClaims{
+				"sub": "hanzo/dev", "owner": "hanzo", "email": "dev@hanzo.ai",
+				"orgs": []any{
+					map[string]any{"org": "hanzo", "role": "owner"},
+					map[string]any{"org": "zoo", "role": "admin"},
+				},
+			},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+		{
+			name: "the org-scoped isAdmin flag",
+			claims: jwt.MapClaims{
+				"sub": "hanzo/dev", "owner": "hanzo", "email": "dev@hanzo.ai",
+				"isAdmin": true, "isGlobalAdmin": true,
+			},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+		{
+			name: "the reserved signing-cert owner, which is not the admin org",
+			claims: jwt.MapClaims{
+				"sub": "built-in/svc", "owner": "built-in", "email": "svc@hanzo.ai",
+			},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+		{
+			name: "an org name that merely contains admin",
+			claims: jwt.MapClaims{
+				"sub": "acme/dev", "owner": "acme", "email": "dev@acme.test",
+				"orgs": []any{map[string]any{"org": "administrators", "role": "admin"}},
+			},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+		{
+			name: "no membership at all",
+			claims: jwt.MapClaims{
+				"sub": "hanzo/anon", "owner": "hanzo", "email": "anon@hanzo.ai",
+			},
+			status:  403,
+			content: []string{`"status":403`},
+		},
+	}
+
+	for _, s := range scenarios {
+		token, jwksURL := mintIAMToken(t, s.claims)
+
+		scenario := tests.ApiScenario{
+			Name:            s.name,
+			Method:          http.MethodGet,
+			URL:             "/v1/collections",
+			Headers:         map[string]string{"Authorization": "Bearer " + token},
+			ExpectedStatus:  s.status,
+			ExpectedContent: s.content,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+				app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+			},
+		}
+
+		scenario.Test(t)
+	}
+
+	guest := tests.ApiScenario{
+		Name:            "no token at all",
+		Method:          http.MethodGet,
+		URL:             "/v1/collections",
+		ExpectedStatus:  401,
+		ExpectedContent: []string{`"status":401`},
+		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+			app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.test/v1/iam/.well-known/jwks")
+		},
+	}
+	guest.Test(t)
 }

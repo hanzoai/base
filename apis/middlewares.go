@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/routine"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/iam/pkg/model"
+	"github.com/hanzoai/iam/pkg/store"
 	"github.com/spf13/cast"
 )
 
@@ -344,26 +347,6 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		name = displayName
 	}
 
-	// Check if this IAM user is an admin/superuser.
-	// Sources: isAdmin claim, isGlobalAdmin claim, or built-in/superuser org membership.
-	isAdmin, _ := claims["isAdmin"].(bool)
-	if !isAdmin {
-		if v, ok := claims["isAdmin"].(string); ok && v == "true" {
-			isAdmin = true
-		}
-	}
-	if !isAdmin {
-		if v, _ := claims["isGlobalAdmin"].(bool); v {
-			isAdmin = true
-		}
-	}
-	if !isAdmin {
-		// IAM's built-in org = superuser org. Users in built-in have full admin access.
-		if owner == "built-in" || owner == "superuser" {
-			isAdmin = true
-		}
-	}
-
 	// Store resolved claims on the request for downstream middleware.
 	e.Set("authSub", sub)
 	e.Set("authOwner", owner)
@@ -375,7 +358,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// rule engine can evaluate it. No writes to _superusers or users collections.
 
 	collectionName := core.CollectionNameSuperusers
-	if !isAdmin {
+	if !superuser(owner, claims["orgs"]) {
 		collectionName = "users"
 		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 			collectionName = v
@@ -401,6 +384,50 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	record.SetVerified(true)
 
 	return record, nil
+}
+
+// superuser reports whether a verified IAM token speaks for a member of the
+// reserved admin org — the SuperAdmin scope, and the only claim that mirrors
+// onto _superusers.
+//
+// Two claims carry that one membership. `owner` is the home org, which
+// store.IsSuperAdmin answers directly; `orgs` is the rest of the membership set,
+// and IAM lets only a SuperAdmin put an entry for a reserved org in there
+// (internal/memberships mayGrant), so an entry naming the admin org is IAM
+// stating the caller holds admin-org tenancy.
+//
+// A role of "admin" on an ordinary org is a different, org-scoped question and
+// never answers this one: _superusers is unscoped inside the process — schema,
+// settings, backups and logs are all process-wide, and one process serves every
+// org's Base — so granting it from an org's own admin would hand one tenant
+// authority over the rest.
+func superuser(owner string, orgs any) bool {
+	if store.IsSuperAdmin(owner) {
+		return true
+	}
+	for _, ref := range orgRefs(orgs) {
+		if store.IsSuperAdmin(ref.Org) {
+			return true
+		}
+	}
+	return false
+}
+
+// orgRefs decodes the `orgs` claim through IAM's own claim type, so the JSON
+// contract has one definition rather than a second spelling here. Anything that
+// does not decode yields no memberships.
+func orgRefs(claim any) []model.OrgRef {
+	raw, err := json.Marshal(claim)
+	if err != nil {
+		return nil
+	}
+
+	var refs []model.OrgRef
+	if err := json.Unmarshal(raw, &refs); err != nil {
+		return nil
+	}
+
+	return refs
 }
 
 // subToRecordID converts an OIDC sub claim (which may be a UUID, slug, or

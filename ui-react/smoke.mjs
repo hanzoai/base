@@ -12,7 +12,7 @@
  *   2. every route paints: text in #root, no page error, and the control
  *      surfaces (.btn/.panel/.input) compute to real colours and radii.
  *
- * Serves dist/ under `/_/` exactly as the Go server mounts it and stubs `/v1`,
+ * Serves dist/ at the root exactly as the Go server mounts it and stubs `/v1`,
  * so it runs against the committed bundle with no Base server and no network.
  *
  * Usage: node smoke.mjs   (needs playwright; point PLAYWRIGHT at a checkout
@@ -87,7 +87,9 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify(stub(url)))
   }
   // SPA fallback: anything without a file extension is a client route.
-  let rel = url.startsWith('/_/') ? url.slice(3) : url.slice(1)
+  // This mirrors the Go handler, which serves the bundle at the root. A stale
+  // mount here would pass the check against a layout nothing runs.
+  let rel = url.slice(1)
   if (!rel || !path.extname(rel)) rel = 'index.html'
   fs.readFile(path.join(root, rel), (err, body) => {
     if (err) { res.writeHead(404); return res.end('not found') }
@@ -98,7 +100,7 @@ const server = http.createServer((req, res) => {
   })
 })
 await new Promise((r) => server.listen(4600, r))
-const origin = 'http://localhost:4600/_'
+const origin = 'http://localhost:4600'
 
 // --- the run ---------------------------------------------------------------
 const routes = [

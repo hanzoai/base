@@ -3,10 +3,7 @@ package apis
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/fatih/color"
 	"github.com/hanzoai/base/core"
@@ -14,25 +11,20 @@ import (
 	"github.com/hanzoai/dbx"
 )
 
-// DefaultInstallerFunc is the default Base installer function.
+// DefaultInstallerFunc tells an operator how to create the first superuser.
 //
-// It will attempt to open a link in the browser (with a short-lived auth
-// token for the systemSuperuser) to the installer UI so that users can
-// create their own custom superuser record.
+// It only runs where IAM is NOT the auth source — with IAM on, loadInstaller
+// returns before this and the superuser is whoever IAM issues an admin-claim
+// token to.
 //
-// See https://github.com/hanzoai/base/discussions/5814.
+// It used to open a browser at `{baseURL}/_/#/baseinstal/{token}` and print
+// that address. There is no such page: the admin was rewritten and serves no
+// `baseinstal` route, so the link a first-boot operator was handed went
+// nowhere, and the CLI line printed under it as a fallback was the only thing
+// that worked. Now it is the instruction rather than the fallback.
 func DefaultInstallerFunc(app core.App, systemSuperuser *core.Record, baseURL string) error {
-	token, err := systemSuperuser.NewStaticAuthToken(30 * time.Minute)
-	if err != nil {
-		return err
-	}
-
-	// launch url (ignore errors and always print a help text as fallback)
-	url := fmt.Sprintf("%s/_/#/baseinstal/%s", strings.TrimRight(baseURL, "/"), token)
-	_ = osutils.LaunchURL(url)
-	color.Magenta("\n(!) Launch the URL below in the browser if it hasn't been open already to create your first superuser account:")
-	color.New(color.Bold).Add(color.FgCyan).Println(url)
-	color.New(color.FgHiBlack, color.Italic).Printf("(you can also create your first superuser by running: %s superuser upsert EMAIL PASS)\n\n", executablePath())
+	color.Magenta("\n(!) No superuser exists yet. Create the first one with:")
+	color.New(color.Bold).Add(color.FgCyan).Printf("    %s superuser upsert EMAIL PASS\n\n", executablePath())
 
 	return nil
 }
