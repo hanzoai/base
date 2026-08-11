@@ -1,9 +1,10 @@
 // Package org gives one Base process a Base per org.
 //
-// An org's Base is a SQLite file of its own under {DataDir}/orgs/{org}/, opened
-// the first time a request arrives carrying that org and encrypted under a key
-// derived for it from KMS. Isolation is physical: a different org is a
-// different file, so there is no query that can read across two.
+// An org's Base is a Base of its own under {DataDir}/orgs/{org}/, opened the
+// first time a request arrives carrying that org. Isolation is physical: a
+// different org is a different file, so there is no query that can read across
+// two. Physical is all it is — OrgDEK derives a key from KMS that nothing opens
+// a file with, so the files are plaintext at rest.
 //
 // Orgs and members are IAM's, read off the validated token. This package never
 // writes them — a local copy is a second answer to "who is in this org", and
@@ -76,23 +77,6 @@ type Config struct {
 	// ComplianceAPIKey is the API key for the compliance service.
 	ComplianceAPIKey string
 
-	// PrincipalIsolation controls how principal (org or user) data is physically separated.
-	//   "prefix"   — (default) t_{slug}_ prefixed collections in shared DB
-	//   "sqlite"   — separate encrypted Liquid SQL file per principal
-	//   "postgres" — separate PostgreSQL database per principal
-	//
-	// For "sqlite" mode, each principal gets its own database file at:
-	//   {DataDir}/orgs/{slug}/data.db (orgs)
-	//   {DataDir}/users/{userId}/data.db (per-user, when enabled)
-	// For "postgres" mode, each principal gets a dedicated schema or database.
-	// The backend can be configured per-principal via PrincipalBackendFunc.
-	//
-	// PII is physically isolated — zero data commingling.
-	PrincipalIsolation string
-
-	// Deprecated: use PrincipalIsolation. Kept as alias for backward compatibility.
-	OrgIsolation string
-
 	// PrincipalEncryptionKey is the master key per-principal keys are derived
 	// from, by github.com/hanzoai/cek — see OrgDB.OrgDEK and OrgDB.UserDEK for
 	// the namespace each one uses. It must be 32 bytes, which is what a master
@@ -147,8 +131,6 @@ func Register(app core.App, config Config) error {
 		return err
 	}
 
-	poolConfig := DefaultPoolConfig()
-
 	p := &plugin{
 		app:        app,
 		config:     config,
@@ -156,8 +138,9 @@ func Register(app core.App, config Config) error {
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
 		orgDB:      NewOrgDB(app, config.OrgEncryptionKey),
-		dbPool:     NewDBPoolManager(poolConfig),
+		jwksURL:    strings.TrimRight(config.IAMEndpoint, "/") + "/v1/iam/.well-known/jwks",
 	}
+	p.bases = newBases(p)
 
 	// Bootstrap: ensure platform system collections exist.
 	app.OnBootstrap().BindFunc(func(e *core.BootstrapEvent) error {
@@ -167,27 +150,23 @@ func Register(app core.App, config Config) error {
 		return p.ensureSystemCollections()
 	})
 
-	// Terminate: release the long-lived KMS connection.
+	// Terminate: release the long-lived KMS connection and the Bases this
+	// process opened.
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		kmsClient.Close()
+		p.bases.close()
 		return e.Next()
 	})
 
-	// Stamp owner+org on every base-collection create from the VALIDATED
-	// principal — never from client body/headers. Makes base isolation
-	// tamper-proof: a caller cannot attribute a record to another user/org.
-	app.OnRecordCreateRequest().BindFunc(stampOrgOwnership)
+	// Which Base serves an org. Reading it is how a request reaches the right
+	// one; without it every read lands on the process's own Base, which is what
+	// used to happen.
+	app.Store().Set(apis.StoreKeyBases, apis.Bases(p.bases.base))
 
-	// IAM is the only auth source. Every Base route validates JWTs against
-	// IAM's JWKS; the legacy local-password / OTP / MFA paths are
-	// unreachable (see apis/record_auth_*: 410 Gone with a Location pointer
-	// to the IAM equivalent). Base never hosts identity — it only validates.
-	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
-	jwksURL := strings.TrimRight(config.IAMEndpoint, "/") + "/v1/iam/.well-known/jwks"
-	app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+	p.declare(app)
 
 	app.Logger().Info("platform: IAM is the only auth source",
-		"jwksURL", jwksURL,
+		"jwksURL", p.jwksURL,
 		"authEndpoint", config.IAMEndpoint,
 	)
 
@@ -232,13 +211,40 @@ func Register(app core.App, config Config) error {
 					return re.Next() // fail-open to next middleware
 				}
 
+				// A key acts in the org IAM issued it under. Where the request
+				// also names one, the key must already carry it — the same rule
+				// a token gets, stated separately because a key is a machine and
+				// holds none of the cross-tenant scope a platform operator does.
+				org := ""
+				if len(user.OrgIDs) > 0 {
+					org = user.OrgIDs[0]
+				}
+				if stated := apis.StatedOrg(re); stated != "" {
+					if !slices.Contains(user.OrgIDs, stated) {
+						return re.ForbiddenError("The key does not carry the requested organization.", nil)
+					}
+					org = stated
+				}
+				if org == "" {
+					return re.ForbiddenError("The key carries no organization.", nil)
+				}
+
+				base, err := p.bases.base(org)
+				if err != nil {
+					return re.InternalServerError("Failed to open the Base for this organization.", err)
+				}
+				re.App = base
+
 				// Set identity context from resolved key
 				re.Set("authSub", user.ID)
 				re.Set("authName", user.Name)
 				re.Set("authEmail", user.Email)
-				if len(user.OrgIDs) > 0 {
-					re.Set("authOwner", user.OrgIDs[0])
-				}
+				re.Set("authOwner", org)
+				re.Set(apis.RequestEventKeyOrg, org)
+				re.Request.Header.Set("X-User-Id", user.ID)
+				re.Request.Header.Set("X-Org-Id", org)
+				re.Request.Header.Set("X-User-Email", user.Email)
+
 				// Store key type for permission checks downstream
 				if IsPublishableKey(token) {
 					re.Set("authKeyType", "publishable") // read-only
@@ -246,44 +252,6 @@ func Register(app core.App, config Config) error {
 					re.Set("authKeyType", "secret") // full access
 				}
 
-				return re.Next()
-			},
-		})
-
-		// Global middleware: set identity headers from authenticated user or API key.
-		// Runs after both loadAuthToken and platformAPIKeyAuth.
-		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
-			Id:       "platformIdentityHeaders",
-			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 2,
-			Func: func(re *core.RequestEvent) error {
-				if re.Auth != nil {
-					userId := re.Auth.Id
-					email := re.Auth.GetString("email")
-					orgId := re.Auth.GetString("org_id")
-
-					if orgId == "" {
-						if v, _ := re.Get("authOwner").(string); v != "" {
-							orgId = v
-						}
-					}
-
-					re.Request.Header.Set("X-User-Id", userId)
-					re.Request.Header.Set("X-Org-Id", orgId)
-					re.Request.Header.Set("X-User-Email", email)
-				} else if sub, _ := re.Get("authSub").(string); sub != "" {
-					// API key auth (no re.Auth record, but identity resolved via IAM)
-					re.Request.Header.Set("X-User-Id", sub)
-					if orgId, _ := re.Get("authOwner").(string); orgId != "" {
-						re.Request.Header.Set("X-Org-Id", orgId)
-					}
-					if email, _ := re.Get("authEmail").(string); email != "" {
-						re.Request.Header.Set("X-User-Email", email)
-					}
-				}
-				// Preserve gateway-injected identity headers if Base auth didn't resolve.
-				// The gateway validates the JWT and sets X-User-Id from the sub claim.
-				// This is the standard path for IAM-authenticated requests.
-				// Do NOT clear headers that the gateway already set.
 				return re.Next()
 			},
 		})
@@ -336,75 +304,6 @@ func Register(app core.App, config Config) error {
 			},
 		})
 
-		// Per-request principal database resolution.
-		// After identity is established, load the Liquid SQL / Postgres pool for the principal.
-		// Services are fully stateless — any instance serves any principal.
-		isolation := config.PrincipalIsolation
-		if isolation == "" {
-			isolation = config.OrgIsolation // backward compat
-		}
-		if isolation == "sqlite" || isolation == "postgres" {
-			e.Router.Bind(&hook.Handler[*core.RequestEvent]{
-				Id:       "platformOrgDBResolver",
-				Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 4,
-				Func: func(re *core.RequestEvent) error {
-					orgId := re.Request.Header.Get("X-Org-Id")
-					userId := re.Request.Header.Get("X-User-Id")
-
-					if orgId == "" {
-						return re.Next() // no org context — use shared platform DB
-					}
-
-					// Resolve or auto-provision org database
-					orgDBPath, exists := p.orgDB.GetOrgDBPath(orgId)
-					if !exists {
-						var err error
-						orgDBPath, err = p.orgDB.ProvisionOrg(orgId)
-						if err != nil {
-							app.Logger().Error("platform: failed to provision org db",
-								"orgId", orgId, "error", err)
-							return re.Next()
-						}
-					}
-
-					orgPool, err := p.dbPool.Get(orgDBPath)
-					if err != nil {
-						app.Logger().Error("platform: failed to open org db pool",
-							"orgId", orgId, "path", orgDBPath, "error", err)
-						return re.Next()
-					}
-					re.Set("orgDB", orgPool)
-					re.Set("orgDBPath", orgDBPath)
-					defer orgPool.Release()
-
-					// Per-user database (only if user is authenticated)
-					if userId != "" {
-						userDBPath, exists := p.orgDB.GetUserDBPath(orgId, userId)
-						if !exists {
-							userDBPath, _ = p.orgDB.ProvisionUser(orgId, userId)
-						}
-						if userDBPath != "" {
-							userPool, err := p.dbPool.Get(userDBPath)
-							if err == nil {
-								re.Set("userDB", userPool)
-								re.Set("userDBPath", userDBPath)
-								defer userPool.Release()
-							}
-						}
-					}
-
-					return re.Next()
-				},
-			})
-
-			app.Logger().Info("platform: per-org SQLite isolation enabled",
-				"dataDir", app.DataDir(),
-				"maxPools", poolConfig.MaxPools,
-				"idleTimeout", poolConfig.IdleTimeout.String(),
-				"shards", poolConfig.NumShards,
-			)
-		}
-
 		p.registerRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
 
@@ -432,7 +331,34 @@ type plugin struct {
 	compliance *ComplianceClient
 	org        *OrgService
 	orgDB      *OrgDB
-	dbPool     *DBPoolManager
+	bases      *bases
+	jwksURL    string
+}
+
+// declare is what this plugin states on every Base it opens, the process's own
+// included.
+//
+// A tenant's Base has to answer the way the platform's does — same single auth
+// source, same ownership stamped from the validated principal, same OrgService
+// bound for extensions — because it is the same product serving a different
+// org. Stating it in one function is what keeps the two from drifting; the
+// alternative is a handler that reads a store key set on only one Base and
+// silently takes the zero value on the others.
+func (p *plugin) declare(app core.App) {
+	// IAM is the only auth source. Every Base route validates JWTs against
+	// IAM's JWKS; the legacy local-password / OTP / MFA paths are unreachable
+	// (see apis/record_auth_*: 410 Gone with a Location pointer to the IAM
+	// equivalent). Base never hosts identity — it only validates.
+	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+	app.Store().Set(apis.StoreKeyJWKSURL, p.jwksURL)
+
+	// OrgService, reachable from Goja extensions.
+	app.Store().Set("org", p.org)
+
+	// Stamp owner+org on every base-collection create from the VALIDATED
+	// principal — never from client body/headers. A caller cannot attribute a
+	// record to another user or org.
+	app.OnRecordCreateRequest().BindFunc(stampOrgOwnership)
 }
 
 // --------------------------------------------------------------------------
@@ -525,8 +451,8 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	// Declared whole rather than on a group, so the collection root is
 	// /v1/bases and not /v1/bases/ — an empty leaf composes to the trailing
 	// slash, which is an address nobody calls.
-	r.GET(bases, p.handleListBases)
-	r.GET(bases+"/{id}", p.handleGetBase)
+	r.GET(basesPath, p.handleListBases)
+	r.GET(basesPath+"/{id}", p.handleGetBase)
 
 	// Compliance is its own service domain, a sibling of /v1/iam — not a child
 	// of Base's own resource. Optional: registered only where it is configured.
@@ -872,14 +798,19 @@ func stampOrgOwnership(e *core.RecordRequestEvent) error {
 	}
 
 	// Derive identity from the validated principal ONLY.
-	owner, org := "", ""
+	//
+	// The org is the one the request acts in, resolved once from the credential
+	// that authenticated it. This used to read the record's own org_id, which
+	// was mirrored from the `owner` claim — the org of the APPLICATION the token
+	// came through — so a record created by a member of alpha was stamped with
+	// whichever org owned the sign-in app.
+	owner := ""
 	if e.Auth != nil { // IAM JWT session
 		owner = e.Auth.Id
-		org = e.Auth.GetString("org_id")
 	} else if sub, _ := e.Get("authSub").(string); sub != "" { // IAM API key (pk-/sk-)
 		owner = sub
-		org, _ = e.Get("authOwner").(string)
 	}
+	org, _ := e.Get(apis.RequestEventKeyOrg).(string)
 
 	if hasOrg {
 		if org == "" {

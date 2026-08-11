@@ -17,6 +17,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hanzoai/authz"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/base/tools/claims"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/router"
@@ -33,6 +34,16 @@ const (
 	// []string. Set by resolveJWKSToken; read by anything that answers a
 	// per-org question.
 	RequestEventKeyOrgs = "authOrgs"
+
+	// RequestEventKeyOrg carries the one org the request acts in, as a string —
+	// the org resolved from the verified token, and the org whose Base is
+	// serving. Set by resolveJWKSToken.
+	RequestEventKeyOrg = "authOrg"
+
+	// requestEventKeyStatedOrg carries the org a request SAID it meant, read off
+	// X-Org-Id before that header is deleted. It is a statement of intent and
+	// never an identity — see loadAuthToken.
+	requestEventKeyStatedOrg = "__statedOrg"
 
 	requestEventKeyExecStart              = "__execStart"                 // the value must be time.Time
 	requestEventKeySkipSuccessActivityLog = "__skipSuccessActivityLogger" // the value must be bool
@@ -200,7 +211,30 @@ const (
 	// (admin-panel login), tracked for removal once admin → IAM
 	// redirect login lands.
 	StoreKeyExternalAuthOnly = "externalAuthOnly"
+
+	// StoreKeyBases holds the [Bases] of the deployment. Set by the org plugin.
+	StoreKeyBases = "bases"
 )
+
+// Bases answers which Base serves an org.
+//
+// One Base per org is the tenancy model whole, so this is the one lookup in it.
+// A deployment that registers this has a Base per org; a deployment that does
+// not has exactly one Base, the process's own, for everybody — a single-tenant
+// Base with no other Base for a request to have missed.
+type Bases func(org string) (core.App, error)
+
+// refusal is what a VERIFIED token produces when Base will not serve it.
+//
+// The distinction from an ordinary validation error is the whole point. A token
+// that does not verify is simply not authentication and the request carries on
+// as a guest; a token that verifies but resolves to no Base must stop the
+// request, because carrying on would serve it from whichever Base happened to
+// be bound — the fallthrough this exists to remove.
+type refusal struct{ err error }
+
+func (r refusal) Error() string { return r.err.Error() }
+func (r refusal) Unwrap() error { return r.err }
 
 // iamJWKSPath is IAM's canonical JWKS endpoint (HIP-0111). It is the one
 // suffix that turns StoreKeyJWKSURL back into the IAM origin, which is
@@ -235,6 +269,13 @@ var jwksCache = security.NewJWKSCache(10 * time.Minute)
 // _superusers collection (admin panel sessions). All other local tokens are
 // rejected — users must authenticate via the configured identity provider.
 //
+// It also decides WHICH BASE serves the request, because that follows from the
+// same verified token and deciding it anywhere else means deciding it twice.
+// A request carrying no credential at all reaches no org and is served by the
+// process's own Base: with no identity there is no tenant, and what it can read
+// there is what an anonymous caller's rules allow. A credential that verifies
+// but resolves to no org is refused rather than served from there — see orgOf.
+//
 // Note: We don't throw an error on invalid or expired token to allow
 // users to extend with their own custom handling in external middleware(s).
 func loadAuthToken() *hook.Handler[*core.RequestEvent] {
@@ -242,6 +283,19 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 		Id:       DefaultLoadAuthTokenMiddlewareId,
 		Priority: DefaultLoadAuthTokenMiddlewarePriority,
 		Func: func(e *core.RequestEvent) error {
+			// The identity headers are the gateway's to write from a token it
+			// validated. Arriving from a client they are a client saying who it
+			// is, so none of them is believed: X-Org-Id is read once, as the org
+			// a request SAYS it means, and every one of them is then deleted so
+			// that nothing downstream can mistake an assertion for an identity.
+			//
+			// The stated org buys the caller nothing on its own — orgOf admits
+			// it only where the token already carries it. It is read at all so
+			// that naming someone else's org can be answered with a refusal
+			// instead of silently with the caller's own data.
+			e.Set(requestEventKeyStatedOrg, e.Request.Header.Get(claims.HeaderOrgID))
+			claims.StripIdentityHeaders(e.Request.Header)
+
 			// already loaded by another middleware
 			if e.Auth != nil {
 				return e.Next()
@@ -267,6 +321,10 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 					if jwksErr == nil && record != nil {
 						e.Auth = record
 						return e.Next()
+					}
+					var stop refusal
+					if errors.As(jwksErr, &stop) {
+						return stop.err
 					}
 					if jwksErr != nil {
 						e.App.Logger().Debug("loadAuthToken: IAM JWKS validation failed",
@@ -303,6 +361,10 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 			}
 
 			jwksRecord, jwksErr := resolveJWKSToken(e, token, jwksURL)
+			var stop refusal
+			if errors.As(jwksErr, &stop) {
+				return stop.err
+			}
 			if jwksErr != nil {
 				e.App.Logger().Warn("loadAuthToken: JWKS validation failed",
 					"localError", err,
@@ -325,7 +387,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	ctx, cancel := context.WithTimeout(e.Request.Context(), 10*time.Second)
 	defer cancel()
 
-	claims, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, jwksCache)
+	raw, err := security.ParseJWTWithJWKS(ctx, token, jwksURL, jwksCache)
 	if err != nil {
 		return nil, fmt.Errorf("jwks validation: %w", err)
 	}
@@ -333,38 +395,30 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// Extract standard OIDC claims.
 	// "sub" is the primary identifier (RFC 7519). Fall back to
 	// "preferred_username" then "name" for compatibility.
-	sub, _ := claims["sub"].(string)
+	sub, _ := raw["sub"].(string)
 	if sub == "" {
-		sub, _ = claims["preferred_username"].(string)
+		sub, _ = raw["preferred_username"].(string)
 	}
 	if sub == "" {
-		sub, _ = claims["name"].(string)
+		sub, _ = raw["name"].(string)
 	}
 	if sub == "" {
 		return nil, errors.New("token missing sub/preferred_username/name claim")
 	}
 
-	owner, _ := claims["owner"].(string)
-	email, _ := claims["email"].(string)
-	name, _ := claims["name"].(string)
-	displayName, _ := claims["displayName"].(string)
+	email, _ := raw["email"].(string)
+	name, _ := raw["name"].(string)
+	displayName, _ := raw["displayName"].(string)
 	if name == "" {
 		name = displayName
 	}
 
-	verified := decode(claims)
+	verified := decode(raw)
 
-	// Store resolved claims on the request for downstream middleware.
-	e.Set("authSub", sub)
-	e.Set("authOwner", owner)
-	e.Set("authEmail", email)
-	e.Set("authName", name)
-	e.Set(RequestEventKeyOrgs, orgsOf(verified))
-
-	// When IAM is active, Base does NOT store user records. IAM is the user store.
-	// We create an ephemeral (unsaved) auth record from JWT claims so Base's
-	// rule engine can evaluate it. No writes to _superusers or users collections.
-
+	// Which collection mirrors the token is the PLATFORM's decision — the
+	// reserved admin org is a property of the process, not of any tenant — so it
+	// is read off the platform's store here, before the request moves onto a
+	// tenant's Base and that store becomes the tenant's.
 	collectionName := core.CollectionNameSuperusers
 	if !verified.PlatformSudo() {
 		collectionName = "users"
@@ -372,10 +426,59 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 			collectionName = v
 		}
 	}
+	bases, _ := e.App.Store().Get(StoreKeyBases).(Bases)
 
+	stated, _ := e.Get(requestEventKeyStatedOrg).(string)
+	org, err := orgOf(verified, stated)
+	if err != nil {
+		return nil, refusal{err}
+	}
+
+	// Acting anywhere but home is either an explicit selection the membership
+	// set admits or a platform operator reaching a tenant, which is the one
+	// cross-tenant scope in the estate and the one worth a line in the log.
+	if org != verified.Home() {
+		e.App.Logger().Info("base: request acts outside its home org",
+			"sub", sub, "home", verified.Home(), "org", org)
+	}
+
+	if bases != nil {
+		b, err := bases(org)
+		if err != nil {
+			return nil, refusal{router.NewInternalServerError("Failed to open the Base for this organization.", err)}
+		}
+		e.App = b
+	}
+
+	// Publish the identity: on the request, for Base's own middleware, and back
+	// onto the headers, for the proxies and shard routers that read them. They
+	// were deleted on the way in, so what is here now came from the token.
+	e.Set("authSub", sub)
+	e.Set("authEmail", email)
+	e.Set("authName", name)
+	e.Set(RequestEventKeyOrgs, orgsOf(verified))
+	e.Set(RequestEventKeyOrg, org)
+	e.Request.Header.Set(claims.HeaderUserID, sub)
+	e.Request.Header.Set(claims.HeaderOrgID, org)
+	e.Request.Header.Set(headerUserEmail, email)
+
+	// When IAM is active, Base does NOT store user records. IAM is the user store.
+	// We create an ephemeral (unsaved) auth record from JWT claims so Base's
+	// rule engine can evaluate it. No writes to _superusers or users collections.
+	//
+	// It is minted from the Base that is about to serve, so the collection the
+	// rule engine resolves @request.auth against is the one it will query.
+	//
+	// A Base with no auth collection to mirror into refuses the request rather
+	// than carrying on without one. The request is already pointed at that Base,
+	// and continuing would serve a caller who holds a valid token as though they
+	// held none — an anonymous read of a Base they are in fact a member of,
+	// which is a strange enough answer to be worth an error instead.
 	collection, err := e.App.FindCachedCollectionByNameOrId(collectionName)
 	if err != nil {
-		return nil, fmt.Errorf("auth collection %q not found: %w", collectionName, err)
+		return nil, refusal{router.NewInternalServerError(
+			"The Base for this organization has no auth collection.",
+			fmt.Errorf("auth collection %q not found: %w", collectionName, err))}
 	}
 
 	// Ephemeral record — NOT persisted. IAM is the user store, not Base.
@@ -386,12 +489,62 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	if name != "" {
 		record.Set("name", name)
 	}
-	if owner != "" && collection.Fields.GetByName("org_id") != nil {
-		record.Set("org_id", owner)
+	if collection.Fields.GetByName("org_id") != nil {
+		record.Set("org_id", org)
 	}
 	record.SetVerified(true)
 
 	return record, nil
+}
+
+// headerUserEmail travels beside the canonical three but is not one of them —
+// tools/claims strips it and does not name it, because nothing authorizes on an
+// address.
+const headerUserEmail = "X-User-Email"
+
+// StatedOrg is the org a request SAID it meant, read off X-Org-Id before that
+// header was deleted.
+//
+// It is intent, not identity. Honor it only where the credential already
+// carries the org, and refuse the request otherwise — a caller that names
+// someone else's org and is handed its own reads the answer as that org's, and
+// acts on it.
+func StatedOrg(e *core.RequestEvent) string {
+	v, _ := e.Get(requestEventKeyStatedOrg).(string)
+	return v
+}
+
+// orgOf answers which org a verified token acts in.
+//
+// The org is the SUBJECT's own membership, home first, which is the only thing
+// on a token that carries authority. Not the `owner` claim: IAM stamps that with
+// the org of the APPLICATION a token was minted through, so reading it named the
+// app's org for every caller — a token carrying alpha opened a Base for hanzo,
+// and every tenant signing in through one application shared one file.
+//
+// stated is what the request said it meant, read off X-Org-Id. It selects among
+// the orgs the token already carries and can add none, so on its own it grants
+// nothing. It is honored at all so that naming an org the token does not carry
+// can be answered with a refusal: served the caller's own org instead, an empty
+// list reads as "this Base is empty", which is a different statement and a
+// false one.
+//
+// A token with no membership set at all is a machine, and a machine is refused
+// rather than handed the process's own Base. Its org could only come from the
+// `owner` claim, and reading that claim — conditionally, on a predicate one
+// reader will eventually drop — is the exact shape of the bug above. A machine
+// that needs a Base reaches it with an IAM key, which carries a real membership.
+func orgOf(c *authz.Claims, stated string) (string, error) {
+	org, _ := c.EffectiveOrg(stated)
+
+	if stated != "" && stated != org {
+		return "", router.NewForbiddenError("The token does not carry the requested organization.", nil)
+	}
+	if org == "" {
+		return "", router.NewForbiddenError("The token carries no organization.", nil)
+	}
+
+	return org, nil
 }
 
 // platformSudo reports whether verified claims carry platform authority — the
@@ -415,14 +568,14 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 // Bases — so honoring an org's own admin would hand one tenant the rest.
 //
 // Claims that do not decode carry no authority.
-func decode(claims jwt.MapClaims) *authz.Claims {
-	raw, err := json.Marshal(claims)
+func decode(raw jwt.MapClaims) *authz.Claims {
+	encoded, err := json.Marshal(raw)
 	if err != nil {
 		return &authz.Claims{}
 	}
 
 	var c authz.Claims
-	if err := json.Unmarshal(raw, &c); err != nil {
+	if err := json.Unmarshal(encoded, &c); err != nil {
 		return &authz.Claims{}
 	}
 

@@ -1,6 +1,7 @@
 package org
 
 import (
+	"os"
 	"testing"
 )
 
@@ -22,8 +23,16 @@ func TestBaseReportsWhatIsOnDisk(t *testing.T) {
 		t.Fatalf("unused org: got %+v, want a Base that does not exist", got)
 	}
 
-	// Open it the one way anything opens one.
+	// A place to put one is not one. Provisioning makes the directory; opening
+	// the Base makes the file, and only the file is a Base.
 	if _, err := db.ProvisionOrg("acme"); err != nil {
+		t.Fatal(err)
+	}
+	if got := p.base("acme"); got.Exists {
+		t.Fatalf("an empty directory was reported as a Base: %+v", got)
+	}
+
+	if err := os.WriteFile(db.OrgDBPath("acme"), []byte("a base"), 0600); err != nil {
 		t.Fatal(err)
 	}
 

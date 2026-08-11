@@ -121,10 +121,10 @@ func main() {
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
 
-	// Per-org platform (IAM + KMS integration).
-	// PrincipalIsolation="sqlite" gives every org its own encrypted Liquid SQL
-	// database and every user a per-user database (see plugins/org/org_db.go).
-	// The bootnode plugin's collections are resolved per-org through this.
+	// Per-org platform (IAM + KMS integration). Registering it is what gives
+	// every org a Base of its own under {DataDir}/orgs/{org} — there is no
+	// second setting to turn that on, because a deployment with orgs and one
+	// shared database is not a shape anyone wants.
 	org.MustRegister(app, org.Config{
 		// Accept the canonical *_ENDPOINT name or the *_URL alias so a
 		// deployment can set either without config drift (one way to
@@ -134,7 +134,6 @@ func main() {
 		KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
 		IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
-		PrincipalIsolation:     "sqlite",
 		PrincipalEncryptionKey: os.Getenv("PRINCIPAL_ENCRYPTION_KEY"),
 	})
 
