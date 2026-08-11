@@ -34,19 +34,9 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-const (
-	// System collection names.
-	collectionOrgs       = "_orgs"
-	collectionOrgMembers = "_org_members"
-
-	// Header for org context scoping.
-
-	// Member roles.
-	RoleOwner  = "owner"
-	RoleAdmin  = "admin"
-	RoleMember = "member"
-	RoleViewer = "viewer"
-)
+// apiKeyAuthId names the middleware that resolves an IAM key, so that a route
+// which must not be authenticated by Base can say which door it is closing.
+const apiKeyAuthId = "platformAPIKeyAuth"
 
 // Config defines the configuration for the platform plugin.
 type Config struct {
@@ -194,7 +184,7 @@ func Register(app core.App, config Config) error {
 		// the token isn't a JWT), try resolving it as an IAM API key.
 		// This gives every Base app native support for IAM-managed keys.
 		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
-			Id:       "platformAPIKeyAuth",
+			Id:       apiKeyAuthId,
 			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 1,
 			Func: func(re *core.RequestEvent) error {
 				// Skip if already authenticated via JWKS/JWT
@@ -379,13 +369,16 @@ func (p *plugin) declare(app core.App) {
 // Bootstrap: system collections
 // --------------------------------------------------------------------------
 
+// ensureSystemCollections creates what this plugin reads and writes.
+//
+// Orgs and memberships are not among them. There used to be an _orgs and an
+// _org_members collection here, created on every bootstrap and written by
+// nothing, because IAM owns both nouns and this package only reads them off the
+// validated token. An empty table is not a harmless one: the credential check
+// on /v1/bases/{org}/creds asked it who belonged to an org, found no row, and
+// read that as permission, so the emptiness that made it look unused was
+// exactly what made it grant everyone access to everything.
 func (p *plugin) ensureSystemCollections() error {
-	if err := p.ensureOrgsCollection(); err != nil {
-		return fmt.Errorf("platform: ensure _orgs: %w", err)
-	}
-	if err := p.ensureMembersCollection(); err != nil {
-		return fmt.Errorf("platform: ensure _org_members: %w", err)
-	}
 	if err := p.ensureOrgConfigsCollection(); err != nil {
 		return fmt.Errorf("platform: ensure %s: %w", collectionOrgConfigs, err)
 	}
@@ -393,53 +386,6 @@ func (p *plugin) ensureSystemCollections() error {
 		return fmt.Errorf("platform: ensure %s: %w", collectionOrgCustomers, err)
 	}
 	return nil
-}
-
-func (p *plugin) ensureOrgsCollection() error {
-	_, err := p.app.FindCollectionByNameOrId(collectionOrgs)
-	if err == nil {
-		return nil // already exists
-	}
-
-	c := core.NewBaseCollection(collectionOrgs)
-	c.System = true
-	c.Fields.Add(
-		&core.TextField{Name: "name", Required: true, Min: 1, Max: 100},
-		&core.TextField{Name: "slug", Required: true, Min: 1, Max: 50},
-		&core.TextField{Name: "ownerId", Required: true},
-		&core.TextField{Name: "iamOrgId"},
-		&core.TextField{Name: "kmsProjectId"},
-		&core.AutodateField{Name: "created", OnCreate: true},
-		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
-	)
-
-	p.app.Logger().Info("creating platform system collection", "name", collectionOrgs)
-	return p.app.Save(c)
-}
-
-func (p *plugin) ensureMembersCollection() error {
-	_, err := p.app.FindCollectionByNameOrId(collectionOrgMembers)
-	if err == nil {
-		return nil
-	}
-
-	c := core.NewBaseCollection(collectionOrgMembers)
-	c.System = true
-	c.Fields.Add(
-		&core.TextField{Name: "orgId", Required: true},
-		&core.TextField{Name: "userId", Required: true},
-		&core.SelectField{
-			Name:      "role",
-			Required:  true,
-			MaxSelect: 1,
-			Values:    []string{RoleOwner, RoleAdmin, RoleMember, RoleViewer},
-		},
-		&core.AutodateField{Name: "created", OnCreate: true},
-		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},
-	)
-
-	p.app.Logger().Info("creating platform system collection", "name", collectionOrgMembers)
-	return p.app.Save(c)
 }
 
 // --------------------------------------------------------------------------
@@ -462,11 +408,14 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	// IAM already answers both questions — /v1/iam/organizations owns the org, and
 	// a validated token carries the caller's memberships (IAMUser.OrgIDs), so the
 	// read needs no call at all. Create, delete and invite live at IAM.
-	// Declared whole rather than on a group, so the collection root is
-	// /v1/bases and not /v1/bases/ — an empty leaf composes to the trailing
-	// slash, which is an address nobody calls.
+	//
+	// This is the collection, which names no org and so answers the membership
+	// question: every Base on the caller's token. Everything that names one lives
+	// under it and is registered together in registerOrgRoutes, where the rule for
+	// naming an org is stated once. Declared whole rather than on a group, so the
+	// collection root is /v1/bases and not /v1/bases/ — an empty leaf composes to
+	// the trailing slash, which is an address nobody calls.
 	r.GET(basesPath, p.handleListBases)
-	r.GET(basesPath+"/{id}", p.handleGetBase)
 
 	// Compliance is its own service domain, a sibling of /v1/iam — not a child
 	// of Base's own resource. Optional: registered only where it is configured.
@@ -537,25 +486,12 @@ func (p *plugin) handleListBases(e *core.RequestEvent) error {
 
 // handleGetBase answers for one Base.
 //
-// It used to read a record out of the local _orgs collection, which IAM owns
-// and Base never writes — so it answered 404 for every org, including the
-// caller's own. Membership is the token's to state.
+// Who may ask is settled on the subtree this route hangs off, beside the six
+// other routes that name an org — see actsInNamedOrg. It used to say so here in
+// its own words, which was the fourth statement of a rule three of its
+// neighbours had forgotten to make.
 func (p *plugin) handleGetBase(e *core.RequestEvent) error {
-	user, err := p.requireAuth(e)
-	if err != nil {
-		return err
-	}
-
-	org := e.Request.PathValue("id")
-	if org == "" {
-		return e.BadRequestError("missing org", nil)
-	}
-
-	if !slices.Contains(user.OrgIDs, org) {
-		return e.ForbiddenError("not a member of "+org, nil)
-	}
-
-	return e.JSON(http.StatusOK, p.base(org))
+	return e.JSON(http.StatusOK, p.base(e.Request.PathValue("orgId")))
 }
 
 func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
@@ -589,69 +525,6 @@ func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 	}
 
 	return user, nil
-}
-
-// --------------------------------------------------------------------------
-// Membership helpers
-// --------------------------------------------------------------------------
-
-func findMembership(app core.App, userId, orgId string) (*core.Record, error) {
-	records, err := app.FindRecordsByFilter(
-		collectionOrgMembers,
-		"userId = {:userId} && orgId = {:orgId}",
-		"",
-		1, 0,
-		map[string]any{"userId": userId, "orgId": orgId},
-	)
-	if err != nil || len(records) == 0 {
-		return nil, fmt.Errorf("membership not found")
-	}
-	return records[0], nil
-}
-
-func addMember(app core.App, orgId, userId, role string) error {
-	col, err := app.FindCollectionByNameOrId(collectionOrgMembers)
-	if err != nil {
-		return fmt.Errorf("_org_members collection not found: %w", err)
-	}
-
-	record := core.NewRecord(col)
-	record.Set("orgId", orgId)
-	record.Set("userId", userId)
-	record.Set("role", role)
-
-	return app.Save(record)
-}
-
-// checkAccess verifies that userId has at least the required permission level
-// for the given org.
-//
-// Hierarchy: owner(4) > admin(3) > member(2) > viewer/read(1).
-func checkAccess(app core.App, orgId, userId, permission string) bool {
-	m, err := findMembership(app, userId, orgId)
-	if err != nil {
-		return false
-	}
-	return roleHasPermission(m.GetString("role"), permission)
-}
-
-func roleHasPermission(role, permission string) bool {
-	levels := map[string]int{
-		RoleViewer: 1, RoleMember: 2, RoleAdmin: 3, RoleOwner: 4,
-	}
-	required := map[string]int{
-		"read": 1, "member": 2, "admin": 3, "owner": 4,
-	}
-
-	roleLevel, ok := levels[role]
-	if !ok {
-		return false
-	}
-	requiredLevel, ok := required[permission]
-	if !ok {
-		return false
-	}
-	return roleLevel >= requiredLevel
 }
 
 // --------------------------------------------------------------------------

@@ -7,62 +7,6 @@ import (
 	"testing"
 )
 
-func TestIsValidSlug(t *testing.T) {
-	tests := []struct {
-		slug string
-		want bool
-	}{
-		{"hello", true},
-		{"my-org", true},
-		{"org123", true},
-		{"a", true},
-		{"", false},
-		{"-bad", false},
-		{"bad-", false},
-		{"Bad", false},
-		{"no spaces", false},
-		{"no_underscores", false},
-		{"no.dots", false},
-	}
-	for _, tt := range tests {
-		if got := isValidSlug(tt.slug); got != tt.want {
-			t.Errorf("isValidSlug(%q) = %v, want %v", tt.slug, got, tt.want)
-		}
-	}
-}
-
-func TestRoleHasPermission(t *testing.T) {
-	tests := []struct {
-		role       string
-		permission string
-		want       bool
-	}{
-		{RoleOwner, "owner", true},
-		{RoleOwner, "admin", true},
-		{RoleOwner, "member", true},
-		{RoleOwner, "read", true},
-		{RoleAdmin, "owner", false},
-		{RoleAdmin, "admin", true},
-		{RoleAdmin, "member", true},
-		{RoleAdmin, "read", true},
-		{RoleMember, "owner", false},
-		{RoleMember, "admin", false},
-		{RoleMember, "member", true},
-		{RoleMember, "read", true},
-		{RoleViewer, "owner", false},
-		{RoleViewer, "admin", false},
-		{RoleViewer, "member", false},
-		{RoleViewer, "read", true},
-		{"invalid", "read", false},
-		{RoleViewer, "invalid", false},
-	}
-	for _, tt := range tests {
-		if got := roleHasPermission(tt.role, tt.permission); got != tt.want {
-			t.Errorf("roleHasPermission(%q, %q) = %v, want %v", tt.role, tt.permission, got, tt.want)
-		}
-	}
-}
-
 func TestOrgPrefix(t *testing.T) {
 	got := OrgPrefix("acme")
 	want := "t_acme_"
