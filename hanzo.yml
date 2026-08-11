@@ -64,6 +64,45 @@ test:
       set -e
       export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go test -count=1 ./...
+  - name: releases-published
+    # A release that builds nothing looks exactly like a release that built.
+    # v1.5.17 reached CI and its build died; v1.5.18 and v1.5.24 never reached CI
+    # at all. All three cut a Go module while ghcr stayed on v1.5.16 for six days,
+    # and NOTHING said so — the only thing that reports here is a run, and the
+    # failure was the absence of one. A pipeline cannot notice its own silence, so
+    # this asks the registry rather than the pipeline.
+    #
+    # The two lists compared here are compared nowhere else: github carries the
+    # tags, because that is where a push cuts the Go module, and ghcr is where the
+    # image has to end up. Either one alone looks healthy in exactly this failure.
+    #
+    # No credential, so it cannot fail for want of one: `ls-remote` speaks the git
+    # protocol rather than the REST API (no token, no rate-limit budget), and
+    # ghcr's token endpoint issues an anonymous pull token for a public package.
+    #
+    # The floor is the OLDEST v* tag ghcr already carries, never a number written
+    # here. Tags below it predate verbatim tag publishing and correctly have no
+    # image; a literal would be right today and wrong at the release that moves
+    # the range. The tag being built right now is excluded — its image is pushed
+    # by a later step, so demanding it here would fail every release on principle.
+    run: |
+      set -euo pipefail
+      img=$(yq -r '.images[0].repo' hanzo.yml)
+      pkg=${img#ghcr.io/}
+      tok=$(curl -fsSL "https://ghcr.io/token?scope=repository:${pkg}:pull&service=ghcr.io" | jq -r .token)
+      have=$(curl -fsSL -H "Authorization: Bearer $tok" "https://ghcr.io/v2/${pkg}/tags/list?n=1000" \
+             | jq -r '.tags[]' | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V)
+      [ -n "$have" ] || { echo "::error::${img} carries no v* tag — the release lane has never published"; exit 1; }
+      floor=$(printf '%s\n' "$have" | head -1)
+      missing=
+      for t in $(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" \
+                 | sed -n 's#.*refs/tags/\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$#\1#p' | sort -V -u); do
+        [ "$(printf '%s\n%s\n' "$floor" "$t" | sort -V | head -1)" = "$floor" ] || continue
+        if [ "${GITHUB_REF_TYPE:-}" = tag ] && [ "$t" = "${GITHUB_REF_NAME:-}" ]; then continue; fi
+        printf '%s\n' "$have" | grep -qx -- "$t" || missing="$missing $t"
+      done
+      [ -z "$missing" ] || { echo "::error::these release tags published no image to ${img}:$missing"; exit 1; }
+      echo "release tags from $floor up all resolve to an image in ${img}"
 
 images:
   - name: base
