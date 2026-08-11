@@ -133,18 +133,59 @@ schema, settings, backups and logs are process-wide. A token with no membership
 at all is a machine and is refused rather than handed that Base; a machine that
 needs a Base uses an IAM key, which carries a real membership.
 
+**A route that NAMES an org compares, it does not decide.** The seven routes
+under `/v1/bases/{org}` take an org in the path, and the rule for all of them is
+stated once as a middleware on that subtree (`actsInNamedOrg`): the org named
+must be the org the request acts in, which `loadAuthToken` or the key middleware
+already resolved from the verified credential into `apis.RequestEventKeyOrg`.
+Refusal is **403 and never 404** — a 404 is an answer about the data, so it tells
+a caller its token reached that org.
+
+Stating it four times is what shipped, and three of the four were wrong.
+`/config` and `/customers` asked nothing; `/creds` asked `checkOrgAccess`, which
+looked the org up in a local `_orgs` table and returned TRUE on a miss — and
+`_orgs` was written by nothing, so it missed always and granted always. `_orgs`,
+`_org_members` and their four helpers are gone: a second answer to "who is in
+this org" that nothing filled, and the emptiness that made it look unused was
+what made it admit everyone.
+
+Note also what these routes are NOT: `_org_configs` and `_org_customers` are
+shared tables on the platform Base keyed by an `org_id` column, so for them the
+column is the whole boundary, and the rule above is what defends it. Everything
+in `/v1/collections` is defended by the file instead.
+
 Still open here:
-- Shards are plaintext. `OrgDEK`/`UserDEK` derive keys nothing opens a file
-  with, so `orm/replicated` would stream plaintext tenant databases to object
-  storage.
 - `CreateBackup` zips `DataDir`, so the platform Base's backup contains every
   tenant's Base. A tenant's own backup is correctly scoped — its `DataDir` is
   its own directory.
 - Open Bases are held in a map with no eviction; 2000 orgs is 4000 SQLite
-  handles. `orm/db.Namespaces` is the primitive to adopt when that binds.
+  handles, and the cold open holds a process-wide write lock across a full
+  migration run — measured at ~50ms of stall on every other tenant's request.
+  `orm/db.Namespaces` is the primitive to adopt when that binds.
+- Naming an org a credential admits OPENS that org's Base, so an operator (or a
+  token with a large membership set) creates Bases by mentioning them.
 - Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
   rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do
   not follow the request onto a tenant Base.
+- `RealIP` reads `TrustedProxy` off `e.App`, which by then is the tenant's Base,
+  so behind a proxy the rate limiter keys authenticated traffic on the ingress
+  address. Latent — the default is empty on both Bases — and fixing it wants
+  `core.RequestEvent` to distinguish the deployment from the request's Base.
+
+### Rate limits belong to the process
+
+The limiter runs at priority -1000, after `loadAuthToken` at -1020 has pointed
+the request at its tenant's Base, so reading the limit off `e.App` asked each
+tenant how hard the process may be hit — and a freshly opened Base answers
+`Enabled=false`. Every authenticated caller was unlimited while anonymous callers
+were held to the rule; the `*:auth` 2-per-3s default applied to nobody with a
+token.
+
+The Base the process serves from is now named on the request by the router's
+event factory, and the limiter asks for it by name — settings, counters and the
+cleanup cron alike. One policy, one set of counters. Copying the posture onto
+each tenant Base at bootstrap was the alternative and is worse: N copies that
+drift, and per-tenant counters make a limit of 2 mean 2 per org.
 
 ### Functions — both halves exist, in different packages
 
@@ -248,7 +289,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 | Plugin | Path | Purpose |
 |--------|------|---------|
 | vault | plugins/vault/ | Per-user encrypted SQLite shards, DEK/KEK, CRDT sync, chain anchor |
-| zap | plugins/zap/ | ZAP transport (8.7us latency) |
+| zap | plugins/zap/ | ZAP transport (8.7us latency) — base's fully-wrapped HTTP handler on the `forward` terminal, and nothing else. The four native message types (Collections/Records/Auth/Realtime) called `app.Save` and `app.Delete` with no credential, no org and no create hook; they are deleted rather than mended, because resolving an org from a ZAP envelope is authentication and there is one of those in the estate. |
 | org | plugins/org/ | Per-org Bases: orgs read from IAM, per-org encrypted SQLite, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
