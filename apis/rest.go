@@ -3,6 +3,8 @@ package apis
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"
@@ -101,7 +104,7 @@ func restList(e *core.RequestEvent) error {
 	e.Request = e.Request.WithContext(
 		context.WithValue(e.Request.Context(), restWireKey{}, &restCall{preds: preds}))
 
-	return recordsList(e)
+	return restFail(e, recordsList(e))
 }
 
 // restRender writes the PostgREST shape: the rows as a bare array, and the count
@@ -470,7 +473,7 @@ func restCreate(e *core.RequestEvent) error {
 	e.Request = e.Request.WithContext(context.WithValue(e.Request.Context(), restWireKey{}, call))
 
 	if err := recordCreate(true, nil)(e); err != nil {
-		return err
+		return restFail(e, err)
 	}
 
 	if restWantsObject(e) && len(call.rows) != 1 {
@@ -535,7 +538,7 @@ func restWriteOverRows(e *core.RequestEvent, apply func(*core.RequestEvent, stri
 
 	for _, id := range ids {
 		if err := apply(e, id); err != nil {
-			return err
+			return restFail(e, err)
 		}
 	}
 
@@ -658,4 +661,70 @@ func restWriteRender(e *core.RequestEvent, rows []*core.Record, affected int) er
 		rows = []*core.Record{}
 	}
 	return e.JSON(http.StatusOK, rows)
+}
+
+// restFail renders any failure on this door in PostgREST's error shape.
+//
+// A client reads `code` and branches on it, so an error that arrives as Base's
+// {data,message,status} is an error the caller cannot act on: every
+// `error.code === '23505'` branch in a migrated app is dead against that body.
+// A unique violation is the one that matters most, because handling a duplicate
+// is ordinary application logic rather than an exceptional case — it becomes 409
+// with the SQLSTATE, which is what postgrest answers and what clients test for.
+func restFail(e *core.RequestEvent, err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var apiErr *router.ApiError
+	if !errors.As(err, &apiErr) {
+		return restError(e, http.StatusInternalServerError, "PGRST000", err.Error(), "")
+	}
+
+	if field, ok := restNotUnique(apiErr); ok {
+		return restError(e, http.StatusConflict, "23505",
+			"duplicate key value violates unique constraint",
+			fmt.Sprintf("Key (%s) already exists.", field))
+	}
+
+	details := ""
+	if len(apiErr.Data) > 0 {
+		if raw, mErr := json.Marshal(apiErr.Data); mErr == nil {
+			details = string(raw)
+		}
+	}
+	return restError(e, apiErr.Status, restCodeFor(apiErr.Status), apiErr.Message, details)
+}
+
+// restNotUnique reports the first field a validation error rejected as
+// non-unique. The normalizer upstream turns both engines' wording into this one
+// code, so the door reads a code rather than matching an engine's prose.
+func restNotUnique(apiErr *router.ApiError) (string, bool) {
+	for field, raw := range apiErr.Data {
+		if v, ok := raw.(validation.Error); ok && v.Code() == "validation_not_unique" {
+			return field, true
+		}
+		if m, ok := raw.(map[string]any); ok && m["code"] == "validation_not_unique" {
+			return field, true
+		}
+	}
+	return "", false
+}
+
+// restCodeFor gives a failure the PGRST code its status implies. PostgREST's own
+// codes are finer than this, but a wrong specific code is worse than an honest
+// general one — a client branching on it would take the wrong path.
+func restCodeFor(status int) string {
+	switch status {
+	case http.StatusBadRequest:
+		return "PGRST100"
+	case http.StatusUnauthorized, http.StatusForbidden:
+		return "PGRST301"
+	case http.StatusNotFound:
+		return "PGRST202"
+	case http.StatusNotAcceptable:
+		return "PGRST116"
+	default:
+		return "PGRST000"
+	}
 }

@@ -56,6 +56,35 @@ func NormalizeUniqueIndexError(err error, tableOrAlias string, fieldNames []stri
 
 	msg := strings.ToLower(err.Error())
 
+	if !IsUniqueViolation(err) {
+		return err
+	}
+
+	// Postgres names the INDEX rather than the columns
+	// ("duplicate key value violates unique constraint \"idx_unique_demo2_title\""),
+	// so the field is recovered from the index name instead. Base builds those
+	// names out of the column, and matching a whole underscore-delimited token
+	// rather than a substring is what keeps a field named "e" from matching
+	// every index that happens to contain the letter.
+	if !strings.Contains(msg, "unique constraint failed") {
+		if idx := uniqueIndexName(msg); idx != "" {
+			tokens := map[string]bool{}
+			for _, t := range strings.Split(idx, "_") {
+				tokens[t] = true
+			}
+			normalizedErrs := validation.Errors{}
+			for _, name := range fieldNames {
+				if tokens[strings.ToLower(name)] {
+					normalizedErrs[name] = validation.NewError("validation_not_unique", "Value must be unique")
+				}
+			}
+			if len(normalizedErrs) > 0 {
+				return normalizedErrs
+			}
+		}
+		return err
+	}
+
 	// check for unique constraint failure
 	if strings.Contains(msg, "unique constraint failed") {
 		// note: extra space to unify multi-columns lookup
@@ -77,4 +106,38 @@ func NormalizeUniqueIndexError(err error, tableOrAlias string, fieldNames []stri
 	}
 
 	return err
+}
+
+// IsUniqueViolation reports whether err is the engine's way of saying a unique
+// index was violated.
+//
+// The two engines this store runs on word it completely differently, and the
+// literal match this used to be ("unique constraint failed") is SQLite's alone —
+// so on Postgres a duplicate never normalized into a field error and surfaced as
+// a 500 instead of a 400. It is also what the /rest/v1 door reads to answer with
+// SQLSTATE 23505, which is the code postgrest clients branch on.
+func IsUniqueViolation(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint failed") || // sqlite
+		strings.Contains(msg, "duplicate key value violates unique constraint") || // postgres
+		strings.Contains(msg, "sqlstate 23505") // postgres, when the driver reports the code
+}
+
+// uniqueIndexName pulls the quoted index name out of a Postgres duplicate-key
+// message, or returns "" when there is not one to read.
+func uniqueIndexName(msg string) string {
+	const marker = `unique constraint "`
+	i := strings.Index(msg, marker)
+	if i < 0 {
+		return ""
+	}
+	rest := msg[i+len(marker):]
+	j := strings.IndexByte(rest, '"')
+	if j < 0 {
+		return ""
+	}
+	return rest[:j]
 }
