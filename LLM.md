@@ -425,24 +425,30 @@ the address it is served at and the redirect it asks for cannot disagree.
 The admin is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default — production
 services are headless `/v1` APIs); the `/v1` data plane is always on.
 
-## Storage tier (`BASE_DB_TIER`)
+## Storage tier (`BASE_DB_TIER`) — sqlite is the only one that works
 
-One knob picks the data backend for a Base instance — default `sqlite`,
-upgradable in place with no app rewrite (the `/v1` data plane is identical
-across tiers). Resolved once in `core.ResolveStorageTier()` (called from
-`base.NewWithConfig`) → applied to `BaseAppConfig.DataDSN`/`AuxDSN`, built on the
-existing dialect + `PostgresDBConnect` plumbing.
+`BASE_DB_TIER=sql` opens a PostgreSQL connection and is documented as a
+per-instance upgrade. It is not one yet, and the reason is worth stating rather
+than leaving to be discovered: Base writes SQLite-flavoured SQL directly — 21
+`strftime`, 6 `sqlite_master`, 3 `json_extract`, 3 `json_each` across 39 files
+that build raw queries. Postgres spells all four differently, so the tier
+selects a backend the queries cannot address.
 
-| `BASE_DB_TIER` | Backend | Extra env |
-|---|---|---|
-| `sqlite` (default / unset) | embedded SQLite (or `:memory:`) | — |
-| `sql` | `hanzoai/sql` (PostgreSQL) | `BASE_DB_URL` (DSN); optional `BASE_AUX_DSN` |
-| `datastore` | `hanzoai/datastore` (OLAP) | reserved — errors until the adapter ships |
+There WAS something that looked like the missing piece: `core.SQLDialect`, 345
+lines over three files, 22 methods covering exactly these differences —
+placeholders, `json_extract`, `strftime`, `AUTOINCREMENT`, `RETURNING`. Nothing
+ever called it. Not one caller, in the whole repo, since it was written. It made
+the codebase read as though the abstraction existed, which is the most likely
+reason nobody noticed the tier could not work, so it is gone.
 
-Misconfig fails loudly at startup (sql without `BASE_DB_URL`, the not-yet-wired
-`datastore`, or an unknown value) rather than silently running the wrong DB —
-same convention as the platform plugin's IAM check. Per-org tiering (each
-`plugins/org/org_db.go` shard on its own tier) builds on this selector.
+The abstraction to adopt is `hanzoai/orm`, already a dependency (used today only
+in `tools/search` for query building). Its `engine` package opens by driver name
+— `NewEngine(driver, dsn)` — and carries postgres, sqlite and mysql, including
+the `?` to `$N` placeholder rewrite that the dead interface promised. Routing
+Base's raw queries through it is what makes `sql` real; a second hand-rolled
+dialect is what was just deleted.
+
+No deployment sets the variable, so nothing regresses in the meantime.
 
 ## SQLite driver — one driver, OUR way (`github.com/hanzoai/sqlite`)
 
