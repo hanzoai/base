@@ -63,6 +63,7 @@ function Bases() {
               <th>Organisation</th>
               <th>State</th>
               <th>Size</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -75,6 +76,16 @@ function Bases() {
                   </span>
                 </td>
                 <td>{ b.exists ? size(b.bytes ?? 0) : '—' }</td>
+                <td>
+                  {/* Same origin, so the session already in this browser is the
+                      session the studio gets — no token handed across a boundary
+                      and no second sign-in. An org with no Base yet has nothing
+                      to open, which is why this is a link rather than a button
+                      that would have to explain itself. */}
+                  <a className="btn" href={ `/project/${ encodeURIComponent(b.org) }` }>
+                    { b.exists ? 'Open' : 'Start' }
+                  </a>
+                </td>
               </tr>
             )) }
           </tbody>
