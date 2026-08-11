@@ -7,13 +7,13 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// bases is the one address this plugin publishes. A Base is per org, so
+// basesPath is the one address this plugin publishes. A Base is per org, so
 // everything scoped to an org hangs off the Base it belongs to.
-const bases = "/v1/bases"
+const basesPath = "/v1/bases"
 
 // registerOrgRoutes registers what belongs to one Base.
 func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group(bases)
+	api := r.Group(basesPath)
 
 	api.GET("/{orgId}/config", p.handleGetOrgConfig)
 	api.GET("/{orgId}/creds/{provider}", p.handleGetOrgCreds)
