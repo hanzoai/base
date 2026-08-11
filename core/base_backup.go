@@ -75,10 +75,13 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 		tempPath := filepath.Join(localTempDir, "hz_backup_"+security.PseudorandomString(6))
 		createErr := e.App.RunInTransaction(func(txApp App) error {
 			return txApp.AuxRunInTransaction(func(txApp App) error {
-				// run manual checkpoint and truncate the WAL files
-				// (errors are ignored because it is not that important and the PRAGMA may not be supported by the used driver)
-				txApp.DB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
-				txApp.AuxDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
+				// fold the write-ahead log back in so the archived files are
+				// whole (errors are ignored — the archive is still usable and
+				// an engine without a log has nothing to fold)
+				if checkpoint := txApp.Dialect().Checkpoint(); checkpoint != "" {
+					txApp.DB().NewQuery(checkpoint).Execute()
+					txApp.AuxDB().NewQuery(checkpoint).Execute()
+				}
 
 				return archive.Create(txApp.DataDir(), tempPath, e.Exclude...)
 			})

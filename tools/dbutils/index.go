@@ -5,10 +5,13 @@ import (
 	"strings"
 
 	"github.com/hanzoai/base/tools/tokenizer"
+	"github.com/hanzoai/orm/dialect"
 )
 
 var (
-	indexRegex       = regexp.MustCompile(`(?im)create\s+(unique\s+)?\s*index\s*(if\s+not\s+exists\s+)?(\S*)\s+on\s+(\S*)\s*\(([\s\S]*)\)(?:\s*where\s+([\s\S]*))?`)
+	// the optional USING clause names the access method, which an engine that
+	// has more than one reports back in the index it hands out
+	indexRegex       = regexp.MustCompile(`(?im)create\s+(unique\s+)?\s*index\s*(if\s+not\s+exists\s+)?(\S*)\s+on\s+(\S*)(?:\s+using\s+\S+)?\s*\(([\s\S]*)\)(?:\s*where\s+([\s\S]*))?`)
 	indexColumnRegex = regexp.MustCompile(`(?im)^([\s\S]+?)(?:\s+collate\s+([\w]+))?(?:\s+(asc|desc))?$`)
 )
 
@@ -38,7 +41,7 @@ func (idx Index) IsValid() bool {
 // Build returns a "CREATE INDEX" SQL string from the current index parts.
 //
 // Returns empty string if idx.IsValid() is false.
-func (idx Index) Build() string {
+func (idx Index) Build(d dialect.Dialect) string {
 	if !idx.IsValid() {
 		return ""
 	}
@@ -58,18 +61,16 @@ func (idx Index) Build() string {
 	}
 
 	if idx.SchemaName != "" {
-		str.WriteString("`")
-		str.WriteString(idx.SchemaName)
-		str.WriteString("`.")
+		str.WriteString(d.Quote(idx.SchemaName))
+		str.WriteString(".")
 	}
 
-	str.WriteString("`")
-	str.WriteString(idx.IndexName)
-	str.WriteString("` ")
+	str.WriteString(d.Quote(idx.IndexName))
+	str.WriteString(" ")
 
-	str.WriteString("ON `")
-	str.WriteString(idx.TableName)
-	str.WriteString("` (")
+	str.WriteString("ON ")
+	str.WriteString(d.Quote(idx.TableName))
+	str.WriteString(" (")
 
 	if len(idx.Columns) > 1 {
 		str.WriteString("\n  ")
@@ -91,9 +92,7 @@ func (idx Index) Build() string {
 			str.WriteString(trimmedColName)
 		} else {
 			// regular identifier
-			str.WriteString("`")
-			str.WriteString(trimmedColName)
-			str.WriteString("`")
+			str.WriteString(d.Quote(trimmedColName))
 		}
 
 		if col.Collate != "" {
@@ -157,7 +156,15 @@ func ParseIndex(createIndexExpr string) Index {
 
 	// TableName
 	// ---
-	result.TableName = strings.Trim(matches[4], trimChars)
+	// a qualifier here names the schema the table is in; Base works in one
+	// schema and carries it on the index name, so only the table survives
+	tableTk := tokenizer.NewFromString(matches[4])
+	tableTk.Separators('.')
+
+	tableParts, _ := tableTk.ScanAll()
+	if len(tableParts) > 0 {
+		result.TableName = strings.Trim(tableParts[len(tableParts)-1], trimChars)
+	}
 
 	// Columns
 	// ---

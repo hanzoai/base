@@ -16,6 +16,17 @@ type Join struct {
 	On         query.Expression
 }
 
+// Condition is what the join is made on. A join whose relation is a function
+// of the row it is joined to has nothing of its own to match, and an engine
+// that requires an outer join to state a condition still has to be given one.
+func (j *Join) Condition() query.Expression {
+	if j.On != nil {
+		return j.On
+	}
+
+	return query.NewExp("1=1")
+}
+
 // MultiMatchSubquery defines a multi-match record subquery expression.
 type MultiMatchSubquery struct {
 	TargetTableAlias string
@@ -52,10 +63,8 @@ func (m *MultiMatchSubquery) Build(db *query.DB, params query.Params) string {
 		mergedJoins.WriteString(db.QuoteTableName(j.TableName))
 		mergedJoins.WriteString(" ")
 		mergedJoins.WriteString(db.QuoteTableName(j.TableAlias))
-		if j.On != nil {
-			mergedJoins.WriteString(" ON ")
-			mergedJoins.WriteString(j.On.Build(db, params))
-		}
+		mergedJoins.WriteString(" ON ")
+		mergedJoins.WriteString(j.Condition().Build(db, params))
 	}
 
 	return fmt.Sprintf(

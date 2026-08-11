@@ -56,6 +56,7 @@ require (
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
@@ -70,6 +71,7 @@ require (
 	github.com/hanzoai/csqlite v0.1.2 // indirect
 	github.com/hanzoai/lz4/v4 v4.1.22 // indirect
 	github.com/hanzoai/sqlcipher v0.1.1 // indirect
+	github.com/hanzokv/go/v9 v9.22.0 // indirect
 	github.com/hanzos3/crc64nvme v1.1.2 // indirect
 	github.com/hanzos3/md5-simd v1.1.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
@@ -123,6 +125,7 @@ require (
 	go.opentelemetry.io/contrib/detectors/gcp v1.42.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.275.0 // indirect
@@ -147,7 +150,7 @@ require (
 	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/hanzoai/orm v0.6.16
+	github.com/hanzoai/orm v0.6.24
 	github.com/hanzoai/replicate v0.9.5
 	github.com/hanzoai/sqlite v0.5.2
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

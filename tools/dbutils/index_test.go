@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"strings"
 	"testing"
 
@@ -224,7 +225,7 @@ func TestIndexBuild(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			result := s.index.Build()
+			result := s.index.Build(dialect.For("sqlite"))
 			if result != s.expected {
 				t.Fatalf("Expected \n%v \ngot \n%v", s.expected, result)
 			}

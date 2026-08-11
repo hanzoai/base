@@ -3,13 +3,14 @@ package search_test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"testing"
 
 	"github.com/hanzoai/base/tools/search"
 )
 
 func TestSortFieldBuildExpr(t *testing.T) {
-	resolver := search.NewSimpleFieldResolver("test1", "test2", "test3", "test4.sub")
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), "test1", "test2", "test3", "test4.sub")
 
 	scenarios := []struct {
 		sortField        search.SortField

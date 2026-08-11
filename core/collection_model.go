@@ -780,7 +780,7 @@ func (c *Collection) updateGeneratedIdIfExists(app App) {
 		original := parsed.IndexName
 		parsed.IndexName = strings.ReplaceAll(parsed.IndexName, c.Id, newId)
 		if parsed.IndexName != original {
-			c.Indexes[i] = parsed.Build()
+			c.Indexes[i] = parsed.Build(app.Dialect())
 		}
 	}
 
@@ -970,7 +970,7 @@ func (c *Collection) initTokenKeyField() {
 	// ensure that there is a unique index for the field
 	if _, ok := dbutils.FindSingleColumnUniqueIndex(c.Indexes, FieldNameTokenKey); !ok {
 		c.Indexes = append(c.Indexes, fmt.Sprintf(
-			"CREATE UNIQUE INDEX `%s` ON `%s` (`%s`)",
+			"CREATE UNIQUE INDEX %s ON %s (%s)",
 			c.fieldIndexName(FieldNameTokenKey),
 			c.Name,
 			FieldNameTokenKey,
@@ -996,7 +996,7 @@ func (c *Collection) initEmailField() {
 	// ensure that there is a unique index for the email field
 	if _, ok := dbutils.FindSingleColumnUniqueIndex(c.Indexes, FieldNameEmail); !ok {
 		c.Indexes = append(c.Indexes, fmt.Sprintf(
-			"CREATE UNIQUE INDEX `%s` ON `%s` (`%s`) WHERE `%s` != ''",
+			"CREATE UNIQUE INDEX %s ON %s (%s) WHERE [[%s]] != ''",
 			c.fieldIndexName(FieldNameEmail),
 			c.Name,
 			FieldNameEmail,

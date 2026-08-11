@@ -26,6 +26,7 @@ import (
 	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/base/tools/types"
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/dialect"
 	tasksembed "github.com/hanzoai/tasks/pkg/tasks"
 	"github.com/spf13/cast"
 	"golang.org/x/sync/semaphore"
@@ -101,6 +102,7 @@ type BaseApp struct {
 	nonconcurrentDB     dbx.Builder
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
+	dialect             dialect.Dialect
 	network             baseNetwork
 
 	// app event hooks
@@ -590,6 +592,21 @@ func (app *BaseApp) ConcurrentDB() dbx.Builder {
 // In a transaction the ConcurrentDB() and NonconcurrentDB() refer to the same *dbx.TX instance.
 func (app *BaseApp) NonconcurrentDB() dbx.Builder {
 	return app.nonconcurrentDB
+}
+
+// Dialect returns how the connected engine spells the SQL that differs
+// between engines — the JSON accessors, the schema catalog, the generated
+// instant and identifier. It is resolved from the driver the data DB was
+// opened with, so nothing downstream reads the storage tier or the DSN.
+//
+// Before the DB is open it reads as SQLite, which is what an unconfigured
+// Base runs on.
+func (app *BaseApp) Dialect() dialect.Dialect {
+	if app.dialect == nil {
+		return dialect.For("sqlite")
+	}
+
+	return app.dialect
 }
 
 // AuxDB returns the app auxiliary.db builder instance.
@@ -1248,6 +1265,7 @@ func (app *BaseApp) initDataDB() error {
 
 	app.concurrentDB = concurrentDB
 	app.nonconcurrentDB = nonconcurrentDB
+	app.dialect = dialect.For(concurrentDB.DriverName())
 
 	return nil
 }
@@ -1428,19 +1446,21 @@ func (app *BaseApp) registerBaseHooks() {
 	})
 
 	app.Cron().Add("__hzDBOptimize__", "0 0 * * *", func() {
-		_, execErr := app.NonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
-		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the main DB", "error", execErr.Error())
+		if checkpoint := app.Dialect().Checkpoint(); checkpoint != "" {
+			_, execErr := app.NonconcurrentDB().NewQuery(checkpoint).Execute()
+			if execErr != nil {
+				app.Logger().Warn("Failed to run the periodic checkpoint for the main DB", "error", execErr.Error())
+			}
+
+			_, execErr = app.AuxNonconcurrentDB().NewQuery(checkpoint).Execute()
+			if execErr != nil {
+				app.Logger().Warn("Failed to run the periodic checkpoint for the auxiliary DB", "error", execErr.Error())
+			}
 		}
 
-		_, execErr = app.AuxNonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
+		_, execErr := app.NonconcurrentDB().NewQuery(app.Dialect().Optimize()).Execute()
 		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA wal_checkpoint for the auxiliary DB", "error", execErr.Error())
-		}
-
-		_, execErr = app.NonconcurrentDB().NewQuery("PRAGMA optimize").Execute()
-		if execErr != nil {
-			app.Logger().Warn("Failed to run periodic PRAGMA optimize", "error", execErr.Error())
+			app.Logger().Warn("Failed to refresh statistics", "error", execErr.Error())
 		}
 	})
 

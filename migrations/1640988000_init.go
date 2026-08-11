@@ -7,6 +7,7 @@ import (
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 // Register is a short alias for `AppMigrations.Register()`
@@ -28,32 +29,38 @@ func Register(
 
 func init() {
 	core.SystemMigrations.Register(func(txApp core.App) error {
+		if err := runPrelude(txApp, txApp.DB()); err != nil {
+			return err
+		}
+
 		if err := createParamsTable(txApp); err != nil {
 			return fmt.Errorf("_params exec error: %w", err)
 		}
 
 		// -----------------------------------------------------------
 
-		_, execerr := txApp.DB().NewQuery(`
+		d := txApp.Dialect()
+
+		_, execerr := txApp.DB().NewQuery(fmt.Sprintf(`
 			CREATE TABLE {{_collections}} (
-				[[id]]         TEXT PRIMARY KEY DEFAULT ('r'||lower(hex(randomblob(7)))) NOT NULL,
+				[[id]]         TEXT PRIMARY KEY DEFAULT ('r'||%s) NOT NULL,
 				[[system]]     BOOLEAN DEFAULT FALSE NOT NULL,
-				[[type]]       TEXT DEFAULT "base" NOT NULL,
+				[[type]]       TEXT DEFAULT 'base' NOT NULL,
 				[[name]]       TEXT UNIQUE NOT NULL,
-				[[fields]]     JSON DEFAULT "[]" NOT NULL,
-				[[indexes]]    JSON DEFAULT "[]" NOT NULL,
+				[[fields]]     %s DEFAULT '[]' NOT NULL,
+				[[indexes]]    %s DEFAULT '[]' NOT NULL,
 				[[listRule]]   TEXT DEFAULT NULL,
 				[[viewRule]]   TEXT DEFAULT NULL,
 				[[createRule]] TEXT DEFAULT NULL,
 				[[updateRule]] TEXT DEFAULT NULL,
 				[[deleteRule]] TEXT DEFAULT NULL,
-				[[options]]    JSON DEFAULT "{}" NOT NULL,
-				[[created]]    TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL,
-				[[updated]]    TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL
+				[[options]]    %s DEFAULT '{}' NOT NULL,
+				[[created]]    TEXT DEFAULT (%s) NOT NULL,
+				[[updated]]    TEXT DEFAULT (%s) NOT NULL
 			);
 
 			CREATE INDEX IF NOT EXISTS idx__collections_type on {{_collections}} ([[type]]);
-		`).Execute()
+		`, d.Random(14), d.Json(), d.Json(), d.Json(), d.Now(), d.Now())).Execute()
 		if execerr != nil {
 			return fmt.Errorf("_collections exec error: %w", execerr)
 		}
@@ -86,14 +93,16 @@ func init() {
 }
 
 func createParamsTable(txApp core.App) error {
-	_, execErr := txApp.DB().NewQuery(`
+	d := txApp.Dialect()
+
+	_, execErr := txApp.DB().NewQuery(fmt.Sprintf(`
 		CREATE TABLE {{_params}} (
-			[[id]]      TEXT PRIMARY KEY DEFAULT ('r'||lower(hex(randomblob(7)))) NOT NULL,
-			[[value]]   JSON DEFAULT NULL,
-			[[created]] TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL,
-			[[updated]] TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL
+			[[id]]      TEXT PRIMARY KEY DEFAULT ('r'||%s) NOT NULL,
+			[[value]]   %s DEFAULT NULL,
+			[[created]] TEXT DEFAULT (%s) NOT NULL,
+			[[updated]] TEXT DEFAULT (%s) NOT NULL
 		);
-	`).Execute()
+	`, d.Random(14), d.Json(), d.Now(), d.Now())).Execute()
 
 	return execErr
 }
@@ -154,4 +163,22 @@ func createUsersCollection(txApp core.App) error {
 	users.OAuth2.MappedFields.AvatarURL = "avatar"
 
 	return txApp.Save(users)
+}
+
+// runPrelude gives the schema whatever the engine expects it to already have —
+// the collations an index can name, and the like. It is idempotent, so a
+// database that predates it gets them on the next boot.
+//
+// Only the data schema asks for it. The log schema names no collation, and
+// when both live in one database the second caller waits on the first one's
+// uncommitted catalog row for as long as that transaction is open.
+func runPrelude(app core.App, db dbx.Builder) error {
+	prelude := app.Dialect().Prelude()
+	if prelude == "" {
+		return nil
+	}
+
+	_, err := db.NewQuery(prelude).Execute()
+
+	return err
 }

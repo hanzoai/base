@@ -38,7 +38,15 @@ func (app *BaseApp) FindAllCollections(collectionTypes ...string) ([]*Collection
 		q.AndWhere(dbx.In("type", list.ToInterfaceSlice(types)...))
 	}
 
-	err := q.OrderBy("rowid ASC").All(&collections)
+	// insertion order, which the engine's own row column gives directly and
+	// otherwise has to be read off the row itself
+	if row := app.Dialect().Row(); row != "" {
+		q.OrderBy(row + " ASC")
+	} else {
+		q.OrderBy("created ASC").AndOrderBy("id ASC")
+	}
+
+	err := q.All(&collections)
 	if err != nil {
 		return nil, err
 	}

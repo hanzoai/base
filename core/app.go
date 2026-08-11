@@ -17,6 +17,7 @@ import (
 	"github.com/hanzoai/base/tools/subscriptions"
 	"github.com/hanzoai/base/tools/tasks"
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/dialect"
 )
 
 // App defines the main Base app interface.
@@ -193,6 +194,12 @@ type App interface {
 	//
 	// In a transaction the ConcurrentDB() and NonconcurrentDB() refer to the same *dbx.TX instance.
 	NonconcurrentDB() dbx.Builder
+
+	// Dialect returns how the connected engine spells the SQL that differs
+	// between engines — the JSON accessors, the schema catalog, the generated
+	// instant and identifier. Anything building raw SQL asks it rather than
+	// writing one engine's spelling directly.
+	Dialect() dialect.Dialect
 
 	// AuxDB returns the app auxiliary.db builder instance.
 	//

@@ -79,9 +79,10 @@ func recordsList(e *core.RequestEvent) error {
 
 	searchProvider := search.NewProvider(fieldsResolver).Query(query)
 
-	// use rowid when available to minimize the need of a covering index with the "id" field
-	if !collection.IsView() {
-		searchProvider.CountCol("_rowid_")
+	// count over the insertion-order column where the engine has one, so the
+	// count doesn't need a covering index on "id"
+	if row := e.App.Dialect().Row(); row != "" && !collection.IsView() {
+		searchProvider.CountCol(row)
 	}
 
 	records := []*core.Record{}

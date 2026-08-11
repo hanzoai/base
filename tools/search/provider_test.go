@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/hanzoai/orm/dialect"
 	"strconv"
 	"strings"
 	"sync"
@@ -352,8 +353,8 @@ func TestProviderExecNonEmptyQuery(t *testing.T) {
 			false,
 			`{"items":[{"test1":2,"test2":"test2.2","test3":""}],"page":1,"perPage":` + fmt.Sprint(MaxPerPage) + `,"totalItems":1,"totalPages":1}`,
 			[]string{
-				"SELECT COUNT(DISTINCT [[test.id]]) FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS NOT '' AND test2 IS NOT NULL)))) AND (test1 >= 2)",
-				"SELECT * FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS NOT '' AND test2 IS NOT NULL)))) AND (test1 >= 2) ORDER BY `test1` ASC, `test2` DESC LIMIT " + fmt.Sprint(MaxPerPage),
+				"SELECT COUNT(DISTINCT [[test.id]]) FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS DISTINCT FROM '' AND test2 IS NOT NULL)))) AND (test1 >= 2)",
+				"SELECT * FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS DISTINCT FROM '' AND test2 IS NOT NULL)))) AND (test1 >= 2) ORDER BY `test1` ASC, `test2` DESC LIMIT " + fmt.Sprint(MaxPerPage),
 			},
 		},
 		{
@@ -366,7 +367,7 @@ func TestProviderExecNonEmptyQuery(t *testing.T) {
 			false,
 			`{"items":[{"test1":2,"test2":"test2.2","test3":""}],"page":1,"perPage":` + fmt.Sprint(MaxPerPage) + `,"totalItems":-1,"totalPages":-1}`,
 			[]string{
-				"SELECT * FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS NOT '' AND test2 IS NOT NULL)))) AND (test1 >= 2) ORDER BY `test1` ASC, `test2` DESC LIMIT " + fmt.Sprint(MaxPerPage),
+				"SELECT * FROM `test` WHERE ((NOT (`test1` IS NULL)) AND (((test2 IS DISTINCT FROM '' AND test2 IS NOT NULL)))) AND (test1 >= 2) ORDER BY `test1` ASC, `test2` DESC LIMIT " + fmt.Sprint(MaxPerPage),
 			},
 		},
 		{
@@ -379,8 +380,8 @@ func TestProviderExecNonEmptyQuery(t *testing.T) {
 			false,
 			`{"items":[],"page":1,"perPage":10,"totalItems":0,"totalPages":0}`,
 			[]string{
-				"SELECT COUNT(DISTINCT [[test.id]]) FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS NOT '' AND test3 IS NOT NULL)))",
-				"SELECT * FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS NOT '' AND test3 IS NOT NULL))) ORDER BY `test1` ASC, `test3` ASC LIMIT 10",
+				"SELECT COUNT(DISTINCT [[test.id]]) FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS DISTINCT FROM '' AND test3 IS NOT NULL)))",
+				"SELECT * FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS DISTINCT FROM '' AND test3 IS NOT NULL))) ORDER BY `test1` ASC, `test3` ASC LIMIT 10",
 			},
 		},
 		{
@@ -393,7 +394,7 @@ func TestProviderExecNonEmptyQuery(t *testing.T) {
 			false,
 			`{"items":[],"page":1,"perPage":10,"totalItems":-1,"totalPages":-1}`,
 			[]string{
-				"SELECT * FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS NOT '' AND test3 IS NOT NULL))) ORDER BY `test1` ASC, `test3` ASC LIMIT 10",
+				"SELECT * FROM `test` WHERE (NOT (`test1` IS NULL)) AND (((test3 IS DISTINCT FROM '' AND test3 IS NOT NULL))) ORDER BY `test1` ASC, `test3` ASC LIMIT 10",
 			},
 		},
 		{
@@ -780,6 +781,10 @@ func createTestDB() (*testDB, error) {
 type testFieldResolver struct {
 	UpdateQueryCalls int
 	ResolveCalls     int
+}
+
+func (t *testFieldResolver) Dialect() dialect.Dialect {
+	return dialect.For("sqlite")
 }
 
 func (t *testFieldResolver) UpdateQuery(query *query.SelectQuery) error {

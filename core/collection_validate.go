@@ -520,7 +520,7 @@ func (cv *collectionValidator) checkIndexes(value any) error {
 		// ensure that the index name is not used in another collection
 		var usedTblName string
 		_ = cv.app.ConcurrentDB().Select("tbl_name").
-			From("sqlite_master").
+			From(cv.app.Dialect().Catalog()).
 			AndWhere(dbx.HashExp{"type": "index"}).
 			AndWhere(dbx.NewExp("LOWER([[tbl_name]])!=LOWER({:oldName})", dbx.Params{"oldName": cv.original.Name})).
 			AndWhere(dbx.NewExp("LOWER([[tbl_name]])!=LOWER({:newName})", dbx.Params{"newName": cv.new.Name})).
@@ -539,7 +539,7 @@ func (cv *collectionValidator) checkIndexes(value any) error {
 		// reset non-important identifiers
 		parsed.SchemaName = "validator"
 		parsed.IndexName = "validator"
-		parsedDef := parsed.Build()
+		parsedDef := parsed.Build(cv.app.Dialect())
 
 		if _, isDuplicated := duplicatedDefinitions[parsedDef]; isDuplicated {
 			return validation.Errors{
@@ -579,7 +579,7 @@ func (cv *collectionValidator) checkIndexes(value any) error {
 				oldParsed.Columns[i].Sort = ""
 			}
 
-			oldParsedStr := oldParsed.Build()
+			oldParsedStr := oldParsed.Build(cv.app.Dialect())
 
 			for _, column := range oldParsed.Columns {
 				for _, f := range cv.original.Fields {
@@ -605,7 +605,7 @@ func (cv *collectionValidator) checkIndexes(value any) error {
 							newParsed.Columns[i].Sort = ""
 						}
 
-						if oldParsedStr == newParsed.Build() {
+						if oldParsedStr == newParsed.Build(cv.app.Dialect()) {
 							hasMatch = true
 							break
 						}

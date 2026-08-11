@@ -1,51 +1,37 @@
 package dbutils
 
 import (
-	"fmt"
-	"strings"
+	"github.com/hanzoai/orm/dialect"
 )
 
-// JSONEach returns JSON_EACH SQLite string expression with
-// some normalizations for non-json columns.
-func JSONEach(column string) string {
-	// note: we are not using the new and shorter "if(x,y)" syntax for
-	// compatibility with custom drivers that use older SQLite version
-	return fmt.Sprintf(
-		`json_each(CASE WHEN iif(json_valid([[%s]]), json_type([[%s]])='array', FALSE) THEN [[%s]] ELSE json_array([[%s]]) END)`,
-		column, column, column, column,
-	)
+// The helpers here take a column name and hand the engine's spelling back with
+// the identifier bracketed the way dbx expects it. The spelling itself belongs
+// to the dialect — a column declared to hold JSON may equally hold a bare
+// scalar, and normalizing that is the same problem on every engine.
+
+// JSONEach is a relation with one row per element of the column, in a column
+// named value.
+func JSONEach(d dialect.Dialect, column string) string {
+	return d.Each(bracket(column))
 }
 
-// JSONArrayLength returns JSON_ARRAY_LENGTH SQLite string expression
-// with some normalizations for non-json columns.
-//
-// It works with both json and non-json column values.
-//
-// Returns 0 for empty string or NULL column values.
-func JSONArrayLength(column string) string {
-	// note: we are not using the new and shorter "if(x,y)" syntax for
-	// compatibility with custom drivers that use older SQLite version
-	return fmt.Sprintf(
-		`json_array_length(CASE WHEN iif(json_valid([[%s]]), json_type([[%s]])='array', FALSE) THEN [[%s]] ELSE (CASE WHEN [[%s]] = '' OR [[%s]] IS NULL THEN json_array() ELSE json_array([[%s]]) END) END)`,
-		column, column, column, column, column, column,
-	)
+// JSONArrayLength counts the elements of the column. An empty or null column
+// is 0.
+func JSONArrayLength(d dialect.Dialect, column string) string {
+	return d.Length(bracket(column))
 }
 
-// JSONExtract returns a JSON_EXTRACT SQLite string expression with
-// some normalizations for non-json columns.
-func JSONExtract(column string, path string) string {
-	// prefix the path with dot if it is not starting with array notation
-	if path != "" && !strings.HasPrefix(path, "[") {
+// JSONExtract reads path out of the column as text. The path is relative to
+// the value: "a.b", "[0]" or "" for the value itself.
+func JSONExtract(d dialect.Dialect, column string, path string) string {
+	// a property path reads as a member unless it already opens with an index
+	if path != "" && path[0] != '[' {
 		path = "." + path
 	}
 
-	return fmt.Sprintf(
-		// note: the extra object wrapping is needed to workaround the cases where a json_extract is used with non-json columns.
-		"(CASE WHEN json_valid([[%s]]) THEN JSON_EXTRACT([[%s]], '$%s') ELSE JSON_EXTRACT(json_object('base', [[%s]]), '$.base%s') END)",
-		column,
-		column,
-		path,
-		column,
-		path,
-	)
+	return d.Extract(bracket(column), path)
+}
+
+func bracket(column string) string {
+	return "[[" + column + "]]"
 }

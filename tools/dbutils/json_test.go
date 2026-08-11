@@ -1,65 +1,45 @@
 package dbutils_test
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/tools/dbutils"
+	"github.com/hanzoai/orm/dialect"
 )
 
-func TestJSONEach(t *testing.T) {
-	result := dbutils.JSONEach("a.b")
+// The engine's spelling is the dialect's to get right, and it is tested there
+// by executing it. What this layer owes its callers is the bracketing dbx
+// expects around a column name, and a path that reads as a member unless it
+// already opens with an index.
 
-	expected := "json_each(CASE WHEN iif(json_valid([[a.b]]), json_type([[a.b]])='array', FALSE) THEN [[a.b]] ELSE json_array([[a.b]]) END)"
+func TestJSONColumnIsBracketed(t *testing.T) {
+	d := dialect.For("sqlite")
 
-	if result != expected {
-		t.Fatalf("Expected\n%v\ngot\n%v", expected, result)
+	for name, got := range map[string]string{
+		"each":    dbutils.JSONEach(d, "a.b"),
+		"length":  dbutils.JSONArrayLength(d, "a.b"),
+		"extract": dbutils.JSONExtract(d, "a.b", ""),
+	} {
+		if strings.Contains(got, "[[a.b]]") {
+			continue
+		}
+		t.Errorf("%s did not bracket the column: %s", name, got)
 	}
 }
 
-func TestJSONArrayLength(t *testing.T) {
-	result := dbutils.JSONArrayLength("a.b")
+func TestJSONExtractPath(t *testing.T) {
+	d := dialect.For("sqlite")
 
-	expected := "json_array_length(CASE WHEN iif(json_valid([[a.b]]), json_type([[a.b]])='array', FALSE) THEN [[a.b]] ELSE (CASE WHEN [[a.b]] = '' OR [[a.b]] IS NULL THEN json_array() ELSE json_array([[a.b]]) END) END)"
-
-	if result != expected {
-		t.Fatalf("Expected\n%v\ngot\n%v", expected, result)
-	}
-}
-
-func TestJSONExtract(t *testing.T) {
-	scenarios := []struct {
-		name     string
-		column   string
-		path     string
-		expected string
-	}{
-		{
-			"empty path",
-			"a.b",
-			"",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base') END)",
-		},
-		{
-			"starting with array index",
-			"a.b",
-			"[1].a[2]",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$[1].a[2]') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base[1].a[2]') END)",
-		},
-		{
-			"starting with key",
-			"a.b",
-			"a.b[2].c",
-			"(CASE WHEN json_valid([[a.b]]) THEN JSON_EXTRACT([[a.b]], '$.a.b[2].c') ELSE JSON_EXTRACT(json_object('base', [[a.b]]), '$.base.a.b[2].c') END)",
-		},
-	}
-
-	for _, s := range scenarios {
-		t.Run(s.name, func(t *testing.T) {
-			result := dbutils.JSONExtract(s.column, s.path)
-
-			if result != s.expected {
-				t.Fatalf("Expected\n%v\ngot\n%v", s.expected, result)
-			}
-		})
+	for path, want := range map[string]string{
+		"":      "'$'",
+		"a":     "'$.a'",
+		"a.b":   "'$.a.b'",
+		"[0]":   "'$[0]'",
+		"[0].a": "'$[0].a'",
+	} {
+		if got := dbutils.JSONExtract(d, "col", path); !strings.Contains(got, want) {
+			t.Errorf("path %q produced %s, wanted it to carry %s", path, got, want)
+		}
 	}
 }

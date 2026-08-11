@@ -1,25 +1,29 @@
 package migrations
 
 import (
+	"fmt"
+
 	"github.com/hanzoai/base/core"
 )
 
 func init() {
 	core.SystemMigrations.Add(&core.Migration{
 		Up: func(txApp core.App) error {
-			_, execErr := txApp.AuxDB().NewQuery(`
+			d := txApp.Dialect()
+
+			_, execErr := txApp.AuxDB().NewQuery(fmt.Sprintf(`
 				CREATE TABLE IF NOT EXISTS {{_logs}} (
-					[[id]]      TEXT PRIMARY KEY DEFAULT ('r'||lower(hex(randomblob(7)))) NOT NULL,
+					[[id]]      TEXT PRIMARY KEY DEFAULT ('r'||%s) NOT NULL,
 					[[level]]   INTEGER DEFAULT 0 NOT NULL,
-					[[message]] TEXT DEFAULT "" NOT NULL,
-					[[data]]    JSON DEFAULT "{}" NOT NULL,
-					[[created]] TEXT DEFAULT (strftime('%Y-%m-%d %H:%M:%fZ')) NOT NULL
+					[[message]] TEXT DEFAULT '' NOT NULL,
+					[[data]]    %s DEFAULT '{}' NOT NULL,
+					[[created]] TEXT DEFAULT (%s) NOT NULL
 				);
 
 				CREATE INDEX IF NOT EXISTS idx_logs_level on {{_logs}} ([[level]]);
 				CREATE INDEX IF NOT EXISTS idx_logs_message on {{_logs}} ([[message]]);
-				CREATE INDEX IF NOT EXISTS idx_logs_created_hour on {{_logs}} (strftime('%Y-%m-%d %H:00:00', [[created]]));
-			`).Execute()
+				CREATE INDEX IF NOT EXISTS idx_logs_created_hour on {{_logs}} (%s);
+			`, d.Random(14), d.Json(), d.Now(), core.LogHour)).Execute()
 
 			return execErr
 		},

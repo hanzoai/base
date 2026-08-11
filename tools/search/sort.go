@@ -29,9 +29,11 @@ func (s *SortField) BuildExpr(fieldResolver FieldResolver) (string, error) {
 		return "RANDOM()", nil
 	}
 
-	// special case for the builtin SQLite rowid column
+	// special case for the engine's insertion-order column, where it has one
 	if s.Name == rowidSortKey {
-		return fmt.Sprintf("[[_rowid_]] %s", s.Direction), nil
+		if row := fieldResolver.Dialect().Row(); row != "" {
+			return fmt.Sprintf("[[%s]] %s", row, s.Direction), nil
+		}
 	}
 
 	result, err := fieldResolver.Resolve(s.Name)
