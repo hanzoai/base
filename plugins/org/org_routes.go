@@ -2,6 +2,8 @@ package org
 
 import (
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
@@ -14,19 +16,12 @@ const basesPath = "/v1/bases"
 
 // registerOrgRoutes registers what belongs to one Base.
 //
-// Every route below names an org in its path, and one sentence governs all of
-// them: the org a request names is the org it acts in. Which org that is was
-// settled once, at the door, from the verified credential — the subject's home
-// org, an org its membership set admits and the request selected, or any org at
-// all for a platform operator carrying the reserved admin membership.
-//
-// The sentence is stated on the subtree rather than inside each handler, which
-// is what makes a handler that forgets it impossible to write. Three of these
-// seven forgot: /config and /customers asked nothing, and /creds asked a
-// question about a local membership table that IAM owns and this package never
-// writes, so it found no row and read that as permission.
+// What these routes require of a credential is not stated here. It is a
+// property of the address, stated once on the router — see the three rules
+// below and where Register binds them — and it holds for whatever route sits at
+// that address, this file's or anyone's.
 func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
-	base := r.Group(basesPath + "/{orgId}").BindFunc(actsInNamedOrg)
+	base := r.Group(basesPath + "/{orgId}")
 
 	base.GET("", p.handleGetBase)
 	base.GET("/config", p.handleGetOrgConfig)
@@ -35,6 +30,102 @@ func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
 	base.DELETE("/creds", p.handleInvalidateOrgCreds)
 	base.GET("/customers/{userId}", p.handleGetCustomer)
 	base.POST("/customers/{userId}", p.handleProvisionCustomer)
+}
+
+// caller is the subject the credential names, whichever door resolved it. An
+// IAM key mints no auth record, so e.Auth answers nothing for one; and e.Auth.Id
+// is a record id derived from the subject rather than the subject itself, so it
+// does not compare against an id IAM issued.
+func caller(e *core.RequestEvent) string {
+	sub, _ := e.Get(apis.RequestEventKeySub).(string)
+	return sub
+}
+
+// actingOrg is the org the request acts in, resolved at the door from the
+// verified credential.
+func actingOrg(e *core.RequestEvent) string {
+	org, _ := e.Get(apis.RequestEventKeyOrg).(string)
+	return org
+}
+
+// actsForUser reports whether the credential may act for the named user: it is
+// that user, or it carries the org rather than a person — an org admin's token,
+// the org's own secret key, or a platform operator.
+func actsForUser(e *core.RequestEvent, user string) bool {
+	if user != "" && user == caller(e) {
+		return true
+	}
+
+	admin, _ := e.Get(apis.RequestEventKeyOrgAdmin).(bool)
+	return admin || e.HasSuperuserAuth()
+}
+
+// addressed is what a path under /v1/bases names: the org, and — where the
+// address has one — the user. Either may be empty.
+type addressed struct {
+	org  string
+	user string
+}
+
+// address reads a request path as an address under /v1/bases, reporting false
+// for a path that is not one.
+//
+// It reads the ESCAPED path and unescapes each segment itself, which is what
+// the mux does to fill a path parameter. Reading URL.Path instead compares
+// against something already decoded: /v1/bases/beta%2Fx arrives there as
+// /v1/bases/beta/x, which is a different address with a different org in it.
+func address(escaped string) (addressed, bool) {
+	if escaped == basesPath {
+		return addressed{}, true
+	}
+
+	rest, ok := strings.CutPrefix(escaped, basesPath+"/")
+	if !ok {
+		return addressed{}, false
+	}
+
+	segments := strings.Split(strings.TrimSuffix(rest, "/"), "/")
+
+	a := addressed{org: unescape(segments[0])}
+	if len(segments) == 3 && segments[1] == "customers" {
+		a.user = unescape(segments[2])
+	}
+
+	return a, true
+}
+
+func unescape(segment string) string {
+	if decoded, err := url.PathUnescape(segment); err == nil {
+		return decoded
+	}
+	return segment
+}
+
+// publishableReachesNoBase refuses a publishable key everything under
+// /v1/bases.
+//
+// A pk- key is the one you paste into a web page. It travels in ?key=, so
+// reaching these routes with it needs no Authorization header and no secret at
+// all — the page source is the credential. The only thing that stood between it
+// and an org's provider secrets was a check that publishable keys may not
+// WRITE, and every read here is a GET: the page's own key returned the
+// platform's live Stripe key and every member's billing identity. Read-only was
+// the wrong reading of publishable. Publishable means public, and nothing under
+// this prefix is.
+//
+// It is refused by kind rather than by method, so a read is refused for the
+// same reason a write is and no future GET can be added to the subtree without
+// inheriting it.
+func publishableReachesNoBase(e *core.RequestEvent) error {
+	if _, ok := address(e.Request.URL.EscapedPath()); !ok {
+		return e.Next()
+	}
+
+	if kind, _ := e.Get(keyKind).(string); kind == keyPublishable {
+		return e.ForbiddenError("A publishable key is public and reaches no Base.", nil)
+	}
+
+	return e.Next()
 }
 
 // actsInNamedOrg refuses a request naming an org other than the one its
@@ -50,11 +141,36 @@ func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
 // same posture the door already takes, where a token carrying no membership is
 // a machine and is refused rather than served from the process's own Base.
 func actsInNamedOrg(e *core.RequestEvent) error {
-	named := e.Request.PathValue("orgId")
-	acting, _ := e.Get(apis.RequestEventKeyOrg).(string)
+	named, ok := address(e.Request.URL.EscapedPath())
+	if !ok || named.org == "" {
+		return e.Next() // /v1/bases itself names no org and answers per membership
+	}
 
-	if named == "" || named != acting {
+	if named.org != actingOrg(e) {
 		return e.ForbiddenError("The credential does not act in the requested organization.", nil)
+	}
+
+	return e.Next()
+}
+
+// namesItsOwnUser refuses a request naming a user other than the caller.
+//
+// /customers/{userId} compared orgs and said nothing at all about users, so an
+// ordinary member's own token read any colleague's row — the customer id, the
+// broker account, the commerce customer, the vault. Belonging to an org is not
+// the same fact as being that person.
+//
+// An org's own admin, and a secret key issued to the org, do act for the whole
+// org and reach every member's row. A platform operator reaches it the way it
+// reaches everything else.
+func namesItsOwnUser(e *core.RequestEvent) error {
+	named, ok := address(e.Request.URL.EscapedPath())
+	if !ok || named.user == "" {
+		return e.Next()
+	}
+
+	if !actsForUser(e, named.user) {
+		return e.ForbiddenError("The credential acts for its own user only.", nil)
 	}
 
 	return e.Next()

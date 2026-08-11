@@ -42,10 +42,23 @@ func (p *plugin) ensureOrgConfigsCollection() error {
 	return p.app.Save(c)
 }
 
+// fieldComplianceApp holds the identity a (org, user) pair has at the
+// compliance vendor. It is what makes "whose application is this?" answerable —
+// the vendor's application id is a bare string in a URL and says nothing about
+// who created it.
+const fieldComplianceApp = "compliance_application_id"
+
 func (p *plugin) ensureOrgCustomersCollection() error {
-	_, err := p.app.FindCollectionByNameOrId(collectionOrgCustomers)
+	existing, err := p.app.FindCollectionByNameOrId(collectionOrgCustomers)
 	if err == nil {
-		return nil
+		// A collection created before this field existed still has to grow it,
+		// or every deployment already carrying customer rows would answer the
+		// ownership question with silence.
+		if existing.Fields.GetByName(fieldComplianceApp) != nil {
+			return nil
+		}
+		existing.Fields.Add(&core.TextField{Name: fieldComplianceApp})
+		return p.app.Save(existing)
 	}
 
 	c := core.NewBaseCollection(collectionOrgCustomers)
@@ -63,6 +76,7 @@ func (p *plugin) ensureOrgCustomersCollection() error {
 		&core.TextField{Name: "broker_account_id"},
 		&core.TextField{Name: "commerce_customer_id"},
 		&core.TextField{Name: "mpc_vault_id"},
+		&core.TextField{Name: fieldComplianceApp},
 		&core.JSONField{Name: "metadata", MaxSize: 1 << 20},
 		&core.AutodateField{Name: "created", OnCreate: true},
 		&core.AutodateField{Name: "updated", OnCreate: true, OnUpdate: true},

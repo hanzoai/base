@@ -1,13 +1,16 @@
 package org
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/logger"
 )
 
 // twoOrgs stands up one process serving alpha and beta, the way a deployment
@@ -160,8 +163,15 @@ func TestAnUncredentialedCallerNamesNoOrg(t *testing.T) {
 // an IAM key, which resolves to one org and no more. The rule reads the org the
 // request acts in and never asks which door set it, so the key path needs no
 // second statement of it — this is the test that the one statement covers both.
+//
+// It used to assert that a key reading its own org's stripe credentials was
+// handed STRIPE_API_KEY from the process environment, and called that a key
+// reaching its own org. It was the deployment's key, the same one for every
+// org, and the test pinned the leak as the feature. What the key reaches now is
+// its own org's KMS, which holds nothing here, so the read is a refusal to
+// answer and never the platform's secret.
 func TestAKeyActsInItsOwnOrg(t *testing.T) {
-	t.Setenv("STRIPE_API_KEY", "alpha-secret")
+	t.Setenv("STRIPE_API_KEY", "the-deployment-key")
 
 	app, err := tests.NewTestApp()
 	if err != nil {
@@ -191,9 +201,14 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 	}
 	mux := serve(t, app)
 
+	// Its own org is reached — not refused — and answers that it holds no such
+	// credential rather than handing over the deployment's.
 	code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/creds/stripe", "sk-service", nil)
-	if code != http.StatusOK || !strings.Contains(body, "alpha-secret") {
-		t.Fatalf("a key could not read its own org's credentials: %d %s", code, body)
+	if code == http.StatusForbidden {
+		t.Fatalf("a key was refused its own org: %d %s", code, body)
+	}
+	if strings.Contains(body, "the-deployment-key") {
+		t.Fatalf("a key was handed the deployment's own credential: %d %s", code, body)
 	}
 
 	for _, r := range orgRoutes {
@@ -202,8 +217,264 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 		if code != http.StatusForbidden {
 			t.Errorf("%s %s with an alpha key answered %d %s, want 403", r.method, path, code, body)
 		}
-		if strings.Contains(body, "alpha-secret") {
+		if strings.Contains(body, "the-deployment-key") {
 			t.Errorf("%s %s leaked a credential: %s", r.method, path, body)
 		}
+	}
+}
+
+// keyed stands up the half of IAM a key resolves against, so a test can issue
+// one. Every key it answers for belongs to owner.
+func keyed(t *testing.T, owner string) (core.App, http.Handler) {
+	t.Helper()
+
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	iam := newIssuer(t)
+	keys := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"u_key","name":"keyuser","email":"k@example.test","owner":"` + owner + `"}}`))
+	}))
+	t.Cleanup(keys.Close)
+
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+		t.Fatal(err)
+	}
+	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
+
+	db := NewOrgDB(app, "")
+	for _, org := range []string{"alpha", "beta"} {
+		if _, err := db.ProvisionOrg(org); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return app, serve(t, app)
+}
+
+// seedOrgConfig puts a real config row in, so a read that is admitted has
+// something to hand back and the test measures a disclosure rather than a
+// status code.
+func seedOrgConfig(t *testing.T, app core.App, org, secret string) {
+	t.Helper()
+
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+
+	c, err := app.FindCollectionByNameOrId(collectionOrgConfigs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := core.NewRecord(c)
+	r.Set("org_id", org)
+	r.Set("display_name", org+" Inc")
+	r.Set("kms_project_id", secret)
+	if err := app.Save(r); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestAPublishableKeyReachesNoBase pins what publishable means.
+//
+// A pk- key is the one that goes in a web page, and it travels in ?key=, so
+// reaching a Base with it needs no Authorization header — the page source IS
+// the credential. The only thing that stood in its way was a check that a
+// publishable key may not WRITE, and every read here is a GET, so the key
+// printed in a customer's HTML returned that org's provider secrets and every
+// member's billing identity. Read-only was the wrong reading of publishable.
+func TestAPublishableKeyReachesNoBase(t *testing.T) {
+	app, mux := keyed(t, "alpha")
+	seedOrgConfig(t, app, "alpha", "alpha-kms-project")
+
+	for _, r := range orgRoutes {
+		// Its OWN org, which is the point: the org rule is not what refuses it.
+		path := strings.Replace(r.path, "%s", "alpha", 1)
+
+		for _, how := range []struct{ name, token, query string }{
+			{"as a bearer", "pk-in-the-page", ""},
+			{"in the query", "", "?key=pk-in-the-page"},
+		} {
+			code, body := call(t, mux, r.method, path+how.query, how.token, nil)
+			if code != http.StatusForbidden {
+				t.Errorf("%s %s %s answered %d %s, want 403", r.method, path, how.name, code, body)
+			}
+			if strings.Contains(body, "alpha-kms-project") {
+				t.Errorf("%s %s %s handed a web page's key the org's config: %s", r.method, path, how.name, body)
+			}
+		}
+	}
+
+	// And it is refused by address rather than by being a pk- key at all: the
+	// same key still reaches what is not a Base.
+	if code, body := call(t, mux, http.MethodGet, "/v1/health", "pk-in-the-page", nil); code == http.StatusForbidden {
+		t.Errorf("a publishable key was refused something that is not a Base: %s", body)
+	}
+}
+
+// TestAMemberReachesOnlyItsOwnCustomerRow pins the second half of the customer
+// route, which compared orgs and said nothing whatever about users.
+//
+// Belonging to an org is not the same fact as being a person in it. The row
+// holds a customer id, a broker account, a commerce customer and a vault id, so
+// an ordinary member reading a colleague's is a real disclosure inside a tenant
+// that the org boundary cannot see.
+func TestAMemberReachesOnlyItsOwnCustomerRow(t *testing.T) {
+	app, iam, mux, _ := twoOrgs(t)
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+
+	ann := iam.member(t, "alpha/ann", "alpha")
+
+	code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/alpha%2Fceo", ann, nil)
+	if code != http.StatusForbidden {
+		t.Errorf("a member read another member's row: %d %s", code, body)
+	}
+	code, body = call(t, mux, http.MethodPost, "/v1/bases/alpha/customers/alpha%2Fceo", ann, nil)
+	if code != http.StatusForbidden {
+		t.Errorf("a member provisioned another member's row: %d %s", code, body)
+	}
+
+	// Its own row is its own business.
+	if code, body := call(t, mux, http.MethodPost, "/v1/bases/alpha/customers/alpha%2Fann", ann, nil); code == http.StatusForbidden {
+		t.Errorf("a member was refused its own row: %s", body)
+	}
+
+	// An org's owner acts for the org and reaches every member's.
+	owner := iam.token(t, "alpha/boss", "alpha")
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/alpha%2Fann", owner, nil); code == http.StatusForbidden {
+		t.Errorf("an org owner was refused a member's row: %s", body)
+	}
+}
+
+// TestTheRuleFollowsTheAddressAndNotTheGroup pins that what defends
+// /v1/bases/{org} is the address and not the subtree it happened to be
+// registered under.
+//
+// tools/router inherits middleware down the GROUP tree, not the URL. A rule
+// stated on the group that declares these seven routes therefore covers those
+// seven and nothing else, so a route registered off the router at the identical
+// address carried none of it — and jsvm's routerAdd takes an arbitrary path
+// string from an extension with no validation at all, which is exactly that
+// registration.
+func TestTheRuleFollowsTheAddressAndNotTheGroup(t *testing.T) {
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	iam := newIssuer(t)
+	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	db := NewOrgDB(app, "")
+	for _, org := range []string{"alpha", "beta"} {
+		if _, err := db.ProvisionOrg(org); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// A route at the same address, registered the way an extension does it.
+	mux := serve(t, app, func(e *core.ServeEvent) {
+		e.Router.GET("/v1/bases/{orgId}/usage", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"org": re.Request.PathValue("orgId")})
+		})
+	})
+
+	alpha := iam.token(t, "alpha/ann", "alpha")
+
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/beta/usage", alpha, nil); code != http.StatusForbidden {
+		t.Errorf("a route registered off the router at a /v1/bases address answered %d %s, want 403", code, body)
+	}
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/usage", alpha, nil); code == http.StatusForbidden {
+		t.Errorf("the same route refused alpha its own org: %s", body)
+	}
+}
+
+// requestLog waits for the row a served request writes and hands it back.
+//
+// The write is handed to a goroutine and then held by a batching handler, so it
+// is neither synchronous with the response nor written on the first flush.
+func requestLog(t *testing.T, app core.App) *core.Log {
+	t.Helper()
+
+	h, ok := app.SlogLogger().Handler().(*logger.BatchHandler)
+	if !ok {
+		t.Fatal("the app's log handler does not batch, so there is nothing to flush")
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if err := h.WriteAll(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+
+		logs := []*core.Log{}
+		if err := app.LogQuery().All(&logs); err != nil {
+			t.Fatal(err)
+		}
+		for _, l := range logs {
+			if l.Data["type"] == "request" {
+				return l
+			}
+		}
+
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	return nil
+}
+
+// TestTheAuditLogIsTheOperatorsAndCarriesNoSecret pins three things about one
+// row, all of which were wrong at once.
+//
+// The row belongs on the Base the process serves from. logRequest read
+// e.App, which a credential naming an org has already moved to that tenant's
+// file, so an authenticated request logged itself into the tenant's Base and
+// the operator's log held only traffic that never authenticated.
+//
+// It carries no credential. A key arrives in ?key= on a request with no
+// Authorization header, and the row recorded RequestURI() whole — so a live
+// secret key sat in _logs in plaintext for Logs.MaxDays, was served by
+// GET /v1/logs, and went into every backup.
+//
+// And it names who acted. A key mints no auth record, so every keyed action was
+// attributed to nobody at all.
+func TestTheAuditLogIsTheOperatorsAndCarriesNoSecret(t *testing.T) {
+	app, mux := keyed(t, "alpha")
+
+	s := app.Settings()
+	s.Logs.MaxDays = 5
+	s.Logs.LogAuthId = true
+	if err := app.Save(s); err != nil {
+		t.Fatal(err)
+	}
+
+	const secret = "sk-live-never-in-a-log"
+	if code, body := call(t, mux, http.MethodGet, "/v1/health?key="+secret, "", nil); code != http.StatusOK {
+		t.Fatalf("the keyed request did not reach /v1/health: %d %s", code, body)
+	}
+
+	row := requestLog(t, app)
+	if row == nil {
+		t.Fatal("the deployment's log holds no row for a request its tenant served")
+	}
+
+	if url, _ := row.Data["url"].(string); strings.Contains(url, secret) {
+		t.Errorf("a live key was written to the log: %s", url)
+	}
+	if auth, _ := row.Data["auth"].(string); auth != "key" {
+		t.Errorf("a keyed request was attributed to %q", auth)
+	}
+	if id, _ := row.Data["authId"].(string); id != "u_key" {
+		t.Errorf("a keyed request named the subject %q", id)
 	}
 }

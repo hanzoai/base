@@ -38,6 +38,15 @@ import (
 // which must not be authenticated by Base can say which door it is closing.
 const apiKeyAuthId = "platformAPIKeyAuth"
 
+// keyKind carries which tier of IAM key authenticated a request, and the two
+// tiers it can hold. A pk- key ships inside a web page and is public knowledge;
+// an sk- or hk- key is the org's own server credential.
+const (
+	keyKind        = "authKeyType"
+	keyPublishable = "publishable"
+	keySecret      = "secret"
+)
+
 // Config defines the configuration for the platform plugin.
 type Config struct {
 	// IAMEndpoint is the base URL for Hanzo IAM (default: "https://hanzo.id").
@@ -240,7 +249,7 @@ func Register(app core.App, config Config) error {
 				re.App = base
 
 				// Set identity context from resolved key
-				re.Set("authSub", user.ID)
+				re.Set(apis.RequestEventKeySub, user.ID)
 				re.Set("authName", user.Name)
 				re.Set("authEmail", user.Email)
 				re.Set("authOwner", org)
@@ -249,34 +258,42 @@ func Register(app core.App, config Config) error {
 				re.Request.Header.Set("X-Org-Id", org)
 				re.Request.Header.Set("X-User-Email", user.Email)
 
-				// Store key type for permission checks downstream
+				// Which tier of key this is. It decides what the key may reach,
+				// so it is stated once here, where the key was read.
+				//
+				// A secret key belongs to the org's own server rather than to
+				// any one person, so it acts for the org: it reaches every
+				// member's row the way an org admin's token does. A publishable
+				// key acts for nobody — it is in a web page.
 				if IsPublishableKey(token) {
-					re.Set("authKeyType", "publishable") // read-only
+					re.Set(keyKind, keyPublishable)
 				} else {
-					re.Set("authKeyType", "secret") // full access
+					re.Set(keyKind, keySecret)
+					re.Set(apis.RequestEventKeyOrgAdmin, true)
 				}
 
 				return re.Next()
 			},
 		})
 
-		// Publishable key enforcement: pk- keys are read-only.
-		// Blocks non-GET methods for publishable keys. Secret keys and
-		// JWTs have no method restrictions.
-		//
-		// Priority +3: runs after identity headers are set, before route handlers.
-		//
-		// Scope rules:
-		//   pk- → GET only (read market data, config, public info)
+		// A publishable key writes nothing, anywhere:
+		//   pk- → GET, plus a create in a collection that is open to anyone
 		//   sk- → all methods (create orders, manage accounts, admin)
 		//   hk- → all methods (IAM service key, legacy compat)
 		//   JWT → all methods (user session via IAM OIDC)
+		//
+		// This is a floor and not the whole rule, because a method says nothing
+		// about what an answer contains. What a pk- key may READ is settled per
+		// address — see publishableReachesNoBase, which refuses it every org
+		// secret and every billing identity on the strength of what the key IS.
+		//
+		// Priority +3: runs after identity headers are set, before route handlers.
 		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
 			Id:       "platformKeyTypeEnforcement",
 			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 3,
 			Func: func(re *core.RequestEvent) error {
-				keyType, _ := re.Get("authKeyType").(string)
-				if keyType != "publishable" {
+				kind, _ := re.Get(keyKind).(string)
+				if kind != keyPublishable {
 					return re.Next() // JWT, sk-, hk-, or unauthenticated — no restriction
 				}
 
@@ -307,6 +324,25 @@ func Register(app core.App, config Config) error {
 				})
 			},
 		})
+
+		// What every address under /v1/bases requires of the credential that
+		// reaches it, bound on the ROUTER and reading the path.
+		//
+		// Not bound on the group that declares those routes. A group states its
+		// middleware down the GROUP tree and not down the URL, so a route
+		// registered off the router at the identical address inherits nothing —
+		// and two live mechanisms register exactly that way: /v1/bases itself,
+		// just below, and jsvm's routerAdd, which takes a path string from an
+		// extension and validates none of it. The comment this replaces claimed
+		// that stating the rule on the subtree made a handler that forgets it
+		// impossible to write. It is the address that carries the data, so it
+		// has to be the address that carries the rule.
+		//
+		// Anonymous by construction: an anonymous middleware has no id and
+		// Unbind removes nothing that has no id, so no group beneath this one
+		// can drop the tenant boundary the way /v1/iam legitimately drops the
+		// doors that resolve a credential.
+		e.Router.BindFunc(publishableReachesNoBase, actsInNamedOrg, namesItsOwnUser)
 
 		p.registerRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
@@ -343,11 +379,12 @@ type plugin struct {
 // included.
 //
 // A tenant's Base has to answer the way the platform's does — same single auth
-// source, same ownership stamped from the validated principal, same OrgService
-// bound for extensions — because it is the same product serving a different
-// org. Stating it in one function is what keeps the two from drifting; the
-// alternative is a handler that reads a store key set on only one Base and
-// silently takes the zero value on the others.
+// source, same ownership stamped from the validated principal — because it is
+// the same product serving a different org. Stating it in one function is what
+// keeps the two from drifting; the alternative is a handler that reads a store
+// key set on only one Base and silently takes the zero value on the others.
+//
+// What a tenant's Base must NOT get is anything that reaches past its own org.
 func (p *plugin) declare(app core.App) {
 	// IAM is the only auth source. Every Base route validates JWTs against
 	// IAM's JWKS; the legacy local-password / OTP / MFA paths are unreachable
@@ -356,9 +393,13 @@ func (p *plugin) declare(app core.App) {
 	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 	app.Store().Set(apis.StoreKeyJWKSURL, p.jwksURL)
 
-	// OrgService, reachable from Goja extensions.
-	app.Store().Set("org", p.org)
-
+	// OrgService is NOT among what a tenant's Base gets. Its methods take an
+	// org as an argument and check nothing, so an extension running on one
+	// tenant's Base could read every other tenant's credentials and customers
+	// by naming them — the whole boundary this package exists to draw, undone
+	// by a store key. It stays on the process's own Base, where an operator's
+	// extension runs, and it is set there by Register.
+	//
 	// Stamp owner+org on every base-collection create from the VALIDATED
 	// principal — never from client body/headers. A caller cannot attribute a
 	// record to another user or org.
@@ -531,8 +572,53 @@ func (p *plugin) requireAuth(e *core.RequestEvent) (*IAMUser, error) {
 // Compliance handlers
 // --------------------------------------------------------------------------
 
+// requireOrg is what every compliance route needs before anything else: an org
+// the credential actually acts in.
+//
+// These routes name no org in their address, so the rules on /v1/bases do not
+// reach them and they have to ask. requireAuth alone answers "is there a
+// caller", which is not the question — a KYC record belongs to somebody.
+func requireOrg(e *core.RequestEvent) (string, error) {
+	org := actingOrg(e)
+	if org == "" {
+		return "", e.ForbiddenError("The credential acts in no organization.", nil)
+	}
+
+	return org, nil
+}
+
+// ownsComplianceApp refuses an application the credential does not hold.
+//
+// The application id is the vendor's and arrives in the path, so on its own it
+// is an unowned name: taking it and calling requireAuth answered "is there a
+// caller" and never "is this caller's", and one tenant read another tenant's
+// KYC status — provider, verification state and all — and started verifications
+// against it. What makes it answerable is the row written when the application
+// was created.
+//
+// The refusal for an application this org does not hold is 403 rather than 404,
+// for the reason actsInNamedOrg gives: a 404 is an answer about the data, and
+// it would separate "someone else's application" from "no such application".
+func (p *plugin) ownsComplianceApp(e *core.RequestEvent, applicationID string) error {
+	org, err := requireOrg(e)
+	if err != nil {
+		return err
+	}
+
+	owner, ok := p.org.ComplianceApp(org, applicationID)
+	if !ok || !actsForUser(e, owner) {
+		return e.ForbiddenError("The credential does not hold that application.", nil)
+	}
+
+	return nil
+}
+
 func (p *plugin) handleCreateComplianceApp(e *core.RequestEvent) error {
 	user, err := p.requireAuth(e)
+	if err != nil {
+		return err
+	}
+	org, err := requireOrg(e)
 	if err != nil {
 		return err
 	}
@@ -551,6 +637,13 @@ func (p *plugin) handleCreateComplianceApp(e *core.RequestEvent) error {
 		return e.InternalServerError("compliance: create application failed", err)
 	}
 
+	// An application nobody is recorded as holding is one nobody can read back,
+	// so failing to record it fails the call rather than returning an id into
+	// the void.
+	if err := p.org.BindComplianceApp(org, caller(e), appID); err != nil {
+		return e.InternalServerError("compliance: record who holds the application", err)
+	}
+
 	return e.JSON(http.StatusCreated, map[string]string{
 		"application_id": appID,
 		"user_id":        user.ID,
@@ -565,6 +658,9 @@ func (p *plugin) handleInitiateKYC(e *core.RequestEvent) error {
 	applicationID := e.Request.PathValue("applicationId")
 	if applicationID == "" {
 		return e.BadRequestError("missing applicationId", nil)
+	}
+	if err := p.ownsComplianceApp(e, applicationID); err != nil {
+		return err
 	}
 
 	var body struct {
@@ -592,6 +688,9 @@ func (p *plugin) handleGetKYCStatus(e *core.RequestEvent) error {
 	if applicationID == "" {
 		return e.BadRequestError("missing applicationId", nil)
 	}
+	if err := p.ownsComplianceApp(e, applicationID); err != nil {
+		return err
+	}
 
 	status, err := p.compliance.GetKYCStatus(applicationID)
 	if err != nil {
@@ -601,8 +700,18 @@ func (p *plugin) handleGetKYCStatus(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, status)
 }
 
+// handleScreenIndividual screens a name the caller supplies.
+//
+// There is no owner to check here — the subject is a person the org is
+// considering, not a record anyone holds — so what this can be scoped to is the
+// org doing the asking. Each call spends a screening on the deployment's
+// vendor account, and the control for that is the rate limit and the org on the
+// log line, not an ownership question that has no subject.
 func (p *plugin) handleScreenIndividual(e *core.RequestEvent) error {
 	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+	if _, err := requireOrg(e); err != nil {
 		return err
 	}
 
@@ -625,6 +734,9 @@ func (p *plugin) handleScreenIndividual(e *core.RequestEvent) error {
 
 func (p *plugin) handleValidatePayment(e *core.RequestEvent) error {
 	if _, err := p.requireAuth(e); err != nil {
+		return err
+	}
+	if _, err := requireOrg(e); err != nil {
 		return err
 	}
 

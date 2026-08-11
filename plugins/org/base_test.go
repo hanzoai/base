@@ -55,14 +55,28 @@ func newIssuer(t *testing.T) *issuer {
 	return &issuer{url: ts.URL, key: key}
 }
 
-// token signs what IAM signs for a person: a subject and the membership set,
-// home org first.
+// token signs what IAM signs for a person who owns the orgs it belongs to: a
+// subject and the membership set, home org first.
 func (i *issuer) token(t *testing.T, sub string, orgs ...string) string {
+	t.Helper()
+
+	return i.as(t, "owner", sub, orgs...)
+}
+
+// member signs the same for an ordinary member, whose role admits reads and no
+// authority over anybody else in the org.
+func (i *issuer) member(t *testing.T, sub string, orgs ...string) string {
+	t.Helper()
+
+	return i.as(t, "member", sub, orgs...)
+}
+
+func (i *issuer) as(t *testing.T, role, sub string, orgs ...string) string {
 	t.Helper()
 
 	memberships := make([]any, 0, len(orgs))
 	for _, o := range orgs {
-		memberships = append(memberships, map[string]any{"org": o, "role": "owner"})
+		memberships = append(memberships, map[string]any{"org": o, "role": role})
 	}
 
 	claims := jwt.MapClaims{
