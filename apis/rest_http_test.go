@@ -31,7 +31,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/rest/v1/missing",
 			ExpectedStatus:  404,
-			ExpectedContent: []string{`"data":{}`},
+			ExpectedContent: []string{`"code":"PGRST202"`, `"details"`, `"hint"`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -44,7 +44,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/rest/v1/demo1",
 			ExpectedStatus:  403,
-			ExpectedContent: []string{`"data":{}`, `Only superusers`},
+			ExpectedContent: []string{`"code":"PGRST301"`, `Only superusers`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -162,7 +162,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/rest/v1/demo2?nosuchcolumn=eq.x",
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"data":{}`},
+			ExpectedContent: []string{`"code":"PGRST100"`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -391,6 +391,46 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 			URL:            "/rest/v1/demo2?title=eq.nosuchtitle",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{"*": 0},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// A duplicate is ordinary application logic, not an exceptional case: clients
+// branch on error.code === '23505' to show "that name is taken". demo2 carries
+// idx_unique_demo2_title, so inserting a title it already holds is the real
+// thing rather than a simulated one.
+func TestRestApiDuplicateIsSQLState23505(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "a unique violation answers 409 with the SQLSTATE",
+			Method:         http.MethodPost,
+			URL:            "/rest/v1/demo2",
+			Body:           strings.NewReader(`{"title":"test1"}`),
+			ExpectedStatus: 409,
+			ExpectedContent: []string{
+				`"code":"23505"`,
+				`duplicate key value violates unique constraint`,
+				`already exists`,
+			},
+			NotExpectedContent: []string{`"data":{`, `"status":409`},
+			ExpectedEvents:     map[string]int{"OnRecordCreateRequest": 1},
+		},
+		{
+			// The same write on Base's own door keeps Base's shape — the
+			// PostgREST body belongs to the PostgREST wire, not to the store.
+			Name:            "the collections door still answers its own shape",
+			Method:          http.MethodPost,
+			URL:             "/v1/collections/demo2/records",
+			Body:            strings.NewReader(`{"title":"test1"}`),
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`validation_not_unique`},
+			ExpectedEvents:  map[string]int{"OnRecordCreateRequest": 1},
 		},
 	}
 
