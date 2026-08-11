@@ -2,8 +2,8 @@ package migrations
 
 import "github.com/hanzoai/base/core"
 
-// Multi-tenant identity: expose the caller's IAM org on the auth record so
-// collection rules can scope by tenant (`@request.auth.org_id = org`).
+// Per-org identity: expose the caller's IAM org on the auth record so
+// collection rules can scope by base (`@request.auth.org_id = org`).
 //
 // resolveJWKSToken (apis/middlewares.go) already stamps the JWT `owner` claim
 // onto the ephemeral auth record as `org_id`, but ONLY when the auth collection

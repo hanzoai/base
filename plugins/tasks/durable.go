@@ -28,7 +28,7 @@ type DurableConfig struct {
 	// (cloud's Embedded.ServeGated listener; the standalone tasksd is retired).
 	Address string `json:"address" yaml:"address"`
 
-	// Namespace is the Temporal namespace. For multi-tenant, use org ID.
+	// Namespace is the Temporal namespace. For per-org, use org ID.
 	// Default "default".
 	Namespace string `json:"namespace" yaml:"namespace"`
 
@@ -46,7 +46,7 @@ type DurableConfig struct {
 // Env vars:
 //   - TASKS_ENABLED (or HANZO_TASKS_ENABLED): "true" to enable
 //   - TASKS_ADDRESS (or HANZO_TASKS_ADDRESS): Temporal frontend address
-//   - TASKS_NAMESPACE (or HANZO_TASKS_NAMESPACE): Temporal namespace (org ID for multi-tenant)
+//   - TASKS_NAMESPACE (or HANZO_TASKS_NAMESPACE): Temporal namespace (org ID for per-org)
 //   - TASKS_QUEUE: default task queue name
 //   - TASKS_WORKER: "false" to disable embedded worker
 func DefaultDurableConfig() DurableConfig {
@@ -87,7 +87,7 @@ func DefaultDurableConfig() DurableConfig {
 }
 
 // DurableStore implements durable task execution via Temporal.
-// Supports multi-tenant org isolation via per-namespace client connections.
+// Supports per-org org isolation via per-namespace client connections.
 type DurableStore struct {
 	Client    client.Client // default namespace client
 	addr      string
@@ -205,7 +205,7 @@ func (ds *DurableStore) IsConnected() bool {
 }
 
 // SubmitTask starts a durable workflow execution for a task.
-// Uses task.OrgID as the Temporal namespace for multi-tenant isolation.
+// Uses task.OrgID as the Temporal namespace for per-org isolation.
 // Falls back to default namespace if OrgID is empty.
 func (ds *DurableStore) SubmitTask(ctx context.Context, task *Task) error {
 	c, err := ds.ClientForOrg(task.OrgID)

@@ -92,11 +92,11 @@ type ListOpts struct {
 
 // Page is one slice of a List result.
 type Page struct {
-	Items       []Record
-	Page        int
-	PerPage     int
-	TotalItems  int
-	TotalPages  int
+	Items      []Record
+	Page       int
+	PerPage    int
+	TotalItems int
+	TotalPages int
 }
 
 // Event is one realtime change notification.

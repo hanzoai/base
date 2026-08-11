@@ -59,12 +59,12 @@ type rgaNode struct {
 // It maintains a linked list of character nodes with unique IDs that allow
 // concurrent inserts to be ordered deterministically.
 type RGA struct {
-	mu       sync.RWMutex
-	head     *rgaNode          // sentinel head node
-	index    map[string]*rgaNode // id.String() -> node for O(1) lookup
-	seq      uint64
-	nodeID   NodeID
-	pending  []RGAOp           // pending ops for sync
+	mu      sync.RWMutex
+	head    *rgaNode            // sentinel head node
+	index   map[string]*rgaNode // id.String() -> node for O(1) lookup
+	seq     uint64
+	nodeID  NodeID
+	pending []RGAOp // pending ops for sync
 }
 
 // NewRGA creates a new RGA instance for the given node.

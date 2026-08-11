@@ -34,8 +34,8 @@ func (*stubRuntime) Capabilities() extruntime.Capabilities {
 		// HardSandbox=false: cgo CPython shares the host process. A C
 		// extension segfault kills the whole Go binary. Use wazero +
 		// RustPython if you need a sandboxed Python.
-		HardSandbox:   false,
-		Cgo:           true,
+		HardSandbox: false,
+		Cgo:         true,
 		// HONEST: pyvm cannot hard-abort a running invocation. See README.
 		SupportsAbort: false,
 	}

@@ -119,7 +119,7 @@ func MustRegister(app core.App, config PlatformConfig) {
 // Register registers the platform plugin to the provided app instance.
 //
 // Hanzo Base is a pure IAM client — it never hosts identity. IAM must be
-// reachable at boot via IAM_ENDPOINT (a hanzo.id tenant, or an in-process
+// reachable at boot via IAM_ENDPOINT (a hanzo.id base, or an in-process
 // iam.Embed() served by the fused daemon). Base validates IAM JWTs against
 // that endpoint's JWKS; there is no local password / OTP / MFA surface.
 func Register(app core.App, config PlatformConfig) error {
@@ -165,10 +165,10 @@ func Register(app core.App, config PlatformConfig) error {
 		return e.Next()
 	})
 
-	// Stamp owner+org on every tenant-collection create from the VALIDATED
-	// principal — never from client body/headers. Makes tenant isolation
+	// Stamp owner+org on every base-collection create from the VALIDATED
+	// principal — never from client body/headers. Makes base isolation
 	// tamper-proof: a caller cannot attribute a record to another user/org.
-	app.OnRecordCreateRequest().BindFunc(stampTenantOwnership)
+	app.OnRecordCreateRequest().BindFunc(stampOrgOwnership)
 
 	// IAM is the only auth source. Every Base route validates JWTs against
 	// IAM's JWKS; the legacy local-password / OTP / MFA paths are
@@ -309,7 +309,7 @@ func Register(app core.App, config PlatformConfig) error {
 				// collection (createRule == "" ⇒ anonymous create allowed) — the
 				// public submit path (contact forms, signups, waitlists). Every
 				// other write stays blocked. Org is derived from the key by the
-				// stampTenantOwnership create hook, never from the request.
+				// stampOrgOwnership create hook, never from the request.
 				if method == http.MethodPost {
 					if name := recordsCreateCollectionName(re.Request.URL.Path); name != "" {
 						if c, err := re.App.FindCachedCollectionByNameOrId(name); err == nil &&
@@ -1031,13 +1031,13 @@ func isValidSlug(s string) bool {
 	return true
 }
 
-// stampTenantOwnership force-sets owner+org on record create from the VALIDATED
+// stampOrgOwnership force-sets owner+org on record create from the VALIDATED
 // principal (IAM JWT auth record, or resolved IAM API key) — never from the
-// request body or headers, so tenant attribution cannot be forged. Collections
-// without owner/org fields (non-tenant) are left untouched. An org-scoped record
+// request body or headers, so base attribution cannot be forged. Collections
+// without owner/org fields (non-base) are left untouched. An org-scoped record
 // with no trusted org (anonymous, no key) is refused — this is what makes the
 // publishable key mandatory even when a collection's createRule is "".
-func stampTenantOwnership(e *core.RecordRequestEvent) error {
+func stampOrgOwnership(e *core.RecordRequestEvent) error {
 	col := e.Collection
 	hasOwner := col.Fields.GetByName("owner") != nil
 	hasOrg := col.Fields.GetByName("org") != nil

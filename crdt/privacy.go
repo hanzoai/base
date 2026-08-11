@@ -22,7 +22,7 @@
 //	             can merge ciphertexts without decrypting. Orders of
 //	             magnitude more expensive than plaintext or age, but the
 //	             only option when an untrusted third party must compute
-//	             on the data (e.g. cross-tenant analytics).
+//	             on the data (e.g. cross-base analytics).
 //	             Build with: go build -tags fhe
 //
 // The CRDT machinery is identical across backends; only the encode /
@@ -63,7 +63,7 @@ type PlaintextPrivacy struct{}
 func NewPlaintextPrivacy() *PlaintextPrivacy { return &PlaintextPrivacy{} }
 
 func (PlaintextPrivacy) Name() string                           { return "plaintext/v1" }
-func (PlaintextPrivacy) EncryptOp(op Operation) ([]byte, error)  { return json.Marshal(op) }
+func (PlaintextPrivacy) EncryptOp(op Operation) ([]byte, error) { return json.Marshal(op) }
 func (PlaintextPrivacy) DecryptOp(b []byte) (Operation, error) {
 	var op Operation
 	err := json.Unmarshal(b, &op)

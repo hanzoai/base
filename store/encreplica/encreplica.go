@@ -1,9 +1,9 @@
 // Package encreplica is a replicate.ReplicaClient that PQ-encrypts every LTX
-// segment with a per-tenant age key BEFORE it touches durable storage, and
+// segment with a per-base age key BEFORE it touches durable storage, and
 // decrypts on read — the SOLE at-rest boundary for the replica stream, using
-// the SAME key as the whole-file path (store.TenantKey). This is what makes
-// hanzoai/replicate safe for multi-tenant data: without it the replica stream
-// is plaintext and every tenant's SQLite pages hit the backend unencrypted.
+// the SAME key as the whole-file path (store.OrgKey). This is what makes
+// hanzoai/replicate safe for per-org data: without it the replica stream
+// is plaintext and every base's SQLite pages hit the backend unencrypted.
 //
 // # Why a client and not replicate's built-in age
 //
@@ -20,7 +20,7 @@
 // write time and stored in the clear PREFIX so LTXFiles can report an accurate
 // FileInfo (size + CreatedAt) — which replicate's restore requires (it checks
 // Size >= ltx.HeaderSize and drives a resumable reader off Size) — WITHOUT
-// leaking any tenant data (the LTX body is entirely inside the age ciphertext).
+// leaking any base data (the LTX body is entirely inside the age ciphertext).
 //
 // The backend is any path-addressed Blobs store: local-fs for dev/test, S3 or
 // hanzoai/vfs in production (durability/scale, Pillar 3). Encryption is in this
@@ -60,7 +60,7 @@ type Blobs interface {
 	DeleteAll(ctx context.Context) error
 }
 
-// Client is the per-tenant age-encrypting replica client.
+// Client is the per-base age-encrypting replica client.
 type Client struct {
 	blobs     Blobs
 	recipient age.Recipient
@@ -68,14 +68,14 @@ type Client struct {
 	logger    *slog.Logger
 }
 
-// New builds an encrypting client over blobs for one tenant. recipient
-// encrypts, identity decrypts — both are the tenant's key (store.TenantKey).
+// New builds an encrypting client over blobs for one base. recipient
+// encrypts, identity decrypts — both are the base's key (store.OrgKey).
 func New(blobs Blobs, recipient age.Recipient, identity age.Identity) (*Client, error) {
 	if blobs == nil {
 		return nil, errors.New("encreplica: blobs backend is required")
 	}
 	if recipient == nil || identity == nil {
-		return nil, errors.New("encreplica: tenant recipient and identity are required")
+		return nil, errors.New("encreplica: base recipient and identity are required")
 	}
 	return &Client{blobs: blobs, recipient: recipient, identity: identity, logger: slog.Default()}, nil
 }
@@ -146,7 +146,7 @@ func (c *Client) OpenLTXFile(ctx context.Context, level int, minTXID, maxTXID lt
 	}
 	plain, err := ageOpen(c.identity, ct)
 	if err != nil {
-		return nil, fmt.Errorf("encreplica: decrypt ltx %d/%s-%s (wrong tenant key or tampered): %w",
+		return nil, fmt.Errorf("encreplica: decrypt ltx %d/%s-%s (wrong base key or tampered): %w",
 			level, minTXID, maxTXID, err)
 	}
 	if int64(len(plain)) != plainLen {
@@ -204,7 +204,7 @@ func (c *Client) DeleteLTXFiles(ctx context.Context, a []*ltx.FileInfo) error {
 	return nil
 }
 
-// DeleteAll removes every LTX file for this tenant.
+// DeleteAll removes every LTX file for this base.
 func (c *Client) DeleteAll(ctx context.Context) error { return c.blobs.DeleteAll(ctx) }
 
 // decodeBlob splits the stored [plainLen][ts][ciphertext] framing.
@@ -217,7 +217,7 @@ func decodeBlob(blob []byte) (plainLen, tsMillis int64, ct []byte, err error) {
 	return plainLen, tsMillis, blob[prefixLen:], nil
 }
 
-// ageSeal age-encrypts plaintext to the tenant recipient.
+// ageSeal age-encrypts plaintext to the base recipient.
 func ageSeal(recipient age.Recipient, plaintext []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	w, err := age.Encrypt(&buf, recipient)
@@ -233,7 +233,7 @@ func ageSeal(recipient age.Recipient, plaintext []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// ageOpen age-decrypts ciphertext with the tenant identity.
+// ageOpen age-decrypts ciphertext with the base identity.
 func ageOpen(identity age.Identity, ciphertext []byte) ([]byte, error) {
 	r, err := age.Decrypt(bytes.NewReader(ciphertext), identity)
 	if err != nil {

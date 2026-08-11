@@ -5,9 +5,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/hanzoai/orm/query"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/list"
+	"github.com/hanzoai/orm/query"
 )
 
 type NullFallbackPreference int

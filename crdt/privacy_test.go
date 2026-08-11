@@ -38,7 +38,6 @@ func TestPlaintextRoundTrip(t *testing.T) {
 	}
 }
 
-
 // TestAgeRoundTrip encrypts with an age identity's recipient and
 // decrypts with the same identity. The ciphertext blob must differ
 // from the plaintext (so we're confident age actually ran) and the

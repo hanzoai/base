@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/store"
+	"github.com/hanzoai/dbx"
 	"golang.org/x/sync/semaphore"
 )
 

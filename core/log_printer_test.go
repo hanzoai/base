@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/logger"
+	"github.com/hanzoai/dbx"
 )
 
 func TestBaseAppLoggerLevelDevPrint(t *testing.T) {

@@ -20,11 +20,11 @@ import (
 // per isolate; the pool exists for *state isolation* between back-to-back
 // invocations, not for concurrency.
 type module struct {
-	rt       *runtime
-	name     string
-	exports  []string
-	origin   string
-	unbound  *v8.UnboundScript
+	rt      *runtime
+	name    string
+	exports []string
+	origin  string
+	unbound *v8.UnboundScript
 
 	mu     sync.Mutex
 	pool   []*v8.Context

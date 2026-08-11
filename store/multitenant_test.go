@@ -20,7 +20,7 @@ import (
 // newTestStore constructs a store backed by a fileblob bucket in a temp
 // directory. Returns the store and the path to the bucket so tests can peek
 // at object keys directly.
-func newTestStore(t *testing.T, opts ...func(*store.Options)) (*store.MultiTenantStore, string) {
+func newTestStore(t *testing.T, opts ...func(*store.Options)) (*store.OrgStore, string) {
 	t.Helper()
 	bucketDir := filepath.Join(t.TempDir(), "bucket")
 	cacheDir := filepath.Join(t.TempDir(), "cache")
@@ -166,7 +166,7 @@ func TestKey_Valid_AcceptsSlugs(t *testing.T) {
 }
 
 // TestHydrate_MissCreatesLocalAndOpens verifies that a first Get for a
-// brand-new tenant creates the local file and opens a working SQLite.
+// brand-new base creates the local file and opens a working SQLite.
 func TestHydrate_MissCreatesLocalAndOpens(t *testing.T) {
 	s, _ := newTestStore(t)
 	ctx := ctxWithClaims("acme", "alice")
@@ -310,11 +310,11 @@ func TestCheckpoint_WritesToObjectStorage(t *testing.T) {
 func TestEvictionPersistsAndRehydrates(t *testing.T) {
 	s, _ := newTestStore(t)
 
-	// LRUSize = 4. Open 5 distinct tenants; the first should be evicted.
-	tenants := []struct{ org, user string }{
+	// LRUSize = 4. Open 5 distinct bases; the first should be evicted.
+	bases := []struct{ org, user string }{
 		{"o1", "u1"}, {"o2", "u2"}, {"o3", "u3"}, {"o4", "u4"}, {"o5", "u5"},
 	}
-	for _, tn := range tenants {
+	for _, tn := range bases {
 		ctx := ctxWithClaims(tn.org, tn.user)
 		db, err := s.ForCtx(ctx)
 		if err != nil {
@@ -334,7 +334,7 @@ func TestEvictionPersistsAndRehydrates(t *testing.T) {
 		}
 	}
 
-	// Re-hydrate the first (evicted) tenant from the bucket.
+	// Re-hydrate the first (evicted) base from the bucket.
 	ctx := ctxWithClaims("o1", "u1")
 	db, err := s.ForCtx(ctx)
 	if err != nil {
@@ -586,12 +586,12 @@ func TestHydrate_RejectsPoisonedBlob(t *testing.T) {
 // TestValidateSQLiteMagic checks boundary cases on the magic-header check.
 func TestValidateSQLiteMagic_AcceptsEmpty(t *testing.T) {
 	// This exercises store.verifySQLiteFile indirectly through a fresh
-	// tenant — empty local file must NOT be rejected (a new tenant's
+	// base — empty local file must NOT be rejected (a new base's
 	// localPath is 0 bytes on first hydrate).
 	s, _ := newTestStore(t)
 	ctx := ctxWithClaims("acme", "alice")
 	if _, err := s.ForCtx(ctx); err != nil {
-		t.Fatalf("fresh tenant (empty file) must not be rejected: %v", err)
+		t.Fatalf("fresh base (empty file) must not be rejected: %v", err)
 	}
 }
 
@@ -626,7 +626,7 @@ func TestEvict_SurfacesUploadError(t *testing.T) {
 }
 
 // TestClose_AggregatesUploadFailures (P7-H1) — Close loudly surfaces how
-// many tenants failed to flush so ops can intervene.
+// many bases failed to flush so ops can intervene.
 func TestClose_AggregatesUploadFailures(t *testing.T) {
 	s, bucketDir := newTestStore(t)
 
@@ -657,7 +657,7 @@ func TestClose_AggregatesUploadFailures(t *testing.T) {
 }
 
 // TestReaper_LockHoldTimeChunked (P7-H2) — with 100 resident handles, a
-// Get call for a fresh tenant made while the reaper is flushing must
+// Get call for a fresh base made while the reaper is flushing must
 // return fast (under 500ms), proving the reaper releases s.mu per-handle.
 func TestReaper_LockHoldTimeChunked(t *testing.T) {
 	// Large LRU so filling 100 handles doesn't trigger cap eviction; tiny
@@ -684,7 +684,7 @@ func TestReaper_LockHoldTimeChunked(t *testing.T) {
 	done := make(chan struct{})
 	start := time.Now()
 	go func() {
-		// While the reaper is mid-flush, issue a cold Get for a NEW tenant.
+		// While the reaper is mid-flush, issue a cold Get for a NEW base.
 		// Under the old (O(N)) reaper this Get blocks for the entire reap
 		// cycle; under the chunked reaper it blocks at most one handle.
 		ctx := ctxWithClaims("acme", "probe")
@@ -852,8 +852,8 @@ func TestGet_DeniesCrossTenant(t *testing.T) {
 		t.Fatalf("same-org Get must succeed: %v", err)
 	}
 	_, err := s.Get(ctx, store.Key{OrgID: "orgb", UserID: "bob", Scope: store.ScopeUser})
-	if !errors.Is(err, store.ErrCrossTenant) {
-		t.Fatalf("cross-tenant Get must be denied with ErrCrossTenant, got %v", err)
+	if !errors.Is(err, store.ErrCrossOrg) {
+		t.Fatalf("cross-base Get must be denied with ErrCrossOrg, got %v", err)
 	}
 }
 

@@ -97,11 +97,11 @@ type Capabilities struct {
 
 // Errors returned at the boundary. Wrappers should keep using errors.Is.
 var (
-	ErrNoManifest   = errors.New("extruntime: extension.toml not found in directory")
-	ErrBadManifest  = errors.New("extruntime: extension.toml is invalid")
-	ErrUnknownFn    = errors.New("extruntime: function not found in module")
-	ErrClosed       = errors.New("extruntime: module is closed")
-	ErrUnsupported  = errors.New("extruntime: runtime does not support this operation")
+	ErrNoManifest  = errors.New("extruntime: extension.toml not found in directory")
+	ErrBadManifest = errors.New("extruntime: extension.toml is invalid")
+	ErrUnknownFn   = errors.New("extruntime: function not found in module")
+	ErrClosed      = errors.New("extruntime: module is closed")
+	ErrUnsupported = errors.New("extruntime: runtime does not support this operation")
 )
 
 // Manifest is the parsed extension.json contents.

@@ -18,7 +18,7 @@ var Version = "0.1.0"
 func NewCLICommand() *cobra.Command {
 	var flagURL string
 	var flagToken string
-	var flagTenant string
+	var flagBase string
 	var flagFormat string
 	var nf cli.NetworkFlags
 
@@ -27,7 +27,7 @@ func NewCLICommand() *cobra.Command {
 		return cli.NewClient(
 			cli.ResolveURL(flagURL),
 			cli.ResolveToken(flagToken),
-			flagTenant,
+			flagBase,
 		)
 	}
 	formatFn := func() cli.Format {
@@ -45,7 +45,7 @@ by pointing --url at the running instance.`,
 
 	root.PersistentFlags().StringVar(&flagURL, "url", "", "server URL (default $BASE_URL or http://127.0.0.1:8090)")
 	root.PersistentFlags().StringVar(&flagToken, "token", "", "auth token (default $BASE_TOKEN or ~/.config/base/token)")
-	root.PersistentFlags().StringVar(&flagTenant, "tenant", "", "tenant org ID (sets X-Org-Id header)")
+	root.PersistentFlags().StringVar(&flagBase, "base", "", "base org ID (sets X-Org-Id header)")
 	root.PersistentFlags().StringVar(&flagFormat, "format", "", "output format: table, json, yaml (default: table on tty, json otherwise)")
 
 	// Network flags: --mainnet, --testnet, --devnet, --dev
@@ -82,19 +82,19 @@ by pointing --url at the running instance.`,
 func AddCLISubcommands(parent *cobra.Command) {
 	var flagURL string
 	var flagToken string
-	var flagTenant string
+	var flagBase string
 	var flagFormat string
 
 	parent.PersistentFlags().StringVar(&flagURL, "url", "", "server URL (default $BASE_URL or http://127.0.0.1:8090)")
 	parent.PersistentFlags().StringVar(&flagToken, "token", "", "auth token (default $BASE_TOKEN or ~/.config/base/token)")
-	parent.PersistentFlags().StringVar(&flagTenant, "tenant", "", "tenant org ID (sets X-Org-Id header)")
+	parent.PersistentFlags().StringVar(&flagBase, "base", "", "base org ID (sets X-Org-Id header)")
 	parent.PersistentFlags().StringVar(&flagFormat, "format", "", "output format: table, json, yaml (default: table on tty, json otherwise)")
 
 	clientFn := func() *cli.Client {
 		return cli.NewClient(
 			cli.ResolveURL(flagURL),
 			cli.ResolveToken(flagToken),
-			flagTenant,
+			flagBase,
 		)
 	}
 	formatFn := func() cli.Format {

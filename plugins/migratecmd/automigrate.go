@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/dbx"
 )
 
 // automigrateOnCollectionChange handles the automigration snapshot

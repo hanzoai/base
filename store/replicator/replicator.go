@@ -1,15 +1,15 @@
-// Package replicator gives Base's per-tenant SQLite substrate continuous
+// Package replicator gives Base's per-base SQLite substrate continuous
 // streaming replication and point-in-time restore via hanzoai/replicate — the
 // HA / resilience layer (Pillar 2): a pod dying or rescheduling restores each
-// tenant DB from its replica (bounded RPO, no data loss).
+// base DB from its replica (bounded RPO, no data loss).
 //
 // # One at-rest boundary — encryption lives in the storage client
 //
 // Encryption is NOT applied at replicate's LTX layer. In production the
 // replica client is a vfs-backed client that PQ-encrypts every block with the
-// tenant's age key (store.TenantKey) — the SAME key the whole-file path uses.
+// base's age key (store.OrgKey) — the SAME key the whole-file path uses.
 // So there is exactly one at-rest boundary (luxfi/age, ML-KEM-768 + X25519),
-// one key per tenant, across the whole-file, block, and replica-stream paths,
+// one key per base, across the whole-file, block, and replica-stream paths,
 // with no double-encryption.
 //
 // (replicate v0.8.0's built-in age — Replica.AgeRecipients — is deliberately
@@ -18,7 +18,7 @@
 // encryption in the storage client is both the correct single-boundary design
 // and the working one.)
 //
-// Lifecycle per tenant DB:
+// Lifecycle per base DB:
 //
 //	Restore(...)   pull the DB from its replica into a fresh pod (failover / hydrate)
 //	Open(...)      start tailing the WAL to the replica
@@ -36,14 +36,14 @@ import (
 	"github.com/hanzoai/replicate"
 )
 
-// Handle is a running replication of one tenant DB. Stop it on evict/close.
+// Handle is a running replication of one base DB. Stop it on evict/close.
 type Handle struct {
 	db *replicate.DB
 }
 
 // Open starts replication of the SQLite DB at localPath to client. The caller
 // keeps writing through its own connection; replicate tails the WAL on Sync.
-// client owns at-rest encryption (vfs-backed, per-tenant, in production).
+// client owns at-rest encryption (vfs-backed, per-base, in production).
 func Open(localPath string, client replicate.ReplicaClient) (*Handle, error) {
 	if client == nil {
 		return nil, errors.New("replicator: replica client is required")
@@ -73,8 +73,8 @@ func (h *Handle) Close(ctx context.Context) error {
 	return h.db.Close(ctx)
 }
 
-// Restore pulls the tenant DB from its replica into localPath (most-recent
-// state). Returns (false, nil) when no replica exists yet (fresh tenant —
+// Restore pulls the base DB from its replica into localPath (most-recent
+// state). Returns (false, nil) when no replica exists yet (fresh base —
 // nothing to restore). This is the restore-if-absent path a pod runs on
 // hydrate before opening SQLite.
 func Restore(ctx context.Context, localPath string, client replicate.ReplicaClient) (bool, error) {
@@ -100,8 +100,8 @@ func Restore(ctx context.Context, localPath string, client replicate.ReplicaClie
 		}
 		return false, err
 	}
-	// Safety gate (defense in depth): the per-tenant age-decrypt already ran
-	// inside the encrypting client (a wrong-tenant or tampered replica fails
+	// Safety gate (defense in depth): the per-base age-decrypt already ran
+	// inside the encrypting client (a wrong-base or tampered replica fails
 	// there); reject anything that is not a real SQLite DB before the store
 	// opens it, and never leave a hostile file on disk.
 	if err := verifySQLiteFile(localPath); err != nil {
@@ -142,7 +142,7 @@ func verifySQLiteFile(path string) error {
 }
 
 // hasSnapshot reports whether the replica holds any LTX file at level 0 — the
-// gate that distinguishes a fresh tenant (nothing to restore) from one whose
+// gate that distinguishes a fresh base (nothing to restore) from one whose
 // DB must be pulled back on failover.
 func hasSnapshot(ctx context.Context, client replicate.ReplicaClient) (bool, error) {
 	if err := client.Init(ctx); err != nil {

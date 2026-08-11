@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/dbx"
 )
 
 func TestMigrationsRunnerUpAndDown(t *testing.T) {

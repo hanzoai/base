@@ -17,7 +17,7 @@ func (p *plugin) ensureCollections() error {
 	c.Fields.Add(
 		&core.TextField{Name: "name", Required: true, Max: 255},
 		&core.TextField{Name: "qualifiedName", Required: true, Max: 512},
-		&core.TextField{Name: "tenantId", Required: true, Max: 255},
+		&core.TextField{Name: "orgId", Required: true, Max: 255},
 		&core.TextField{Name: "image", Max: 1024},
 		&core.TextField{Name: "runtime", Max: 64},
 		&core.TextField{Name: "handler", Max: 512},

@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 	"github.com/spf13/cast"
 )
 
@@ -1484,22 +1484,22 @@ func TestRecordPublicExportAndMarshalJSON(t *testing.T) {
 	}
 
 	data := map[string]any{
-		"id":              "test_id",
-		"field1":          "field_1",
-		"field2":          "field_2.png",
-		"field3":          []string{"test1", "test2"},
-		"field4":          "field_4",
-		"field5":          "field_5",
-		"expand":          map[string]any{"test": 123},
-		"collectionId":    "m_id",   // should be always ignored
-		"collectionName":  "m_name", // should be always ignored
-		"unknown":         "test_unknown",
-		"password":        "test_passwordHash",
-		"emailVisibility": "test_invalid", // for auth collections should be casted to bool
-		"email":           "test_email",
-		"verified":        true,
-		"tokenKey":        "test_tokenKey",
-		"@baseInternalAbc":  "test_custom_inter", // always hidden
+		"id":               "test_id",
+		"field1":           "field_1",
+		"field2":           "field_2.png",
+		"field3":           []string{"test1", "test2"},
+		"field4":           "field_4",
+		"field5":           "field_5",
+		"expand":           map[string]any{"test": 123},
+		"collectionId":     "m_id",   // should be always ignored
+		"collectionName":   "m_name", // should be always ignored
+		"unknown":          "test_unknown",
+		"password":         "test_passwordHash",
+		"emailVisibility":  "test_invalid", // for auth collections should be casted to bool
+		"email":            "test_email",
+		"verified":         true,
+		"tokenKey":         "test_tokenKey",
+		"@baseInternalAbc": "test_custom_inter", // always hidden
 	}
 
 	for _, s := range scenarios {

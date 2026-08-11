@@ -1,7 +1,7 @@
 // Gateway-upstream assertion and request-context helpers.
 //
 // Every Base-derived service MUST sit behind hanzoai/gateway. The gateway is
-// the sole JWT verifier in the stack. Services refuse to serve tenant-scoped
+// the sole JWT verifier in the stack. Services refuse to serve base-scoped
 // routes unless this invariant is explicitly acknowledged at boot.
 //
 // Usage in a service:
@@ -10,7 +10,7 @@
 //	    log.Fatal(err) // boot refuses
 //	}
 //	mux.Use(claims.Strip)           // defense-in-depth: drop forged headers
-//	mux.Use(claims.RequireGateway)  // 503 if headers are missing on tenant routes
+//	mux.Use(claims.RequireGateway)  // 503 if headers are missing on base routes
 //	mux.Use(claims.Inject)          // pull Claims into ctx
 package claims
 
@@ -26,7 +26,7 @@ import (
 // triggers a boot refusal.
 const EnvGatewayUpstream = "HANZO_GATEWAY_UPSTREAM"
 
-// ErrGatewayBypass is returned / surfaced when a tenant-scoped request reaches
+// ErrGatewayBypass is returned / surfaced when a base-scoped request reaches
 // a handler without the canonical identity headers. It maps to HTTP 503; 401
 // would suggest the client can recover by authenticating, which is wrong —
 // the deployment topology is broken, not the caller.
@@ -54,7 +54,7 @@ type ctxKey struct{}
 
 // Inject is a middleware that parses the canonical 3 identity headers and
 // attaches the resulting Claims to the request context. It does NOT validate
-// presence — pair it with RequireGateway for tenant-scoped routes.
+// presence — pair it with RequireGateway for base-scoped routes.
 func Inject(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c := FromHeaders(r)
@@ -81,7 +81,7 @@ func HasRole(ctx context.Context, role ...string) bool {
 	return FromContext(ctx).HasRole(role...)
 }
 
-// RequireGateway is a middleware for tenant-scoped routes. If either X-User-Id
+// RequireGateway is a middleware for base-scoped routes. If either X-User-Id
 // or X-Org-Id is missing after Strip + Inject have run, the gateway was
 // bypassed (misconfigured ingress, direct pod access, etc.) and the handler
 // MUST NOT serve. Returns 503 with a neutral body (no hint about which header
@@ -100,9 +100,9 @@ func RequireGateway(next http.Handler) http.Handler {
 	})
 }
 
-// Chain is the canonical tenant-route middleware chain: Strip → Inject →
+// Chain is the canonical base-route middleware chain: Strip → Inject →
 // RequireGateway → next. This is the ONLY approved way to mount a
-// tenant-scoped handler. Services MUST NOT compose Strip, Inject, and
+// base-scoped handler. Services MUST NOT compose Strip, Inject, and
 // RequireGateway by hand — the PHILOSOPHY.md "one and only one way"
 // principle applies, and a misordered hand-wired chain silently defeats
 // the forged-header defense (verified by Red probe P7-H3).
@@ -117,7 +117,7 @@ func Chain(next http.Handler) http.Handler {
 // RequireRole returns a middleware that enforces the caller holds at least one
 // of the requested roles. On failure, the response is a 404 — not 403 — so
 // probing for authorized endpoints does not leak their existence. If you want
-// an explicit 403 for a user that IS in the tenant but lacks a role, check
+// an explicit 403 for a user that IS in the base but lacks a role, check
 // HasRole inside the handler instead.
 func RequireRole(role ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

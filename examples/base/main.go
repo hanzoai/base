@@ -121,7 +121,7 @@ func main() {
 	// GitHub selfupdate
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
 
-	// Multi-tenant platform (IAM + KMS integration).
+	// Per-org platform (IAM + KMS integration).
 	// PrincipalIsolation="sqlite" gives every org its own encrypted Liquid SQL
 	// database and every user a per-user database (see plugins/platform/org_db.go).
 	// The bootnode plugin's collections are resolved per-org through this.
@@ -148,7 +148,7 @@ func main() {
 	// Mounts under /v1/calendar. Opt-in via CALENDAR_ENABLED=true.
 	calendar.MustRegister(app, calendar.ConfigFromEnv())
 
-	// Hanzo Cloud SQL — serverless PostgreSQL (per-tenant database provisioning)
+	// Hanzo Cloud SQL — serverless PostgreSQL (per-base database provisioning)
 	cloudsql.MustRegister(app, cloudsql.Config{
 		MetaURL:       os.Getenv("CLOUD_SQL_META_URL"),
 		ComputeHost:   os.Getenv("CLOUD_SQL_COMPUTE_HOST"),

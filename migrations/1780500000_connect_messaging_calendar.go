@@ -16,9 +16,10 @@ import (
 // engine owns the writes. System=false so the REST + realtime API expose them.
 //
 // Split into three concerns (one plugin each, later):
-//   connect  — connectedAccount (OAuth tokens, encrypted) + participant matching
-//   messaging — messageChannel/message/messageThread/messageParticipant/messageAssociation
-//   calendar — calendarChannel/calendarEvent/calendarEventParticipant/calendarEventAssociation
+//
+//	connect  — connectedAccount (OAuth tokens, encrypted) + participant matching
+//	messaging — messageChannel/message/messageThread/messageParticipant/messageAssociation
+//	calendar — calendarChannel/calendarEvent/calendarEventParticipant/calendarEventAssociation
 //
 // Token fields hold ONLY ciphertext (accessTokenEnc/refreshTokenEnc, AES-256-GCM
 // per-user-derived key in dev, Hanzo KMS in prod) — never plaintext, enforced by
