@@ -77,6 +77,20 @@ func recordsList(e *core.RequestEvent) error {
 	// hidden fields are searchable only by superusers
 	fieldsResolver.SetAllowHiddenFields(requestInfo.HasSuperuserAuth())
 
+	// The PostgREST door carries its predicates as DATA rather than as a filter
+	// string, so they bind here against this collection's own resolver: the
+	// column becomes a resolved identifier and the value a bound parameter,
+	// neither of them ever text in an expression.
+	if c := restCallOf(e); c != nil {
+		expr, err := restWhere(fieldsResolver, c.preds)
+		if err != nil {
+			return e.BadRequestError(err.Error(), err)
+		}
+		if expr != nil {
+			query.AndWhere(expr)
+		}
+	}
+
 	searchProvider := search.NewProvider(fieldsResolver).Query(query)
 
 	// count over the insertion-order column where the engine has one, so the

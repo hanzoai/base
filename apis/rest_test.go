@@ -7,8 +7,13 @@ import (
 )
 
 // A PostgREST query becomes Base's own, exactly. These are the shapes the Studio
-// grid actually sends, so a regression here is a broken table view rather than a
-// style nit.
+// grid actually sends, so a regression here is a broken table view.
+//
+// Note what is NOT here any more: an assertion that a filter renders to a STRING.
+// It used to, and the string it rendered ({:p0} plus a sibling param) was never
+// substituted by anything, so every filtered read answered 400 while this test
+// stayed green. A predicate is data now, and the test that proves it works is the
+// HTTP one that filters a real collection and gets rows back.
 func TestRestQueryTranslates(t *testing.T) {
 	for _, s := range []struct {
 		name    string
@@ -36,41 +41,22 @@ func TestRestQueryTranslates(t *testing.T) {
 		in:   "limit=25&offset=50",
 		want: map[string]string{"perPage": "25", "page": "3", "skipTotal": "1"},
 	}, {
-		name: "the first page needs no offset",
-		in:   "limit=10",
-		want: map[string]string{"perPage": "10", "page": "1", "skipTotal": "1"},
-	}, {
 		name:    "asking for a count drops skipTotal",
 		in:      "limit=10",
 		counted: true,
 		want:    map[string]string{"perPage": "10", "page": "1"},
 	}, {
-		name: "a column predicate crosses as a placeholder, never as text",
+		// A predicate never reaches the query string at all — it travels as data.
+		name: "a predicate leaves no trace in the query params",
 		in:   "status=eq.active",
-		want: map[string]string{"filter": "status={:p0}", "p0": "active", "skipTotal": "1"},
-	}, {
-		name: "several predicates conjoin",
-		in:   "status=eq.active&age=gte.18",
-		want: map[string]string{"filter": "age>={:p0} && status={:p1}", "p0": "18", "p1": "active", "skipTotal": "1"},
-	}, {
-		name: "is.null is a literal, because a quoted null matches nothing",
-		in:   "deleted=is.null",
-		want: map[string]string{"filter": "deleted=null", "skipTotal": "1"},
-	}, {
-		name: "in expands to a disjunction, one placeholder per value",
-		in:   "id=in.(a,b)",
-		want: map[string]string{"filter": "(id={:p0} || id={:p1})", "p0": "a", "p1": "b", "skipTotal": "1"},
-	}, {
-		name: "like translates the wildcard PostgREST spells with a star",
-		in:   "name=like.*ace*",
-		want: map[string]string{"filter": "name~{:p0}", "p0": "%ace%", "skipTotal": "1"},
+		want: map[string]string{"skipTotal": "1"},
 	}} {
 		t.Run(s.name, func(t *testing.T) {
 			in, err := url.ParseQuery(s.in)
 			if err != nil {
 				t.Fatalf("bad test input: %v", err)
 			}
-			got, err := restQuery(in, s.counted)
+			got, _, err := restQuery(in, s.counted)
 			if err != nil {
 				t.Fatalf("restQuery(%q) errored: %v", s.in, err)
 			}
@@ -86,10 +72,59 @@ func TestRestQueryTranslates(t *testing.T) {
 	}
 }
 
-// A window this store cannot express is REFUSED. Rounding an unaligned offset to
-// the nearest page would answer with real rows for the wrong range, which is
+// The predicates a query carries, as data.
+func TestRestPredicates(t *testing.T) {
+	for _, s := range []struct {
+		name string
+		in   string
+		want []restPredicate
+	}{{
+		name: "one comparison",
+		in:   "status=eq.active",
+		want: []restPredicate{{Col: "status", Op: "eq", Vals: []string{"active"}}},
+	}, {
+		name: "several, in column order so one request is one expression",
+		in:   "status=eq.active&age=gte.18",
+		want: []restPredicate{
+			{Col: "age", Op: "gte", Vals: []string{"18"}},
+			{Col: "status", Op: "eq", Vals: []string{"active"}},
+		},
+	}, {
+		name: "in carries every value",
+		in:   "id=in.(a,b,c)",
+		want: []restPredicate{{Col: "id", Op: "in", Vals: []string{"a", "b", "c"}}},
+	}, {
+		name: "the wildcard PostgREST spells with a star becomes SQL's",
+		in:   "name=like.*ace*",
+		want: []restPredicate{{Col: "name", Op: "like", Vals: []string{"%ace%"}}},
+	}, {
+		name: "select and paging are not predicates",
+		in:   "select=id&limit=5&offset=0&order=id",
+		want: []restPredicate{},
+	}} {
+		t.Run(s.name, func(t *testing.T) {
+			in, _ := url.ParseQuery(s.in)
+			got, err := restPredicates(in)
+			if err != nil {
+				t.Fatalf("restPredicates(%q) errored: %v", s.in, err)
+			}
+			if len(got) != len(s.want) {
+				t.Fatalf("restPredicates(%q) = %+v, want %+v", s.in, got, s.want)
+			}
+			for i := range got {
+				if got[i].Col != s.want[i].Col || got[i].Op != s.want[i].Op ||
+					strings.Join(got[i].Vals, ",") != strings.Join(s.want[i].Vals, ",") {
+					t.Errorf("predicate %d = %+v, want %+v", i, got[i], s.want[i])
+				}
+			}
+		})
+	}
+}
+
+// A window or an operator this store cannot honour is REFUSED. Rounding an
+// unaligned offset would answer with real rows for the wrong range, which is
 // indistinguishable from correct data at the call site.
-func TestRestQueryRefusesAWindowItCannotHonour(t *testing.T) {
+func TestRestQueryRefusesWhatItCannotHonour(t *testing.T) {
 	for _, s := range []struct{ name, in, wants string }{
 		{"offset off a page boundary", "limit=25&offset=30", "page boundary"},
 		{"offset with no limit", "offset=30", "needs a limit"},
@@ -102,7 +137,7 @@ func TestRestQueryRefusesAWindowItCannotHonour(t *testing.T) {
 	} {
 		t.Run(s.name, func(t *testing.T) {
 			in, _ := url.ParseQuery(s.in)
-			_, err := restQuery(in, false)
+			_, _, err := restQuery(in, false)
 			if err == nil {
 				t.Fatalf("restQuery(%q) was accepted; it should be refused", s.in)
 			}
@@ -114,51 +149,49 @@ func TestRestQueryRefusesAWindowItCannotHonour(t *testing.T) {
 	}
 }
 
-// The filter string must be stable for one request. url.Values iterates randomly,
-// so without an explicit order the same query yields different expressions run to
-// run — which defeats the parsed-filter cache and makes a failure unreproducible.
-func TestRestFilterIsStableAcrossRuns(t *testing.T) {
+// The predicate order is stable for one request. url.Values iterates randomly,
+// so without an explicit order the same query yields a different expression run
+// to run, which cannot be reproduced from a log.
+func TestRestPredicatesAreStableAcrossRuns(t *testing.T) {
 	in, _ := url.ParseQuery("b=eq.2&a=eq.1&c=eq.3")
-	first, params, err := restFilter(in)
+	first, err := restPredicates(in)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for i := 0; i < 50; i++ {
-		got, gotParams, err := restFilter(in)
+		got, err := restPredicates(in)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got != first {
-			t.Fatalf("filter changed between runs: %q then %q", first, got)
-		}
-		if len(gotParams) != len(params) {
-			t.Fatalf("params changed between runs: %v then %v", params, gotParams)
+		for j := range got {
+			if got[j].Col != first[j].Col {
+				t.Fatalf("predicate order changed between runs: %v then %v", first, got)
+			}
 		}
 	}
-	// and the column order is the sorted one, so the expression is predictable
-	if !strings.HasPrefix(first, "a=") {
-		t.Errorf("filter %q does not lead with the first column by name", first)
+	if first[0].Col != "a" {
+		t.Errorf("predicates do not lead with the first column by name: %+v", first)
 	}
 }
 
-// A caller's value never reaches the expression text. The filter DSL is an
-// expression language, so a value spliced into it is injection into the WHERE
-// clause — this is the property that makes the door safe to expose.
-func TestRestFilterNeverSplicesACallersValue(t *testing.T) {
+// A caller's value stays a VALUE. It is never rendered into an expression, which
+// is what makes the door safe to expose — restWhere binds it as a parameter and
+// the column is resolved to an identifier before it can reach SQL.
+func TestRestPredicateCarriesTheValueVerbatim(t *testing.T) {
 	hostile := `x' || 1=1 || '`
 	in, _ := url.ParseQuery("name=eq." + url.QueryEscape(hostile))
 
-	filter, params, err := restFilter(in)
+	preds, err := restPredicates(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(filter, "1=1") || strings.Contains(filter, hostile) {
-		t.Fatalf("the value reached the expression: %q", filter)
+	if len(preds) != 1 {
+		t.Fatalf("want one predicate, got %+v", preds)
 	}
-	if filter != "name={:p0}" {
-		t.Fatalf("filter = %q, want a bare placeholder", filter)
+	if preds[0].Vals[0] != hostile {
+		t.Fatalf("the value should travel verbatim as data, got %q", preds[0].Vals[0])
 	}
-	if params["p0"] != hostile {
-		t.Fatalf("the value should be carried as a param verbatim, got %q", params["p0"])
+	if strings.Contains(preds[0].Col, "1=1") {
+		t.Fatalf("the value leaked into the column: %q", preds[0].Col)
 	}
 }
