@@ -21,31 +21,13 @@ const (
 	rateLimitersSettingsHookId = "__hzRateLimitersSettingsHook__"
 )
 
-// requestEventKeyDeployment carries the Base the process serves from, put on
-// every request by the router's event factory — see [NewRouter].
-const requestEventKeyDeployment = "__deployment"
-
-// deployment is the Base the process serves from, which is where a rate limit
-// lives.
-//
-// A limit protects the process, not a tenant's data, so it is one policy over
-// one set of counters and neither is a tenant's to hold. e.App answers a
-// different question — which Base this request's records are in — and it moves
-// onto a tenant's the moment a credential names an org. Reading the limit there
-// asked each tenant how hard the process may be hit, and a Base that has just
-// been opened says "no limit at all", so every authenticated caller in the
-// estate was unlimited while anonymous callers were held to the rule. The
-// 2-per-3-seconds on auth was the one that mattered and it applied to nobody who
-// had a token.
-//
-// Falling back to e.App keeps a request built outside the router — a test, a
-// batch child — limited by the Base it names, which is the only Base it knows.
-func deployment(e *core.RequestEvent) core.App {
-	if app, ok := e.Get(requestEventKeyDeployment).(core.App); ok && app != nil {
-		return app
-	}
-	return e.App
-}
+// A limit protects the process, not a tenant's data, so the rule, the counters
+// and the client key all come from [core.RequestEvent.Deployment]. Reading any
+// of them off e.App asked each tenant how hard the process may be hit, and a
+// Base that has just been opened says "no limit at all" — so every
+// authenticated caller in the estate was unlimited while anonymous callers were
+// held to the rule. The 2-per-3-seconds on auth was the one that mattered and it
+// applied to nobody who had a token.
 
 // rateLimit defines the global rate limit middleware.
 //
@@ -59,7 +41,7 @@ func rateLimit() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			rule, ok := deployment(e).Settings().RateLimits.FindRateLimitRule(
+			rule, ok := e.Deployment().Settings().RateLimits.FindRateLimitRule(
 				defaultRateLimitLabels(e),
 				defaultRateLimitAudience(e)...,
 			)
@@ -124,7 +106,7 @@ func checkCollectionRateLimit(e *core.RequestEvent, collection *core.Collection,
 	}
 	labels = append(labels, defaultRateLimitLabels(e)...)
 
-	rule, ok := deployment(e).Settings().RateLimits.FindRateLimitRule(labels, defaultRateLimitAudience(e)...)
+	rule, ok := e.Deployment().Settings().RateLimits.FindRateLimitRule(labels, defaultRateLimitAudience(e)...)
 	if ok {
 		return checkRateLimit(e, rtId+rule.Audience, rule)
 	}
@@ -153,7 +135,7 @@ func checkRateLimit(e *core.RequestEvent, rtId string, rule core.RateLimitRule) 
 	// counters would multiply every rule by the number of orgs a caller can
 	// name, so a limit of 2 would admit 2 per org and the number the operator
 	// wrote would not be the number anyone was held to.
-	app := deployment(e)
+	app := e.Deployment()
 
 	rateLimiters := app.Store().GetOrSet(rateLimitersStoreKey, func() any {
 		return initRateLimitersStore(app)
@@ -185,7 +167,7 @@ func checkRateLimit(e *core.RequestEvent, rtId string, rule core.RateLimitRule) 
 }
 
 func skipRateLimit(e *core.RequestEvent) bool {
-	return !deployment(e).Settings().RateLimits.Enabled || e.HasSuperuserAuth()
+	return !e.Deployment().Settings().RateLimits.Enabled || e.HasSuperuserAuth()
 }
 
 var defaultAuthAudience = []string{core.RateLimitRuleAudienceAll, core.RateLimitRuleAudienceAuth}
