@@ -233,25 +233,6 @@ type App interface {
 	// Per-org DB methods
 	// ---------------------------------------------------------------
 
-	// OrgDB returns the data.db builder for a specific org.
-	//
-	// Returns nil, nil if per-org bases is not enabled.
-	// Returns an error if the org ID is invalid or the database cannot be opened.
-	//
-	// The returned builder routes SELECTs to a concurrent pool and writes
-	// to a nonconcurrent pool, same as DB().
-	//
-	// Multi-per-org isolation activates only when MULTI_BASE=true or MASTER_KEY is set.
-	OrgDB(orgID string) (dbx.Builder, error)
-
-	// OrgNonconcurrentDB returns the write-only builder for a specific org.
-	//
-	// Returns nil, nil if per-org bases is not enabled.
-	OrgNonconcurrentDB(orgID string) (dbx.Builder, error)
-
-	// Base returns the Bases, or nil if per-org bases is not enabled.
-	Bases() *Bases
-
 	// HasTable checks if a table (or view) with the provided name exists (case insensitive).
 	// in the data.db.
 	HasTable(tableName string) bool

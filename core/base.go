@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -78,11 +77,6 @@ type BaseAppConfig struct {
 	// When set, overrides the file-path-based SQLite aux connection.
 	AuxDSN string
 
-	// PerOrg enables per-org database isolation.
-	// When true, OrgDB(orgID) returns a separate database per org.
-	// Also enabled automatically when MasterKey is set.
-	PerOrg bool
-
 	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
 	// When set, per-org bases is automatically enabled and per-org databases
 	// are encrypted with HKDF-derived keys.
@@ -107,7 +101,6 @@ type BaseApp struct {
 	nonconcurrentDB     dbx.Builder
 	auxConcurrentDB     dbx.Builder
 	auxNonconcurrentDB  dbx.Builder
-	bases               *Bases
 	network             baseNetwork
 
 	// app event hooks
@@ -164,7 +157,7 @@ type BaseApp struct {
 	onCollectionAfterDeleteError   *hook.Hook[*CollectionErrorEvent]
 
 	// mailer event hooks
-	onMailerSend                   *hook.Hook[*MailerEvent]
+	onMailerSend *hook.Hook[*MailerEvent]
 
 	// realtime api event hooks
 	onRealtimeConnectRequest   *hook.Hook[*RealtimeConnectRequestEvent]
@@ -475,8 +468,6 @@ func (app *BaseApp) Bootstrap() error {
 			return err
 		}
 
-		app.initBases()
-
 		if err := app.initLogger(); err != nil {
 			return err
 		}
@@ -536,14 +527,6 @@ func (app *BaseApp) ResetBootstrapState() error {
 			}
 		}
 		*db = nil
-	}
-
-	// Close base databases
-	if app.bases != nil {
-		if err := app.bases.Close(); err != nil {
-			errs = append(errs, err)
-		}
-		app.bases = nil
 	}
 
 	if app.network != nil {
@@ -656,29 +639,6 @@ func (app *BaseApp) AuxConcurrentDB() dbx.Builder {
 // In a transaction the AuxConcurrentDB() and AuxNonconcurrentDB() refer to the same *dbx.TX instance.
 func (app *BaseApp) AuxNonconcurrentDB() dbx.Builder {
 	return app.auxNonconcurrentDB
-}
-
-// OrgDB returns the data.db builder for a specific org.
-// Returns nil, nil if per-org bases is not enabled.
-func (app *BaseApp) OrgDB(orgID string) (dbx.Builder, error) {
-	if app.bases == nil {
-		return nil, nil
-	}
-	return app.bases.OrgDB(orgID)
-}
-
-// OrgNonconcurrentDB returns the write-only builder for a specific org.
-// Returns nil, nil if per-org bases is not enabled.
-func (app *BaseApp) OrgNonconcurrentDB(orgID string) (dbx.Builder, error) {
-	if app.bases == nil {
-		return nil, nil
-	}
-	return app.bases.OrgNonconcurrentDB(orgID)
-}
-
-// Base returns the Bases, or nil if per-org bases is not enabled.
-func (app *BaseApp) Bases() *Bases {
-	return app.bases
 }
 
 // DataDir returns the app data directory path.
@@ -1244,42 +1204,6 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // -------------------------------------------------------------------
 // Helpers
 // -------------------------------------------------------------------
-
-// initBases initializes the Bases if per-org bases is enabled.
-// Multi-per-org isolation activates when config.PerOrg is true OR config.MasterKey is set,
-// OR the MULTI_BASE env var is "true", OR the MASTER_KEY env var is set.
-func (app *BaseApp) initBases() {
-	perOrg := app.config.PerOrg
-	masterKey := app.config.MasterKey
-
-	// Check env vars as fallback
-	if !perOrg && os.Getenv("MULTI_BASE") == "true" {
-		perOrg = true
-	}
-	if len(masterKey) == 0 {
-		if envKey := os.Getenv("MASTER_KEY"); envKey != "" {
-			decoded, err := hex.DecodeString(envKey)
-			if err == nil && len(decoded) == 32 {
-				masterKey = decoded
-			}
-		}
-	}
-
-	// Master key implies per-org bases
-	if len(masterKey) == 32 {
-		perOrg = true
-	}
-
-	if !perOrg {
-		return
-	}
-
-	app.bases = NewBases(&BasesConfig{
-		DataDir:   app.config.DataDir,
-		MasterKey: masterKey,
-		DBConnect: app.config.DBConnect,
-	})
-}
 
 func (app *BaseApp) initDataDB() error {
 	var connectFunc func() (*dbx.DB, error)

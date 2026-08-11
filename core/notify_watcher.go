@@ -15,11 +15,16 @@ import (
 
 const systemHookIdNotifyWatcher = "__hzNotifyWatcherSystemHook__"
 
+// notifyDebounce is how long a change must be followed by quiet before the
+// watcher reloads. A burst of changes therefore costs one reload rather than
+// one per change.
+const notifyDebounce = 50 * time.Millisecond
+
 // notifyFileTTL is how long a notify file stays on disk before cleanup.
 // kqueue-backed watchers (macOS) detect directory children by rescanning
 // on dir-change events — a file created and unlinked within one scan
 // window is never observed, so the signal file must outlive the watcher
-// latency (event delivery + 50ms debounce).
+// latency (event delivery + notifyDebounce).
 const notifyFileTTL = 200 * time.Millisecond
 
 func (app *BaseApp) registerNotifyWatcherHooks() {
@@ -176,7 +181,7 @@ func createNotifyDirWatcher(app App, instanceId string, localNotifyDirPath strin
 
 				stopDebounceTimer()
 
-				debounceTimer = time.AfterFunc(50*time.Millisecond, func() {
+				debounceTimer = time.AfterFunc(notifyDebounce, func() {
 					filename := filepath.Base(event.Name)
 
 					// settings changed

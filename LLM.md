@@ -342,6 +342,29 @@ Store keys: `StoreKeyExternalAuthOnly` (always true once platform
 registers), `StoreKeyJWKSURL` (external mode), `StoreKeyAuthUsersCollection`
 (default `"users"`).
 
+## One Base per org, one implementation
+
+An org's Base is `{DataDir}/orgs/{org}/org.db`, opened the first time a request
+arrives carrying that org and encrypted under a key derived for it from KMS
+(`plugins/org`). Isolation is physical — a different org is a different file, so
+no query can read across two. There is no create verb: using an org opens its
+Base.
+
+`/v1/bases` reports what is on disk for each org on the caller's token. It used
+to read the local `_orgs` collection, which IAM owns and Base never writes, so it
+answered "no such org" for every org including the caller's own while that org's
+Base sat on disk being written to. Membership is the token's to state; a local
+copy is a second answer to "who is in this org" and the one a request arrives on
+wins.
+
+There was a second, complete implementation of all this in `core`: a `Bases`
+registry with its own encryption, lazy open, and concurrent/nonconcurrent pools,
+gated behind `MULTI_BASE`/`MASTER_KEY`, reachable through three `core.App`
+interface methods. Same directory, different filename (`data.db` vs `org.db`),
+different key derivation, different id validator. Nothing called it — its only
+callers were its own tests — and no deployment has ever set either env var. It
+is gone.
+
 ## Base sends no auth mail
 
 There is no verification or email-change mail, no template for either on a
