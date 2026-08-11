@@ -1,4 +1,4 @@
-package platform
+package org
 
 import (
 	"net/http"
@@ -7,16 +7,20 @@ import (
 	"github.com/hanzoai/base/tools/router"
 )
 
-// registerOrgRoutes registers per-org API routes under /v1/platform/org.
-func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
-	api := r.Group("/v1/platform/org")
+// bases is the one address this plugin publishes. A Base is per org, so
+// everything scoped to an org hangs off the Base it belongs to.
+const bases = "/v1/bases"
 
-	api.GET("/config/{orgId}", p.handleGetOrgConfig)
-	api.GET("/creds/{orgId}/{provider}", p.handleGetOrgCreds)
-	api.POST("/creds/{orgId}/{provider}", p.handleSetOrgCreds)
-	api.DELETE("/creds/{orgId}", p.handleInvalidateOrgCreds)
-	api.GET("/customer/{orgId}/{userId}", p.handleGetCustomer)
-	api.POST("/customer/{orgId}/{userId}", p.handleProvisionCustomer)
+// registerOrgRoutes registers what belongs to one Base.
+func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
+	api := r.Group(bases)
+
+	api.GET("/{orgId}/config", p.handleGetOrgConfig)
+	api.GET("/{orgId}/creds/{provider}", p.handleGetOrgCreds)
+	api.POST("/{orgId}/creds/{provider}", p.handleSetOrgCreds)
+	api.DELETE("/{orgId}/creds", p.handleInvalidateOrgCreds)
+	api.GET("/{orgId}/customers/{userId}", p.handleGetCustomer)
+	api.POST("/{orgId}/customers/{userId}", p.handleProvisionCustomer)
 }
 
 func (p *plugin) handleGetOrgConfig(e *core.RequestEvent) error {

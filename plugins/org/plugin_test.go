@@ -1,4 +1,4 @@
-package platform
+package org
 
 import (
 	"encoding/json"

@@ -1,4 +1,4 @@
-package platform
+package org
 
 import (
 	"context"
@@ -17,7 +17,7 @@ func TestOrgServiceGetCreds_EnvFallback(t *testing.T) {
 
 	s := &OrgService{
 		kms:    mustKMS(t, ""), // no KMS configured
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	creds := s.GetCreds("org-1", "commerce")
@@ -35,7 +35,7 @@ func TestOrgServiceGetCreds_EnvFallback(t *testing.T) {
 func TestOrgServiceGetCreds_Empty(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	creds := s.GetCreds("org-1", "nonexistent")
@@ -47,7 +47,7 @@ func TestOrgServiceGetCreds_Empty(t *testing.T) {
 func TestOrgServiceGetCreds_EmptyArgs(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	if creds := s.GetCreds("", "commerce"); creds != nil {
@@ -67,7 +67,7 @@ func TestOrgServiceGetCreds_KMSWithCache(t *testing.T) {
 
 	s := &OrgService{
 		kms:    mustKMS(t, "kms.test:9999"),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	creds := s.GetCreds("org-1", "commerce")
@@ -99,7 +99,7 @@ func TestOrgServiceInvalidateCreds(t *testing.T) {
 
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	// Populate cache.
@@ -124,7 +124,7 @@ func TestOrgServiceInvalidateCreds(t *testing.T) {
 func TestOrgServiceSetCreds_NoKMS(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	err := s.SetCreds("org-1", "commerce", map[string]string{"api_key": "test"})
@@ -136,7 +136,7 @@ func TestOrgServiceSetCreds_NoKMS(t *testing.T) {
 func TestOrgServiceSetCreds_EmptyArgs(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, "kms.test:9999"),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	if err := s.SetCreds("", "commerce", nil); err == nil {
@@ -150,7 +150,7 @@ func TestOrgServiceSetCreds_EmptyArgs(t *testing.T) {
 func TestOrgServiceGetCustomer_NilArgs(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	if c := s.GetCustomer("", "user-1"); c != nil {
@@ -164,7 +164,7 @@ func TestOrgServiceGetCustomer_NilArgs(t *testing.T) {
 func TestOrgServiceProvisionCustomer_EmptyArgs(t *testing.T) {
 	s := &OrgService{
 		kms:    mustKMS(t, ""),
-		config: PlatformConfig{},
+		config: Config{},
 	}
 
 	_, err := s.ProvisionCustomer("", "user-1", nil)

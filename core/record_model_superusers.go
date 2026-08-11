@@ -80,7 +80,7 @@ func (app *BaseApp) registerSuperuserHooks() {
 
 			// the _superusers collection is mirrored from IAM — no local
 			// password / OAuth2 / MFA / OTP path lives here. The PKCE
-			// flow against IAM is the only way in (see plugins/platform
+			// flow against IAM is the only way in (see plugins/org
 			// proxy + apis.recordAuthMethods).
 			e.Collection.OAuth2.Enabled = false
 			e.Collection.OAuth2.Providers = nil

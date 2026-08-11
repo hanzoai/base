@@ -8,7 +8,7 @@
 // opaque to the client. The mount is /v1/iam, never /api/* — /v1 is
 // Base's one external prefix.
 
-package platform
+package org
 
 import (
 	"io"

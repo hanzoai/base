@@ -1,6 +1,6 @@
 // Environment knobs for the platform-side KMS bridge.
 
-package platform
+package org
 
 import (
 	"os"
