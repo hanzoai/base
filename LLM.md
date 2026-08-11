@@ -300,23 +300,21 @@ Hanzo IAM is the **only** auth source. There is no `BASE_AUTH_MODE` toggle,
 no built-in password / OTP / MFA / OAuth2 / email-change / password-reset
 surface, no legacy parallel auth path. The platform plugin
 (`plugins/org/`) is mandatory and registers IAM unconditionally;
-booting without `IAM_ENDPOINT` (or `IAM_MODE=embedded`) errors at startup.
+booting without `IAM_ENDPOINT` errors at startup.
 
-Two ways to host IAM, identical OIDC contract from the client side:
+Base never hosts identity, so there is only one arrangement and only one
+knob. `IAM_ENDPOINT` names a Hanzo IAM and `/v1/iam/*` is a transparent
+reverse proxy to it. What answers there is IAM's business: federation,
+MFA, social, magic links, multi-tenant orgs.
 
-1. **External** (default): set `IAM_ENDPOINT=https://hanzo.id` (or your
-   tenant). `/v1/iam/*` is a transparent reverse proxy to that endpoint.
-   Full Hanzo IAM features: federation, MFA, social, magic links,
-   multi-tenant orgs.
-2. **Embedded**: set `IAM_MODE=embedded`. `/v1/iam/*` is served in-process
-   by the minimal OIDC provider in `plugins/org/iam_embedded.go`
-   (email+password only, no federation). For single-tenant solo
-   deployments. See section below for the surface details.
+Where IAM runs is a deployment choice, not a Base mode. It is usually
+another service (`https://hanzo.id`, or a tenant's). It can equally be
+`iam.Embed()` inside a fused daemon, which Base still reaches through
+`IAM_ENDPOINT` — being in the same process changes the address, not the
+contract, and Base implements no part of OIDC either way.
 
-Both modes expose the same six paths under `/v1/iam/*` (discovery, JWKS,
-authorize, login, token, userinfo) and the same RS256 JWT shape. The
-`@hanzo/iam/browser` SDK does PKCE redirect against either with no
-client-side branching — only the feature ceiling differs.
+The `@hanzo/iam/browser` SDK does a PKCE redirect against whatever that
+endpoint is, with no client-side branching.
 
 `resolveJWKSToken` (`apis/middlewares.go`) mirrors the verified token into an
 ephemeral auth record — nothing is written, IAM stays the user store. The
@@ -398,8 +396,8 @@ deploy together.
 
 **IAM is always a fixed sibling at `/v1/iam`** regardless of
 `BASE_API_PREFIX`. In production a gateway typically routes `/v1/iam/*`
-to the central IAM service; in solo/dev mode `IAM_MODE=embedded` serves
-it in-process. Apps do NOT mount their own IAM at `/v1/<app>/iam`.
+to the central IAM service; otherwise Base proxies it to whatever
+`IAM_ENDPOINT` names. Apps do NOT mount their own IAM at `/v1/<app>/iam`.
 
 Root liveness probe stays at `/healthz` (outside the mount prefix) so
 ops doesn't have to know the app name.
@@ -478,46 +476,24 @@ modernc.org/sqlite` now shows it ONLY transitively under `hanzoai/sqlite`.
   hanzoai/sqlite). The old `modernc_versions_check.go` libc-pairing warning was
   removed — that pairing is hanzoai/sqlite's concern now, not base's.
 
-## Embedded IAM Mode (`IAM_MODE=embedded`)
+## Base hosts no identity, so there is no embedded IAM
 
-Set `IAM_MODE=embedded` to boot Base with an in-process OIDC provider
-at `/v1/iam/*` instead of reverse-proxying to an external Hanzo IAM.
-Same `@hanzo/iam/browser` PKCE contract from the client's perspective —
-the path doesn't change, only the implementation. We use `/v1/iam`, not
-`/api/iam` — `/v1` is Base's one external prefix.
+This section used to describe an in-process OIDC provider reached by setting
+`IAM_MODE=embedded`: a login form at `/v1/iam/oauth/authorize`, an `_iam_users`
+collection holding bcrypt passwords, an `iam-user` CLI, `EMBEDDED_IAM_ROOT_EMAIL`
+to seed the first account, a `platformEmbeddedAuth` middleware validating tokens
+against a local signing key at `${DataDir}/iam.key`.
 
-Surface (minimal viable, NOT a full Hanzo IAM):
+None of it exists. `IAM_MODE`, `iam_embedded.go`, `_iam_users`,
+`EMBEDDED_IAM_ROOT_EMAIL`, `IAM_USER_PASSWORD`, the `iam-user` command and
+`platformEmbeddedAuth` are absent from the tree — not one of them is findable.
+It was worse than merely out of date: it documented Base storing
+passwords and running a login flow, which is the one thing this repo is not
+allowed to do and which `Register()` refuses at boot in as many words.
 
-- `GET /v1/iam/.well-known/openid-configuration` — OIDC discovery (issuer derived from request Host)
-- `GET /v1/iam/.well-known/jwks` — public RSA JWK
-- `GET /v1/iam/oauth/authorize` — plain HTML login form
-- `POST /v1/iam/oauth/login` — verifies email+password, redirects to `redirect_uri?code=...&state=...`
-- `POST /v1/iam/oauth/token` — exchanges single-use code for RS256-signed JWT (1h TTL)
-- `GET /v1/iam/oauth/userinfo` — bearer-validated user record
-
-Signing key: `${DataDir}/iam.key` (RSA-2048 PEM, 0600). Generated on
-first boot; back it up alongside the SQLite database — losing it
-invalidates every outstanding JWT.
-
-Users: `_iam_users` system collection (email + bcrypt-cost-12 password
-+ name). Bootstrap via either:
-
-- env: `EMBEDDED_IAM_ROOT_EMAIL=z@example.com EMBEDDED_IAM_ROOT_PASSWORD=...`
-  on first boot (no-op if `_iam_users` already has rows)
-- CLI: `./base iam-user create z@example.com` (prompts for password
-  via stdin, or honor `IAM_USER_PASSWORD`)
-
-Token validation runs in-process via the `platformEmbeddedAuth`
-middleware bound at `DefaultLoadAuthTokenMiddlewarePriority - 1`. The
-JWT is verified against the local signer (NOT the JWKS-over-HTTP path
-external mode uses) and `re.Auth` is set to the matching `_iam_users`
-record, so the standard identity-header pipeline keeps working
-unchanged.
-
-Out of scope (boot against an external Hanzo IAM at `IAM_ENDPOINT` if
-you need any of these): multi-tenant orgs, social federation
-(Google/GitHub/SAML), MFA/OTP, password reset, refresh tokens, fancy
-login UI.
+What is true is the section above. `IAM_ENDPOINT` is required, `/v1/iam/*`
+proxies to it, and where IAM runs — a separate service or `iam.Embed()` in a
+fused daemon — changes the address rather than the contract.
 
 ## Network (Quasar replication) — singleton collapse (v0.48.1)
 
