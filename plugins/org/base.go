@@ -1,12 +1,60 @@
 package org
 
 import (
+	"encoding/hex"
 	"fmt"
 	"sync"
 
 	"github.com/hanzoai/authz"
 	"github.com/hanzoai/base/core"
+	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/sqlite"
 )
+
+// encrypted returns how to open an org's Base with the org's own key, or nil to
+// open it plaintext.
+//
+// The key is derived per org (OrgDEK), so one org's file is unreadable with
+// another's key and a leaked key is worth one tenant rather than all of them.
+// sqlite.OpenDB is the whole mechanism and it means the same thing under both
+// builds: SQLCipher when Base is linked with cgo, and the pure-Go codec envelope
+// otherwise. The two are byte-compatible, so a file written by one opens under
+// the other — which matters because CI ships CGO_ENABLED=0 and an operator may
+// not.
+//
+// An empty DEK is dev mode: no master key was configured, and the Base opens
+// plaintext exactly as it did before. A master key of the wrong length is an
+// error rather than a silent downgrade, because a key that quietly becomes no
+// key is how data ends up in the clear while the deployment believes otherwise.
+func encryptedConnect(orgDB *OrgDB, org string) (core.DBConnectFunc, error) {
+	dek, err := orgDB.OrgDEK(org)
+	if err != nil {
+		return nil, err
+	}
+	if dek == "" {
+		return nil, nil
+	}
+
+	key, err := hex.DecodeString(dek)
+	if err != nil {
+		return nil, fmt.Errorf("platform: decode the %q key: %w", org, err)
+	}
+
+	return func(dbPath string) (*dbx.DB, error) {
+		// Same refusal DefaultDBConnect makes: a build whose SQLite cannot
+		// answer geoDistance dies here rather than at a failed search.
+		if err := core.VerifySQLiteMathFunctions(); err != nil {
+			return nil, err
+		}
+
+		db, err := sqlite.OpenDB(dbPath, key)
+		if err != nil {
+			return nil, err
+		}
+
+		return dbx.NewFromDB(db, "sqlite"), nil
+	}, nil
+}
 
 // bases maps an org to the Base that serves it: {DataDir}/orgs/{org}, opened the
 // first time a request arrives carrying that org. There is no create verb —
@@ -59,10 +107,16 @@ func (b *bases) base(org string) (core.App, error) {
 		return nil, err
 	}
 
+	connect, err := encryptedConnect(b.p.orgDB, org)
+	if err != nil {
+		return nil, err
+	}
+
 	app = core.NewBaseApp(core.BaseAppConfig{
 		DataDir:       dir,
 		EncryptionEnv: b.p.app.EncryptionEnv(),
 		IsDev:         b.p.app.IsDev(),
+		DBConnect:     connect,
 	})
 	if err := app.Bootstrap(); err != nil {
 		return nil, fmt.Errorf("open the Base for %q: %w", org, err)
