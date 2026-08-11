@@ -22,7 +22,7 @@ import (
 //	_view_groups    per-view group buckets (board columns / row groups)
 //
 // Owner-scoped: a caller sees/manages only their own views. Ownership is the IAM
-// user id (@request.auth.id), matching every other tenant-scoped collection.
+// user id (@request.auth.id), matching every other base-scoped collection.
 func init() {
 	core.SystemMigrations.Register(func(txApp core.App) error {
 		for _, create := range []func(core.App) error{
@@ -79,11 +79,11 @@ func createViewsCollection(txApp core.App) error {
 	c.Fields.Add(&core.TextField{Name: "name", Required: true})       // human label
 	c.Fields.Add(&core.SelectField{Name: "type", MaxSelect: 1, Values: []string{"table", "board", "calendar"}})
 	c.Fields.Add(&core.TextField{Name: "icon"})
-	c.Fields.Add(&core.TextField{Name: "group_by_field"})            // board columns / row groups source (a select/relation field)
-	c.Fields.Add(&core.TextField{Name: "calendar_field"})            // date field for the calendar view
-	c.Fields.Add(&core.NumberField{Name: "position"})               // ordering in the view bar
+	c.Fields.Add(&core.TextField{Name: "group_by_field"}) // board columns / row groups source (a select/relation field)
+	c.Fields.Add(&core.TextField{Name: "calendar_field"}) // date field for the calendar view
+	c.Fields.Add(&core.NumberField{Name: "position"})     // ordering in the view bar
 	c.Fields.Add(&core.SelectField{Name: "filter_logic", MaxSelect: 1, Values: []string{"and", "or"}})
-	c.Fields.Add(&core.BoolField{Name: "is_default"})               // the object's default view
+	c.Fields.Add(&core.BoolField{Name: "is_default"}) // the object's default view
 	addTimestamps(c)
 	c.AddIndex("idx_views_owner_collection", false, "owner, collection", "")
 	return txApp.Save(c)
@@ -110,7 +110,7 @@ func createViewFiltersCollection(txApp core.App) error {
 	c.Fields.Add(&core.SelectField{Name: "operator", MaxSelect: 1, Values: []string{
 		"eq", "neq", "gt", "gte", "lt", "lte", "like", "nlike", "empty", "nempty",
 	}})
-	c.Fields.Add(&core.JSONField{Name: "value"}) // scalar, list, or relation id(s)
+	c.Fields.Add(&core.JSONField{Name: "value"})   // scalar, list, or relation id(s)
 	c.Fields.Add(&core.NumberField{Name: "group"}) // filter-group index for nested AND/OR
 	c.Fields.Add(&core.NumberField{Name: "position"})
 	addTimestamps(c)

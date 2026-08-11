@@ -1,5 +1,5 @@
 // Package functions implements serverless function management for Hanzo Base
-// via OpenFaaS. It provides per-tenant function deployment, invocation, and
+// via OpenFaaS. It provides per-base function deployment, invocation, and
 // lifecycle management through the Base API surface.
 //
 // Example:

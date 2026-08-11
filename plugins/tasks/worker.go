@@ -13,7 +13,7 @@ type Worker struct {
 }
 
 // NewWorker creates a worker for a specific task queue.
-// For multi-tenant deployments, each org/space can have its own queue.
+// For per-org deployments, each org/space can have its own queue.
 func NewWorker(c client.Client, queue string) *Worker {
 	w := sdkworker.New(c, queue, sdkworker.Options{})
 

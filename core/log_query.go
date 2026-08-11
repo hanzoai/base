@@ -3,8 +3,8 @@ package core
 import (
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 // LogQuery returns a new Log select query.

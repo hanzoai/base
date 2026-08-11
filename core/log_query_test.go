@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 func TestFindLogById(t *testing.T) {

@@ -349,7 +349,7 @@ func (s *Store) dependenciesMet(task *Task) bool {
 	}
 	for _, depID := range task.DependsOn {
 		// allOrgs deliberately: a dependency is a property of the task graph,
-		// not of tenancy, so a blocker in another org still blocks. This read
+		// not of per-org isolation, so a blocker in another org still blocks. This read
 		// was already unscoped — the variadic just made it impossible to see
 		// that it differed from the scoped call that leads here.
 		dep, err := s.GetTask(depID, allOrgs)

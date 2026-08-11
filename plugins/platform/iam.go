@@ -25,12 +25,12 @@ type IAMUser struct {
 }
 
 // Cache parameters. The 5-minute TTL matches the original map+TTL design;
-// 10K is a safe default for the per-tenant fleet sizes Hanzo runs (each
+// 10K is a safe default for the per-base fleet sizes Hanzo runs (each
 // service has its own IAMClient instance and a single token is shared
 // across many requests, so the working set stays well under cap).
 const (
-	tokenCacheTTL     = 5 * time.Minute
-	defaultCacheSize  = 10_000
+	tokenCacheTTL    = 5 * time.Minute
+	defaultCacheSize = 10_000
 )
 
 // ValidateIAMToken validates a bearer token against the IAM userinfo endpoint
@@ -240,7 +240,7 @@ func (c *IAMClient) InvalidateToken(token string) {
 type IAMKey struct {
 	Owner       string `json:"owner"`
 	Name        string `json:"name"`
-	Type        string `json:"type"`        // Organization, Application, User
+	Type        string `json:"type"` // Organization, Application, User
 	Org         string `json:"organization"`
 	Application string `json:"application"`
 	User        string `json:"user"`

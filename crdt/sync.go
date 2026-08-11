@@ -23,11 +23,11 @@ const (
 // There is no plaintext-ops field; PlaintextPrivacy produces envelopes
 // that happen to contain JSON as the "ciphertext". One wire format.
 type SyncMessage struct {
-	Type        string        `json:"type"`
-	DocID       string        `json:"docId"`
-	ClientID    string        `json:"clientId,omitempty"`
-	StateVector StateVersion  `json:"stateVector,omitempty"`
-	Envelopes   []OpEnvelope  `json:"envelopes,omitempty"`
+	Type        string       `json:"type"`
+	DocID       string       `json:"docId"`
+	ClientID    string       `json:"clientId,omitempty"`
+	StateVector StateVersion `json:"stateVector,omitempty"`
+	Envelopes   []OpEnvelope `json:"envelopes,omitempty"`
 }
 
 // SyncBroadcastFunc is called when operations need to be broadcast to other clients.

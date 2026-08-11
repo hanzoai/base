@@ -10,9 +10,9 @@
 // native ZAP to github.com/luxfi/kms, the canonical KMS. There is no HTTP
 // path. Secrets never live anywhere else.
 //
-// THE ORG IS A PATH SEGMENT. The KMS store shards its tenant boundary on the
+// THE ORG IS A PATH SEGMENT. The KMS store shards its base boundary on the
 // "orgs/{org}" prefix of the secret PATH; a path without that segment is
-// deployment-wide and shared by every tenant. The previous implementation
+// deployment-wide and shared by every base. The previous implementation
 // carried the org in an HTTP URL (/v1/kms/orgs/{org}/secrets/…) and passed the
 // caller's bare path straight through on the ZAP transport — so on the
 // transport operators are told to use in-cluster, every org read and wrote the
@@ -163,7 +163,7 @@ func NewKMSClient(endpoint string) (*KMSClient, error) {
 func (c *KMSClient) configured() bool { return c != nil && (c.addr != "" || c.mdns) }
 
 // ref maps (org, "provider/key") onto the (path, name) coordinate the KMS store
-// keys on. The org leads the path because that segment IS the tenant boundary.
+// keys on. The org leads the path because that segment IS the base boundary.
 func ref(orgId, secretPath string) (path, name string) {
 	name = strings.Trim(strings.TrimSpace(secretPath), "/")
 	dir := ""

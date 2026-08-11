@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/dbx"
 )
 
 func TestRecordQueryWithDifferentCollectionValues(t *testing.T) {

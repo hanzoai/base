@@ -31,10 +31,10 @@ type RecoveryProvider interface {
 
 // ProviderRegistry discovers and manages providers.
 type ProviderRegistry struct {
-	mu        sync.RWMutex
-	sync      map[string]SyncProvider
-	storage   map[string]StorageProvider
-	recovery  map[string]RecoveryProvider
+	mu       sync.RWMutex
+	sync     map[string]SyncProvider
+	storage  map[string]StorageProvider
+	recovery map[string]RecoveryProvider
 }
 
 // NewProviderRegistry creates an empty registry.

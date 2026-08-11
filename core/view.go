@@ -7,11 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/base/tools/dbutils"
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/tokenizer"
+	"github.com/hanzoai/dbx"
 )
 
 // DeleteView drops the specified view name.

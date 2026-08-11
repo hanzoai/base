@@ -6,7 +6,7 @@
 //   - Enabled()       — FromEnv toggles off when BASE_NETWORK is unset.
 //   - Start/Stop      — lifecycle for all shard engines and transport.
 //   - InstallWALHook  — per-connection commit hook; captures frames,
-//                       submits to the shard engine.
+//     submits to the shard engine.
 //   - WriterFor       — which pod owns shardID (consistent hash).
 //   - MembersFor      — replica set for shardID.
 package network
@@ -74,10 +74,10 @@ func FromEnv() (Network, error) {
 // allocate nothing.
 type noop struct{}
 
-func (noop) Enabled() bool                              { return false }
-func (noop) Start(context.Context) error                { return nil }
-func (noop) Stop(context.Context) error                 { return nil }
-func (noop) InstallWALHook(any, string) error           { return nil }
-func (noop) WriterFor(string) (string, bool)            { return "", true }
-func (noop) MembersFor(string) []string                 { return nil }
-func (noop) Metrics() *Metrics                          { return nil }
+func (noop) Enabled() bool                    { return false }
+func (noop) Start(context.Context) error      { return nil }
+func (noop) Stop(context.Context) error       { return nil }
+func (noop) InstallWALHook(any, string) error { return nil }
+func (noop) WriterFor(string) (string, bool)  { return "", true }
+func (noop) MembersFor(string) []string       { return nil }
+func (noop) Metrics() *Metrics                { return nil }

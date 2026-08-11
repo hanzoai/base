@@ -51,7 +51,7 @@ func TestFromHeaders_IgnoresLegacyVariants(t *testing.T) {
 	r.Header.Set("X-IAM-User-Id", "forged")
 	r.Header.Set("X-User-Role", "admin")  // singular legacy
 	r.Header.Set("X-User-Roles", "admin") // plural legacy
-	r.Header.Set("X-Tenant-Id", "forged-org")
+	r.Header.Set("X-Base-Id", "forged-org")
 	// No canonical headers set.
 
 	c := claims.FromHeaders(r)
@@ -90,7 +90,7 @@ func TestStripIdentityHeaders_RemovesCanonicalAndLegacy(t *testing.T) {
 		"X-User-Email", "X-Phone-Number", "X-User-IsAdmin",
 		// non-canonical legacy
 		"X-User-Role", "X-User-Roles", "X-User-Name",
-		"X-Tenant-Id", "X-Tenant-ID", "X-Org", "X-Is-Admin",
+		"X-Base-Id", "X-Base-ID", "X-Org", "X-Is-Admin",
 		// pre-validation hints
 		"X-Gateway-Validated", "X-Gateway-User-Id",
 		"X-Gateway-Org-Id", "X-Gateway-User-Email",

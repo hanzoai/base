@@ -15,17 +15,17 @@ import (
 type Client struct {
 	BaseURL   string
 	Token     string
-	Tenant    string
+	Base      string
 	APIPrefix string
 	HTTP      *http.Client
 }
 
 // NewClient returns a Client with sensible defaults.
-func NewClient(baseURL, token, tenant string) *Client {
+func NewClient(baseURL, token, base string) *Client {
 	return &Client{
 		BaseURL:   strings.TrimRight(baseURL, "/"),
 		Token:     token,
-		Tenant:    tenant,
+		Base:      base,
 		APIPrefix: "/v1",
 		HTTP:      &http.Client{Timeout: 30 * time.Second},
 	}
@@ -56,8 +56,8 @@ func (c *Client) Do(method, path string, body any) (json.RawMessage, int, error)
 	if c.Token != "" {
 		req.Header.Set("Authorization", c.Token)
 	}
-	if c.Tenant != "" {
-		req.Header.Set("X-Org-Id", c.Tenant)
+	if c.Base != "" {
+		req.Header.Set("X-Org-Id", c.Base)
 	}
 
 	resp, err := c.HTTP.Do(req)

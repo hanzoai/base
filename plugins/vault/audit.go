@@ -13,12 +13,12 @@ import (
 // AuditEntry records a single vault operation.
 type AuditEntry struct {
 	Timestamp time.Time `json:"timestamp"`
-	VaultID   string    `json:"vaultId"`   // org:user
-	Actor     string    `json:"actor"`     // DID of who performed the action
-	Action    string    `json:"action"`    // "put", "get", "delete", "sync", "anchor", "grant", "revoke"
-	Resource  string    `json:"resource"`  // key, capability ID, etc.
-	Hash      string    `json:"hash"`      // SHA-256 of entry for chaining
-	PrevHash  string    `json:"prevHash"`  // hash of previous entry (chain link)
+	VaultID   string    `json:"vaultId"`  // org:user
+	Actor     string    `json:"actor"`    // DID of who performed the action
+	Action    string    `json:"action"`   // "put", "get", "delete", "sync", "anchor", "grant", "revoke"
+	Resource  string    `json:"resource"` // key, capability ID, etc.
+	Hash      string    `json:"hash"`     // SHA-256 of entry for chaining
+	PrevHash  string    `json:"prevHash"` // hash of previous entry (chain link)
 }
 
 // AuditLog is an append-only log of vault operations.

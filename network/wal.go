@@ -161,9 +161,21 @@ func decodeFrame(b []byte) (Frame, error) {
 	return f, nil
 }
 
-func appendU16(b []byte, v uint16) []byte { var t [2]byte; binary.BigEndian.PutUint16(t[:], v); return append(b, t[:]...) }
-func appendU32(b []byte, v uint32) []byte { var t [4]byte; binary.BigEndian.PutUint32(t[:], v); return append(b, t[:]...) }
-func appendU64(b []byte, v uint64) []byte { var t [8]byte; binary.BigEndian.PutUint64(t[:], v); return append(b, t[:]...) }
+func appendU16(b []byte, v uint16) []byte {
+	var t [2]byte
+	binary.BigEndian.PutUint16(t[:], v)
+	return append(b, t[:]...)
+}
+func appendU32(b []byte, v uint32) []byte {
+	var t [4]byte
+	binary.BigEndian.PutUint32(t[:], v)
+	return append(b, t[:]...)
+}
+func appendU64(b []byte, v uint64) []byte {
+	var t [8]byte
+	binary.BigEndian.PutUint64(t[:], v)
+	return append(b, t[:]...)
+}
 
 // HookRegisterer is the narrow surface we need to install a commit hook:
 // RegisterCommitHook(func() int32). In production core/base_network.go supplies

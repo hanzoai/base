@@ -37,9 +37,9 @@ func wipeLocal(t *testing.T, dbPath string) {
 	}
 }
 
-// tenantClient builds a per-tenant age-encrypting replica client over a local
+// orgClient builds a per-base age-encrypting replica client over a local
 // blob dir — the SAME shape used in production (with an S3/vfs backend).
-func tenantClient(t *testing.T, replicaDir string, id *age.HybridIdentity) *encreplica.Client {
+func orgClient(t *testing.T, replicaDir string, id *age.HybridIdentity) *encreplica.Client {
 	t.Helper()
 	c, err := encreplica.New(encreplica.NewLocalBlobs(replicaDir), id.Recipient(), id)
 	if err != nil {
@@ -89,8 +89,8 @@ func TestReplicaBytesAreEncrypted_NoPlaintextMarker(t *testing.T) {
 		t.Fatal(err)
 	}
 	replicaDir := t.TempDir()
-	client := tenantClient(t, replicaDir, id)
-	dbPath := filepath.Join(t.TempDir(), "tenant.db")
+	client := orgClient(t, replicaDir, id)
+	dbPath := filepath.Join(t.TempDir(), "base.db")
 
 	w := openSQL(t, dbPath)
 	if _, err := w.ExecContext(ctx, `CREATE TABLE t(v TEXT)`); err != nil {
@@ -126,8 +126,8 @@ func TestRoundTrip_WriteReplicateWipeRestoreRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := tenantClient(t, t.TempDir(), id)
-	dbPath := filepath.Join(t.TempDir(), "tenant.db")
+	client := orgClient(t, t.TempDir(), id)
+	dbPath := filepath.Join(t.TempDir(), "base.db")
 
 	w := openSQL(t, dbPath)
 	if _, err := w.ExecContext(ctx, `CREATE TABLE t(v TEXT)`); err != nil {
@@ -171,8 +171,8 @@ func TestRoundTrip_WriteReplicateWipeRestoreRead(t *testing.T) {
 	}
 }
 
-// A different tenant's key cannot restore the replica — the stream is bound to
-// the per-tenant age key (age-decrypt fails inside the client).
+// A different base's key cannot restore the replica — the stream is bound to
+// the per-base age key (age-decrypt fails inside the client).
 func TestRestore_CrossTenantFails(t *testing.T) {
 	ctx := context.Background()
 	replicaDir := t.TempDir()
@@ -181,8 +181,8 @@ func TestRestore_CrossTenantFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientA := tenantClient(t, replicaDir, idA)
-	dbPath := filepath.Join(t.TempDir(), "tenant.db")
+	clientA := orgClient(t, replicaDir, idA)
+	dbPath := filepath.Join(t.TempDir(), "base.db")
 
 	w := openSQL(t, dbPath)
 	if _, err := w.ExecContext(ctx, `CREATE TABLE t(v TEXT)`); err != nil {
@@ -203,14 +203,14 @@ func TestRestore_CrossTenantFails(t *testing.T) {
 	h.Close(ctx)
 	wipeLocal(t, dbPath)
 
-	// Tenant B, same replica storage, different key — must NOT restore.
+	// Base B, same replica storage, different key — must NOT restore.
 	idB, err := age.GenerateHybridIdentity()
 	if err != nil {
 		t.Fatal(err)
 	}
-	clientB := tenantClient(t, replicaDir, idB)
+	clientB := orgClient(t, replicaDir, idB)
 	if _, err := replicator.Restore(ctx, dbPath, clientB); err == nil {
-		t.Fatal("ISOLATION BREACH: cross-tenant restore succeeded")
+		t.Fatal("ISOLATION BREACH: cross-base restore succeeded")
 	}
 }
 
@@ -220,7 +220,7 @@ func TestRestore_NoReplicaReturnsFalse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := tenantClient(t, t.TempDir(), id)
+	client := orgClient(t, t.TempDir(), id)
 	dbPath := filepath.Join(t.TempDir(), "fresh.db")
 
 	restored, err := replicator.Restore(ctx, dbPath, client)
@@ -228,7 +228,7 @@ func TestRestore_NoReplicaReturnsFalse(t *testing.T) {
 		t.Fatalf("restore of empty replica: %v", err)
 	}
 	if restored {
-		t.Fatal("expected restored=false for a fresh tenant with no replica")
+		t.Fatal("expected restored=false for a fresh base with no replica")
 	}
 }
 
@@ -238,8 +238,8 @@ func TestRoundTrip_ReplicateAfterRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := tenantClient(t, t.TempDir(), id)
-	dbPath := filepath.Join(t.TempDir(), "tenant.db")
+	client := orgClient(t, t.TempDir(), id)
+	dbPath := filepath.Join(t.TempDir(), "base.db")
 
 	w := openSQL(t, dbPath)
 	if _, err := w.ExecContext(ctx, `CREATE TABLE t(v INTEGER)`); err != nil {

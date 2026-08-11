@@ -96,12 +96,11 @@ func TestResolveWriterURL(t *testing.T) {
 
 func TestToHTTPHeader(t *testing.T) {
 	cases := map[string]string{
-		"user_id":   "User-Id",
-		"org_id":    "Org-Id",
-		"tenant_id": "Tenant-Id",
-		"x":         "X",
-		"":          "",
-		"a_b_c_d":   "A-B-C-D",
+		"user_id": "User-Id",
+		"org_id":  "Org-Id",
+		"x":       "X",
+		"":        "",
+		"a_b_c_d": "A-B-C-D",
 	}
 	for in, want := range cases {
 		if got := toHTTPHeader(in); got != want {
@@ -205,13 +204,13 @@ type fakeNet struct {
 	local bool
 }
 
-func (f *fakeNet) Enabled() bool                              { return true }
-func (f *fakeNet) Start(context.Context) error                { return nil }
-func (f *fakeNet) Stop(context.Context) error                 { return nil }
-func (f *fakeNet) InstallWALHook(any, string) error           { return nil }
-func (f *fakeNet) WriterFor(string) (string, bool)            { return f.owner, f.local }
-func (f *fakeNet) MembersFor(string) []string                 { return nil }
-func (f *fakeNet) Metrics() *network.Metrics                  { return nil }
+func (f *fakeNet) Enabled() bool                    { return true }
+func (f *fakeNet) Start(context.Context) error      { return nil }
+func (f *fakeNet) Stop(context.Context) error       { return nil }
+func (f *fakeNet) InstallWALHook(any, string) error { return nil }
+func (f *fakeNet) WriterFor(string) (string, bool)  { return f.owner, f.local }
+func (f *fakeNet) MembersFor(string) []string       { return nil }
+func (f *fakeNet) Metrics() *network.Metrics        { return nil }
 
 // TestWriteForwardReadPassthrough: GET requests always run local
 // even if WriterFor says remote.

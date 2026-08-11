@@ -4,7 +4,7 @@
 //
 // The Hanzo Gateway validates the IAM JWT upstream and re-emits exactly three
 // headers on the forwarded request. Services MUST NOT read any other variant
-// (no X-Hanzo-*, no X-IAM-*, no singular X-User-Role, no X-Tenant-Id alias):
+// (no X-Hanzo-*, no X-IAM-*, no singular X-User-Role, no X-Base-Id alias):
 //
 //	X-User-Id <- JWT "sub"
 //	X-Org-Id  <- JWT "owner"
@@ -178,8 +178,8 @@ var legacyIdentityHeaders = []string{
 	"X-User-Role",  // singular
 	"X-User-Roles", // plural — renamed to X-Roles
 	"X-User-Name",
-	"X-Tenant-Id",
-	"X-Tenant-ID",
+	"X-Base-Id",
+	"X-Base-ID",
 	"X-Org",
 	"X-Is-Admin",
 	// Pre-validation hints from older gateway flows.

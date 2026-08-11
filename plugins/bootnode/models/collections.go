@@ -10,7 +10,7 @@
 // CRUD). The plugin's HTTP handlers are the only write path; superusers retain
 // dashboard access.
 //
-// Tenancy: when the platform plugin runs with PrincipalIsolation="sqlite",
+// per-org isolation: when the platform plugin runs with PrincipalIsolation="sqlite",
 // these collections are resolved per-org automatically by the platform's
 // org-DB middleware. The OrgCluster collection is the canonical
 // org→k8s-cluster mapping that scopes fleet operations.

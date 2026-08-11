@@ -19,8 +19,8 @@ type LocalSyncProvider struct {
 	dir string
 
 	mu          sync.Mutex
-	ops         map[string][]Op           // vaultID → ops
-	subscribers map[string][]func([]Op)   // vaultID → callbacks
+	ops         map[string][]Op         // vaultID → ops
+	subscribers map[string][]func([]Op) // vaultID → callbacks
 }
 
 // NewLocalSyncProvider creates a sync provider backed by a directory.
@@ -200,4 +200,3 @@ var (
 	_ StorageProvider  = (*LocalStorageProvider)(nil)
 	_ RecoveryProvider = (*LocalRecoveryProvider)(nil)
 )
-

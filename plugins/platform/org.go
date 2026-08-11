@@ -317,15 +317,15 @@ func (s *OrgService) nextCustomerId(orgId string) (string, error) {
 // customerRecordToMap converts a customer record to a plain map.
 func customerRecordToMap(record *core.Record) map[string]any {
 	return map[string]any{
-		"id":                  record.Id,
-		"org_id":              record.GetString("org_id"),
-		"user_id":             record.GetString("user_id"),
-		"customer_id":         record.GetString("customer_id"),
-		"status":              record.GetString("status"),
-		"display_name":        record.GetString("display_name"),
-		"broker_account_id":   record.GetString("broker_account_id"),
-		"commerce_customer_id":  record.GetString("commerce_customer_id"),
-		"mpc_vault_id":        record.GetString("mpc_vault_id"),
-		"metadata":            record.Get("metadata"),
+		"id":                   record.Id,
+		"org_id":               record.GetString("org_id"),
+		"user_id":              record.GetString("user_id"),
+		"customer_id":          record.GetString("customer_id"),
+		"status":               record.GetString("status"),
+		"display_name":         record.GetString("display_name"),
+		"broker_account_id":    record.GetString("broker_account_id"),
+		"commerce_customer_id": record.GetString("commerce_customer_id"),
+		"mpc_vault_id":         record.GetString("mpc_vault_id"),
+		"metadata":             record.Get("metadata"),
 	}
 }

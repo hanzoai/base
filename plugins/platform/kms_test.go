@@ -9,8 +9,8 @@ import (
 
 // fakeSecrets is a KMS stand-in that records the exact coordinate every call
 // asks for. The coordinate is the whole point of these tests: the KMS store
-// shards its tenant boundary on the "orgs/{org}" segment of the PATH, so a
-// bridge that drops the org writes every tenant's material into one shared
+// shards its base boundary on the "orgs/{org}" segment of the PATH, so a
+// bridge that drops the org writes every base's material into one shared
 // deployment-wide record.
 type fakeSecrets struct {
 	mu     sync.Mutex
@@ -85,9 +85,9 @@ func TestKMSRefFoldsOrgIntoPath(t *testing.T) {
 	}
 }
 
-// TestKMSSecretsAreTenantScoped is the regression guard. Two orgs storing the
+// TestKMSSecretsAreOrgScoped is the regression guard. Two orgs storing the
 // same logical secret must never collide on one KMS record.
-func TestKMSSecretsAreTenantScoped(t *testing.T) {
+func TestKMSSecretsAreOrgScoped(t *testing.T) {
 	f := withFakeKMS(t)
 	c := mustKMS(t, "kms.test:9999")
 

@@ -25,11 +25,11 @@ func (s *StaticWriter) RedirectTarget(string) string { return s.Target }
 
 // WriterProvider abstracts writer-pin strategies.
 //
-// Both methods take the ownership KEY, because ownership is per tenant, not per
+// Both methods take the ownership KEY, because ownership is per base, not per
 // process: store.Key.String() ("org/apps/a/projects/p") names one SQLite file,
 // and SQLite's single-writer constraint is per FILE. A process-wide writer would
-// pin every tenant's writes to one node — correct, and a bottleneck that grows
-// with tenant count.
+// pin every base's writes to one node — correct, and a bottleneck that grows
+// with base count.
 type WriterProvider interface {
 	IsWriter(key string) bool
 	RedirectTarget(key string) string
@@ -47,13 +47,13 @@ type WriterProvider interface {
 //
 // It previously ranked the live set by NodeID and pinned the lowest-sorted as the
 // writer for EVERYTHING. That is correct for SQLite and wrong for a fleet: every
-// tenant's writes land on one node, and a rolling restart hands the whole write
+// base's writes land on one node, and a rolling restart hands the whole write
 // load to whoever sorts first next. HRW spreads ownership and moves only the keys
-// a departing node owned, so losing one of N relocates 1/N of the tenants.
+// a departing node owned, so losing one of N relocates 1/N of the bases.
 //
 // WHAT THIS DOES NOT YET DO. Heartbeat liveness cannot make a deposed or
 // partitioned owner STOP writing, so two nodes with different views of the live
-// set can each believe they own a key. store/multitenant.go documents that window
+// set can each believe they own a key. store/per-org.go documents that window
 // honestly ("during an HPA rebalance a (short) single-writer window may overlap
 // across pods; ops MUST drain before scaling"). Closing it needs ha.Leases: the
 // owner stamps a monotone Round onto each write and the store refuses any round
@@ -150,10 +150,10 @@ func (w *QuasarWriter) members() []ha.Member {
 // writerID names the owner of key by Rendezvous (HRW) weight over the live set.
 //
 // It replaced `sort.Strings(alive); return alive[0]`, which made the
-// lowest-sorted node the writer for EVERY tenant — one hotspot, and a rolling
+// lowest-sorted node the writer for EVERY base — one hotspot, and a rolling
 // restart that hands the whole write load to whichever node sorts first next.
 // HRW spreads ownership across the set and moves only the keys a departing node
-// owned, so losing one node relocates 1/N of the tenants instead of all of them.
+// owned, so losing one node relocates 1/N of the bases instead of all of them.
 //
 // Deterministic and order-independent, so every node reaches the same answer
 // from the same membership without asking anyone.
@@ -190,7 +190,7 @@ func (w *QuasarWriter) loop() {
 
 			// Liveness only. There is no longer ONE writer to cache: ownership is
 			// per key, so RedirectTarget(key) computes it from the live set on
-			// demand. Caching a single target here is what made every tenant's
+			// demand. Caching a single target here is what made every base's
 			// writes land on one node.
 			//
 			// MEMBERSHIP is what to log now, and it is the more useful signal: it

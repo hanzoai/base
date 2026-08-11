@@ -21,10 +21,10 @@ const (
 
 // ZAP field offsets (matching orm/db/zap.go protocol).
 const (
-	fieldPath   = 4  // Text: request path
-	fieldBody   = 12 // Bytes: JSON body
-	respStatus  = 0  // Uint32: HTTP-style status
-	respBody    = 4  // Bytes: response JSON
+	fieldPath  = 4  // Text: request path
+	fieldBody  = 12 // Bytes: JSON body
+	respStatus = 0  // Uint32: HTTP-style status
+	respBody   = 4  // Bytes: response JSON
 )
 
 // handler wraps a Base app to handle ZAP messages.

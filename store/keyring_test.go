@@ -27,8 +27,8 @@ func localFS(t *testing.T) *filesystem.System {
 	return fs
 }
 
-// ageSeal/ageOpen exercise a TenantKey at the exact at-rest boundary (luxfi/age).
-func ageSeal(t *testing.T, tk *store.TenantKey, msg []byte) []byte {
+// ageSeal/ageOpen exercise a OrgKey at the exact at-rest boundary (luxfi/age).
+func ageSeal(t *testing.T, tk *store.OrgKey, msg []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
 	w, err := age.Encrypt(&buf, tk.Recipient)
@@ -44,7 +44,7 @@ func ageSeal(t *testing.T, tk *store.TenantKey, msg []byte) []byte {
 	return buf.Bytes()
 }
 
-func ageOpen(tk *store.TenantKey, ct []byte) ([]byte, error) {
+func ageOpen(tk *store.OrgKey, ct []byte) ([]byte, error) {
 	r, err := age.Decrypt(bytes.NewReader(ct), tk.Identity)
 	if err != nil {
 		return nil, err
@@ -96,7 +96,7 @@ func TestKeyring_CrossOrgDecryptFails(t *testing.T) {
 	}
 }
 
-// PROOF 2: within one org, every scope/tenant gets an independent key and no
+// PROOF 2: within one org, every scope/base gets an independent key and no
 // ciphertext is cross-decryptable.
 func TestKeyring_SameOrgTenantsIsolated(t *testing.T) {
 	fs := localFS(t)
@@ -113,7 +113,7 @@ func TestKeyring_SameOrgTenantsIsolated(t *testing.T) {
 		{OrgID: "acme", App: "fleet", Scope: store.ScopeApp},
 		{OrgID: "acme", App: "fleet", Project: "east", Scope: store.ScopeProject},
 	}
-	tks := make([]*store.TenantKey, len(keys))
+	tks := make([]*store.OrgKey, len(keys))
 	for i, k := range keys {
 		tk, err := kr.Resolve(ctx, k)
 		if err != nil {
@@ -128,7 +128,7 @@ func TestKeyring_SameOrgTenantsIsolated(t *testing.T) {
 			_, err := ageOpen(tks[j], ct)
 			switch {
 			case i == j && err != nil:
-				t.Fatalf("tenant %s failed to self-decrypt: %v", keys[i], err)
+				t.Fatalf("base %s failed to self-decrypt: %v", keys[i], err)
 			case i != j && err == nil:
 				t.Fatalf("ISOLATION BREACH: %s decrypted %s ciphertext", keys[j], keys[i])
 			}
@@ -168,7 +168,7 @@ func TestKeyring_TamperedSidecarRejected(t *testing.T) {
 }
 
 // PROOF 4: a wrapped-key sidecar is bound to its exact objectKey (AAD), so it
-// cannot be relocated onto another tenant's slot.
+// cannot be relocated onto another base's slot.
 func TestKeyring_SidecarNotPortableAcrossTenants(t *testing.T) {
 	fs := localFS(t)
 	root := newMemRoot()
@@ -271,7 +271,7 @@ func TestKeyring_RotateKEK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Simulate the on-disk DB ciphertext (encrypted to the tenant identity).
+	// Simulate the on-disk DB ciphertext (encrypted to the base identity).
 	dbCiphertext := ageSeal(t, tk, []byte("stable DB bytes — never rewritten"))
 	sidecarBefore := sidecarBytes(t, fs, k.ObjectKey()+sidecarSuffix)
 
@@ -333,7 +333,7 @@ func TestKeyring_CiphertextHidesPlaintext(t *testing.T) {
 func TestNew_RequiresKeys(t *testing.T) {
 	fs := localFS(t)
 	if _, err := store.New(store.Options{ObjectStore: fs, CacheRoot: t.TempDir()}); err == nil {
-		t.Fatal("store.New must require Keys (per-tenant encryption is mandatory)")
+		t.Fatal("store.New must require Keys (per-base encryption is mandatory)")
 	}
 }
 

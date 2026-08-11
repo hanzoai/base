@@ -18,7 +18,7 @@ func TestStripsEveryGatewayIdentityHeader(t *testing.T) {
 		"X-User-Permissions", "X-User-Email", "X-Phone-Number",
 		"X-User-IsAdmin", "X-User-IsGlobalAdmin", "X-Project-Id",
 		"X-Billing-Account-Id", "X-User-Role", "X-User-Roles",
-		"X-User-Name", "X-Tenant-Id", "X-Tenant-ID", "X-Org",
+		"X-User-Name", "X-Base-Id", "X-Base-ID", "X-Org",
 	}
 
 	h := http.Header{}

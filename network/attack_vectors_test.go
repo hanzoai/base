@@ -408,8 +408,8 @@ func TestAttack_QuasarFloodDOS(t *testing.T) {
 		// Acceptable — either the engine absorbed all, or returned err
 		// on overflow. Both are bounded liveness.
 	case <-time.After(3 * time.Second):
-		t.Fatalf("flood of 2048 frames blocked submitLocal past 3 s — "+
-			"unbounded blocking on engine channel. At 100k shards this is "+
+		t.Fatalf("flood of 2048 frames blocked submitLocal past 3 s — " +
+			"unbounded blocking on engine channel. At 100k shards this is " +
 			"a fleetwide DOS via any one shard.")
 	}
 }
@@ -512,8 +512,8 @@ func TestAttack_ArchiveSegmentForgery(t *testing.T) {
 			return
 		}
 		if f.Seq == 5000 && string(f.Payload) == "INJECTED-PITR-ROWS" {
-			t.Fatalf("EXPLOIT: forged segment accepted during PITR; "+
-				"attacker payload replayed as if quasar-finalised. "+
+			t.Fatalf("EXPLOIT: forged segment accepted during PITR; " +
+				"attacker payload replayed as if quasar-finalised. " +
 				"Signature verification absent or trust set too wide.")
 		}
 	}
@@ -672,10 +672,10 @@ func TestAttack_ArchiveBucketPermissionLeak(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 // TestAttack_ShardKeySpoofingViaHeader — client sets X-User-Id to another
-// tenant.
+// base.
 //
 // Threat: gateway config `shard_key_source: header:X-User-Id` lets the
-// client choose their shard. In dev this is fine; in prod it's tenant
+// client choose their shard. In dev this is fine; in prod it's base
 // bypass.
 // Invariant: production configs MUST NOT use `header:*` as shard key
 // source; the only safe source is `jwt.sub` or `jwt.org_id` (cryptographic
@@ -735,12 +735,12 @@ func TestAttack_OwnerConsistencyAcrossPods(t *testing.T) {
 // TestAttack_EmptyShardKey — Config.ShardKey validation.
 //
 // Threat: production deploy with BASE_SHARD_KEY unset; every request
-// lands on shard "" which collapses every tenant into one engine.
+// lands on shard "" which collapses every base into one engine.
 // Invariant: Config.validate() rejects empty ShardKey when Enabled.
 func TestAttack_EmptyShardKey(t *testing.T) {
 	cfg := Config{Enabled: true, Replication: 1, NodeID: "a"}
 	if err := cfg.validate(); err == nil {
-		t.Fatalf("empty ShardKey with Enabled=true accepted. Every tenant "+
+		t.Fatalf("empty ShardKey with Enabled=true accepted. Every base " +
 			"collapses into one engine → no isolation.")
 	}
 }
@@ -863,7 +863,7 @@ func TestAttack_UnboundedShardBacklog(t *testing.T) {
 		t.Fatalf("backlog segments %d > 2x cap %d", backlogLen, cfg.BacklogMaxSegments)
 	}
 	if drops.Load() == 0 {
-		t.Fatalf("4000 appends against failing uploader produced 0 drops; "+
+		t.Fatalf("4000 appends against failing uploader produced 0 drops; " +
 			"either the cap is absent or IncDrops wiring is missing.")
 	}
 }
@@ -897,20 +897,20 @@ func TestAttack_ApplyLoopStarvation(t *testing.T) {
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatalf("quiet shard starved: its 1 frame did not finalise while "+
+	t.Fatalf("quiet shard starved: its 1 frame did not finalise while " +
 		"noisy shard's 500 were in flight. Per-shard apply isolation broken.")
 }
 
 // TestAttack_ManySmallShards — O(shards) engine memory.
 //
-// Threat: a tenant creates thousands of shards (e.g. per-user when the
+// Threat: a base creates thousands of shards (e.g. per-user when the
 // shard key is too fine-grained); each allocates a Quasar engine with a
 // 1024-cap channel.
-// Invariant: shard creation is bounded by tenant-scoped limits; runaway
+// Invariant: shard creation is bounded by base-scoped limits; runaway
 // creation does not OOM the pod.
 // Today: no cap exists. This is the pre-scale debt flagged in the review.
 func TestAttack_ManySmallShards(t *testing.T) {
-	// The fix is a per-tenant shard-count cap; no such cap is in the code
+	// The fix is a per-base shard-count cap; no such cap is in the code
 	// today. Marker only.
 	t.Skip(blockedReason)
 }
@@ -1074,7 +1074,7 @@ func TestAttack_FeatureGateEscape(t *testing.T) {
 	t.Setenv("BASE_SHARD_KEY", "user_id")
 	t.Setenv("HOSTNAME", "a")
 	if _, err := FromEnv(); err == nil {
-		t.Fatalf("unknown BASE_NETWORK=paxos-v99 accepted; fail-open on "+
+		t.Fatalf("unknown BASE_NETWORK=paxos-v99 accepted; fail-open on " +
 			"feature gate is a silent-regression vector.")
 	}
 }
@@ -1154,7 +1154,7 @@ func TestAttack_NetworkPartition(t *testing.T) {
 	// schedule it later — but if we still see > start+2 after 500 ms,
 	// the apply loop is spinning.
 	if runtime.NumGoroutine() > start+2 {
-		t.Fatalf("applyLoop goroutine did not exit after shard.close(); "+
+		t.Fatalf("applyLoop goroutine did not exit after shard.close(); " +
 			"partition = goroutine leak + CPU burn.")
 	}
 }
@@ -1174,7 +1174,7 @@ func TestAttack_ClockSkew(t *testing.T) {
 	future.Timestamp = time.Now().Add(time.Hour).UnixNano()
 
 	if past.ApplyKey() == future.ApplyKey() {
-		t.Fatalf("independent frames share ApplyKey; dedupe would collide "+
+		t.Fatalf("independent frames share ApplyKey; dedupe would collide " +
 			"even across clock-skewed submissions")
 	}
 	// Both must pass Valid().
@@ -1217,7 +1217,7 @@ func TestAttack_SegmentCRCWithBadSig(t *testing.T) {
 
 	_, derr := decodeSegment(enc, verifier)
 	if derr == nil {
-		t.Fatalf("EXPLOIT: CRC-valid + signature-corrupt segment accepted. "+
+		t.Fatalf("EXPLOIT: CRC-valid + signature-corrupt segment accepted. " +
 			"Signature verification is skipped when CRC matches.")
 	}
 }
@@ -1235,7 +1235,7 @@ func TestAttack_SegmentV1Downgrade(t *testing.T) {
 	buf = append(buf, []byte("LBN1")...)
 	buf = append(buf, 0x00, 0x01) // shard len = 1
 	buf = append(buf, 's')
-	buf = append(buf, make([]byte, 8)...)  // startSeq = 0
+	buf = append(buf, make([]byte, 8)...)     // startSeq = 0
 	buf = append(buf, 0x00, 0x00, 0x00, 0x00) // frame count = 0
 	crc := crc32.ChecksumIEEE(buf)
 	cb := make([]byte, 4)
@@ -1247,7 +1247,7 @@ func TestAttack_SegmentV1Downgrade(t *testing.T) {
 	_, verifier := testSignerPair(t)
 	_, err := decodeSegment(buf, verifier)
 	if err == nil {
-		t.Fatalf("LBN1 (unauthenticated legacy) accepted by LBN2 reader; "+
+		t.Fatalf("LBN1 (unauthenticated legacy) accepted by LBN2 reader; " +
 			"downgrade attack succeeds.")
 	}
 }
@@ -1265,7 +1265,7 @@ func TestAttack_NilVerifier(t *testing.T) {
 		t.Fatalf("encode: %v", err)
 	}
 	if _, derr := decodeSegment(enc, nil); derr == nil {
-		t.Fatalf("EXPLOIT: nil verifier accepted a segment. Must fail "+
+		t.Fatalf("EXPLOIT: nil verifier accepted a segment. Must fail " +
 			"closed with ErrSegmentUnsigned.")
 	}
 }
@@ -1273,7 +1273,7 @@ func TestAttack_NilVerifier(t *testing.T) {
 // TestAttack_P2PPortBindLocalOnly — accidental 0.0.0.0 exposure.
 //
 // Threat: the default ListenP2P is `:9999`, which binds every interface;
-// on a multi-tenant node this is a lateral-movement surface.
+// on a per-org node this is a lateral-movement surface.
 // Invariant: production must bind to the pod IP only. Config default is a
 // CI lint.
 func TestAttack_P2PPortBindLocalOnly(t *testing.T) {
@@ -1303,7 +1303,7 @@ func TestAttack_FrameSeqZero(t *testing.T) {
 		t.Fatalf("buildFrame: %v", err)
 	}
 	if f.Seq == 0 {
-		t.Fatalf("first frame has Seq=0; collides with txseq=0 sentinel. "+
+		t.Fatalf("first frame has Seq=0; collides with txseq=0 sentinel. " +
 			"First Seq MUST be 1.")
 	}
 }

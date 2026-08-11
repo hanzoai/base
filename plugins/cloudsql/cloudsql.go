@@ -1,12 +1,12 @@
 // Package cloudsql implements Hanzo Cloud SQL — a serverless PostgreSQL
-// integration plugin for Hanzo Base. It manages per-tenant database
+// integration plugin for Hanzo Base. It manages per-base database
 // provisioning, connection routing, and proxies schema management requests
 // to postgres-meta.
 //
-// Hanzo Cloud SQL is the scalable, multi-tenant PostgreSQL layer backed by
+// Hanzo Cloud SQL is the scalable, per-org PostgreSQL layer backed by
 // Neon's open-source storage/compute separation. "Hanzo SQL" (sql.hanzo.svc)
 // is the shared single-instance PostgreSQL; "Hanzo Cloud SQL" is the
-// auto-scaling, per-tenant serverless variant.
+// auto-scaling, per-base serverless variant.
 //
 // Example:
 //
@@ -89,11 +89,11 @@ func Register(app core.App, config Config) error {
 	}
 
 	p := &plugin{
-		app:    app,
-		config: config,
+		app:       app,
+		config:    config,
 		metaProxy: httputil.NewSingleHostReverseProxy(metaURL),
-		tenantDB: &tenantDBMap{
-			databases: make(map[string]*TenantDatabase),
+		orgDB: &orgDBMap{
+			databases: make(map[string]*OrgDatabase),
 		},
 	}
 
@@ -122,12 +122,12 @@ type plugin struct {
 	app       core.App
 	config    Config
 	metaProxy *httputil.ReverseProxy
-	tenantDB  *tenantDBMap
+	orgDB     *orgDBMap
 }
 
-// TenantDatabase holds Cloud SQL database info for a tenant.
-type TenantDatabase struct {
-	TenantID     string `json:"tenantId"`
+// OrgDatabase holds Cloud SQL database info for a base.
+type OrgDatabase struct {
+	OrgID        string `json:"orgId"`
 	DatabaseName string `json:"databaseName"`
 	Host         string `json:"host"`
 	Port         int    `json:"port"`
@@ -137,7 +137,7 @@ type TenantDatabase struct {
 }
 
 // ConnectionString returns a PostgreSQL connection string.
-func (t *TenantDatabase) ConnectionString() string {
+func (t *OrgDatabase) ConnectionString() string {
 	sslMode := t.SSLMode
 	if sslMode == "" {
 		sslMode = "require"
@@ -146,28 +146,28 @@ func (t *TenantDatabase) ConnectionString() string {
 		t.User, t.Password, t.Host, t.Port, t.DatabaseName, sslMode)
 }
 
-type tenantDBMap struct {
+type orgDBMap struct {
 	mu        sync.RWMutex
-	databases map[string]*TenantDatabase
+	databases map[string]*OrgDatabase
 }
 
-func (m *tenantDBMap) Get(tenantID string) (*TenantDatabase, bool) {
+func (m *orgDBMap) Get(orgID string) (*OrgDatabase, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	db, ok := m.databases[tenantID]
+	db, ok := m.databases[orgID]
 	return db, ok
 }
 
-func (m *tenantDBMap) Set(tenantID string, db *TenantDatabase) {
+func (m *orgDBMap) Set(orgID string, db *OrgDatabase) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.databases[tenantID] = db
+	m.databases[orgID] = db
 }
 
-func (m *tenantDBMap) Delete(tenantID string) {
+func (m *orgDBMap) Delete(orgID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	delete(m.databases, tenantID)
+	delete(m.databases, orgID)
 }
 
 // --------------------------------------------------------------------------
@@ -185,7 +185,7 @@ func (p *plugin) ensureCollections() error {
 	c := core.NewBaseCollection(collectionCloudSQLDBs)
 	c.System = true
 	c.Fields.Add(
-		&core.TextField{Name: "tenantId", Required: true},
+		&core.TextField{Name: "orgId", Required: true},
 		&core.TextField{Name: "databaseName", Required: true},
 		&core.TextField{Name: "host", Required: true},
 		&core.NumberField{Name: "port", Required: true},
@@ -244,25 +244,25 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	}
 
 	var body struct {
-		TenantID     string `json:"tenantId"`
+		OrgID        string `json:"orgId"`
 		DatabaseName string `json:"databaseName"`
 	}
 	if err := e.BindBody(&body); err != nil {
 		return e.BadRequestError("invalid request body", err)
 	}
-	if body.TenantID == "" || body.DatabaseName == "" {
-		return e.BadRequestError("tenantId and databaseName are required", nil)
+	if body.OrgID == "" || body.DatabaseName == "" {
+		return e.BadRequestError("orgId and databaseName are required", nil)
 	}
 
-	existing, _ := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "tenantId", body.TenantID)
+	existing, _ := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", body.OrgID)
 	if existing != nil {
-		return e.BadRequestError("tenant already has a database", nil)
+		return e.BadRequestError("base already has a database", nil)
 	}
 
 	dbName := "t_" + sanitizeDBName(body.DatabaseName)
 	if err := p.createDatabase(dbName); err != nil {
 		p.app.Logger().Error("failed to create Cloud SQL database",
-			"tenantId", body.TenantID,
+			"orgId", body.OrgID,
 			"error", err.Error(),
 		)
 		return e.InternalServerError("failed to provision database", err)
@@ -274,7 +274,7 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	}
 
 	record := core.NewRecord(col)
-	record.Set("tenantId", body.TenantID)
+	record.Set("orgId", body.OrgID)
 	record.Set("databaseName", dbName)
 	record.Set("host", p.config.ComputeHost)
 	record.Set("port", p.config.ComputePort)
@@ -287,8 +287,8 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 		return e.InternalServerError("failed to save database record", err)
 	}
 
-	tdb := &TenantDatabase{
-		TenantID:     body.TenantID,
+	tdb := &OrgDatabase{
+		OrgID:        body.OrgID,
 		DatabaseName: dbName,
 		Host:         p.config.ComputeHost,
 		Port:         p.config.ComputePort,
@@ -296,11 +296,11 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 		Password:     p.config.DefaultPGPass,
 		SSLMode:      "disable",
 	}
-	p.tenantDB.Set(body.TenantID, tdb)
+	p.orgDB.Set(body.OrgID, tdb)
 
 	return e.JSON(http.StatusCreated, map[string]any{
 		"id":               record.Id,
-		"tenantId":         body.TenantID,
+		"orgId":            body.OrgID,
 		"databaseName":     dbName,
 		"host":             p.config.ProxyHost,
 		"port":             p.config.ProxyPort,
@@ -319,7 +319,7 @@ func (p *plugin) handleListDatabases(e *core.RequestEvent) error {
 	for _, r := range records {
 		result = append(result, map[string]any{
 			"id":           r.Id,
-			"tenantId":     r.GetString("tenantId"),
+			"orgId":        r.GetString("orgId"),
 			"databaseName": r.GetString("databaseName"),
 			"host":         r.GetString("host"),
 			"port":         r.Get("port"),
@@ -337,7 +337,7 @@ func (p *plugin) handleGetDatabase(e *core.RequestEvent) error {
 	}
 	return e.JSON(http.StatusOK, map[string]any{
 		"id":           record.Id,
-		"tenantId":     record.GetString("tenantId"),
+		"orgId":        record.GetString("orgId"),
 		"databaseName": record.GetString("databaseName"),
 		"host":         record.GetString("host"),
 		"port":         record.Get("port"),
@@ -353,7 +353,7 @@ func (p *plugin) handleDeleteDatabase(e *core.RequestEvent) error {
 	}
 
 	dbName := record.GetString("databaseName")
-	tenantID := record.GetString("tenantId")
+	orgID := record.GetString("orgId")
 
 	if err := p.dropDatabase(dbName); err != nil {
 		p.app.Logger().Warn("failed to drop Cloud SQL database",
@@ -366,7 +366,7 @@ func (p *plugin) handleDeleteDatabase(e *core.RequestEvent) error {
 		return e.InternalServerError("failed to delete database record", err)
 	}
 
-	p.tenantDB.Delete(tenantID)
+	p.orgDB.Delete(orgID)
 	return e.JSON(http.StatusOK, map[string]bool{"deleted": true})
 }
 
@@ -377,8 +377,8 @@ func (p *plugin) handleGetConnection(e *core.RequestEvent) error {
 		return e.NotFoundError("database not found", err)
 	}
 
-	tdb := &TenantDatabase{
-		TenantID:     record.GetString("tenantId"),
+	tdb := &OrgDatabase{
+		OrgID:        record.GetString("orgId"),
 		DatabaseName: record.GetString("databaseName"),
 		Host:         record.GetString("host"),
 		Port:         int(record.GetFloat("port")),
@@ -438,21 +438,21 @@ func (p *plugin) handleListBranches(e *core.RequestEvent) error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) handleMetaProxy(e *core.RequestEvent) error {
-	// Canonical 3 identity contract: per-tenant routing uses X-Org-Id (the
+	// Canonical 3 identity contract: per-base routing uses X-Org-Id (the
 	// JWT "owner" claim), injected by the gateway after JWKS validation.
-	// The legacy X-Tenant-ID header is no longer read here.
-	tenantID := e.Request.Header.Get("X-Org-Id")
+	// The legacy X-Base-ID header is no longer read here.
+	orgID := e.Request.Header.Get("X-Org-Id")
 
 	var connStr string
-	if tenantID != "" {
-		tdb, ok := p.tenantDB.Get(tenantID)
+	if orgID != "" {
+		tdb, ok := p.orgDB.Get(orgID)
 		if !ok {
-			record, err := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "tenantId", tenantID)
+			record, err := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", orgID)
 			if err != nil {
-				return e.NotFoundError("no database found for tenant", err)
+				return e.NotFoundError("no database found for base", err)
 			}
-			tdb = &TenantDatabase{
-				TenantID:     tenantID,
+			tdb = &OrgDatabase{
+				OrgID:        orgID,
 				DatabaseName: record.GetString("databaseName"),
 				Host:         record.GetString("host"),
 				Port:         int(record.GetFloat("port")),
@@ -460,7 +460,7 @@ func (p *plugin) handleMetaProxy(e *core.RequestEvent) error {
 				Password:     record.GetString("pgPassword"),
 				SSLMode:      record.GetString("sslMode"),
 			}
-			p.tenantDB.Set(tenantID, tdb)
+			p.orgDB.Set(orgID, tdb)
 		}
 		connStr = tdb.ConnectionString()
 	} else {
