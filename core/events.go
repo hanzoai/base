@@ -163,12 +163,6 @@ type MailerEvent struct {
 	Message *mailer.Message
 }
 
-type MailerRecordEvent struct {
-	MailerEvent
-	baseRecordEventData
-	Meta map[string]any
-}
-
 // -------------------------------------------------------------------
 // Model events data
 // -------------------------------------------------------------------

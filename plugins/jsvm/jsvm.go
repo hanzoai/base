@@ -208,7 +208,6 @@ func (p *plugin) registerMigrations() error {
 		httpClientBinds(vm)
 		filesystemBinds(vm)
 		formsBinds(vm)
-		mailsBinds(vm)
 
 		vm.Set("$template", templateRegistry)
 		vm.Set("__hooks", absHooksDir)
@@ -297,7 +296,6 @@ func (p *plugin) registerHooks() error {
 		httpClientBinds(vm)
 		formsBinds(vm)
 		apisBinds(vm)
-		mailsBinds(vm)
 
 		vm.Set("$app", p.app)
 		vm.Set("$template", templateRegistry)

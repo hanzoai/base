@@ -165,8 +165,6 @@ type BaseApp struct {
 
 	// mailer event hooks
 	onMailerSend                   *hook.Hook[*MailerEvent]
-	onMailerRecordVerificationSend *hook.Hook[*MailerRecordEvent]
-	onMailerRecordEmailChangeSend  *hook.Hook[*MailerRecordEvent]
 
 	// realtime api event hooks
 	onRealtimeConnectRequest   *hook.Hook[*RealtimeConnectRequestEvent]
@@ -348,8 +346,6 @@ func (app *BaseApp) initHooks() {
 
 	// mailer event hooks
 	app.onMailerSend = &hook.Hook[*MailerEvent]{}
-	app.onMailerRecordVerificationSend = &hook.Hook[*MailerRecordEvent]{}
-	app.onMailerRecordEmailChangeSend = &hook.Hook[*MailerRecordEvent]{}
 
 	// realtime API event hooks
 	app.onRealtimeConnectRequest = &hook.Hook[*RealtimeConnectRequestEvent]{}
@@ -1111,14 +1107,6 @@ func (app *BaseApp) OnCollectionAfterDeleteError(tags ...string) *hook.TaggedHoo
 
 func (app *BaseApp) OnMailerSend() *hook.Hook[*MailerEvent] {
 	return app.onMailerSend
-}
-
-func (app *BaseApp) OnMailerRecordVerificationSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
-	return hook.NewTaggedHook(app.onMailerRecordVerificationSend, tags...)
-}
-
-func (app *BaseApp) OnMailerRecordEmailChangeSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent] {
-	return hook.NewTaggedHook(app.onMailerRecordEmailChangeSend, tags...)
 }
 
 // -------------------------------------------------------------------

@@ -6,7 +6,6 @@ const navItems = [
     { to: '/settings/smtp', label: 'SMTP' },
     { to: '/settings/backups', label: 'Backups' },
     { to: '/settings/auth', label: 'Auth providers' },
-    { to: '/settings/mail', label: 'Mail templates' },
     { to: '/settings/tokens', label: 'Token options' },
     { to: '/settings/data', label: 'Import / Export' },
     { to: '/settings/superusers', label: 'Superusers' },

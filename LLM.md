@@ -342,6 +342,27 @@ Store keys: `StoreKeyExternalAuthOnly` (always true once platform
 registers), `StoreKeyJWKSURL` (external mode), `StoreKeyAuthUsersCollection`
 (default `"users"`).
 
+## Base sends no auth mail
+
+There is no verification or email-change mail, no template for either on a
+collection, and no `mails` package. The endpoints those mails pointed at were
+deleted in the IAM-native rip — `bindRecordAuthApi` keeps `auth-methods` and
+`auth-refresh` and nothing else — so the templates described flows that answer
+404 for every deployment, and their buttons addressed a route in an admin SPA
+that no longer exists.
+
+What went with them, because each existed only to serve those two mails:
+`core.EmailTemplate` and its two collection fields, the `$mails` JSVM namespace
+(whose type declarations advertised five helpers, three of which were removed in
+that same rip and never bound), the `OnMailerRecordVerificationSend` and
+`OnMailerRecordEmailChangeSend` hooks — which nothing could fire — and
+`core.MailerRecordEvent`.
+
+Sending mail is untouched: `$app.newMailClient().send()` is the general sender an
+app's own hook uses, SMTP settings stay, and `POST /v1/settings/test/email` still
+proves they work — it sends a plain message now rather than rendering a template
+for a flow that is gone, which is the question an operator actually has.
+
 ## Mount prefix (`BASE_API_PREFIX`)
 
 One knob for where the app's data plane lives. Default `/v1`. For

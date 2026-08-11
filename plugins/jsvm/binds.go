@@ -22,7 +22,6 @@ import (
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/forms"
-	"github.com/hanzoai/base/mails"
 	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/inflector"
@@ -674,14 +673,6 @@ func dbxBinds(vm *goja.Runtime) {
 	obj.Set("notExists", dbx.NotExists)
 	obj.Set("between", dbx.Between)
 	obj.Set("notBetween", dbx.NotBetween)
-}
-
-func mailsBinds(vm *goja.Runtime) {
-	obj := vm.NewObject()
-	vm.Set("$mails", obj)
-
-	obj.Set("sendRecordVerification", mails.SendRecordVerification)
-	obj.Set("sendRecordChangeEmail", mails.SendRecordChangeEmail)
 }
 
 func securityBinds(vm *goja.Runtime) {

@@ -509,22 +509,6 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 		Priority: -99999,
 	})
 
-	t.OnMailerRecordVerificationSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
-		Func: func(e *core.MailerRecordEvent) error {
-			t.registerEventCall("OnMailerRecordVerificationSend")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
-	t.OnMailerRecordEmailChangeSend().Bind(&hook.Handler[*core.MailerRecordEvent]{
-		Func: func(e *core.MailerRecordEvent) error {
-			t.registerEventCall("OnMailerRecordEmailChangeSend")
-			return e.Next()
-		},
-		Priority: -99999,
-	})
-
 	t.OnRealtimeConnectRequest().Bind(&hook.Handler[*core.RealtimeConnectRequestEvent]{
 		Func: func(e *core.RealtimeConnectRequestEvent) error {
 			t.registerEventCall("OnRealtimeConnectRequest")

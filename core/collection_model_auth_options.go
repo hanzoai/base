@@ -45,8 +45,6 @@ func (m *Collection) unsetMissingOAuth2MappedFields() {
 
 func (m *Collection) setDefaultAuthOptions() {
 	m.collectionAuthOptions = collectionAuthOptions{
-		VerificationTemplate:       defaultVerificationTemplate,
-		ConfirmEmailChangeTemplate: defaultConfirmEmailChangeTemplate,
 		AuthRule:                   types.Pointer(""),
 		AuthToken: TokenConfig{
 			Secret:   security.RandomString(50),
@@ -112,8 +110,6 @@ type collectionAuthOptions struct {
 
 	// Default email templates
 	// ---
-	VerificationTemplate       EmailTemplate `form:"verificationTemplate" json:"verificationTemplate"`
-	ConfirmEmailChangeTemplate EmailTemplate `form:"confirmEmailChangeTemplate" json:"confirmEmailChangeTemplate"`
 }
 
 func (o *collectionAuthOptions) validate(cv *collectionValidator) error {
@@ -134,8 +130,6 @@ func (o *collectionAuthOptions) validate(cv *collectionValidator) error {
 		validation.Field(&o.EmailChangeToken),
 		validation.Field(&o.VerificationToken),
 		validation.Field(&o.FileToken),
-		validation.Field(&o.VerificationTemplate, validation.Required),
-		validation.Field(&o.ConfirmEmailChangeTemplate, validation.Required),
 	)
 	if err != nil {
 		return err
