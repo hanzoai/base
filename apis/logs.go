@@ -23,7 +23,7 @@ var logFilterFields = []string{
 }
 
 func logsList(e *core.RequestEvent) error {
-	fieldResolver := search.NewSimpleFieldResolver(logFilterFields...)
+	fieldResolver := search.NewSimpleFieldResolver(e.App.Dialect(), logFilterFields...)
 
 	result, err := search.NewProvider(fieldResolver).
 		Query(e.App.AuxModelQuery(&core.Log{})).
@@ -37,7 +37,7 @@ func logsList(e *core.RequestEvent) error {
 }
 
 func logsStats(e *core.RequestEvent) error {
-	fieldResolver := search.NewSimpleFieldResolver(logFilterFields...)
+	fieldResolver := search.NewSimpleFieldResolver(e.App.Dialect(), logFilterFields...)
 
 	filter := e.Request.URL.Query().Get(search.FilterQueryParam)
 

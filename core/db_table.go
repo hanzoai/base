@@ -11,8 +11,10 @@ import (
 func (app *BaseApp) TableColumns(tableName string) ([]string, error) {
 	columns := []string{}
 
-	err := app.ConcurrentDB().NewQuery("SELECT name FROM PRAGMA_TABLE_INFO({:tableName})").
-		Bind(dbx.Params{"tableName": tableName}).
+	err := app.ConcurrentDB().Select("name").
+		From(app.Dialect().Columns()).
+		AndWhere(dbx.HashExp{"tbl_name": tableName}).
+		OrderBy("cid ASC").
 		Column(&columns)
 
 	return columns, err
@@ -30,20 +32,21 @@ type TableInfoRow struct {
 	DefaultValue sql.NullString `db:"dflt_value"`
 }
 
-// TableInfo returns the "table_info" pragma result for the specified table.
+// TableInfo returns the columns of the specified table, in declaration order.
 func (app *BaseApp) TableInfo(tableName string) ([]*TableInfoRow, error) {
 	info := []*TableInfoRow{}
 
-	err := app.ConcurrentDB().NewQuery("SELECT * FROM PRAGMA_TABLE_INFO({:tableName})").
-		Bind(dbx.Params{"tableName": tableName}).
+	err := app.ConcurrentDB().Select("cid", "name", "type", "notnull", "dflt_value", "pk").
+		From(app.Dialect().Columns()).
+		AndWhere(dbx.HashExp{"tbl_name": tableName}).
+		OrderBy("cid ASC").
 		All(&info)
 	if err != nil {
 		return nil, err
 	}
 
-	// SQLite doesn't throw an error on invalid or missing table (PRAGMA
-	// table_info returns an empty set), so we additionally have to check
-	// whether the loaded info result is nonempty
+	// A missing table is an empty result rather than an error, so the caller
+	// would otherwise read "no columns" as "a table with no columns".
 	if len(info) == 0 {
 		return nil, fmt.Errorf("empty table info probably due to invalid or missing table %s", tableName)
 	}
@@ -61,7 +64,7 @@ func (app *BaseApp) TableIndexes(tableName string) (map[string]string, error) {
 	}{}
 
 	err := app.ConcurrentDB().Select("name", "sql").
-		From("sqlite_master").
+		From(app.Dialect().Catalog()).
 		AndWhere(dbx.NewExp("sql is not null")).
 		AndWhere(dbx.HashExp{
 			"type":     "index",
@@ -112,7 +115,7 @@ func (app *BaseApp) hasTable(db dbx.Builder, tableName string) bool {
 	var exists int
 
 	err := db.Select("(1)").
-		From("sqlite_schema").
+		From(app.Dialect().Catalog()).
 		AndWhere(dbx.HashExp{"type": []any{"table", "view"}}).
 		AndWhere(dbx.NewExp("LOWER([[name]])=LOWER({:tableName})", dbx.Params{"tableName": tableName})).
 		Limit(1).

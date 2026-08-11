@@ -45,7 +45,7 @@ func (m *Collection) unsetMissingOAuth2MappedFields() {
 
 func (m *Collection) setDefaultAuthOptions() {
 	m.collectionAuthOptions = collectionAuthOptions{
-		AuthRule:                   types.Pointer(""),
+		AuthRule: types.Pointer(""),
 		AuthToken: TokenConfig{
 			Secret:   security.RandomString(50),
 			Duration: 604800, // 7 days

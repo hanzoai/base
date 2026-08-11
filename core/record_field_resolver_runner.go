@@ -340,7 +340,7 @@ func (r *runner) processRequestBodyEachModifier(bodyField Field) (*search.Resolv
 
 	placeholder := "dataEach" + security.PseudorandomString(8)
 	cleanFieldName := inflector.Columnify(bodyField.GetName())
-	jeTable := fmt.Sprintf("json_each({:%s})", placeholder)
+	jeTable := r.resolver.app.Dialect().Each("{:" + placeholder + "}")
 	jeAlias := "__dataEach_je_" + cleanFieldName + r.resolver.joinAliasSuffix
 
 	err = r.resolver.registerJoin(jeTable, jeAlias, nil)
@@ -350,7 +350,7 @@ func (r *runner) processRequestBodyEachModifier(bodyField Field) (*search.Resolv
 
 	result := &search.ResolverResult{
 		Identifier: fmt.Sprintf("[[%s.value]]", jeAlias),
-		Params:     dbx.Params{placeholder: bodyItemsRaw},
+		Params:     dbx.Params{placeholder: string(bodyItemsRaw)},
 	}
 
 	if multiValuer.IsMultiple() {
@@ -359,14 +359,14 @@ func (r *runner) processRequestBodyEachModifier(bodyField Field) (*search.Resolv
 
 	if r.withMultiMatch {
 		placeholder2 := "mm" + placeholder
-		jeTable2 := fmt.Sprintf("json_each({:%s})", placeholder2)
+		jeTable2 := r.resolver.app.Dialect().Each("{:" + placeholder2 + "}")
 		jeAlias2 := "__mm_" + jeAlias
 
 		r.multiMatch.Joins = append(r.multiMatch.Joins, &search.Join{
 			TableName:  jeTable2,
 			TableAlias: jeAlias2,
 		})
-		r.multiMatch.Params[placeholder2] = bodyItemsRaw
+		r.multiMatch.Params[placeholder2] = string(bodyItemsRaw)
 		r.multiMatch.ValueIdentifier = fmt.Sprintf("[[%s.value]]", jeAlias2)
 
 		result.MultiMatchSubQuery = r.multiMatch
@@ -478,11 +478,11 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 
 			result := &search.ResolverResult{
 				NullFallback: search.NullFallbackDisabled,
-				Identifier:   dbutils.JSONExtract(r.activeTableAlias+"."+inflector.Columnify(prop), jsonPathStr),
+				Identifier:   dbutils.JSONExtract(r.resolver.app.Dialect(), r.activeTableAlias+"."+inflector.Columnify(prop), jsonPathStr),
 			}
 
 			if r.withMultiMatch {
-				r.multiMatch.ValueIdentifier = dbutils.JSONExtract(r.multiMatchActiveTableAlias+"."+inflector.Columnify(prop), jsonPathStr)
+				r.multiMatch.ValueIdentifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.multiMatchActiveTableAlias+"."+inflector.Columnify(prop), jsonPathStr)
 				result.MultiMatchSubQuery = r.multiMatch
 			}
 
@@ -571,7 +571,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 						"[[%s.id]] IN (SELECT [[%s.value]] FROM %s {{%s}})",
 						r.activeTableAlias,
 						jeAlias,
-						dbutils.JSONEach(newTableAlias+"."+cleanBackFieldName),
+						dbutils.JSONEach(r.resolver.app.Dialect(), newTableAlias+"."+cleanBackFieldName),
 						jeAlias,
 					)),
 				)
@@ -617,7 +617,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 							"[[%s.id]] IN (SELECT [[%s.value]] FROM %s {{%s}})",
 							r.multiMatchActiveTableAlias,
 							jeAlias2,
-							dbutils.JSONEach(newTableAlias2+"."+cleanBackFieldName),
+							dbutils.JSONEach(r.resolver.app.Dialect(), newTableAlias2+"."+cleanBackFieldName),
 							jeAlias2,
 						)),
 					},
@@ -673,7 +673,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 		} else {
 			jeAlias := "__je_" + newTableAlias
 
-			err := r.resolver.registerJoin(dbutils.JSONEach(prefixedFieldName), jeAlias, nil)
+			err := r.resolver.registerJoin(dbutils.JSONEach(r.resolver.app.Dialect(), prefixedFieldName), jeAlias, nil)
 			if err != nil {
 				return nil, err
 			}
@@ -715,7 +715,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 			r.multiMatch.Joins = append(
 				r.multiMatch.Joins,
 				&search.Join{
-					TableName:  dbutils.JSONEach(prefixedFieldName2),
+					TableName:  dbutils.JSONEach(r.resolver.app.Dialect(), prefixedFieldName2),
 					TableAlias: jeAlias2,
 				},
 				&search.Join{
@@ -761,12 +761,12 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 		jePair := r.activeTableAlias + "." + cleanFieldName
 
 		result := &search.ResolverResult{
-			Identifier: dbutils.JSONArrayLength(jePair),
+			Identifier: dbutils.JSONArrayLength(r.resolver.app.Dialect(), jePair),
 		}
 
 		if r.withMultiMatch {
 			jePair2 := r.multiMatchActiveTableAlias + "." + cleanFieldName
-			r.multiMatch.ValueIdentifier = dbutils.JSONArrayLength(jePair2)
+			r.multiMatch.ValueIdentifier = dbutils.JSONArrayLength(r.resolver.app.Dialect(), jePair2)
 			result.MultiMatchSubQuery = r.multiMatch
 		}
 
@@ -779,7 +779,7 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 		jePair := r.activeTableAlias + "." + cleanFieldName
 		jeAlias := "__je_" + r.activeTableAlias + "_" + cleanFieldName + r.resolver.joinAliasSuffix
 
-		err := r.resolver.registerJoin(dbutils.JSONEach(jePair), jeAlias, nil)
+		err := r.resolver.registerJoin(dbutils.JSONEach(r.resolver.app.Dialect(), jePair), jeAlias, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -797,7 +797,7 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 			jeAlias2 := "__je_" + r.multiMatchActiveTableAlias + "_" + cleanFieldName + r.resolver.joinAliasSuffix
 
 			r.multiMatch.Joins = append(r.multiMatch.Joins, &search.Join{
-				TableName:  dbutils.JSONEach(jePair2),
+				TableName:  dbutils.JSONEach(r.resolver.app.Dialect(), jePair2),
 				TableAlias: jeAlias2,
 			})
 			r.multiMatch.ValueIdentifier = fmt.Sprintf("[[%s.value]]", jeAlias2)
@@ -835,9 +835,9 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 	// (https://github.com/hanzoai/base/issues/4068)
 	if field.Type() == FieldTypeJSON {
 		result.NullFallback = search.NullFallbackDisabled
-		result.Identifier = dbutils.JSONExtract(r.activeTableAlias+"."+cleanFieldName, "")
+		result.Identifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.activeTableAlias+"."+cleanFieldName, "")
 		if r.withMultiMatch {
-			r.multiMatch.ValueIdentifier = dbutils.JSONExtract(r.multiMatchActiveTableAlias+"."+cleanFieldName, "")
+			r.multiMatch.ValueIdentifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.multiMatchActiveTableAlias+"."+cleanFieldName, "")
 		}
 	}
 

@@ -311,7 +311,7 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 		}
 
 		args, _ := token.Meta.([]fexpr.Token)
-		return fn(func(argToken fexpr.Token) (*ResolverResult, error) {
+		return fn(fieldResolver.Dialect(), func(argToken fexpr.Token) (*ResolverResult, error) {
 			return resolveToken(argToken, fieldResolver)
 		}, args...)
 	}
@@ -327,14 +327,15 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 // with a seek while the COALESCE will induce a table scan.
 func resolveEqualExpr(equal bool, left, right *ResolverResult) query.Expression {
 	equalOp := "="
-	nullEqualOp := "IS"
+	nullEqualOp := "IS NOT DISTINCT FROM"
 	concatOp := "OR"
 	nullExpr := "IS NULL"
 	if !equal {
-		// always use `IS NOT` instead of `!=` because direct non-equal comparisons
-		// to nullable column values that are actually NULL yields to NULL instead of TRUE, eg.:
+		// always use the null-safe form instead of `!=` because a direct
+		// non-equal comparison to a column that is actually NULL yields NULL
+		// rather than TRUE, eg.:
 		// `'example' != nullableColumn` -> NULL even if nullableColumn row value is NULL
-		equalOp = "IS NOT"
+		equalOp = "IS DISTINCT FROM"
 		nullEqualOp = equalOp
 		concatOp = "AND"
 		nullExpr = "IS NOT NULL"
@@ -656,8 +657,10 @@ func (e *manyVsManyExpr) Build(db *query.DB, params query.Params) string {
 		return "0=1"
 	}
 
+	// the two operand subqueries are paired row by row rather than matched on
+	// anything of their own, and an outer join still has to state a condition
 	return fmt.Sprintf(
-		"NOT EXISTS (SELECT 1 FROM (%s) {{%s}} LEFT JOIN (%s) {{%s}} WHERE %s)",
+		"NOT EXISTS (SELECT 1 FROM (%s) {{%s}} LEFT JOIN (%s) {{%s}} ON 1=1 WHERE %s)",
 		e.left.MultiMatchSubQuery.Build(db, params),
 		lAlias,
 		e.right.MultiMatchSubQuery.Build(db, params),

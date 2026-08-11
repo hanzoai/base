@@ -13,6 +13,7 @@ import (
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/types"
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/dialect"
 	"github.com/spf13/cast"
 )
 
@@ -128,6 +129,11 @@ func NewRecordFieldResolver(
 
 // @todo think of a better a way how to call it automatically after BuildExpr
 //
+// Dialect implements [search.FieldResolver].
+func (r *RecordFieldResolver) Dialect() dialect.Dialect {
+	return r.app.Dialect()
+}
+
 // UpdateQuery implements `search.FieldResolver` interface.
 //
 // Conditionally updates the provided search query based on the
@@ -139,7 +145,7 @@ func (r *RecordFieldResolver) UpdateQuery(query *dbx.SelectQuery) error {
 		for _, join := range r.joins {
 			query.LeftJoin(
 				(join.TableName + " " + join.TableAlias),
-				join.On,
+				join.Condition(),
 			)
 		}
 	}
@@ -199,7 +205,7 @@ func (r *RecordFieldResolver) updateQueryWithCollectionListRule(c *Collection, t
 		for _, j := range cloneR.joins {
 			query.LeftJoin(
 				(j.TableName + " " + j.TableAlias),
-				j.On,
+				j.Condition(),
 			)
 		}
 	}

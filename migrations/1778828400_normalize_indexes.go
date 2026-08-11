@@ -29,12 +29,12 @@ func init() {
 			}{}
 
 			err := txApp.DB().Select("name", "sql").
-				From("sqlite_master").
+				From(txApp.Dialect().Catalog()).
 				AndWhere(dbx.HashExp{
 					"type":     "index",
 					"tbl_name": collection.Name,
 				}).
-				AndWhere(dbx.NewExp("sql IS NOT NULL AND name NOT LIKE 'sqlite_autoindex_%'")).
+				AndWhere(dbx.NewExp("sql IS NOT NULL")).
 				All(&masterIndexes)
 			if err != nil {
 				return err
@@ -68,11 +68,11 @@ func init() {
 
 		missingIndexesLoop:
 			for _, missing := range missingParsedIndexes {
-				missingSQL := missing.Build()
+				missingSQL := missing.Build(txApp.Dialect())
 
 				// it shouldn't be possible but for just in case if there is an edge case the regex doesn't cover
 				if missingSQL == "" {
-					return fmt.Errorf("failed to build sqlite_master index: %v", missing)
+					return fmt.Errorf("failed to build catalog index: %v", missing)
 				}
 
 				// drop the missing index to recreate later
@@ -95,7 +95,7 @@ func init() {
 					cParsed.IndexName = missing.IndexName
 					cParsed.SchemaName = missing.SchemaName
 					cParsed.TableName = missing.TableName
-					cSQL := cParsed.Build()
+					cSQL := cParsed.Build(txApp.Dialect())
 
 					if missingSQL == cSQL {
 						continue missingIndexesLoop

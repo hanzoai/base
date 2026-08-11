@@ -28,6 +28,12 @@ func (app *BaseApp) FindLogById(id string) (*Log, error) {
 	return model, nil
 }
 
+// LogHour buckets a stored instant to the hour it falls in. An instant is
+// stored as text in a fixed layout, so the bucket is the leading characters
+// of that text rather than a calendar function — which is one expression on
+// every engine, and one an index can be built on.
+const LogHour = `(substr([[created]], 1, 13) || ':00:00')`
+
 // LogsStatsItem defines the total number of logs for a specific time period.
 type LogsStatsItem struct {
 	Date  types.DateTime `db:"date" json:"date"`
@@ -39,7 +45,7 @@ func (app *BaseApp) LogsStats(expr dbx.Expression) ([]*LogsStatsItem, error) {
 	result := []*LogsStatsItem{}
 
 	query := app.LogQuery().
-		Select("count(id) as total", "strftime('%Y-%m-%d %H:00:00', created) as date").
+		Select("count(id) as total", LogHour+" as date").
 		GroupBy("date")
 
 	if expr != nil {
