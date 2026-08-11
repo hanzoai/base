@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import { base } from '~/lib/base';
 import { iam } from '~/lib/iam';
+import { icon } from '../icon'
 
 // Base is IAM-native: sign-in is OAuth2 PKCE against Hanzo IAM. There is no
 // local password — the retired `_superusers` password endpoint is gone
@@ -28,7 +29,7 @@ function LoginPage() {
     <div className="shell shell--centered">
       <div className="panel stack">
         <div className="row">
-          <img src="/icon.svg" alt="Base" width={ 24 } height={ 24 } />
+          <img src={icon} alt="Base" width={ 24 } height={ 24 } />
           <h1 className="page__title">Sign in to Base</h1>
         </div>
         <p className="muted">
