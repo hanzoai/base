@@ -44,9 +44,10 @@ func serveTestJWKS(t *testing.T, pub *rsa.PublicKey, kid string) *httptest.Serve
 //
 // Auth is a real IAM JWT validated against a JWKS endpoint — there are no
 // hardcoded record tokens and no rows written to Base auth collections.
-// Superuser privilege is an IAM claim (`isAdmin`), not a stored `_superusers`
-// row: the JWKS path mints an ephemeral, unpersisted record so the gate can
-// evaluate it. IAM is the user store; Base only validates.
+// Superuser privilege is membership of IAM's reserved admin org, read off the
+// verified `orgs` claim rather than a stored `_superusers` row: the JWKS path
+// mints an ephemeral, unpersisted record so the gate can evaluate it. IAM is
+// the user store; Base only validates.
 func TestSQLRun(t *testing.T) {
 	t.Parallel()
 
@@ -70,10 +71,16 @@ func TestSQLRun(t *testing.T) {
 		return signed
 	}
 
-	// Superuser: IAM token carrying the admin claim. Regular: a plain IAM
-	// identity with no admin claim.
-	superuserToken := mint(jwt.MapClaims{"sub": "iam-admin", "email": "admin@example.com", "isAdmin": true})
-	regularToken := mint(jwt.MapClaims{"sub": "iam-regular", "email": "user@example.com"})
+	// Superuser: an IAM token carrying membership of the reserved admin org.
+	// Regular: an admin of an ordinary org, which is a different authority.
+	superuserToken := mint(jwt.MapClaims{
+		"sub": "iam-admin", "email": "admin@example.com", "owner": "hanzo",
+		"orgs": []any{map[string]any{"org": "hanzo", "role": "admin"}, map[string]any{"org": "admin", "role": "admin"}},
+	})
+	regularToken := mint(jwt.MapClaims{
+		"sub": "iam-regular", "email": "user@example.com", "owner": "hanzo",
+		"orgs": []any{map[string]any{"org": "hanzo", "role": "admin"}},
+	})
 
 	// Point the app at the JWKS endpoint and make IAM the exclusive auth
 	// source, the production posture once the platform plugin registers.
@@ -95,7 +102,7 @@ func TestSQLRun(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:            "regular user (no admin claim)",
+			Name:            "admin of an ordinary org",
 			Method:          http.MethodPost,
 			URL:             "/v1/sql",
 			Body:            strings.NewReader(`{"query":"select 1"}`),
@@ -106,7 +113,7 @@ func TestSQLRun(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:           "superuser (IAM admin claim)",
+			Name:           "member of the reserved admin org",
 			Method:         http.MethodPost,
 			URL:            "/v1/sql",
 			Body:           strings.NewReader(`{"query":"select 1"}`),

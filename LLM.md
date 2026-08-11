@@ -22,7 +22,7 @@ not an SDK; SDK clients and discovery repos link OUT to it. One impl, one place.
 - `base.New()` / `base.NewWithConfig` — app constructor (root package)
 - `examples/base/main.go` — the prebuilt binary
 - `core/` — app, dialect, storage tier (`ResolveStorageTier`, `BASE_DB_TIER`)
-- `plugins/platform/` — Hanzo IAM (mandatory, one way), per-org DBs
+- `plugins/org/` — Hanzo IAM (mandatory, one way), per-org Bases at `/v1/bases`
 - `cmd/` — CLI (`AddCLISubcommands`), serve, superuser
 
 ## Brand rules (hard)
@@ -67,7 +67,7 @@ identical across tiers:
 | +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
 
 The dialect abstraction (SQLite + Postgres) and the per-org/per-user encrypted DB
-provisioner (`plugins/platform/org_db.go`) already exist — Tier-0/1 are real
+provisioner (`plugins/org/org_db.go`) already exist — Tier-0/1 are real
 today. Tier-2 (datastore) and the docdb plugin are the wiring gaps.
 
 ### App layer — App Platform / CMS / CRM on one schema engine
@@ -91,8 +91,7 @@ from the same metadata:
 The current admin (`ui-react/`, TanStack Router: Collections/Records/Settings) is
 replaced by shared **`@hanzo/ui`** components (powered by **`@hanzo/gui`**),
 Hanzo-branded, so the SAME components render the Base admin, the embedded console2
-surface, and any app built on Base. Admin mount stays configurable
-(`BASE_ADMIN_UI_PATH`, default `/_/`). Goes live in **console2** as the Base
+surface, and any app built on Base. The admin is served at the root. Goes live in **console2** as the Base
 product (the tenant orchestrator embed already ships; this is the full app
 surface).
 
@@ -127,7 +126,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 |--------|------|---------|
 | vault | plugins/vault/ | Per-user encrypted SQLite shards, DEK/KEK, CRDT sync, chain anchor |
 | zap | plugins/zap/ | ZAP transport (8.7us latency) |
-| platform | plugins/platform/ | Hanzo platform integration — orgs, IAM, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
+| org | plugins/org/ | Per-org Bases: orgs read from IAM, per-org encrypted SQLite, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
 | functions | plugins/functions/ | Event workers (on CRDT ops, chain receipts) |
@@ -299,8 +298,8 @@ Full details: research brief produced by scientist agent on 2026-04-10.
 
 Hanzo IAM is the **only** auth source. There is no `BASE_AUTH_MODE` toggle,
 no built-in password / OTP / MFA / OAuth2 / email-change / password-reset
-surface, no legacy `/_/auth/oidc/*` parallel path. The platform plugin
-(`plugins/platform/`) is mandatory and registers IAM unconditionally;
+surface, no legacy parallel auth path. The platform plugin
+(`plugins/org/`) is mandatory and registers IAM unconditionally;
 booting without `IAM_ENDPOINT` (or `IAM_MODE=embedded`) errors at startup.
 
 Two ways to host IAM, identical OIDC contract from the client side:
@@ -310,7 +309,7 @@ Two ways to host IAM, identical OIDC contract from the client side:
    Full Hanzo IAM features: federation, MFA, social, magic links,
    multi-tenant orgs.
 2. **Embedded**: set `IAM_MODE=embedded`. `/v1/iam/*` is served in-process
-   by the minimal OIDC provider in `plugins/platform/iam_embedded.go`
+   by the minimal OIDC provider in `plugins/org/iam_embedded.go`
    (email+password only, no federation). For single-tenant solo
    deployments. See section below for the surface details.
 
@@ -346,20 +345,26 @@ it in-process. Apps do NOT mount their own IAM at `/v1/<app>/iam`.
 Root liveness probe stays at `/healthz` (outside the mount prefix) so
 ops doesn't have to know the app name.
 
-## Admin UI path (`BASE_ADMIN_UI_PATH`)
+## Admin UI is served at the ROOT
 
-One knob for where the admin dashboard mounts. Default `/_/`. Set
-`BASE_ADMIN_UI_PATH=/admin/` (any leading/trailing slashes are normalized to a
-single `/x/` form) to relocate it — `apis/serve.go` `adminUIPath()` drives the
-static mount, the root redirect, and the start-banner line from this one value.
+base.hanzo.ai IS the admin, so it lives at the address people type. `/v1` is a
+longer pattern and wins every request that belongs to the API.
 
-The SPA client must match (same contract as `BASE_API_PREFIX` ↔ `VITE_API_PREFIX`):
-`ui-react/vite.config.ts` `base` reads the SAME `BASE_ADMIN_UI_PATH` env, so the
-SPA's absolute asset URLs line up with the mount. Build + serve with the same
-value. The committed `ui-react/dist` is built for the default `/_/`; to ship a
-relocated admin, rebuild with `BASE_ADMIN_UI_PATH=/admin/ pnpm --dir ui-react build`.
-The admin UI is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default —
-production services are headless `/v1` APIs); the `/v1` data plane is always on.
+There used to be a `BASE_ADMIN_UI_PATH` knob (default `/_/`) plus a second knob
+to redirect `/` to wherever the first one pointed. Both are gone, and so is the
+path they existed to reconcile. It cost more than it looked: three things had to
+agree — the Go mount, the SPA's build-time Vite `base`, and the redirect URI
+registered with IAM — and each was configured separately, so any asset written
+as a root path missed the mount and fell to the SPA fallback. That fallback
+answers **200 with HTML**, which is why the broken admin logo showed up in no
+status code, no console error and no network log; the browser was simply handed
+a web page where it asked for an image.
+
+The SPA's callback is derived from the same base (`import.meta.env.BASE_URL`), so
+the address it is served at and the redirect it asks for cannot disagree.
+
+The admin is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default — production
+services are headless `/v1` APIs); the `/v1` data plane is always on.
 
 ## Storage tier (`BASE_DB_TIER`)
 
@@ -378,7 +383,7 @@ existing dialect + `PostgresDBConnect` plumbing.
 Misconfig fails loudly at startup (sql without `BASE_DB_URL`, the not-yet-wired
 `datastore`, or an unknown value) rather than silently running the wrong DB —
 same convention as the platform plugin's IAM check. Per-org tiering (each
-`plugins/platform/org_db.go` shard on its own tier) builds on this selector.
+`plugins/org/org_db.go` shard on its own tier) builds on this selector.
 
 ## SQLite driver — one driver, OUR way (`github.com/hanzoai/sqlite`)
 
@@ -497,8 +502,7 @@ Both are obsolete: `hanzogui` is now **`@hanzo/gui`**, `hanzogui-loader` is
   `react-native-web`, and `.web.*` first in `resolve.extensions`. `src/gui-env.d.ts`
   registers the v5 config so gui's shorthand style props type-check (the v5
   config sets `onlyShorthandStyleProps`, so the shorthands ARE the API).
-- `.dark` pinned on `<html>`; router `basepath` bound to `import.meta.env.BASE_URL`
-  (= `BASE_ADMIN_UI_PATH`).
+- `.dark` pinned on `<html>`; router `basepath` bound to `import.meta.env.BASE_URL`.
 
 ### A green build does not prove a visual change (read before editing UI)
 `@hanzo/gui` **drops a prop it does not recognise in silence** — no error, no type
@@ -506,7 +510,7 @@ failure, just an unstyled element — and CSS resolves an undefined `var(--x)` t
 nothing. Both layers fail quietly, so `pnpm build` going green proves nothing
 about what renders. `ui-react/smoke.mjs` (`pnpm --dir ui-react smoke`, needs
 playwright) is the check that catches silence: it serves the committed `dist/`
-under `/_/` exactly as the Go server does, stubs `/v1`, and gates on every route
+at the root exactly as the Go server does, stubs `/v1`, and gates on every route
 painting, every `var(--token)` resolving, zero utility-class residue, every
 control computing real colours and radii, the overlays opening, and the confirm
 dialog measuring the width `DialogContent maxW` asks for. Measure the dialog

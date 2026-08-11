@@ -32,7 +32,7 @@ migrate((app) => {
       "duration": 604800
     },
     "confirmEmailChangeTemplate": {
-      "body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+      "body": "<p>Hello,</p>\n<p>A new email address was requested for your {APP_NAME} account.</p>\n<p>Open your account to confirm it.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
       "subject": "Confirm your {APP_NAME} new email address"
     },
     "createRule": null,
@@ -124,7 +124,7 @@ migrate((app) => {
     "type": "auth",
     "updateRule": null,
     "verificationTemplate": {
-      "body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+      "body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Your email address is confirmed through your {APP_NAME} account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
       "subject": "Verify your {APP_NAME} email"
     },
     "verificationToken": {
@@ -161,7 +161,7 @@ func init() {
 				"duration": 604800
 			},
 			"confirmEmailChangeTemplate": {
-				"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+				"body": "<p>Hello,</p>\n<p>A new email address was requested for your {APP_NAME} account.</p>\n<p>Open your account to confirm it.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 				"subject": "Confirm your {APP_NAME} new email address"
 			},
 			"createRule": null,
@@ -253,7 +253,7 @@ func init() {
 			"type": "auth",
 			"updateRule": null,
 			"verificationTemplate": {
-				"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+				"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Your email address is confirmed through your {APP_NAME} account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 				"subject": "Verify your {APP_NAME} email"
 			},
 			"verificationToken": {
@@ -378,7 +378,7 @@ migrate((app) => {
       "duration": 604800
     },
     "confirmEmailChangeTemplate": {
-      "body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+      "body": "<p>Hello,</p>\n<p>A new email address was requested for your {APP_NAME} account.</p>\n<p>Open your account to confirm it.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
       "subject": "Confirm your {APP_NAME} new email address"
     },
     "createRule": null,
@@ -470,7 +470,7 @@ migrate((app) => {
     "type": "auth",
     "updateRule": null,
     "verificationTemplate": {
-      "body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+      "body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Your email address is confirmed through your {APP_NAME} account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
       "subject": "Verify your {APP_NAME} email"
     },
     "verificationToken": {
@@ -510,7 +510,7 @@ func init() {
 				"duration": 604800
 			},
 			"confirmEmailChangeTemplate": {
-				"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+				"body": "<p>Hello,</p>\n<p>A new email address was requested for your {APP_NAME} account.</p>\n<p>Open your account to confirm it.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 				"subject": "Confirm your {APP_NAME} new email address"
 			},
 			"createRule": null,
@@ -602,7 +602,7 @@ func init() {
 			"type": "auth",
 			"updateRule": null,
 			"verificationTemplate": {
-				"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Click on the button below to verify your email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-verification/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Verify</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
+				"body": "<p>Hello,</p>\n<p>Thank you for joining us at {APP_NAME}.</p>\n<p>Your email address is confirmed through your {APP_NAME} account.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}\" target=\"_blank\" rel=\"noopener\">Open {APP_NAME}</a>\n</p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
 				"subject": "Verify your {APP_NAME} email"
 			},
 			"verificationToken": {
