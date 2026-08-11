@@ -97,6 +97,74 @@ func TestRestApiList(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
+			// THE test whose absence hid a bug that made every filtered read a
+			// 400: a filter that is supposed to SUCCEED, executed end to end.
+			// demo2 holds test1/test2/test3, so eq on a title returns exactly one.
+			Name:           "a filter that should match, matches",
+			Method:         http.MethodGet,
+			URL:            "/rest/v1/demo2?title=eq.test2",
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"achvryl401bhse3"`,
+				`"title":"test2"`,
+			},
+			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`, `"items"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       1,
+			},
+		},
+		{
+			Name:               "like matches on a wildcard",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?title=like.*est3*",
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"id":"0yxhwia2amd8gec"`},
+			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       1,
+			},
+		},
+		{
+			Name:               "in matches several",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?title=in.(test1,test3)",
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"id":"llvuca81nly1qls"`, `"id":"0yxhwia2amd8gec"`},
+			NotExpectedContent: []string{`"id":"achvryl401bhse3"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       2,
+			},
+		},
+		{
+			Name:               "a boolean column filters on is",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?active=is.false",
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"id":"llvuca81nly1qls"`},
+			NotExpectedContent: []string{`"id":"achvryl401bhse3"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       1,
+			},
+		},
+		{
+			// A column that is not a field on this collection is refused by the
+			// resolver, so a caller cannot name arbitrary SQL as a column.
+			Name:            "an unknown column is refused",
+			Method:          http.MethodGet,
+			URL:             "/rest/v1/demo2?nosuchcolumn=eq.x",
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
 			Name:            "an unknown operator is refused",
 			Method:          http.MethodGet,
 			URL:             "/rest/v1/demo2?title=matches.x",
