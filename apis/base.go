@@ -29,7 +29,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 		// them had a name, so whatever asked for "the app" got whichever one the
 		// credential had chosen — which is the right answer for a tenant's data
 		// and the wrong one for a limit on the process's own front door.
-		event.Set(requestEventKeyDeployment, app)
+		event.Set(core.RequestEventKeyDeployment, app)
 
 		return event, nil
 	})

@@ -40,6 +40,18 @@ const (
 	// serving. Set by resolveJWKSToken.
 	RequestEventKeyOrg = "authOrg"
 
+	// RequestEventKeySub carries the subject the credential names, as a string.
+	// Every door that resolves a credential sets it, which is what lets anything
+	// downstream name the caller without knowing which door it came through — an
+	// IAM key mints no auth record, so e.Auth answers nothing for one.
+	RequestEventKeySub = "authSub"
+
+	// RequestEventKeyOrgAdmin reports, as a bool, whether the credential carries
+	// authority over the org it acts in rather than only over its own subject.
+	// A member's token is not that; an org admin's token and an org's secret key
+	// are. Set by whichever door resolved the credential.
+	RequestEventKeyOrgAdmin = "authOrgAdmin"
+
 	// requestEventKeyStatedOrg carries the org a request SAID it meant, read off
 	// X-Org-Id before that header is deleted. It is a statement of intent and
 	// never an identity — see loadAuthToken.
@@ -453,11 +465,12 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// Publish the identity: on the request, for Base's own middleware, and back
 	// onto the headers, for the proxies and shard routers that read them. They
 	// were deleted on the way in, so what is here now came from the token.
-	e.Set("authSub", sub)
+	e.Set(RequestEventKeySub, sub)
 	e.Set("authEmail", email)
 	e.Set("authName", name)
 	e.Set(RequestEventKeyOrgs, orgsOf(verified))
 	e.Set(RequestEventKeyOrg, org)
+	e.Set(RequestEventKeyOrgAdmin, verified.OrgAdmin(org))
 	e.Request.Header.Set(claims.HeaderUserID, sub)
 	e.Request.Header.Set(claims.HeaderOrgID, org)
 	e.Request.Header.Set(headerUserEmail, email)
@@ -776,9 +789,20 @@ func activityLogger() *hook.Handler[*core.RequestEvent] {
 	}
 }
 
+// logRequest writes one activity row for a served request.
+//
+// It writes to the Base the process serves from, never to the one the request
+// landed on. Both the retention setting and the logger used to be read off
+// e.App, which a credential naming an org has already moved to that tenant's
+// Base — so an authenticated request logged itself into the tenant's file and
+// the operator's log held only the traffic that never authenticated. The
+// operator cannot read a tenant's file to reassemble it, and a tenant should
+// not be holding the estate's audit trail either way.
 func logRequest(event *core.RequestEvent, err error) {
+	app := event.Deployment()
+
 	// no logs retention
-	if event.App.Settings().Logs.MaxDays == 0 {
+	if app.Settings().Logs.MaxDays == 0 {
 		return
 	}
 
@@ -802,7 +826,7 @@ func logRequest(event *core.RequestEvent, err error) {
 
 	status := event.Status()
 	method := cutStr(strings.ToUpper(event.Request.Method), 50)
-	requestUri := cutStr(event.Request.URL.RequestURI(), 3000)
+	requestUri := cutStr(redactQuery(event.Request.URL), 3000)
 
 	// parse the request error
 	if err != nil {
@@ -841,17 +865,28 @@ func logRequest(event *core.RequestEvent, err error) {
 		"userAgent", cutStr(event.Request.UserAgent(), 2000),
 	)
 
-	if event.Auth != nil {
+	// Who acted. A JWT mints an auth record and the collection it lands in says
+	// what kind of principal it is; an IAM key mints none, so a keyed request
+	// used to be attributed to nobody — every action a service key took read as
+	// anonymous, which is the opposite of what an audit trail is for. The
+	// subject is the one thing both doors publish, so a subject with no record
+	// is exactly a key.
+	switch sub, _ := event.Get(RequestEventKeySub).(string); {
+	case event.Auth != nil:
 		attrs = append(attrs, "auth", event.Auth.Collection().Name)
-
-		if event.App.Settings().Logs.LogAuthId {
+		if app.Settings().Logs.LogAuthId {
 			attrs = append(attrs, "authId", event.Auth.Id)
 		}
-	} else {
+	case sub != "":
+		attrs = append(attrs, "auth", "key")
+		if app.Settings().Logs.LogAuthId {
+			attrs = append(attrs, "authId", sub)
+		}
+	default:
 		attrs = append(attrs, "auth", "")
 	}
 
-	if event.App.Settings().Logs.LogIP {
+	if app.Settings().Logs.LogIP {
 		attrs = append(
 			attrs,
 			"userIP", event.RealIP(),
@@ -870,11 +905,42 @@ func logRequest(event *core.RequestEvent, err error) {
 		}
 
 		if err != nil {
-			event.App.Logger().Error(message, attrs...)
+			app.Logger().Error(message, attrs...)
 		} else {
-			event.App.Logger().Info(message, attrs...)
+			app.Logger().Info(message, attrs...)
 		}
 	})
+}
+
+// credentialParams are the query parameters this deployment reads a credential
+// out of: `key` is where an IAM key arrives on a request that carries no
+// Authorization header, and `token` is the file and backup grant.
+var credentialParams = []string{"key", "token"}
+
+// redactQuery renders a request address for the log with any credential in the
+// query replaced.
+//
+// A log row is kept for Logs.MaxDays, served by GET /v1/logs and copied into
+// every backup, so a live secret key written into one is a live secret key in
+// all three. The parameter NAMES stay — they are the shape of the call and the
+// reason anyone reads the log — and only the values that are credentials go.
+func redactQuery(u *url.URL) string {
+	q := u.Query()
+
+	redacted := false
+	for _, name := range credentialParams {
+		if q.Has(name) {
+			q.Set(name, "redacted")
+			redacted = true
+		}
+	}
+	if !redacted {
+		return u.RequestURI()
+	}
+
+	out := *u
+	out.RawQuery = q.Encode()
+	return out.RequestURI()
 }
 
 func cutStr(str string, max int) string {
