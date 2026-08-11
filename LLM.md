@@ -322,9 +322,17 @@ client-side branching — only the feature ceiling differs.
 ephemeral auth record — nothing is written, IAM stays the user store. The
 collection it lands in is the whole authorization decision: `_superusers` for a
 member of IAM's reserved `admin` org, the users collection for everyone else.
-That membership is the SuperAdmin scope and the only cross-tenant one; the
-predicate is IAM's own `store.IsSuperAdmin`, read off the `owner` and `orgs`
-claims through `model.OrgRef`, so Base never spells the reserved org itself.
+That membership is the only cross-tenant scope, and Base does not decide what it
+means — it decodes the verified claims into `authz.Claims` and asks
+`PlatformSudo()`, the estate's published predicate, the same one the gateway
+mints `X-User-IsAdmin` from and cloud reads. A second definition here is how
+platform authority comes to mean two things in two places.
+
+Not the `owner` claim: IAM stamps it with the organization of the **application**
+a token was minted through, not the subject's own, so reading it would hand
+platform authority to everyone who signed in through an admin-org app. And not a
+machine — a `client_credentials` token carries no membership set at all, which is
+how `PlatformSudo` tells a machine from a person.
 
 An `admin` **role** on an ordinary org is a different authority and grants no
 part of this: `_superusers` reaches schema, settings, backups and logs for the
