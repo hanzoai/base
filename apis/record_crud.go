@@ -226,6 +226,51 @@ func recordView(e *core.RequestEvent) error {
 	})
 }
 
+// shadowRow stands a one-row table in for the record as it WOULD be after the
+// write, so a rule can be evaluated against values that are not in the database
+// yet. Postgres calls this WITH CHECK, and it is the half of a policy that says
+// what a row is allowed to look like afterwards rather than which rows may be
+// touched.
+//
+// The shadow carries the collection's own name with a random suffix so the CTE
+// cannot collide with the real table, and the rule compiles against it exactly
+// as it would against the collection.
+func shadowRow(app core.App, collection *core.Collection, record *core.Record) (*core.Collection, string, dbx.Params, error) {
+	randomPart := "__hzf_check__" + security.PseudorandomString(6)
+
+	dummy := record.Clone()
+
+	// the value does not matter; it only has to exist
+	if dummy.Id == "" {
+		dummy.Id = "__temp_id__" + randomPart
+	}
+
+	// unset so a rule relying on it cannot be talked into granting manage access
+	dummy.SetVerified(false)
+
+	export, err := dummy.DBExport(app)
+	if err != nil {
+		return nil, "", nil, fmt.Errorf("dummy DBExport error: %w", err)
+	}
+
+	params := make(dbx.Params, len(export))
+	selects := make([]string, 0, len(export))
+	for k, v := range export {
+		k = inflector.Columnify(k) // extra measure in case of custom fields
+		param := randomPart + "_" + k
+		params[param] = v
+		selects = append(selects, "{:"+param+"} AS [["+k+"]]")
+	}
+
+	shadow := *collection
+	shadow.Id += randomPart
+	shadow.Name += inflector.Columnify(randomPart)
+
+	withFrom := fmt.Sprintf("WITH {{%s}} as (SELECT %s)", shadow.Name, strings.Join(selects, ","))
+
+	return &shadow, withFrom, params, nil
+}
+
 func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		collection, err := e.App.FindCachedCollectionByNameOrId(e.Request.PathValue("collection"))
@@ -473,6 +518,42 @@ func recordUpdate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 			form.GrantSuperuserAccess()
 		}
 		form.Load(data)
+
+		// The rule has already decided WHICH row may be touched. It has not yet
+		// said what the row is allowed to look like afterwards, and those are two
+		// different questions: `owner = @request.auth.id` permits editing a row
+		// you own, and without this it also permits editing it into somebody
+		// else's — handing away the row and every column the rule was guarding.
+		//
+		// Postgres reuses USING as the WITH CHECK when a policy omits one, so a
+		// ported policy means this whether or not it says so. `record` is the
+		// post-image here because form.Load has already applied the submitted
+		// data to it.
+		if !hasSuperuserAuth && collection.UpdateRule != nil && *collection.UpdateRule != "" {
+			shadow, withFrom, shadowParams, err := shadowRow(e.App, collection, record)
+			if err != nil {
+				return firstApiError(err, e.BadRequestError("Failed to update record.", err))
+			}
+
+			checkQuery := e.App.ConcurrentDB().Select("(1)").PreFragment(withFrom).From(shadow.Name).AndBind(shadowParams)
+
+			resolver := core.NewRecordFieldResolver(e.App, shadow, requestInfo, true)
+
+			expr, err := search.FilterData(*collection.UpdateRule).BuildExpr(resolver)
+			if err != nil {
+				return firstApiError(err, e.BadRequestError("Failed to update record.", fmt.Errorf("update rule build expression failure: %w", err)))
+			}
+			checkQuery.AndWhere(expr)
+
+			if err := resolver.UpdateQuery(checkQuery); err != nil {
+				return firstApiError(err, e.BadRequestError("Failed to update record.", fmt.Errorf("update rule update query failure: %w", err)))
+			}
+
+			var exists int
+			if err := checkQuery.Limit(1).Row(&exists); err != nil || exists == 0 {
+				return firstApiError(err, e.BadRequestError("Failed to update record.", fmt.Errorf("update rule check failure: %w", err)))
+			}
+		}
 
 		manageRuleQuery := e.App.ConcurrentDB().Select("(1)").From(collection.Name).AndWhere(dbx.HashExp{
 			collection.Name + ".id": record.Id,
