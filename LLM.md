@@ -318,10 +318,17 @@ authorize, login, token, userinfo) and the same RS256 JWT shape. The
 `@hanzo/iam/browser` SDK does PKCE redirect against either with no
 client-side branching — only the feature ceiling differs.
 
-The middleware mirrors IAM identity into `_superusers` by email, so an
-admin row with the JWT's email automatically authorizes admin endpoints
-(collections, settings, logs, backups). Identity from IAM; admin
-privilege from a `_superusers` row keyed by email.
+`resolveJWKSToken` (`apis/middlewares.go`) mirrors the verified token into an
+ephemeral auth record — nothing is written, IAM stays the user store. The
+collection it lands in is the whole authorization decision: `_superusers` for a
+member of IAM's reserved `admin` org, the users collection for everyone else.
+That membership is the SuperAdmin scope and the only cross-tenant one; the
+predicate is IAM's own `store.IsSuperAdmin`, read off the `owner` and `orgs`
+claims through `model.OrgRef`, so Base never spells the reserved org itself.
+
+An `admin` **role** on an ordinary org is a different authority and grants no
+part of this: `_superusers` reaches schema, settings, backups and logs for the
+whole process, and one process serves many orgs' Bases.
 
 Store keys: `StoreKeyExternalAuthOnly` (always true once platform
 registers), `StoreKeyJWKSURL` (external mode), `StoreKeyAuthUsersCollection`
