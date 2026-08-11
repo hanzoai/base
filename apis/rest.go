@@ -229,6 +229,12 @@ type restPredicate struct {
 	Col  string
 	Op   string
 	Vals []string
+
+	// Negate carries PostgREST's `not.` PREFIX, which is not an operator: it
+	// wraps whatever follows. `not.is.null` is how the wire spells IS NOT NULL,
+	// and the Table Editor offers exactly that, so rejecting the prefix would
+	// leave a filter the grid can build and the server cannot answer.
+	Negate bool
 }
 
 // restReserved are the query params that steer the read rather than filter it.
@@ -271,6 +277,10 @@ func restPredicates(in url.Values) ([]restPredicate, error) {
 	preds := []restPredicate{}
 	for _, col := range cols {
 		for _, raw := range in[col] {
+			negate := false
+			if rest, ok := strings.CutPrefix(raw, "not."); ok {
+				negate, raw = true, rest
+			}
 			op, val, has := strings.Cut(raw, ".")
 			if !has {
 				return nil, fmt.Errorf("filter %s=%q needs an operator, e.g. %s=eq.%s", col, raw, col, raw)
@@ -280,21 +290,21 @@ func restPredicates(in url.Values) ([]restPredicate, error) {
 				if val != "null" && val != "true" && val != "false" {
 					return nil, fmt.Errorf("filter %s=is.%s: is takes null, true or false", col, val)
 				}
-				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{val}})
+				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{val}, Negate: negate})
 			case "in":
 				vals := restValues(val)
 				if len(vals) == 0 {
 					return nil, fmt.Errorf("filter %s=in.%s names no values", col, val)
 				}
-				preds = append(preds, restPredicate{Col: col, Op: op, Vals: vals})
+				preds = append(preds, restPredicate{Col: col, Op: op, Vals: vals, Negate: negate})
 			case "like", "ilike":
 				// PostgREST spells the wildcard *, SQL spells it %.
-				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{strings.ReplaceAll(val, "*", "%")}})
+				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{strings.ReplaceAll(val, "*", "%")}, Negate: negate})
 			default:
 				if _, ok := restOps[op]; !ok {
 					return nil, fmt.Errorf("filter %s=%s.%s: unknown operator %q", col, op, val, op)
 				}
-				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{val}})
+				preds = append(preds, restPredicate{Col: col, Op: op, Vals: []string{val}, Negate: negate})
 			}
 		}
 	}
@@ -371,6 +381,10 @@ func restWhere(resolver search.FieldResolver, preds []restPredicate) (query.Expr
 			exprs = append(exprs, query.NewExp(
 				left.Identifier+" "+restOps[p.Op]+" {:"+key+"}",
 				mergeRestParams(left.Params, params)))
+		}
+
+		if p.Negate {
+			exprs[len(exprs)-1] = query.Not(exprs[len(exprs)-1])
 		}
 
 		if left.AfterBuild != nil {

@@ -484,3 +484,61 @@ func TestRestApiHeadIsTheCountQuery(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// `not.` is a PREFIX, not an operator — it wraps whatever follows. The Table
+// Editor offers "is not null" as a filter, and this is how the wire spells it,
+// so rejecting the prefix would leave a filter the grid can build and the server
+// cannot answer. demo2 has three rows, one of them active=false.
+func TestRestApiNotPrefix(t *testing.T) {
+	t.Parallel()
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:               "not.eq excludes the matching row",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?title=not.eq.test1",
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"id":"achvryl401bhse3"`, `"id":"0yxhwia2amd8gec"`},
+			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       2,
+			},
+		},
+		{
+			Name:               "not.in excludes every named value",
+			Method:             http.MethodGet,
+			URL:                "/rest/v1/demo2?title=not.in.(test1,test2)",
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"id":"0yxhwia2amd8gec"`},
+			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`, `"id":"achvryl401bhse3"`},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       1,
+			},
+		},
+		{
+			// The one the grid actually offers.
+			Name:           "not.is.null is how the wire spells IS NOT NULL",
+			Method:         http.MethodGet,
+			URL:            "/rest/v1/demo2?title=not.is.null",
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"llvuca81nly1qls"`,
+				`"id":"achvryl401bhse3"`,
+				`"id":"0yxhwia2amd8gec"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                    0,
+				"OnRecordsListRequest": 1,
+				"OnRecordEnrich":       3,
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
