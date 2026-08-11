@@ -2,19 +2,13 @@ import { TanStackRouterVite } from '@tanstack/router-plugin/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// Admin UI base path. Default '/_/'. Set BASE_ADMIN_UI_PATH (e.g. '/admin/') to
-// relocate the dashboard — the Go server reads the SAME env to mount it, so the
-// SPA's absolute asset URLs line up. Normalized to a '/x/' form. One knob, set
-// at build+deploy together (same contract as BASE_API_PREFIX ↔ VITE_API_PREFIX).
-const adminBase = (() => {
-  const p = (process.env.BASE_ADMIN_UI_PATH || '').replace(/^\/+|\/+$/g, '')
-  return p ? `/${p}/` : '/_/'
-})()
-
 export default defineConfig({
   // Router plugin generates src/routeTree.gen.ts from src/routes/** (gitignored).
   plugins: [TanStackRouterVite({ target: 'react', autoCodeSplitting: false }), react()],
-  base: adminBase,
+  // The admin is the site: base.hanzo.ai serves it at the root, and the API
+  // answers under /v1. Nothing to keep in agreement with a server path or a
+  // redirect URI registered with IAM.
+  base: '/',
   /*
    * The two settings @hanzo/gui needs, and nothing more — the same arrangement
    * hanzo.sh and the console use. `@hanzo/ui` renders through gui's
