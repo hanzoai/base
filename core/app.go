@@ -1167,24 +1167,6 @@ type App interface {
 	// It allows intercepting the email message or to use a custom mailer client.
 	OnMailerSend() *hook.Hook[*MailerEvent]
 
-	// OnMailerBeforeRecordVerificationSend hook is triggered when
-	// sending a verification email to an auth record, allowing
-	// you to intercept and customize the email message that is being sent.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnMailerRecordVerificationSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
-
-	// OnMailerRecordEmailChangeSend hook is triggered when sending a
-	// confirmation new address email to an auth record, allowing
-	// you to intercept and customize the email message that is being sent.
-	//
-	// If the optional "tags" list (Collection ids or names) is specified,
-	// then all event handlers registered via the created hook will be
-	// triggered and called only if their event data origin matches the tags.
-	OnMailerRecordEmailChangeSend(tags ...string) *hook.TaggedHook[*MailerRecordEvent]
-
 	// ---------------------------------------------------------------
 	// Realtime API event hooks
 	// ---------------------------------------------------------------

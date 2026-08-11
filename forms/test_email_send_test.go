@@ -14,29 +14,22 @@ func TestEmailSendValidateAndSubmit(t *testing.T) {
 	t.Parallel()
 
 	scenarios := []struct {
-		template       string
 		email          string
-		collection     string
 		expectedErrors []string
 	}{
-		{"", "", "", []string{"template", "email"}},
-		{"invalid", "test@example.com", "", []string{"template"}},
-		{forms.TestTemplateVerification, "invalid", "", []string{"email"}},
-		{forms.TestTemplateVerification, "test@example.com", "invalid", []string{"collection"}},
-		{forms.TestTemplateVerification, "test@example.com", "demo1", []string{"collection"}},
-		{forms.TestTemplateVerification, "test@example.com", "users", nil},
-		{forms.TestTemplateEmailChange, "test@example.com", "", nil},
+		{"", []string{"email"}},
+		{"invalid", []string{"email"}},
+		{strings.Repeat("a", 250) + "@example.com", []string{"email"}},
+		{"test@example.com", nil},
 	}
 
 	for i, s := range scenarios {
-		t.Run(fmt.Sprintf("%d_%s", i, s.template), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d_%s", i, s.email), func(t *testing.T) {
 			app, _ := tests.NewTestApp()
 			defer app.Cleanup()
 
 			form := forms.NewTestEmailSend(app)
 			form.Email = s.email
-			form.Template = s.template
-			form.Collection = s.collection
 
 			result := form.Submit()
 
@@ -69,18 +62,15 @@ func TestEmailSendValidateAndSubmit(t *testing.T) {
 				return
 			}
 
-			var expectedContent string
-			switch s.template {
-			case forms.TestTemplateEmailChange:
-				expectedContent = "Confirm new email"
-			case forms.TestTemplateVerification:
-				expectedContent = "Verify"
-			default:
-				expectedContent = "__UNKNOWN_TEMPLATE__"
+			// The point of the send is that SMTP works, so the message says so
+			// and carries no token, no collection and no link — there is no flow
+			// behind it to complete.
+			msg := app.TestMailer.LastMessage()
+			if !strings.Contains(msg.HTML, "SMTP settings work") {
+				t.Errorf("Expected the email to state what it proves, got\n%v", msg.HTML)
 			}
-
-			if !strings.Contains(app.TestMailer.LastMessage().HTML, expectedContent) {
-				t.Errorf("Expected the email to contains %q, got\n%v", expectedContent, app.TestMailer.LastMessage().HTML)
+			if len(msg.To) != 1 || msg.To[0].Address != s.email {
+				t.Errorf("Expected the email addressed to %q, got %v", s.email, msg.To)
 			}
 		})
 	}

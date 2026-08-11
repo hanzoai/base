@@ -848,24 +848,6 @@ declare namespace $dbx {
 }
 
 // -------------------------------------------------------------------
-// mailsBinds
-// -------------------------------------------------------------------
-
-/**
- * ` + "`" + `$mails` + "`" + ` defines helpers to send common
- * auth records emails like verification, password reset, etc.
- *
- * @group Base
- */
-declare namespace $mails {
-  let sendRecordPasswordReset: mails.sendRecordPasswordReset
-  let sendRecordVerification:  mails.sendRecordVerification
-  let sendRecordChangeEmail:   mails.sendRecordChangeEmail
-  let sendRecordOTP:           mails.sendRecordOTP
-  let sendRecordAuthAlert:     mails.sendRecordAuthAlert
-}
-
-// -------------------------------------------------------------------
 // securityBinds
 // -------------------------------------------------------------------
 
@@ -1276,7 +1258,6 @@ func main() {
 			"github.com/hanzoai/base/tools/security":   {"*"},
 			"github.com/hanzoai/base/tools/filesystem": {"*"},
 			"github.com/hanzoai/base/tools/template":   {"*"},
-			"github.com/hanzoai/base/mails":            {"*"},
 			"github.com/hanzoai/base/apis":             {"*"},
 			"github.com/hanzoai/base/core":             {"*"},
 			"github.com/hanzoai/base/forms":            {"*"},
