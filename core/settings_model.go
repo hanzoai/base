@@ -257,17 +257,21 @@ func (s *Settings) DBExport(app App) (map[string]any, error) {
 		return nil, err
 	}
 
-	encryptionKey := os.Getenv(app.EncryptionEnv())
-	if encryptionKey != "" {
-		encryptVal, encryptErr := security.Encrypt(encoded, encryptionKey)
+	// the stored column holds JSON either way: the settings themselves, or a
+	// JSON string carrying their ciphertext
+	if encryptionKey := os.Getenv(app.EncryptionEnv()); encryptionKey != "" {
+		encrypted, encryptErr := security.Encrypt(encoded, encryptionKey)
 		if encryptErr != nil {
 			return nil, encryptErr
 		}
 
-		result["value"] = encryptVal
-	} else {
-		result["value"] = encoded
+		encoded, err = json.Marshal(encrypted)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	result["value"] = encoded
 
 	return result, nil
 }
