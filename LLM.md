@@ -455,7 +455,11 @@ Fallback: `$BASE_ENV` -> default `local`.
 
 ### Config File
 
-`~/.config/base/config.json` (respects `$XDG_CONFIG_HOME`). Contains default env, per-env URLs, default org.
+`~/.config/base/config.json` (respects `$XDG_CONFIG_HOME`). Holds the default
+env, the default org and the token path — nothing else. A service URL is
+computed, not stored: `EnvURLs(env, service, localPort)` over
+`Env.DomainSuffix()`, which is the one way the CLI names a host. Unknown keys
+in an existing file are dropped on the next write.
 
 ### Cluster (HA)
 

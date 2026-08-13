@@ -202,23 +202,23 @@ func TestParseEnv(t *testing.T) {
 func TestEnvURLs(t *testing.T) {
 	t.Parallel()
 
-	got := EnvURLs(EnvLocal, "ats", 8090)
+	got := EnvURLs(EnvLocal, "base", 8090)
 	if got != "http://localhost:8090" {
 		t.Fatalf("expected localhost URL, got %s", got)
 	}
 
-	got = EnvURLs(EnvMainnet, "ats", 8090)
-	if got != "https://ats.example.com" {
+	got = EnvURLs(EnvMainnet, "base", 8090)
+	if got != "https://base.example.com" {
 		t.Fatalf("expected mainnet URL, got %s", got)
 	}
 
-	got = EnvURLs(EnvTestnet, "ats", 8090)
-	if got != "https://ats.test.example.com" {
+	got = EnvURLs(EnvTestnet, "base", 8090)
+	if got != "https://base.test.example.com" {
 		t.Fatalf("expected testnet URL, got %s", got)
 	}
 
-	got = EnvURLs(EnvDevnet, "bd", 8091)
-	if got != "https://bd.dev.example.com" {
+	got = EnvURLs(EnvDevnet, "iam", 8091)
+	if got != "https://iam.dev.example.com" {
 		t.Fatalf("expected devnet URL, got %s", got)
 	}
 }

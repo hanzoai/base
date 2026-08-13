@@ -10,7 +10,7 @@ var Version = "0.1.0"
 
 // NewCLICommand returns the top-level Cobra command tree for the Base CLI
 // client. These subcommands hit the running server's HTTP API, so they work
-// against any Base-backed daemon (base, atsd, brokerd, etc.) by URL.
+// against any daemon that embeds Base, by URL.
 //
 // Usage from a downstream daemon:
 //
@@ -39,8 +39,8 @@ func NewCLICommand() *cobra.Command {
 		Short: "HTTP client commands against a running Base server",
 		Long: `CLI commands that hit the Base HTTP API.
 
-Works against any Base-backed daemon (ats, bd, ta, etc.)
-by pointing --url at the running instance.`,
+Works against any daemon that embeds Base, by pointing --url
+at the running instance.`,
 	}
 
 	root.PersistentFlags().StringVar(&flagURL, "url", "", "server URL (default $BASE_URL or http://127.0.0.1:8090)")
@@ -74,7 +74,7 @@ by pointing --url at the running instance.`,
 // AddCLISubcommands registers the core Base CLI subcommands (collection,
 // record, login, whoami, crons, daemon) directly onto the given parent
 // command. Use this instead of NewCLICommand when you want the commands
-// at root level (e.g. `ats collection list` instead of `ats cli collection list`).
+// at root level (e.g. `base collection list` instead of `base cli collection list`).
 //
 // Does NOT add network flags (--mainnet, --testnet, --devnet, --dev) or
 // infrastructure commands (cluster, operator, config, status, self, rpc)

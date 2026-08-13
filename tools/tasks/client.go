@@ -38,6 +38,10 @@ import (
 	"github.com/luxfi/zap"
 )
 
+// taskQueue is the Hanzo Tasks queue every workflow this client submits
+// is dispatched on.
+const taskQueue = "base"
+
 // ZAP opcodes for task submission.
 const (
 	OpcodeTaskSubmit   uint16 = 0x0050 // one-shot task
@@ -465,7 +469,7 @@ func (c *Client) createCronSchedule(name, cronExpr string) error {
 			"action": map[string]any{
 				"start_workflow": map[string]any{
 					"workflow_type": name,
-					"task_queue":    "ats",
+					"task_queue":    taskQueue,
 				},
 			},
 		},
@@ -630,7 +634,7 @@ func (c *Client) createSchedule(name string, interval time.Duration) error {
 			"action": map[string]any{
 				"start_workflow": map[string]any{
 					"workflow_type": name,
-					"task_queue":    "ats",
+					"task_queue":    taskQueue,
 				},
 			},
 		},
@@ -681,7 +685,7 @@ func (c *Client) execDirect(taskType string, payload map[string]any) error {
 func (c *Client) submitHTTP(taskType string, payload map[string]any) error {
 	envelope := map[string]any{
 		"workflow_type": taskType,
-		"task_queue":    "ats",
+		"task_queue":    taskQueue,
 		"input":         payload,
 	}
 

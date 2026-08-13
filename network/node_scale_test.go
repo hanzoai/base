@@ -8,7 +8,7 @@
 //   - Membership change → router rebuilds → WriterFor may flip
 //   - scale-down → member drops out → router recomputes
 //
-// This is the integration story for consumers (BD, ATS, TA, IAM).
+// This is the integration story for every service that embeds Base.
 // If these tests pass, `kubectl scale` (or `docker compose scale`)
 // works without pod restart.
 

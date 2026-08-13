@@ -12,14 +12,14 @@ on `~/work/hanzo/storage` (`hanzoai/s3`) or GCS for PITR.
 
 ## Problem
 
-Base apps (ATS, BD, TA, IAM, KMS, AML, …) each carry SQLite files —
-often per-user or per-org — and need HA with real durability, no
-split-brain, and uniform ops across dev / test / main.
+Base apps (IAM, KMS, AML, and every app built on Base) each carry
+SQLite files — often per-user or per-org — and need HA with real
+durability, no split-brain, and uniform ops across dev / test / main.
 
 Pre-existing options fall short:
 
 - **Raw StatefulSet + RWO PVC, replicas > 1** → split-brain, silent
-  DB divergence (current mainnet ATS/TA state).
+  DB divergence.
 - **LiteFS + Consul** → three moving parts (FUSE, LTX, Consul) and a
   single-primary election we don't need; we already have quasar.
 - **Litestream + single writer** → backup, not HA.
