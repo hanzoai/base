@@ -193,16 +193,19 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 | `BASE_TLS_SERVER_KEY`       | path to PEM                                 | R5 server key. |
 | `BASE_TLS_ALLOWED_SANS`     | CSV of DNS SANs                             | R5 SAN allowlist. Typically = `BASE_PEERS` stripped of `:9999`. |
 
-### R1–R8 fix notes
+### What the transport and archive enforce
+
+The R-numbers are the labels the env surface above uses; each is glossed
+here so the table reads on its own.
 
 - **R1 (frame/envelope shardID binding)**: inbound envelopes whose inner
   `Frame.ShardID` disagrees with `Envelope.ShardID` are rejected at the
   transport boundary; the apply loop re-checks as defence-in-depth.
 - **R2 (localSeq monotonic)**: `Shard.localSeq` advances strictly by
-  +1 per finalised frame. Out-of-order frames buffer (cap 1024). An
-  attacker-forged high-Seq frame stays in the buffer forever because
-  its predecessors never arrive, so the gateway's `txseq` check cannot
-  be fooled into reporting "caught up".
+  +1 per finalised frame. Out-of-order frames buffer (cap 1024). A
+  frame arriving far ahead of the sequence waits there for
+  predecessors that never come, so it cannot advance `localSeq` and
+  the gateway's `txseq` check cannot read as "caught up".
 - **R3 (archive authorship)**: segments are `LBN2` — Ed25519 signature
   over body || CRC32 || pubkey. Writers refuse to encode without a
   signer; readers refuse to decode without a verifier; `LBN1` hard-
@@ -223,6 +226,38 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 - **R8 (nanos-suffixed object keys)**: `objectKey(…, startSeq, nanos)`
   produces unique keys per flush; `Range` dedupes by
   `(startSeq + frameIndex)` when multiple segments overlap.
+
+### What this layer leaves to you
+
+Standing properties of the design, each with the thing you do about it.
+
+- **`BASE_PEERS` is the trust set.** Peer identity is mTLS with SAN
+  pinning against that list, so every host in it is equally trusted to
+  submit frames for any shard this node owns. There is no second,
+  finer authority inside the set. **Keep the list to peers of the same
+  service in the same namespace**, and treat adding an entry as
+  granting write access to the group's shards.
+
+- **`BASE_SHARD_KEY: header:<Name>` lets the client choose its shard.**
+  A header is whatever the caller sends. It exists because compose dev
+  needs a shard key with no token. **Use `user_id` or `org_id` in
+  anything but local dev** — those derive from the verified JWT, which
+  the caller cannot pick.
+
+- **`BASE_ENCRYPT` does nothing.** `config.go` does not read it, so
+  setting it buys no encryption and no error. The encryption that is
+  real is a layer up: per-org Base shards open under a per-org DEK.
+  **Put the data directory on an encrypted volume** and do not treat
+  this variable as having enabled anything.
+
+- **A shard costs an engine.** Each holds a 1024-entry channel, and
+  nothing has been exercised past single-digit shard counts. **Pick a
+  shard key whose cardinality you can bound** — `org_id` over `user_id`
+  where a tenant is the natural unit — and size before you scale.
+
+- **`network/attack_vectors_test.go` is the executable half of this
+  section.** Run it with the package; the tests that pass are the
+  defences listed above. Nothing runs it on a schedule.
 
 ## Layout
 
@@ -409,9 +444,10 @@ never diverges. Same code path as prod.
    catches up (txseq matches). No row loss, no duplication.
 3. **Archive PITR**: write 1000 rows, record txseq, write 100 more.
    Restore to the first txseq from GCS archive; DB has exactly 1000.
-4. **k8s operator**: apply `LiquidBD` with `network.replication: 3`.
-   Verify: headless svc, 3 pods with BASE_PEERS env, HPA, PDB
-   minAvailable=2, archive sidecar when `archive != off`.
+4. **k8s operator**: apply a Base-backed CR with
+   `network.replication: 3`. Verify: headless svc, 3 pods with
+   BASE_PEERS env, HPA, PDB minAvailable=2, archive sidecar when
+   `archive != off`.
 5. **Autoscale**: drive `base_hot_shards` > `hotShardsTarget` via
    synthetic load; verify KEDA scales Deployment up, new pod joins
    the network, existing shards rebalance.
@@ -429,6 +465,6 @@ never diverges. Same code path as prod.
 
 ## Deprecations
 
-- `~/work/hanzo/base-ha` is superseded. After `base/network` lands
-  and ATS/BD/TA/IAM/KMS/AML migrate, archive `base-ha` to the
-  deprecations page. The repo stays read-only for history.
+- `base-ha` is superseded. Once `base/network` has landed and the
+  services on it have migrated, archive `base-ha` to the deprecations
+  page. The repo stays read-only for history.

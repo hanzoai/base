@@ -13,7 +13,7 @@ package network
 //     "BLOCKED: waiting on blue feat/network-v0-redfix".
 //     CI treats any other skip reason as a hard failure.
 //
-// Groups (see NETWORK_RED_REVIEW.md#attack-suite-catalog for the full table):
+// Groups, in file order:
 //   1. Consensus / frame / envelope integrity
 //   2. P2P / transport
 //   3. Archive / PITR
@@ -23,9 +23,10 @@ package network
 //   7. Operator / CRD / k8s
 //   8. Correctness under concurrency
 //
-// The suite is plumbed into CI at .github/workflows/network-attack-suite.yml
-// which blocks merge on any FAIL, any skip reason other than the blocked
-// reason, or any missing expected test name.
+// Run with the package: go test ./network/. Nothing runs it on a schedule —
+// this repo has no workflows — so a skip that should have become an assertion
+// stays a skip until someone looks. The defences the passing tests describe
+// are stated as contracts in docs/NETWORK.md.
 
 import (
 	"context"
@@ -45,8 +46,8 @@ import (
 	"time"
 )
 
-// blockedReason is the ONLY skip string CI accepts. Any other reason is a
-// build-system failure — either the test is flaky or it regressed silently.
+// blockedReason is the one skip string this file uses. A test skipping for any
+// other reason is flaky or has regressed silently, not blocked.
 const blockedReason = "BLOCKED: waiting on blue feat/network-v0-redfix"
 
 // seededRand returns the deterministic rand source every test in this file
