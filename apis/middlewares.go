@@ -219,9 +219,7 @@ const (
 	// In Hanzo Base this is always true once the platform plugin
 	// registers — the legacy local-password / OTP / MFA / impersonate
 	// surfaces have been removed (returning 404 from the router).
-	// There is no exemption. The _superusers one was removed: it accepted a
-	// local token whenever IAM could not be asked, which is the moment a second
-	// door matters most and is least wanted.
+	// There is no exemption, _superusers included.
 	StoreKeyExternalAuthOnly = "externalAuthOnly"
 
 	// StoreKeyBases holds the [Bases] of the deployment. Set by the org plugin.
@@ -279,8 +277,7 @@ var jwksCache = security.NewJWKSCache(10 * time.Minute)
 // When StoreKeyExternalAuthOnly is true (set by the platform plugin), IAM is the
 // ONLY auth mechanism. No local Base token is accepted for any collection,
 // _superusers included: a second way to reach the widest authority in the
-// process is a second thing to get wrong, and it opened exactly when IAM was
-// unreachable.
+// process is a second thing to get wrong.
 //
 // It also decides WHICH BASE serves the request, because that follows from the
 // same verified token and deciding it anywhere else means deciding it twice.
@@ -324,20 +321,12 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 
 			if externalOnly {
 				// IAM IS THE ONLY AUTH. There is no second way in, and that is
-				// the whole of this branch.
+				// the whole of this branch. _superusers is not an exception:
+				// it reaches schema, settings, backups and logs, and one
+				// process serves many orgs' Bases, so two independently-keyed
+				// doors to it would be one more than can be reasoned about.
 				//
-				// There used to be one: if JWKS was unset or validation failed
-				// for ANY reason, a locally-issued Base token was accepted for
-				// _superusers — described as a fallback for admin sessions,
-				// seeding and CLI tools. It was a second, independently-keyed
-				// path to the widest authority this process has: _superusers
-				// reaches schema, settings, backups and logs, and one process
-				// serves many orgs' Bases. Two doors to that is one more than
-				// can be reasoned about, and the second one opened precisely
-				// when the first was broken — an IAM outage or a wrong jwksURL
-				// turned "nobody can sign in" into "a local token is enough".
-				//
-				// So a token is what IAM says it is. If IAM cannot say, the
+				// A token is what IAM says it is. If IAM cannot say, the
 				// request is unauthenticated and the rules decide what an
 				// anonymous caller may do.
 				if jwksURL != "" {

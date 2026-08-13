@@ -94,9 +94,8 @@ func (brs batchRequestsForm) validate() error {
 func batchTransaction(e *core.RequestEvent) error {
 	// How many requests one body may carry, how long the transaction may hold
 	// and how large the body may be are all limits on the process, so they come
-	// from the Base it serves from. Reading them off e.App asked the tenant, and
-	// a Base that has just been opened answers Enabled=false — so an operator
-	// who turned batching on had it silently off for everyone with a token.
+	// from the Base it serves from. Reading them off e.App would ask the
+	// tenant, whose Base carries no batch posture of its own.
 	batch := e.Deployment().Settings().Batch
 
 	maxRequests := batch.MaxRequests

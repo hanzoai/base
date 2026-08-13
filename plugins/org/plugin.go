@@ -412,13 +412,11 @@ func (p *plugin) declare(app core.App) {
 
 // ensureSystemCollections creates what this plugin reads and writes.
 //
-// Orgs and memberships are not among them. There used to be an _orgs and an
-// _org_members collection here, created on every bootstrap and written by
-// nothing, because IAM owns both nouns and this package only reads them off the
-// validated token. An empty table is not a harmless one: the credential check
-// on /v1/bases/{org}/creds asked it who belonged to an org, found no row, and
-// read that as permission, so the emptiness that made it look unused was
-// exactly what made it grant everyone access to everything.
+// Orgs and memberships are not among them. IAM owns both nouns and this package
+// reads them off the validated token, so there is no _orgs or _org_members
+// collection to keep in step — a local copy would be a second answer to who
+// belongs to an org, and the credential the request arrived on is the one that
+// answers it.
 func (p *plugin) ensureSystemCollections() error {
 	if err := p.ensureOrgConfigsCollection(); err != nil {
 		return fmt.Errorf("platform: ensure %s: %w", collectionOrgConfigs, err)

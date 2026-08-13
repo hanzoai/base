@@ -519,11 +519,10 @@ func recordUpdate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 		}
 		form.Load(data)
 
-		// The rule has already decided WHICH row may be touched. It has not yet
-		// said what the row is allowed to look like afterwards, and those are two
-		// different questions: `owner = @request.auth.id` permits editing a row
-		// you own, and without this it also permits editing it into somebody
-		// else's — handing away the row and every column the rule was guarding.
+		// The rule has already decided WHICH row may be touched. This asks the
+		// second question: what the row is allowed to look like afterwards.
+		// `owner = @request.auth.id` permits editing a row you own, and it
+		// means the result must still be a row you own.
 		//
 		// Postgres reuses USING as the WITH CHECK when a policy omits one, so a
 		// ported policy means this whether or not it says so. `record` is the
