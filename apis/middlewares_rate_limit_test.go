@@ -1,6 +1,7 @@
 package apis_test
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -158,5 +159,65 @@ func TestDefaultRateLimitMiddleware(t *testing.T) {
 				t.Fatalf("Expected response status %d, got %d", s.expectedStatus, result.StatusCode)
 			}
 		})
+	}
+}
+
+// A limit is per client, so what the limiter does with a request that names no
+// client is the whole of this test. It refuses: a rule that admits whatever it
+// cannot count is not a rule, and the request that produces no address is the
+// one a rule was least able to see coming.
+//
+// A transport that terminates elsewhere and hands the request on carries no
+// socket peer, which is where an address goes missing in practice. The
+// deployment says where to read it instead — Settings.TrustedProxy — and that
+// is the third case here.
+func TestRateLimitNeedsAClientAddress(t *testing.T) {
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	app.Settings().RateLimits.Enabled = true
+	app.Settings().RateLimits.Rules = []core.RateLimitRule{
+		{Label: "/probe", MaxRequests: 100, Duration: 1},
+	}
+
+	router, err := apis.NewRouter(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	router.GET("/probe", func(e *core.RequestEvent) error {
+		return e.String(http.StatusOK, "probe")
+	})
+
+	mux, err := router.BuildMux()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	probe := func(remote string, forwarded string) int {
+		req := httptest.NewRequest(http.MethodGet, "/probe", nil)
+		req.RemoteAddr = remote
+		if forwarded != "" {
+			req.Header.Set("X-Forwarded-For", forwarded)
+		}
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	// A socket peer, and a rule the request is nowhere near.
+	if code := probe("192.0.2.4:1234", ""); code != http.StatusOK {
+		t.Fatalf("a request carrying a client address answered %d, want 200", code)
+	}
+
+	// No socket peer.
+	if code := probe("", ""); code != http.StatusTooManyRequests {
+		t.Fatalf("a request carrying no client address answered %d, want 429", code)
+	}
+
+	// Still no socket peer, but the deployment names a header to read the
+	// client from, so there is a client again.
+	app.Settings().TrustedProxy.Headers = []string{"X-Forwarded-For"}
+	if code := probe("", "203.0.113.7"); code != http.StatusOK {
+		t.Fatalf("a forwarded client address answered %d, want 200", code)
 	}
 }

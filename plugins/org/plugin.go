@@ -171,6 +171,26 @@ func Register(app core.App, config Config) error {
 		return e.Next()
 	})
 
+	// A backup carries the Base it is taken on. An org's Base sits in a
+	// subdirectory of this one but is a different Base — its own handles, its
+	// own write-ahead log, outside the transaction this archive is taken in —
+	// so it is not what this archive holds. Each org's Base backs up on that
+	// Base, where the data directory is its own.
+	//
+	// One statement on both hooks, because the two have to name the same thing:
+	// a restore moves aside everything it is about to replace, so an archive
+	// that leaves the orgs out and a restore that does not spare them would
+	// delete every one of them.
+	//
+	// Bound here rather than in declare — this is the only data directory with
+	// orgs under it. What the archive does carry, it says: see tools/archive.
+	omitOrgs := func(e *core.BackupEvent) error {
+		e.Exclude = append(e.Exclude, orgsDirName)
+		return e.Next()
+	}
+	app.OnBackupCreate().BindFunc(omitOrgs)
+	app.OnBackupRestore().BindFunc(omitOrgs)
+
 	// Which Base serves an org. Reading it is how a request reaches the right
 	// one; without it every read lands on the process's own Base, which is what
 	// used to happen.

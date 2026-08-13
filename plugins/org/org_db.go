@@ -50,9 +50,12 @@ func NewOrgDB(app core.App, masterKey string) *OrgDB {
 	}
 }
 
+// orgsDirName is where the orgs' Bases sit under the platform's data directory.
+const orgsDirName = "orgs"
+
 // OrgsDir returns the base directory for all org databases.
 func (t *OrgDB) OrgsDir() string {
-	return filepath.Join(t.app.DataDir(), "orgs")
+	return filepath.Join(t.app.DataDir(), orgsDirName)
 }
 
 // validateSlug rejects slugs containing path traversal characters.
