@@ -48,6 +48,9 @@ type ResolverResult struct {
 
 	// AfterBuild is an optional function that will be called after building
 	// and combining the result of both resolved operands/sides in a single expression.
+	//
+	// It is called with the built comparison and never with nil, so an
+	// implementation that wraps its argument may rely on having one.
 	AfterBuild func(expr query.Expression) query.Expression
 }
 

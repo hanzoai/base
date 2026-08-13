@@ -74,6 +74,11 @@ type addressed struct {
 // the mux does to fill a path parameter. Reading URL.Path instead compares
 // against something already decoded: /v1/bases/beta%2Fx arrives there as
 // /v1/bases/beta/x, which is a different address with a different org in it.
+//
+// A segment names what it names however the address continues past it. Reading
+// the user only where the path STOPS there would recognise the seven shapes
+// this file publishes and no others, and the rules exist precisely because
+// routes are registered here and elsewhere at the same addresses.
 func address(escaped string) (addressed, bool) {
 	if escaped == basesPath {
 		return addressed{}, true
@@ -87,7 +92,7 @@ func address(escaped string) (addressed, bool) {
 	segments := strings.Split(strings.TrimSuffix(rest, "/"), "/")
 
 	a := addressed{org: unescape(segments[0])}
-	if len(segments) == 3 && segments[1] == "customers" {
+	if len(segments) >= 3 && segments[1] == "customers" {
 		a.user = unescape(segments[2])
 	}
 
