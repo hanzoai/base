@@ -69,11 +69,23 @@ type bases struct {
 	p *plugin
 
 	mu   sync.RWMutex
-	open map[string]core.App
+	open map[string]*entry
+}
+
+// entry is one org's Base and the promise that it is open.
+//
+// The lock this registry needs is the one over its map. Opening a Base is a
+// migration run on a fresh file, by far the longest thing here, so it happens
+// outside that lock: the entry goes in first, the open follows, and everyone
+// naming that org waits on ready while no other org waits at all.
+type entry struct {
+	app   core.App
+	err   error
+	ready chan struct{}
 }
 
 func newBases(p *plugin) *bases {
-	return &bases{p: p, open: make(map[string]core.App)}
+	return &bases{p: p, open: make(map[string]*entry)}
 }
 
 // base opens the Base that serves org, and is the one lookup that does.
@@ -85,61 +97,111 @@ func (b *bases) base(org string) (core.App, error) {
 		return nil, fmt.Errorf("org %q: %w", org, err)
 	}
 
-	b.mu.RLock()
-	app, ok := b.open[org]
-	b.mu.RUnlock()
-	if ok {
-		return app, nil
+	e, mine := b.claim(org)
+	if mine {
+		b.fill(org, e)
 	}
 
-	// Cold open is serialized across orgs. Opening one Base is a migration run
-	// on a fresh file and happens once per org per process; splitting the lock
-	// per org buys a few milliseconds and costs a second way to hold it.
+	<-e.ready
+	if e.err != nil {
+		return nil, e.err
+	}
+	return e.app, nil
+}
+
+// claim finds org's entry or puts a fresh one in, and reports whether this
+// caller is the one that put it there and so owes it an open. Everyone else
+// waits on the entry, which is what keeps one org's first request off every
+// other org's path.
+func (b *bases) claim(org string) (*entry, bool) {
+	b.mu.RLock()
+	e, ok := b.open[org]
+	b.mu.RUnlock()
+	if ok {
+		return e, false
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	if app, ok := b.open[org]; ok {
-		return app, nil
+	if e, ok := b.open[org]; ok { // put there while we swapped the lock
+		return e, false
 	}
+	e = &entry{ready: make(chan struct{})}
+	b.open[org] = e
+
+	return e, true
+}
+
+// fill opens org's Base and publishes the outcome to whoever is waiting on it.
+//
+// ready is never closed without one: err is set before the work so an open that
+// unwinds still answers. An entry that did not end in a Base is dropped, so the
+// next request opens it afresh rather than being told the same thing for the
+// life of the process.
+func (b *bases) fill(org string, e *entry) {
+	e.err = fmt.Errorf("open the Base for %q stopped", org)
+
+	defer func() {
+		close(e.ready)
+		if e.err == nil {
+			return
+		}
+		b.mu.Lock()
+		if b.open[org] == e {
+			delete(b.open, org)
+		}
+		b.mu.Unlock()
+	}()
 
 	dir, err := b.p.orgDB.ProvisionOrg(org)
 	if err != nil {
-		return nil, err
+		e.err = err
+		return
 	}
 
 	connect, err := encryptedConnect(b.p.orgDB, org)
 	if err != nil {
-		return nil, err
+		e.err = err
+		return
 	}
 
-	app = core.NewBaseApp(core.BaseAppConfig{
+	app := core.NewBaseApp(core.BaseAppConfig{
 		DataDir:       dir,
 		EncryptionEnv: b.p.app.EncryptionEnv(),
 		IsDev:         b.p.app.IsDev(),
 		DBConnect:     connect,
 	})
 	if err := app.Bootstrap(); err != nil {
-		return nil, fmt.Errorf("open the Base for %q: %w", org, err)
+		e.err = fmt.Errorf("open the Base for %q: %w", org, err)
+		return
 	}
 	b.p.declare(app)
 
-	b.open[org] = app
+	e.app, e.err = app, nil
 	b.p.app.Logger().Info("base: opened", "org", org, "dir", dir)
-
-	return app, nil
 }
 
 // close releases every Base this process opened. A Base holds two SQLite
 // handles, so leaving them to the exit means the last writes of a graceful
 // shutdown land in a WAL nobody checkpoints.
+//
+// The entries come out of the map first: an open still in flight is waited for
+// rather than skipped, and waiting under the lock would meet the open trying to
+// take it.
 func (b *bases) close() {
 	b.mu.Lock()
-	defer b.mu.Unlock()
+	open := b.open
+	b.open = make(map[string]*entry)
+	b.mu.Unlock()
 
-	for org, app := range b.open {
-		if err := app.ResetBootstrapState(); err != nil {
+	for org, e := range open {
+		<-e.ready
+		if e.app == nil {
+			continue
+		}
+		if err := e.app.ResetBootstrapState(); err != nil {
 			b.p.app.Logger().Error("base: failed to close", "org", org, "error", err)
 		}
-		delete(b.open, org)
 	}
 }

@@ -61,7 +61,7 @@ func TestTheLimitIsTheProcessAndReachesTenants(t *testing.T) {
 	// The tenant's own Base still says the limiter is off, which is what makes
 	// the assertion above about where the answer is read rather than about
 	// settings happening to agree.
-	tenant, err := (&bases{p: &plugin{app: app, orgDB: db}, open: map[string]core.App{}}).base("alpha")
+	tenant, err := newBases(&plugin{app: app, orgDB: db}).base("alpha")
 	if err != nil {
 		t.Fatal(err)
 	}
