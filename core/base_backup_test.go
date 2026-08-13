@@ -110,6 +110,34 @@ func TestRestoreBackup(t *testing.T) {
 	}
 }
 
+// A restore runs past the reply that starts it, so what stopped it is recorded
+// where it can be asked for afterwards rather than only said once.
+func TestRestoreBackupRecordsWhatStopped(t *testing.T) {
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	if err := app.RestoreBackup(context.Background(), "missing.zip"); err == nil {
+		t.Fatal("Expected missing error, got nil")
+	}
+
+	failure, ok := app.Store().Get(core.StoreKeyRestoreFailure).(core.RestoreFailure)
+	if !ok {
+		t.Fatal("Expected the stopped restore to be recorded")
+	}
+
+	if failure.Name != "missing.zip" {
+		t.Fatalf("Expected the record to name missing.zip, got %q", failure.Name)
+	}
+
+	if failure.Error == "" {
+		t.Fatal("Expected the record to carry the reason")
+	}
+
+	if failure.Time.IsZero() {
+		t.Fatal("Expected the record to carry the time")
+	}
+}
+
 // -------------------------------------------------------------------
 
 func verifyBackupContent(app core.App, path string) error {
