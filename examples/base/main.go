@@ -125,17 +125,26 @@ func main() {
 	// every org a Base of its own under {DataDir}/orgs/{org} — there is no
 	// second setting to turn that on, because a deployment with orgs and one
 	// shared database is not a shape anyone wants.
-	org.MustRegister(app, org.Config{
-		// Accept the canonical *_ENDPOINT name or the *_URL alias so a
-		// deployment can set either without config drift (one way to
-		// configure Base's upstreams, two accepted spellings). Mirrors the
-		// resolution in plugins/org/kms_helpers.go.
-		IAMEndpoint:            envAny("IAM_ENDPOINT", "IAM_URL"),
-		KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
-		IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
-		IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
-		PrincipalEncryptionKey: os.Getenv("PRINCIPAL_ENCRYPTION_KEY"),
-	})
+	//
+	// It registers when an IAM endpoint is configured, and that endpoint is the
+	// SAME value the plugin already requires rather than a switch beside it. An
+	// org is resolved from identity, so with no identity provider there is
+	// nothing for a Base to be scoped to: this binary then serves ONE Base and
+	// needs no upstream at all, which is what `make dev` runs.
+	//
+	// Accept the canonical *_ENDPOINT name or the *_URL alias so a deployment
+	// can set either without config drift (one way to configure Base's
+	// upstreams, two accepted spellings). Mirrors the resolution in
+	// plugins/org/kms_helpers.go.
+	if iamEndpoint := envAny("IAM_ENDPOINT", "IAM_URL"); iamEndpoint != "" {
+		org.MustRegister(app, org.Config{
+			IAMEndpoint:            iamEndpoint,
+			KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
+			IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
+			IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
+			PrincipalEncryptionKey: os.Getenv("PRINCIPAL_ENCRYPTION_KEY"),
+		})
+	}
 
 	// Bootnode blockchain developer platform (multi-network OAuth, project keys,
 	// teams, network/node/key provisioning via bootno.de CRDs). Opt-in via
