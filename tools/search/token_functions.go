@@ -44,10 +44,12 @@ var TokenFunctions = map[string]func(
 			resolvedArgs[i] = resolved
 		}
 
-		lonA := resolvedArgs[0].Identifier
-		latA := resolvedArgs[1].Identifier
-		lonB := resolvedArgs[2].Identifier
-		latB := resolvedArgs[3].Identifier
+		// The trigonometry below takes numbers, and a coordinate read out of a
+		// geoPoint arrives as text.
+		lonA := coordinate(d, resolvedArgs[0])
+		latA := coordinate(d, resolvedArgs[1])
+		lonB := coordinate(d, resolvedArgs[2])
+		latB := coordinate(d, resolvedArgs[3])
 
 		return &ResolverResult{
 			NullFallback: NullFallbackDisabled,
@@ -189,6 +191,14 @@ var TokenFunctions = map[string]func(
 
 		return result, nil
 	},
+}
+
+func coordinate(d dialect.Dialect, arg *ResolverResult) string {
+	if arg.Extracted {
+		return d.Number(arg.Identifier)
+	}
+
+	return arg.Identifier
 }
 
 func concatUniqueParams(destParams, newParams query.Params) error {

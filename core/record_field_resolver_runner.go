@@ -494,6 +494,7 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 
 			result := &search.ResolverResult{
 				NullFallback: search.NullFallbackDisabled,
+				Extracted:    true,
 				Identifier:   dbutils.JSONExtract(r.resolver.app.Dialect(), r.activeTableAlias+"."+inflector.Columnify(prop), jsonPathStr),
 			}
 
@@ -851,6 +852,7 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 	// (https://github.com/hanzoai/base/issues/4068)
 	if field.Type() == FieldTypeJSON {
 		result.NullFallback = search.NullFallbackDisabled
+		result.Extracted = true
 		result.Identifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.activeTableAlias+"."+cleanFieldName, "")
 		if r.withMultiMatch {
 			r.multiMatch.ValueIdentifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.multiMatchActiveTableAlias+"."+cleanFieldName, "")
