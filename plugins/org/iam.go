@@ -373,9 +373,9 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 // where a downstream service needs to look up or provision IAM users
 // (onboarding, KYC reconciliation, deduplication).
 //
-// The clientId/clientSecret used here are the *service*'s own IAM application
-// credentials (e.g., the BD service's IAM client). They authorize reads against
-// the configured org. They do NOT grant superuser scope.
+// The clientId/clientSecret used here are the calling *service*'s own IAM
+// application credentials. They authorize reads against the configured org.
+// They do NOT grant superuser scope.
 
 // AdminCreds holds the service's IAM application credentials. Pass these to
 // the client via SetAdminCreds before invoking server-to-server methods.

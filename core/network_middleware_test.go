@@ -64,7 +64,7 @@ func TestParsePeerHTTPEndpoints(t *testing.T) {
 
 func TestResolveWriterURL(t *testing.T) {
 	eps := map[string]string{
-		"base-bd-0.base-network.hanzo.svc:9999": "http://bd-0.internal:8090",
+		"base-0.base-network.hanzo.svc:9999": "http://base-0.internal:8090",
 	}
 
 	cases := []struct {
@@ -74,9 +74,9 @@ func TestResolveWriterURL(t *testing.T) {
 		envPort string
 	}{
 		{"empty-owner", "", "", ""},
-		{"explicit-map", "base-bd-0.base-network.hanzo.svc:9999", "http://bd-0.internal:8090", ""},
-		{"derived-default-port", "base-bd-1.base-network.hanzo.svc:9999", "http://base-bd-1.base-network.hanzo.svc:8090", ""},
-		{"derived-no-port-in-owner", "base-bd-2", "http://base-bd-2:8090", ""},
+		{"explicit-map", "base-0.base-network.hanzo.svc:9999", "http://base-0.internal:8090", ""},
+		{"derived-default-port", "base-1.base-network.hanzo.svc:9999", "http://base-1.base-network.hanzo.svc:8090", ""},
+		{"derived-no-port-in-owner", "base-2", "http://base-2:8090", ""},
 		{"derived-custom-http-port", "peer-a:9999", "http://peer-a:9443", "9443"},
 	}
 	for _, tc := range cases {
@@ -271,7 +271,7 @@ func TestWriteForwardWriteNotLocal307(t *testing.T) {
 // TestWriteForwardConventionDerivedURL: no explicit map → port swap.
 func TestWriteForwardConventionDerivedURL(t *testing.T) {
 	n := &fakeNet{
-		owner: "base-bd-2.base-network.hanzo.svc:9999",
+		owner: "base-2.base-network.hanzo.svc:9999",
 		local: false,
 	}
 	fn := writeForward(n, nil)
@@ -285,7 +285,7 @@ func TestWriteForwardConventionDerivedURL(t *testing.T) {
 		t.Fatalf("expected 307, got %d", rec.Code)
 	}
 	loc := rec.Header().Get("Location")
-	wantPrefix := "http://base-bd-2.base-network.hanzo.svc:8090"
+	wantPrefix := "http://base-2.base-network.hanzo.svc:8090"
 	if !strings.HasPrefix(loc, wantPrefix) {
 		t.Errorf("Location: got %q, want prefix %q", loc, wantPrefix)
 	}

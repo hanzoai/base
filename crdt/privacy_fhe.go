@@ -12,8 +12,7 @@
 //
 // Status: research-grade. Only LWW-Register is implemented; the
 // pipeline delivers <1 merge/sec and 136 KB per LWW ciphertext at
-// production parameters. See audits/2026-04-12-fhecrdt-audit.pdf
-// and docs/CRDT-PRIVACY-MODELS.md.
+// production parameters. Measurements in docs/CRDT-PRIVACY-MODELS.md.
 //
 // Use age for production. Use fhe only where a third party must
 // merge ciphertexts without holding the key — sealed auctions,

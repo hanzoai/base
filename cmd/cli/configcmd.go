@@ -11,18 +11,9 @@ import (
 
 // BaseConfig is the ~/.config/base/config.json schema.
 type BaseConfig struct {
-	DefaultEnv string               `json:"default_env"`
-	Envs       map[string]EnvConfig `json:"envs"`
-	DefaultOrg string               `json:"default_org"`
-	TokenPath  string               `json:"token_path"`
-}
-
-// EnvConfig holds per-environment service URLs.
-type EnvConfig struct {
-	ATSURL string `json:"ats_url,omitempty"`
-	BDURL  string `json:"bd_url,omitempty"`
-	TAURL  string `json:"ta_url,omitempty"`
-	IAMURL string `json:"iam_url,omitempty"`
+	DefaultEnv string `json:"default_env"`
+	DefaultOrg string `json:"default_org"`
+	TokenPath  string `json:"token_path"`
 }
 
 // configFilePath returns ~/.config/base/config.json, respecting XDG_CONFIG_HOME.
@@ -63,33 +54,6 @@ func SaveBaseConfig(cfg *BaseConfig) error {
 func defaultBaseConfig() *BaseConfig {
 	return &BaseConfig{
 		DefaultEnv: "dev",
-		Envs: map[string]EnvConfig{
-			"local": {
-				ATSURL: "http://localhost:8090",
-				BDURL:  "http://localhost:8091",
-				TAURL:  "http://localhost:8092",
-				IAMURL: "http://localhost:8093",
-			},
-			"dev": {
-				ATSURL: "https://ats.localhost:8090",
-				BDURL:  "https://bd.localhost:8091",
-				TAURL:  "https://ta.localhost:8092",
-				IAMURL: "https://iam.dev.example.com",
-			},
-			"test": {
-				ATSURL: "https://ats.test.example.com",
-				BDURL:  "https://bd.test.example.com",
-				TAURL:  "https://ta.test.example.com",
-				IAMURL: "https://iam.test.example.com",
-			},
-			"main": {
-				ATSURL: "https://ats.example.com",
-				BDURL:  "https://bd.example.com",
-				TAURL:  "https://ta.example.com",
-				IAMURL: "https://iam.example.com",
-			},
-		},
-		DefaultOrg: "mlc",
 		TokenPath:  "~/.config/base/token",
 	}
 }

@@ -97,17 +97,17 @@ func TestComposePartial(t *testing.T) {
 // name expands; the static hosts stay as one each.
 func TestMixedSeeds(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd.svc", []string{"10.0.0.1", "10.0.0.2"})
-	r.Set("legacy-bd-primary", []string{"192.168.1.50"})
-	r.Set("archive-bd", []string{"192.168.1.51"})
+	r.Set("base.svc", []string{"10.0.0.1", "10.0.0.2"})
+	r.Set("legacy-primary", []string{"192.168.1.50"})
+	r.Set("archive-peer", []string{"192.168.1.51"})
 
 	m := newDNSMembership(
 		context.Background(),
-		"base-bd-0",
+		"base-0",
 		[]string{
-			"bd.svc:9999",
-			"legacy-bd-primary:9999",
-			"archive-bd:9999",
+			"base.svc:9999",
+			"legacy-primary:9999",
+			"archive-peer:9999",
 		},
 		r,
 		time.Hour,
@@ -126,15 +126,15 @@ func TestMixedSeeds(t *testing.T) {
 // dedupe so Members() doesn't list self twice.
 func TestSelfInSeedList(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("base-bd-0.bd-network.ns.svc", []string{"10.60.1.1"})
-	r.Set("base-bd-1.bd-network.ns.svc", []string{"10.60.1.2"})
+	r.Set("base-0.base-network.ns.svc", []string{"10.60.1.1"})
+	r.Set("base-1.base-network.ns.svc", []string{"10.60.1.2"})
 
 	m := newDNSMembership(
 		context.Background(),
-		"base-bd-0",
+		"base-0",
 		[]string{
-			"base-bd-0.bd-network.ns.svc:9999", // self
-			"base-bd-1.bd-network.ns.svc:9999",
+			"base-0.base-network.ns.svc:9999", // self
+			"base-1.base-network.ns.svc:9999",
 		},
 		r,
 		time.Hour,
@@ -142,8 +142,8 @@ func TestSelfInSeedList(t *testing.T) {
 	defer m.Close()
 
 	got := m.Members()
-	// self + IP of self (different string) + IP of bd-1 = at most 3
-	// but with sane dedup the "base-bd-0" symbolic name matches the
+	// self + IP of self (different string) + IP of base-1 = at most 3
+	// but with sane dedup the "base-0" symbolic name matches the
 	// IP via isSelfPeer at the transport layer. Here we just assert
 	// no duplicate NodeID strings.
 	seen := map[NodeID]int{}
@@ -161,13 +161,13 @@ func TestSelfInSeedList(t *testing.T) {
 // should dedupe to one member.
 func TestDuplicateAddresses(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd-primary", []string{"10.0.0.1"})
-	r.Set("bd-backup", []string{"10.0.0.1"}) // same IP
+	r.Set("base-primary", []string{"10.0.0.1"})
+	r.Set("base-backup", []string{"10.0.0.1"}) // same IP
 
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-primary:9999", "bd-backup:9999"},
+		[]string{"base-primary:9999", "base-backup:9999"},
 		r,
 		time.Hour,
 	)
@@ -185,13 +185,13 @@ func TestDuplicateAddresses(t *testing.T) {
 // does.
 func TestPortInheritance(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd-a", []string{"10.0.0.1"})
-	r.Set("bd-b", []string{"10.0.0.2"})
+	r.Set("base-a", []string{"10.0.0.1"})
+	r.Set("base-b", []string{"10.0.0.2"})
 
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-a:9999", "bd-b"}, // bd-b missing port
+		[]string{"base-a:9999", "base-b"}, // base-b missing port
 		r,
 		time.Hour,
 	)
@@ -213,25 +213,25 @@ func TestPortInheritance(t *testing.T) {
 func TestFlakyResolver(t *testing.T) {
 	r := &flakyResolver{
 		succeed: map[string][]string{
-			"bd-a": {"10.0.0.1"},
+			"base-a": {"10.0.0.1"},
 		},
-		failNext: map[string]int{"bd-b": 1},
+		failNext: map[string]int{"base-b": 1},
 		succeedAfterFail: map[string][]string{
-			"bd-b": {"10.0.0.2"},
+			"base-b": {"10.0.0.2"},
 		},
 	}
 
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd-a:9999", "bd-b:9999"},
+		[]string{"base-a:9999", "base-b:9999"},
 		r,
 		10*time.Millisecond,
 	)
 	defer m.Close()
 
 	initial := m.Members()
-	// self + bd-a = 2 (bd-b failed first lookup)
+	// self + base-a = 2 (base-b failed first lookup)
 	if len(initial) != 2 {
 		t.Errorf("flaky initial: got %d, want 2", len(initial))
 	}
@@ -253,12 +253,12 @@ func TestFlakyResolver(t *testing.T) {
 // polling loop or block other subscribers.
 func TestWatchBackPressure(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd", []string{"10.0.0.1"})
+	r.Set("base", []string{"10.0.0.1"})
 
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd:9999"},
+		[]string{"base:9999"},
 		r,
 		10*time.Millisecond,
 	)
@@ -272,7 +272,7 @@ func TestWatchBackPressure(t *testing.T) {
 	fast := m.Watch(context.Background())
 	<-fast // initial
 
-	r.Set("bd", []string{"10.0.0.1", "10.0.0.2"})
+	r.Set("base", []string{"10.0.0.1", "10.0.0.2"})
 
 	select {
 	case <-fast:
@@ -326,12 +326,12 @@ func TestCloseUnblocksWatchers(t *testing.T) {
 // reads. Run under `go test -race` to catch actual issues.
 func TestConcurrentRefreshAndWatch(t *testing.T) {
 	r := &fakeResolver{}
-	r.Set("bd", []string{"10.0.0.1"})
+	r.Set("base", []string{"10.0.0.1"})
 
 	m := newDNSMembership(
 		context.Background(),
 		"self",
-		[]string{"bd:9999"},
+		[]string{"base:9999"},
 		r,
 		5*time.Millisecond,
 	)
@@ -391,7 +391,7 @@ func TestConcurrentRefreshAndWatch(t *testing.T) {
 			case <-stop:
 				return
 			default:
-				r.Set("bd", addrs[i%len(addrs)])
+				r.Set("base", addrs[i%len(addrs)])
 				i++
 				time.Sleep(5 * time.Millisecond)
 			}

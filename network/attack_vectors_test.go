@@ -988,8 +988,8 @@ func TestAttack_CrossOrgKEKLeak(t *testing.T) {
 // TestAttack_HPAWrongKindSilent — R7 operator hardcodes kind=Deployment.
 //
 // Threat: HPA / KEDA scaleTargetRef.kind = "Deployment" hardcoded; when
-// the underlying workload is a StatefulSet (TA today), the autoscaler
-// never binds and capacity never grows.
+// the underlying workload is a StatefulSet, the autoscaler never binds
+// and capacity never grows.
 // Invariant: WorkloadMeta.Kind is threaded through the builder.
 // This suite can only assert against operator source; we read it as a
 // file and grep. When the operator tree is absent in the build env, skip.

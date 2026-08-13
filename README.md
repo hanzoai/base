@@ -165,7 +165,7 @@ It is the storage backend for every multi-tenant subsystem in **HIP-0106**.
 
 ## CLI
 
-The `base cli` subcommand is a complete HTTP client for operating any running Base-backed daemon from the command line. It works against `base`, `atsd`, `brokerd`, `tad`, `bdd`, or any binary that embeds Base.
+The `base cli` subcommand is a complete HTTP client for operating any running Base-backed daemon from the command line. It works against `base` or any binary that embeds Base.
 
 ### Targeting a server
 
@@ -262,7 +262,7 @@ func main() {
     // ... register domain-specific hooks and routes ...
 
     // Register system commands for a flattened CLI:
-    // `ats collection list` instead of `ats cli collection list`
+    // `myapp collection list` instead of `myapp cli collection list`
     app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app))
     app.RootCmd.AddCommand(cmd.NewServeCommand(app, true))
     cmd.AddCLISubcommands(app.RootCmd)
@@ -276,10 +276,10 @@ func main() {
 Then operate the running daemon:
 
 ```bash
-ats collection list
-ats record list trades --filter "status='settled'" --limit 20
-ats crons list
-ats daemon status
+myapp collection list
+myapp record list posts --filter "title~'hello'" --limit 20
+myapp crons list
+myapp daemon status
 ```
 
 ### Registration patterns
