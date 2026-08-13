@@ -1,6 +1,7 @@
 package archive_test
 
 import (
+	"archive/zip"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,9 +49,21 @@ func TestCreateSuccess(t *testing.T) {
 		t.Fatalf("Expected zip with name %q, got %q", zipName, name)
 	}
 
-	expectedSize := int64(544)
+	expectedSize := int64(561)
 	if size := info.Size(); size != expectedSize {
 		t.Fatalf("Expected zip with size %d, got %d", expectedSize, size)
+	}
+
+	// An absence is the one thing a listing cannot show, so the archive names
+	// what it left out.
+	zr, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer zr.Close()
+
+	if expected := "omits a/b/c, test"; zr.Comment != expected {
+		t.Fatalf("Expected the archive to say %q, got %q", expected, zr.Comment)
 	}
 }
 

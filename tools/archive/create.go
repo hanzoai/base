@@ -15,6 +15,10 @@ import (
 //
 // You can specify skipPaths to skip/ignore certain directories and files (relative to src)
 // preventing adding them in the final archive.
+//
+// What was skipped is written as the archive's comment, because listing a zip
+// shows what is in it and nothing shows what is not. Whoever holds the file can
+// then tell what it covers without knowing how it was made.
 func Create(src string, dest string, skipPaths ...string) error {
 	if err := os.MkdirAll(filepath.Dir(dest), os.ModePerm); err != nil {
 		return err
@@ -31,6 +35,12 @@ func Create(src string, dest string, skipPaths ...string) error {
 	zw.RegisterCompressor(zip.Deflate, func(out io.Writer) (io.WriteCloser, error) {
 		return flate.NewWriter(out, flate.BestSpeed)
 	})
+
+	if len(skipPaths) > 0 {
+		if err := zw.SetComment("omits " + strings.Join(skipPaths, ", ")); err != nil {
+			return errors.Join(err, zw.Close(), zf.Close(), os.Remove(dest))
+		}
+	}
 
 	err = zipAddFS(zw, os.DirFS(src), skipPaths...)
 	if err != nil {
