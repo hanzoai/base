@@ -1,52 +1,67 @@
-# CRDT Privacy Model Analysis: Plaintext vs E2E (age) vs fheCRDT
+# CRDT privacy backends: plaintext, age, FHE
 
-**Date:** 2026-04-12
-**Author:** Research brief for Base team
-**Hardware:** Apple M1 Max, macOS arm64, Go 1.26.1
-**Scope:** Hanzo Base admin/sync CRDT layer (`hanzo/base/crdt/`)
+**Measured:** 2026-04-12, Apple M1 Max, macOS arm64, Go 1.26.1
+**Scope:** the CRDT op-log in `crdt/` — document sync, not the record store
+
+`Privacy` is one interface with three implementations (`crdt/privacy.go`).
+Every op leaving a replica is sealed by `EncryptOp` and every op arriving is
+opened by `DecryptOp`; the CRDT machinery above that line is identical whichever
+backend is mounted, so choosing one changes no application code.
+
+- `plaintext/v1` — JSON, no encryption. The default.
+- `age/v1` — each op sealed to the recipients' `luxfi/age` keys, ML-KEM-768 +
+  X25519 hybrid. The relay holds ciphertext and can compute nothing on it.
+- `fhe/tfhe-v1` — `luxfi/fhe`, behind `-tags fhe`. The relay can merge
+  ciphertexts without holding a key.
+
+This document is the evidence behind that default: what each backend costs,
+measured, and which deployment each one answers. The short version is that FHE
+costs about eight orders of magnitude more than age and buys a property only
+one deployment shape needs.
+
+## Which one
+
+```
+Does a party that must not read the data need to MERGE it?
+ YES -> fhe/tfhe-v1        (and read section 2.4 first)
+  NO -> Is the relay trusted to read?
+         YES -> plaintext/v1 + TLS
+          NO -> age/v1 over a relay that only stores and forwards
+```
 
 ---
 
-## Decision Flowchart
+## 1. What each backend answers
 
-```
-Is Base self-hosted (single user, single process)?
- YES -> Plaintext CRDT + TLS (luxfi/zap or standard TLS)
-  NO -> Is the server trusted to read all data?
-         YES -> Plaintext CRDT + TLS
-          NO -> Does the server need to merge/aggregate data it cannot decrypt?
-                 YES -> fheCRDT (not viable today; see cost analysis)
-                  NO -> E2E (luxfi/age) encrypted ops over dumb relay
-```
+### The three shapes
 
-Result: for every realistic Base deployment today, either Plaintext or E2E wins.
-fheCRDT is only theoretically needed for a deployment shape Base does not serve.
+| Shape | Who runs the relay | What it may read |
+|-------|--------------------|------------------|
+| **Self-hosted** | The user, on their own machine. 2–4 devices sync over LAN/WAN. | Everything. It is their machine. |
+| **Hosted, operator trusted** | Hanzo, or the org itself. | Everything it serves. Reading is the job. |
+| **Hosted, operator not trusted** | Hanzo, for an org that wants the operator unable to read at rest. | Ciphertext. |
 
----
+Base is multi-tenant, but not on this axis. A request resolves an org from its
+verified token and lands on that org's own Base at
+`{DataDir}/orgs/{org}/data.db` — separation is one file per tenant, and the
+process reads each file because it answers that tenant's queries and evaluates
+that tenant's rules. Tenancy here is a boundary between tenants, not a claim
+that the process cannot read. Nothing in Base merges across tenants, so no
+deployment asks a relay to compute on data it cannot decrypt.
 
-## 1. Threat Model
+### The matrix
 
-### Deployment Shapes Base Actually Faces
+| Shape | plaintext/v1 | age/v1 | fhe/tfhe-v1 |
+|-------|--------------|--------|-------------|
+| **Self-hosted** | Right answer. TLS covers transit; there is no third party. | Overhead for nothing — the user controls the relay. | Nothing to buy. |
+| **Hosted, operator trusted** | Right answer for admin metadata: collections, settings, logs. | Available if an org wants it anyway. | Nothing to buy; the relay does not compute on ops. |
+| **Hosted, operator not trusted** | Does not hold. The relay reads what it stores. | Right answer. Each tenant seals to its own keys; the relay stores and forwards. | Buys server-side merge the deployment does not ask for, at section 2.4's cost. |
 
-| Shape | Description | Frequency |
-|-------|-------------|-----------|
-| **Self-hosted** | Single user runs Base on own machine. 2-4 device sync via LAN/WAN. | Primary use case |
-| **Single-tenant SaaS** | One org per Base process. Server operated by org or by Hanzo on their behalf. | Secondary |
-| **Multi-tenant SaaS** | Multiple orgs share a Base process. Server operated by Hanzo. | Not supported today. Base is single-tenant per process by design. |
-
-### Threat Model Matrix
-
-| Deployment Shape | Plaintext + TLS | E2E (age) | fheCRDT |
-|------------------|-----------------|-----------|---------|
-| **Self-hosted** | **Acceptable.** Server is the user's own machine. TLS protects transit. No third party sees data. | Unnecessary overhead. User already controls the server. | Absurd. 10,000x overhead for zero benefit. |
-| **Single-tenant SaaS** | **Acceptable if org trusts operator.** Hanzo (or operator) can read admin records. For most admin metadata (collections, settings, logs) this is fine. | **Required if org does NOT trust operator** with data at rest. Prevents operator from reading synced content. Server acts as dumb relay. | Unnecessary. No cross-tenant aggregation needed. Server does not compute on data. |
-| **Multi-tenant SaaS** | **Unacceptable.** Server sees all tenants' data. One breach exposes everyone. | **Acceptable.** Each tenant encrypts to their own keys. Server relays opaque blobs. Cannot merge across tenants, but that is not a requirement for admin data. | **Only model that allows server-side merge across tenants.** But Base does not need server-side cross-tenant merge for admin records. |
-
-### Conclusion on Threat Models
-
-Base is single-tenant per process. The multi-tenant SaaS shape does not exist in production. Even if it did, admin records (collections, users, settings, logs) do not need cross-tenant homomorphic aggregation. The server never needs to compute on data it cannot decrypt.
-
-fheCRDT solves a problem Base does not have.
+The property FHE alone provides — merge without a key — has no consumer in
+Base. Sync is state-vector based: a device sends its state vector, receives the
+ops it lacks, and merges locally. The relay's job is to hold and forward. That
+is why `plaintext/v1` is the default and `age/v1` is the escalation, and why
+`fhe/tfhe-v1` sits behind a build tag rather than a config flag.
 
 ---
 
@@ -148,120 +163,133 @@ A GCounter with 4 nodes stores 4x uint64 values. Under fheCRDT:
 
 ---
 
-## 3. Integration Cost
+## 3. What each backend costs to carry
 
-### 3.1 Plaintext (current state, no changes)
+### 3.1 plaintext/v1
 
-| Dimension | Cost |
-|-----------|------|
-| Lines of code | 0 (already implemented) |
-| New deps | 0 |
-| Binary size delta | 0 |
-| CI surface | 0 |
-| Developer UX | None. Works today. |
+Nothing. No dependency, no key material, no binary weight, no setup. It is the
+default because it is free and because most deployments run the relay
+themselves.
 
-### 3.2 E2E (luxfi/age)
+### 3.2 age/v1
 
 | Dimension | Cost |
 |-----------|------|
-| Lines of code | ~200-300 lines. Wrap `SyncManager.HandleSync` to decrypt incoming, encrypt outgoing. Add key derivation from passphrase (age scrypt) or device keypair (age hybrid). |
-| New deps | `github.com/luxfi/age` (~6 transitive deps, all pure Go). Optionally `github.com/luxfi/zap` for PQ-TLS transport (already used elsewhere). |
-| Binary size delta | ~2-3 MB (ML-KEM implementation + ChaCha20-Poly1305 stream). |
-| CI surface | Add encrypt/decrypt round-trip tests to existing CRDT test suite. ~50 lines of test code. |
-| Developer UX | **Option A (recommended):** Derive per-document key from user passphrase via age scrypt. User provides passphrase at Base startup. No key file management. **Option B:** age hybrid keypair stored in Base data directory. User manages key backup. **Option C:** KMS-backed. Key stored in `kms.hanzo.ai`, fetched at startup. Best for SaaS. |
+| Deps | `github.com/luxfi/age` — ~6 transitive, all pure Go. |
+| Binary | ~2–3 MB: ML-KEM plus the ChaCha20-Poly1305 stream. |
+| Key material | 15 KB identity per device. Derive from a passphrase via age scrypt, hold a hybrid keypair in the data directory, or fetch from `kms.hanzo.ai` — the last is the one for hosted deployments. |
+| Per message | ~140 µs to seal, ~123 µs to open, on top of ~20 µs of merge. |
 
-**Integration pattern:**
+The relay stores and forwards sealed blobs and can do nothing else with them,
+which has consequences worth stating plainly:
 
-```
-SyncManager.HandleSync(clientID, raw []byte)
-  -> age.Decrypt(raw, identity)     // ~130 us
-  -> existing CRDT merge logic      // ~20 us
-  -> age.Encrypt(response, recipient) // ~140 us
-  -> return encrypted response
-```
+- `Diff()` runs on a client. The relay cannot compute one.
+- The relay holds opaque snapshots and relays updates.
+- Client-to-client sync is unaffected: both ends hold the key.
+- Replica-to-replica sync needs the replicas to share a key.
 
-The server becomes a dumb relay. It stores and forwards age-encrypted blobs. It cannot merge, diff, or inspect CRDT state. This means:
-- `SyncManager.Diff()` must run on the client, not the server.
-- The server stores opaque snapshots and relays updates.
-- Client-to-client sync still works (both have the key).
-- Server-to-server sync for multi-replica requires shared key (single-tenant is fine).
+Seal per sync message, not per op. Sealing individually costs a 1,723 B header
+each; one envelope over a batched 131 KB session costs ~1.7 KB total.
 
-### 3.3 fheCRDT (luxfi/fhe)
+### 3.3 fhe/tfhe-v1
+
+Behind `-tags fhe`, and research-grade: `crdt/privacy_fhe.go` implements
+LWW-Register and nothing else, at under one merge per second and 136 KB per
+ciphertext at production parameters.
 
 | Dimension | Cost |
 |-----------|------|
-| Lines of code | ~1,500-2,500 lines. Rewrite every CRDT type to operate on `fhe.Ciphertext` instead of `uint64`/`any`. Implement homomorphic max (for GCounter merge), homomorphic comparison (for LWW timestamp), homomorphic set operations. RGA (text) is not feasible under FHE. |
-| New deps | `github.com/luxfi/fhe` (pulls in `luxfi/lattice/v7` -- heavy lattice crypto). `github.com/luxfi/lattice/v7` has 40+ transitive deps. |
-| Binary size delta | ~15-25 MB (lattice arithmetic, NTT, ring operations). |
-| CI surface | Every CRDT type needs FHE-specific tests. Bootstrapping takes 290 ms per test setup. Test suite runtime would increase from <1 sec to >60 sec. |
-| Developer UX | **Severe.** Every Base user must: (a) generate FHE keys (~290 ms), (b) distribute 129.2 MB bootstrap key to all devices, (c) accept that text editing (RGA) is not supported under FHE, (d) accept 20-second merge latency for counters. |
+| Deps | `github.com/luxfi/fhe`, pulling `luxfi/lattice/v7` and its 40+ transitive deps. |
+| Binary | ~15–25 MB of lattice arithmetic, NTT and ring operations. |
+| Key material | 129.2 MB bootstrap key **per device**, plus 290 ms to generate it. |
+| CI | ~290 ms of bootstrap per test setup; the CRDT suite goes from under a second to over a minute. |
 
-**What cannot be implemented under fheCRDT:**
+Carrying the rest of the document model under FHE is not a matter of writing
+more code. What the primitive cannot express:
 
 - **RGA (text editing):** RGA requires linked-list traversal with pointer chasing based on character IDs. This is a sequential, data-dependent operation that FHE cannot express efficiently. Each character comparison would require a homomorphic string comparison circuit. For a 1000-character document: millions of gate evaluations, each taking 108 ms. Estimated time: hours to days per merge. **Not feasible.**
 - **ORSet:** Requires set membership tests and tag comparison. Each tag is a variable-length string. Homomorphic string comparison is theoretically possible but impractical. **Not feasible.**
 - **LWWRegister with arbitrary values:** FHE operates on integers. Arbitrary `any` values (strings, structs, nested objects) cannot be homomorphically compared. Only numeric timestamps could be compared, but the value itself cannot be meaningfully processed. **Partially feasible (timestamp merge only, value is opaque).**
 - **MVRegister:** Requires dominance testing across variable-length entry lists. **Not feasible.**
 
-Only `GCounter` and `PNCounter` (integer-only CRDTs) can be meaningfully implemented under FHE. This covers 2 of 5 CRDT types in the Base document model.
+Only the integer-only CRDTs — `GCounter` and `PNCounter` — could be carried
+meaningfully, two of the five types in the document model, and neither is
+implemented today.
 
 ---
 
-## 4. Analysis
+## 4. Why plaintext is the default
 
-### The core question: does Base need server-side computation on encrypted data?
+Sync is state-vector based: a device sends its state vector, receives the ops
+it lacks, and merges locally. The relay holds and forwards. There is no point
+in the protocol where a party that must not read the data needs to compute on
+it, which is the only thing FHE buys.
 
-No. Base admin records sync between a user's 2-4 devices. The sync protocol is state-vector based: each device sends its state vector, receives missing ops, and merges locally. The server's role is relay and storage, not computation.
+Homomorphic merge would let a relay merge for an offline client. Against that:
+the workload is under 10 ops/sec per tenant and devices sync directly; RGA,
+ORSet and MVRegister have to merge on the client regardless; and the cost is
+92 million times a plaintext merge, 57 thousand times the storage, and a
+129 MB key on every device.
 
-E2E encryption makes the server a dumb pipe. This is exactly what it should be for the SaaS deployment shape where the operator should not see admin data.
-
-fheCRDT would allow the server to merge on behalf of offline clients. But:
-1. Base has <10 ops/sec per tenant. Devices sync directly.
-2. Merge must happen anyway on the client for RGA/ORSet/MVRegister.
-3. The cost (92M x slower, 57K x larger, 129 MB keys) is catastrophic.
-4. 3 of 5 CRDT types cannot be implemented under FHE at all.
-
-### When would fheCRDT make sense?
-
-fheCRDT becomes relevant when:
-- The server must aggregate across many clients that never sync directly (e.g., anonymous voting tallies, privacy-preserving analytics).
-- The data is purely numeric (counters, sums, max).
-- Latency tolerance is seconds, not milliseconds.
-- The number of merge operations is small (10s, not 1000s).
-
-None of these conditions match Base admin data sync.
+It earns its place elsewhere — a relay aggregating across clients that never
+sync with each other (sealed auctions, tallies, cross-base analytics), on
+numeric data, where seconds per operation is acceptable and merges are counted
+in tens. That is what the build tag is for.
 
 ---
 
-## 5. Recommendation
+## 5. What this layer does and does not do
 
-**For self-hosted Base:** Stay plaintext. Add no encryption layer. TLS on the wire (already present) is sufficient. Zero integration cost, zero performance cost.
+`crdt/` is deliberately policy-free. It seals and opens ops and merges CRDTs;
+it enforces nothing about who is talking to it. That is a layering choice, and
+it means three things are yours to put in front of it:
 
-**For single-tenant SaaS Base (future):** Add optional E2E encryption using `luxfi/age` with hybrid ML-KEM-768 + X25519. ~200 lines of integration code. ~140 us per sync message. ~2 KB bandwidth overhead per batch. Key derived from passphrase (scrypt) or stored in KMS. Ship it as a `--encrypt-sync` flag on Base startup.
+- **A sync message carries no proof of who sent it.** The layer parses a
+  `SyncMessage` and merges what it finds; anyone who can deliver bytes to it
+  can propose a merge. **Authenticate at the transport** — mTLS between
+  replicas, an IAM-verified session on the socket that carries client sync —
+  and treat reachability as authority, because here it is.
+- **Nothing throttles a merge.** `SyncManager` merges as fast as it is fed, and
+  a document's op-log grows with what it accepts. **Put a per-document limit at
+  the HTTP or WebSocket edge** before that edge faces anything but localhost.
+- **`gob` is Go-only.** `Document.Encode`/`Decode` use it, so a non-Go client
+  reads through the JSON `OpEnvelope` path (`SealOps`/`OpenOps`) rather than
+  the snapshot. Not a security property — a portability one, and the reason to
+  prefer the envelope in mixed-language deployments.
 
-**Do not implement fheCRDT for Base.** The cost is 8 orders of magnitude higher than E2E for a threat model Base does not face. The luxfi/fhe library is well-built for its intended purpose (confidential EVM execution), but CRDT admin sync is not that purpose.
+Sealing does not substitute for either of the first two. `age/v1` stops a relay
+reading an op; it does not stop an unauthenticated peer submitting one, because
+a peer holding the recipients' public keys can seal a perfectly valid op. Read
+that as: encryption answers confidentiality here, and authentication is a
+separate thing you still have to bring.
 
-### Implementation Priority
-
-1. **Now:** Nothing. Plaintext is correct for the current deployment shape.
-2. **When SaaS ships:** Add `luxfi/age` E2E as opt-in. Budget: 1-2 days integration.
-3. **Never (for Base):** fheCRDT.
+What the layer does hold, with a regression test for each
+(`crdt/privacy_security_test.go`): an envelope's privacy tag cannot be
+downgraded to plaintext on a sealed document; the right tag with the wrong key
+does not open; an envelope from one document does not replay into another;
+`Encode` seals the snapshot rather than emitting the plaintext under it; and a
+raw blob with no document binding is refused.
 
 ---
 
 ## Sources
 
-All performance numbers measured directly on this hardware during this analysis. Source code references:
+Every number above was measured on the hardware named at the top, not
+estimated. What was read to produce them:
 
-1. `hanzo/base/crdt/types.go` -- GCounter, PNCounter, LWWRegister, ORSet, MVRegister implementations
-2. `hanzo/base/crdt/sync.go` -- SyncManager, state-vector protocol
-3. `hanzo/base/crdt/document.go` -- Document container, Encode/Decode, Diff
-4. `hanzo/base/crdt/text.go` -- RGA (Replicated Growable Array) for collaborative text
-5. `luxfi/fhe/fhe.go` -- TFHE parameters, key generation, bootstrap key
-6. `luxfi/fhe/encryptor.go` -- Bit/integer encryption
-7. `luxfi/fhe/evaluator.go` -- Boolean gate evaluation (AND, OR, XOR with bootstrapping)
-8. `luxfi/fhe/integer_ops.go` -- Homomorphic comparison, bitwise ops
-9. `luxfi/fhe/serialization.go` -- Ciphertext/key serialization sizes
-10. `luxfi/age/pq.go` -- ML-KEM-768 + X25519 hybrid encryption (HybridRecipient/HybridIdentity)
-11. `luxfi/age/age.go` -- age Encrypt/Decrypt, stream cipher (ChaCha20-Poly1305)
-12. `hanzo/base/base.go` -- Base app launcher, single-tenant per process architecture
+- `crdt/privacy.go` — the `Privacy` interface and `plaintext/v1`
+- `crdt/privacy_age.go`, `crdt/privacy_fhe.go` — the other two backends
+- `crdt/types.go` — GCounter, PNCounter, LWWRegister, ORSet, MVRegister
+- `crdt/text.go` — RGA, the collaborative-text type
+- `crdt/sync.go` — SyncManager and the state-vector protocol
+- `crdt/document.go` — the document container, Encode/Decode, Diff, SealOps/OpenOps
+- `luxfi/fhe` — TFHE parameters and key generation (`fhe.go`), bit and integer
+  encryption (`encryptor.go`), gate evaluation with bootstrapping
+  (`evaluator.go`), homomorphic comparison (`integer_ops.go`), and the
+  serialized sizes (`serialization.go`)
+- `luxfi/age` — the hybrid ML-KEM-768 + X25519 recipient and identity
+  (`pq.go`), and the ChaCha20-Poly1305 stream (`age.go`)
+
+The tenancy model — one Base per org under `{DataDir}/orgs/{org}/data.db`,
+resolved from the verified token — is in `plugins/org/` and described in
+`LLM.md`.
