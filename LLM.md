@@ -262,7 +262,7 @@ identical across tiers:
 | Tier | Backend | When | Status |
 |------|---------|------|--------|
 | 0 (default) | embedded SQLite / `:memory:` | everything out of box | core `dialect.go` |
-| 1 | PostgreSQL | relational scale, multi-writer | dialect is `hanzoai/orm/dialect` (NOT a `core/dialect_postgres.go` — no such file) + `core/db_connect_postgres.go` + `plugins/cloudsql`. Selector shipped (`BASE_DB_TIER=sql`); **never executed — no Postgres in CI, no test opens a connection.** See the blockers above. |
+| 1 | PostgreSQL | relational scale, multi-writer | dialect is `hanzoai/orm/dialect` (NOT a `core/dialect_postgres.go` — no such file) + `core/db_connect_postgres.go` + `plugins/cloudsql`. Runs the whole `/v1` data plane; see the section below for what a live run settled. **No Postgres in CI and no test opens a connection**, so it is verified by hand and nothing stops it regressing. |
 | 2 | `hanzoai/datastore` | true horizontal OLAP analytics | repo exists; backend adapter = TODO |
 | +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
 
@@ -640,7 +640,29 @@ migrations, collection DDL, record CRUD, paging, sorting, filtering, the
 per-hour log rollup. Proved by running it — a collection created over the API
 lands as a real table with `text`/`numeric`/`jsonb` columns and its declared
 index, and records list, page, sort, filter, update and delete through the same
-handlers SQLite serves.
+handlers SQLite serves. Realtime, files, auth records, crons, batch and
+`/rest/v1` were exercised the same way, against PostgreSQL 18.3.
+
+Three things a live run settled, each of them a place where SQLite's shape had
+been assumed:
+
+- **Settings are encrypted at rest on both engines.** The ciphertext is base64
+  and `_params.value` is `jsonb`, so it is stored as a JSON string. A row
+  written by an older binary is read as-is and rewritten on the first settings
+  write; after that an older binary refuses to start rather than misreading it.
+  Forward-only, and loud in the direction that is not.
+- **The exec mode is `describe_exec`.** A pooled connection holds a prepared
+  plan that a schema change invalidates, so without it every collection edit is
+  followed by a burst of failures on whichever connections are stale. It costs a
+  parse per execution, worst on a local socket and pipelined into the same round
+  trip over a network. `exec` and `simple_protocol` are not alternatives: Base
+  binds JSON as `[]byte` in many places, which those modes send as `bytea`.
+- **The write pool is single-connection only where the engine requires it.** That
+  is SQLite's rule; the cap is asked of each connection's own driver, so the aux
+  database answers for itself. Lifting it makes lock-order deadlocks reachable in
+  one process, where a single connection had been serialising them away — which
+  is why retrying a serialization failure is what makes concurrent writes correct
+  rather than merely possible.
 
 Nothing in Base branches on the engine. It asks `app.Dialect()`, which resolves
 from the driver the data DB was opened with, for the pieces that differ:
@@ -652,7 +674,8 @@ from the driver the data DB was opened with, for the pieces that differ:
 | generated values in DDL | `Now()`, `Random(n)`, `Json()`, `Bytes()` |
 | identifier quoting for hand-built index DDL | `Quote()`, used by `dbutils.Index.Build` |
 | what the engine has no equivalent of | `Row()`, `Checkpoint()`, `Format()`, each empty where the feature is absent, so the caller falls back or refuses |
-| what the schema needs before it exists | `Prelude()` — Postgres gets a nondeterministic ICU collation named `nocase`, so `COLLATE NOCASE` means the same thing on both |
+| what the schema needs before it exists | `Prelude()` — Postgres gets a nondeterministic ICU collation named `nocase`, so `COLLATE NOCASE` means the same thing on both. It is for sorting and equality; pattern matching goes through `Like()`, because PG17 refuses a nondeterministic collation for LIKE |
+| how a comparison is spelled against a typed column | `Like()`, `Bool()`, `Number()` — see below |
 
 The dialect lives in `hanzoai/orm/dialect`, not here. That is the point: the
 thing this repo must not grow is a second hand-rolled dialect, and the estate's
@@ -677,11 +700,28 @@ layout and an index can be built on the substring; equality is
 condition, because only some engines let one be omitted; an `int64` column is
 `BIGINT`, since `INTEGER` is 32 bits outside SQLite.
 
-Known limit, and it is a type question rather than a spelling one: comparing a
-JSON sub-path to a **number** under Postgres is refused by the engine. The
-extraction yields text and the literal binds as a number, and nothing in the
-filter language says which of the two the comparison meant — SQLite dodges this
-by being dynamically typed. `meta.n = "3"` works; `meta.n = 3` does not.
+Comparing a JSON sub-path to a **number** works on both engines. A value read
+out of a JSON document is text wherever the engine types its columns, so the
+filter layer reads it back as a number where it is compared to one —
+`dialect.Number`, a guarded cast on Postgres, so a value that is not a numeral
+fails to match rather than raising. That is the answer SQLite already gives for
+the same data, and an engine difference should not become an error.
+
+Three spellings are the dialect's, all for the same reason: the schema is
+generated through the dialect, so a column is a real `boolean`, `numeric` or
+`jsonb`, and comparing it needs the engine's own words rather than SQLite's.
+`Like` (`LIKE`/`ILIKE` — only SQLite's LIKE folds case, and the nocase collation
+is not the fix, since PG17 refuses it for LIKE outright), `Bool` (`1` / `'true'`,
+quoted so one literal serves both a boolean column and a JSON reading), and
+`Number`. The cast is applied only where a value came out of JSON, marked at the
+two extraction sites, so a real numeric column and the `geoDistance` result are
+left alone.
+
+What still differs is the question the filter language does not answer: a JSON
+**number** compared to a **text** literal. `meta.n = "3"` matches on Postgres,
+where the reading is text, and does not on SQLite, where `json_extract` hands
+back an integer. Write `meta.n = 3` for a number. Postgres also refuses `~`
+against a numeric column, which SQLite answers by stringifying the value.
 
 Also SQLite-only by design, and not on the sql path: the per-tenant `store/`
 databases, the WAL/PITR replication in `network/`, and `hack/pitr-restore.go`.
