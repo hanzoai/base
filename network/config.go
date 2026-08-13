@@ -103,6 +103,16 @@ func ConfigFromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("BASE_NETWORK=%q: must be 'quasar' or 'standalone'", mode)
 	}
 
+	// Encryption at rest is decided by how a database is opened, not here: a
+	// per-org shard is opened with a key derived from KMS, and the process
+	// database takes its protection from the volume it sits on. Nothing in this
+	// package changes either, so a name that reads like a switch for them is
+	// refused. An operator who sets it has an expectation about data at rest,
+	// and the only honest answers are to meet it or to say so.
+	if v := strings.TrimSpace(os.Getenv("BASE_ENCRYPT")); v != "" {
+		return Config{}, fmt.Errorf("BASE_ENCRYPT=%q: not a setting. A per-org shard is opened with a key derived from KMS. Settings are encrypted by naming an env var with --encryptionEnv. The process database takes its protection from the volume it is on", v)
+	}
+
 	return cfg, cfg.validate()
 }
 
