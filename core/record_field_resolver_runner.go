@@ -204,16 +204,12 @@ func (r *runner) processRequestAuthField() (*search.ResolverResult, error) {
 		// row — which is the whole point of `owner = @request.auth.id` and what
 		// Postgres answers, where `owner = NULL` is NULL and NULL is not true.
 		//
-		// The identifier alone could not say that. `NULL` reads as an EMPTY
+		// The identifier alone cannot say that: `NULL` reads as an EMPTY
 		// identifier to the filter compiler, and equality against an empty
-		// identifier is rewritten to `(owner = '' OR owner IS NULL)` so that a
-		// missing value can still be compared — which handed every unowned row
-		// to anyone who asked. Each step is reasonable alone; together they
-		// inverted the most common rule anyone writes.
-		//
-		// Stating it on the built comparison instead settles it for every
-		// operator at once: `!=` against an absent identity excludes everything
-		// too, exactly as `owner <> NULL` does.
+		// identifier is rewritten so that a missing value can still be compared.
+		// So it is stated on the built comparison instead, which settles it for
+		// every operator at once: `!=` against an absent identity excludes
+		// everything too, exactly as `owner <> NULL` does.
 		return &search.ResolverResult{
 			Identifier: "NULL",
 			AfterBuild: func(query.Expression) query.Expression {

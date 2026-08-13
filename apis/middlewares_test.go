@@ -689,13 +689,9 @@ func TestExternalAuthGuard(t *testing.T) {
 }
 
 // TestExternalAuthOnlyHasNoFallback pins that IAM is the only auth when the
-// platform plugin is registered — for _superusers as much as for anybody.
-//
-// This test used to assert the opposite, because the code did: a local Base
-// token was accepted for _superusers whenever JWKS was unset or validation
-// failed. That is a second, independently-keyed path to the widest authority
-// the process has, and it opened exactly when the first one was broken. An IAM
-// outage turned "nobody can sign in" into "a local token is enough".
+// platform plugin is registered — for _superusers as much as for anybody, and
+// whether or not JWKS is configured or reachable. A local Base token is refused
+// in every one of those cases.
 func TestExternalAuthOnlyHasNoFallback(t *testing.T) {
 	t.Parallel()
 

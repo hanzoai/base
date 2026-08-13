@@ -72,7 +72,7 @@ collection with no list rule refuses on both doors.
 nothing that speaks `/v1/collections` breaks. The 23 Go repos embedding Base
 consume Go types, not URLs.
 
-### RLS — the hard part, and one live exposure
+### RLS — one enforcement path, in Go
 
 Postgres enforces RLS in the engine. SQLite has none, so Base enforces policies
 itself. **Do not delegate to native Postgres RLS on the sql tier**: Base rules
@@ -84,32 +84,27 @@ null-safe identically on both engines — delegating would throw away exactly th
 One enforcement path in Go. Native RLS is worth enabling only as a backstop
 against connections that are not Base.
 
-What is already right: rules ARE predicates, ANDed into the query before
-pagination and before the count; a joined collection contributes its own list
-rule; `?expand=` applies the related collection's view rule. Base is also
-RLS-on-by-default, which is better than parity.
+Rules ARE predicates, ANDed into the query before pagination and before the
+count; a joined collection contributes its own list rule; `?expand=` applies the
+related collection's view rule. Base is RLS-on-by-default, which is better than
+parity.
 
-**Live exposure — `owner = @request.auth.id` leaks to anonymous callers.** With
-no auth, `processRequestAuthField` returns the identifier `NULL`
-(`core/record_field_resolver_runner.go:201`); `isEmptyIdentifier` counts `"null"`
-as empty (`tools/search/filter.go:441`); so `resolveEqualExpr` emits
-`(owner = '' OR owner IS NULL)` (`filter.go:393`). Every row with an empty or
-NULL owner becomes publicly readable. Postgres does the opposite — `= NULL`
-yields NULL and the row is hidden. This is a silent inversion of the single most
-common policy anyone writes. The fix is to stop `@request.auth.*` collapsing to
-empty, and it needs a differential test corpus, because it flips any rule written
-as `@request.auth.id = ""` to mean "allow if anonymous".
+**An absent identity matches no row.** `@request.auth.*` with nobody signed in
+resolves to a comparison that excludes everything
+(`core/record_field_resolver_runner.go:201-222`), which is what `owner =
+@request.auth.id` means and what Postgres answers, where `owner = NULL` is NULL
+and NULL is not true. It is stated on the built comparison rather than on the
+identifier, so it settles every operator at once — `!=` against an absent
+identity excludes everything too, exactly as `owner <> NULL` does.
 
-**Missing `WITH CHECK` on UPDATE.** `createRule` has true `WITH CHECK` — a CTE
-shadows the table with the would-be row and the rule runs against it
-(`apis/record_crud.go:294-317`). UPDATE has no post-image check, so a ported
-`USING (owner = auth.uid())` lets a user hand their row to someone else. The CTE
-machinery is directly reusable.
-
-Also: `/api/ws` binds subscribe with no auth (harmless while it carries only CRDT
-and presence, catastrophic the moment records go over it); a JWKS validation
-failure still admits a local token for `_superusers`; and the multi-match
-subquery degrades to `0=1`, which fails OPEN under negation.
+**UPDATE has a post-image check.** `shadowRow` (`apis/record_crud.go:229-271`)
+stands a one-row CTE in for the record as it WOULD be after the write, and the
+update rule compiles against that shadow exactly as it would against the
+collection (`apis/record_crud.go:532-556`). Postgres calls this `WITH CHECK` and
+reuses `USING` for it when a policy omits one, so a ported policy means this
+whether or not it says so. The rule decides which row may be touched AND what it
+is allowed to look like afterwards; those are two questions and both are asked.
+`createRule` has had this all along.
 
 ### Per-tenant storage — the request reaches the org's Base
 
@@ -148,37 +143,31 @@ path (`actsInNamedOrg`, `publishableReachesNoBase`, `namesItsOwnUser`):
 Refusal is **403 and never 404** — a 404 is an answer about the data, so it tells
 a caller its token reached that org.
 
-This file used to say the rule was stated on the subtree, "which is what makes a
-handler that forgets it impossible to write". That was false. `tools/router`
-inherits middleware down the GROUP tree and not down the URL, so a route
-registered off the router at the identical address carried nothing — and two
-live mechanisms register exactly that way: `/v1/bases` itself, and `jsvm`'s
-`routerAdd`, which takes a path string from an extension and validates none of
-it. It is the address that carries the data, so it has to be the address that
-carries the rule.
+Why the ROUTER and not the subtree: `tools/router` inherits middleware down the
+GROUP tree and not down the URL, so a route registered off the router at the
+identical address inherits nothing. Two live mechanisms register exactly that
+way — `/v1/bases` itself, and `jsvm`'s `routerAdd`, which takes a path string
+from an extension. It is the address that carries the data, so it has to be the
+address that carries the rule, and stating it once on the router is what makes a
+handler that forgets it impossible to write.
 
-Stating it four times is what shipped before that, and three of the four were
-wrong. `/config` and `/customers` asked nothing; `/creds` asked `checkOrgAccess`,
-which looked the org up in a local `_orgs` table and returned TRUE on a miss —
-and `_orgs` was written by nothing, so it missed always and granted always.
-`_orgs`, `_org_members` and their four helpers are gone: a second answer to "who
-is in this org" that nothing filled, and the emptiness that made it look unused
-was what made it admit everyone.
+Membership is the token's to state. There is no local `_orgs` or `_org_members`
+collection and no local `checkOrgAccess`: a second answer to "who is in this
+org" is one that can disagree with the credential the request arrived on, and
+the one it arrived on wins.
 
 **Publishable means public, not read-only.** A `pk-` key is the one that ships
 inside a web page and travels in `?key=`, so reaching a route with it needs no
-Authorization header at all. The only thing in its way was a check that a
-publishable key may not WRITE, and every read under `/v1/bases` is a GET: the key
-printed in a customer's HTML returned that org's provider credentials and every
-member's billing identity. The method check stays as a floor — a `pk-` key writes
-nothing anywhere — but what it may READ is settled per address.
+Authorization header at all. It is refused across `/v1/bases` by KIND and never
+by method — every read there is a GET, so a method check alone settles nothing.
+The method floor stays (a `pk-` key writes nothing anywhere) and what it may
+READ is settled per address.
 
-**A provider name is not a key to the pod environment.** `OrgService.GetCreds`
-used to fall through to `os.Getenv(PROVIDER + "_API_KEY")` whenever KMS held no
-row, which is every org that has not configured that provider — and `provider` is
-a path segment the caller writes. An org could name `openai`, `anthropic` or
-`github` and be handed the DEPLOYMENT's secret for it, the one the KMSSecret CRDs
-inject. The read is KMS or nothing.
+**A provider name is not a key to the pod environment.** `provider` is a path
+segment the caller writes, so `OrgService.GetCreds` reads KMS or nothing. There
+is no environment fallback: the deployment's own secrets, the ones the KMSSecret
+CRDs inject, are not addressable by naming a provider an org has not
+configured.
 
 Note also what these routes are NOT: `_org_configs` and `_org_customers` are
 shared tables on the platform Base keyed by an `org_id` column, so for them the
@@ -186,83 +175,53 @@ column is the whole boundary, and the rule above is what defends it. Everything
 in `/v1/collections` is defended by the file instead.
 
 `/v1/compliance/*` names no org in its address, so none of the above reaches it
-and it has to ask. It took `applicationId` from the path and called `requireAuth`,
-which answers "is there a caller" and never "is this caller's" — one tenant read
-another's KYC status and started verifications against it. A compliance
-application id is the vendor's, and a bare string in a URL says nothing about who
-created it, so it is recorded on the caller's `_org_customers` row
-(`compliance_application_id`) when the application is created and checked on
-every read. `/screen` and `/payment/validate` have no owned subject at all — the
-subject is a person the org is considering — so what they are scoped to is the
-org doing the asking, and each call still spends a screening on the deployment's
-vendor account. It is registered only where `ComplianceEndpoint` is configured,
-which is nowhere: no deployment sets it, and nothing in `examples/base/main.go`
-reads an env var for it, so the whole surface is unreachable as shipped.
+and it has to ask. A compliance application id is the vendor's, and a bare string
+in a URL says nothing about who created it, so it is recorded on the caller's
+`_org_customers` row (`compliance_application_id`) when the application is
+created and checked on every read. `/screen` and `/payment/validate` have no
+owned subject at all — the subject is a person the org is considering — so what
+they are scoped to is the org doing the asking, and each call spends a screening
+on the deployment's vendor account. It is registered only where
+`ComplianceEndpoint` is configured, which is nowhere: no deployment sets it, and
+nothing in `examples/base/main.go` reads an env var for it, so the whole surface
+is unreachable as shipped.
 
-Still open here:
-- `CreateBackup` zips `DataDir`, so the platform Base's backup contains every
-  tenant's Base. A tenant's own backup is correctly scoped — its `DataDir` is
-  its own directory.
-- Open Bases are held in a map with no eviction; 2000 orgs is 4000 SQLite
-  handles, and the cold open holds a process-wide write lock across a full
-  migration run — measured at ~50ms of stall on every other tenant's request.
-  `orm/db.Namespaces` is the primitive to adopt when that binds.
-- Naming an org a credential admits OPENS that org's Base, so an operator (or a
-  token with a large membership set) creates Bases by mentioning them.
-- Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
-  rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do
-  not follow the request onto a tenant Base. `OrgService` is deliberately NOT
-  among what `declare` states on a tenant's Base: its methods take an org as an
-  argument and check nothing, so an extension on one tenant's Base could read
-  every other tenant's credentials by naming them.
-- A revoked IAM key still opens its org until its cache entry expires. Tokens and
-  keys now expire on separate clocks, because a token carries its own expiry and
-  a key has none — revocation at IAM is the only thing that ends one — but 30
-  seconds is still a window, and closing it wants IAM to say so rather than Base
-  to guess.
-- `checkRateLimit` allows a request it cannot key. That is reachable now that
-  `RemoteIP` reports no address instead of the literal string `"invalid IP"`,
-  which is what a ZAP-forwarded request has; before, the whole ZAP leg shared one
-  bucket under that constant. Unlimited on an internal mesh terminal beats one
-  shared bucket, but the honest fix is for the forward terminal to carry a client.
+Capacity, still open: open Bases are held in a map with no eviction, so 2000 orgs
+is 4000 SQLite handles, and the cold open holds a process-wide write lock across
+a full migration run — measured at ~50ms of stall on every other tenant's
+request. `orm/db.Namespaces` is the primitive to adopt when that binds.
 
-### Rate limits belong to the process, and so does the client key
+Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
+rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do not
+follow the request onto a tenant Base. `OrgService` is deliberately NOT among
+what `declare` states on a tenant's Base — its methods take an org as an argument
+rather than reading one from the request, so it belongs on the process's own
+Base, where an operator's extension runs, and `Register` sets it there.
 
-The limiter runs at priority -1000, after `loadAuthToken` at -1020 has pointed
-the request at its tenant's Base, so reading the limit off `e.App` asked each
-tenant how hard the process may be hit — and a freshly opened Base answers
-`Enabled=false`. Every authenticated caller was unlimited while anonymous callers
-were held to the rule; the `*:auth` 2-per-3s default applied to nobody with a
-token.
+### The process answers what is asked of the process
 
-The Base the process serves from is named on the request by the router's event
-factory and read through `core.RequestEvent.Deployment()` — settings, counters
-and the cleanup cron alike. One policy, one set of counters. Copying the posture
-onto each tenant Base at bootstrap was the alternative and is worse: N copies
-that drift, and per-tenant counters make a limit of 2 mean 2 per org.
+Anything that governs the process rather than a tenant's data reads the Base the
+process serves from, named on the request by the router's event factory and
+reached through `core.RequestEvent.Deployment()`: rate-limit settings and
+counters, the cleanup cron, `RealIP`, the activity log, and the batch limits.
+One policy, one set of counters.
 
-The rule and the counters moved first and the KEY did not, which turned the fix
-into a cross-tenant denial of service. `checkRateLimit` keys on `RealIP`, and
-`RealIP` asked `e.App` which proxy headers to believe — the tenant's Base, whose
-`TrustedProxy` is empty and can never be anything else, since only a superuser
-writes settings and a tenant's Base has none. So behind an ingress every
-authenticated request fell back to the socket peer, which is the ingress for all
-of them: one bucket for the estate, and any one tenant could spend the whole
-budget and lock out every other. `RealIP` reads the deployment now.
+Reading them off `e.App` would ask the tenant instead, since `loadAuthToken` at
+priority -1020 has already pointed the request at its tenant's Base by the time
+the limiter runs at -1000. Copying the posture onto each tenant Base at bootstrap
+is the alternative and is worse: N copies that drift, and per-tenant counters
+make a limit of 2 mean 2 per org.
 
-Everything else that answers a question about the process rather than about a
-tenant's data reads the same place: the activity log (which was writing an
-authenticated request's audit row into that tenant's `_logs`, leaving the
-operator's log holding only traffic that never authenticated) and the batch
-limits (whose `Enabled=false` on a fresh tenant Base silently turned batching off
-for everyone with a token).
+`RealIP` reads the deployment for the same reason and one of its own: which
+proxies are believed is the deployment's answer, and only a superuser writes
+settings while a tenant's Base has no superuser, so a tenant's `TrustedProxy` is
+empty by construction and can never be anything else.
 
-A log row also carries no credential and names who acted. `logRequest` wrote
-`RequestURI()` whole, so a key arriving in `?key=` — the shape that needs no
-Authorization header — sat in `_logs` in plaintext for `Logs.MaxDays`, was served
-by `GET /v1/logs`, and went into every backup; the query is redacted now. And a
-keyed request set no `e.Auth`, so every action a service key took was attributed
-to nobody at all.
+A log row carries no credential and names who acted. `logRequest` redacts any
+credential in the query before writing, which matters because a key may arrive in
+`?key=` — the shape that needs no Authorization header — and `_logs` is kept for
+`Logs.MaxDays`, served by `GET /v1/logs`, and included in every backup. A keyed
+request sets `e.Auth`, so a service key's actions are attributed to it.
 
 ### Functions — both halves exist, in different packages
 
@@ -366,7 +325,7 @@ The server is a relay/index/cache layer, not the owner of truth.
 | Plugin | Path | Purpose |
 |--------|------|---------|
 | vault | plugins/vault/ | Per-user encrypted SQLite shards, DEK/KEK, CRDT sync, chain anchor |
-| zap | plugins/zap/ | ZAP transport (8.7us latency) — base's fully-wrapped HTTP handler on the `forward` terminal, and nothing else. The four native message types (Collections/Records/Auth/Realtime) called `app.Save` and `app.Delete` with no credential, no org and no create hook; they are deleted rather than mended, because resolving an org from a ZAP envelope is authentication and there is one of those in the estate. |
+| zap | plugins/zap/ | ZAP transport (8.7us latency) — base's fully-wrapped HTTP handler on the `forward` terminal, and nothing else. There are no native message types beside it: resolving an org from a ZAP envelope is authentication, and there is exactly one of those in the estate. |
 | org | plugins/org/ | Per-org Bases: orgs read from IAM, per-org encrypted SQLite, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
@@ -590,16 +549,21 @@ verb: using an org opens its Base. The file was `org.db`, which was one name too
 many; the directory already says whose it is, and the second name made a Base
 look like something else.
 
-Physical is all it is so far. The key `OrgDEK` derives from KMS opens nothing —
-the shards are plaintext on disk, and calling them encrypted is what kept anyone
-from noticing.
+Isolation is also cryptographic. The Base opens under the org's own key —
+`OrgDEK`, derived per org, so one org's file is unreadable with another's key and
+a leaked key is worth one tenant rather than all of them. `sqlite.OpenDB` is the
+whole mechanism and it means the same thing under both builds: SQLCipher when
+Base is linked with cgo, the pure-Go codec envelope otherwise. The two are
+byte-compatible, so a file written by one opens under the other — which matters
+because CI ships `CGO_ENABLED=0` and an operator may not. An empty DEK is dev
+mode, opening plaintext; a master key of the wrong length is an error rather than
+a silent downgrade, because a key that quietly becomes no key is how data ends up
+in the clear while the deployment believes otherwise.
 
-`/v1/bases` reports what is on disk for each org on the caller's token. It used
-to read the local `_orgs` collection, which IAM owns and Base never writes, so it
-answered "no such org" for every org including the caller's own while that org's
-Base sat on disk being written to. Membership is the token's to state; a local
-copy is a second answer to "who is in this org" and the one a request arrives on
-wins.
+`/v1/bases` reports what is on disk for each org on the caller's token, and
+membership is the token's to state. A local copy of "who is in this org" is a
+second answer that can disagree with the credential the request arrived on, and
+the one it arrived on wins.
 
 There was a second, complete implementation of all this in `core`: a `Bases`
 registry with its own encryption, lazy open, and concurrent/nonconcurrent pools,
