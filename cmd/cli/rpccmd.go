@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
@@ -11,6 +12,8 @@ import (
 // NewRPCCommand returns the `rpc` subcommand.
 // Matches `lux rpc` shape: direct API call passthrough.
 func NewRPCCommand(clientFn func() *Client, formatFn func() Format) *cobra.Command {
+	daemonName := filepath.Base(os.Args[0])
+
 	cmd := &cobra.Command{
 		Use:   "rpc",
 		Short: "Direct API call passthrough to the daemon",
@@ -18,13 +21,13 @@ func NewRPCCommand(clientFn func() *Client, formatFn func() Format) *cobra.Comma
 
 Examples:
   # GET a path
-  ats rpc get /health
+  ` + daemonName + ` rpc get /health
 
   # POST with JSON body
-  ats rpc post /collections/orders/records '{"symbol":"AAPL","qty":100}'
+  ` + daemonName + ` rpc post /collections/posts/records '{"title":"hello","views":1}'
 
   # DELETE
-  ats rpc delete /collections/orders/records/abc123`,
+  ` + daemonName + ` rpc delete /collections/posts/records/abc123`,
 	}
 
 	cmd.AddCommand(rpcGetCmd(clientFn, formatFn))

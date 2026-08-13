@@ -8,23 +8,23 @@ import (
 func TestHaConfigPath(t *testing.T) {
 	t.Parallel()
 
-	got := haConfigPath("ats", EnvMainnet)
-	if !strings.HasSuffix(got, "ha-ats-mainnet.yaml") {
-		t.Fatalf("expected ha-ats-mainnet.yaml suffix, got %s", got)
+	got := haConfigPath("base", EnvMainnet)
+	if !strings.HasSuffix(got, "ha-base-mainnet.yaml") {
+		t.Fatalf("expected ha-base-mainnet.yaml suffix, got %s", got)
 	}
 
-	got = haConfigPath("bd", EnvLocal)
-	if !strings.HasSuffix(got, "ha-bd-local.yaml") {
-		t.Fatalf("expected ha-bd-local.yaml suffix, got %s", got)
+	got = haConfigPath("iam", EnvLocal)
+	if !strings.HasSuffix(got, "ha-iam-local.yaml") {
+		t.Fatalf("expected ha-iam-local.yaml suffix, got %s", got)
 	}
 }
 
 func TestHaConfigContent(t *testing.T) {
 	t.Parallel()
 
-	content := haConfigContent("ats", EnvLocal, "lux", 3)
+	content := haConfigContent("base", EnvLocal, "lux", 3)
 
-	if !strings.Contains(content, "daemon: ats") {
+	if !strings.Contains(content, "daemon: base") {
 		t.Fatalf("expected daemon name in config, got:\n%s", content)
 	}
 	if !strings.Contains(content, "consensus: lux") {
@@ -44,7 +44,7 @@ func TestHaConfigContent(t *testing.T) {
 func TestHaConfigContentPubsub(t *testing.T) {
 	t.Parallel()
 
-	content := haConfigContent("bd", EnvTestnet, "pubsub", 5)
+	content := haConfigContent("iam", EnvTestnet, "pubsub", 5)
 
 	if !strings.Contains(content, "consensus: pubsub") {
 		t.Fatalf("expected pubsub consensus, got:\n%s", content)

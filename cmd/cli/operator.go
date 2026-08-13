@@ -36,7 +36,7 @@ kubectl context selection.`,
 
 	daemonName := filepath.Base(os.Args[0])
 
-	cmd.AddCommand(operatorApplyCmd(nf, &operatorDir))
+	cmd.AddCommand(operatorApplyCmd(nf, &operatorDir, daemonName))
 	cmd.AddCommand(operatorStatusCmd(nf, daemonName))
 	cmd.AddCommand(operatorDescribeCmd(nf))
 	cmd.AddCommand(operatorUpgradeCmd(nf, daemonName))
@@ -45,13 +45,13 @@ kubectl context selection.`,
 	return cmd
 }
 
-func operatorApplyCmd(nf *NetworkFlags, operatorDir *string) *cobra.Command {
+func operatorApplyCmd(nf *NetworkFlags, operatorDir *string, daemonName string) *cobra.Command {
 	var yes bool
 
 	cmd := &cobra.Command{
 		Use:          "apply",
 		Short:        "Apply operator network YAML for the target environment",
-		Example:      "ats operator apply --testnet --yes",
+		Example:      daemonName + " operator apply --testnet --yes",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			env, err := nf.Resolve()
@@ -90,7 +90,7 @@ func operatorStatusCmd(nf *NetworkFlags, daemonName string) *cobra.Command {
 	return &cobra.Command{
 		Use:          "status",
 		Short:        "Show operator-managed CRD resources",
-		Example:      "ats operator status --testnet",
+		Example:      daemonName + " operator status --testnet",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			env, err := nf.Resolve()
@@ -154,7 +154,7 @@ func operatorUpgradeCmd(nf *NetworkFlags, daemonName string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "upgrade",
 		Short:        "Rolling upgrade via CRD spec bump",
-		Example:      "ats operator upgrade --testnet --tag v1.4.0 --yes",
+		Example:      daemonName + " operator upgrade --testnet --tag v1.4.0 --yes",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			env, err := nf.Resolve()

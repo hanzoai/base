@@ -7,7 +7,7 @@ Temporal workflows when `TASKS_URL` is set, local goroutine tickers otherwise.
 ## What didn't change
 
 - `app.Cron().Add(id, expr, fn)` keeps its signature. Existing callers compile
-  and run without edits. Services like BD, ATS, TA, etc. need no code changes.
+  and run without edits. Services that embed Base need no code changes.
 - `cron.NewSchedule(expr)` is still the cron-expression validator used by
   `core/settings_model.go` for `Backups.Cron` validation.
 - `GET /crons` and `POST /crons/{id}` admin endpoints keep the same JSON shape
