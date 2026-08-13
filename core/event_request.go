@@ -60,9 +60,8 @@ func (e *RequestEvent) Deployment() App {
 // Which proxies are believed is the deployment's answer and never a tenant's.
 // Only a superuser writes settings and a tenant's Base has no superuser, so a
 // tenant's TrustedProxy is empty by construction and can never be anything
-// else; reading it there meant that behind an ingress every authenticated
-// request reported the ingress address, and everything keyed on the client —
-// the rate limit above all — put the whole estate in one bucket.
+// else. Everything keyed on the client address — the rate limit above all —
+// depends on this reading the deployment.
 //
 // NB!
 // Be careful when used in a security critical context as it relies on

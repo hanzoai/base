@@ -13,9 +13,9 @@ import (
 	"github.com/luxfi/age"
 )
 
-// // Attack: malicious peer sends SyncMessage{Ops: [...], Envelopes: nil}
-// to a replica whose document is configured with age privacy.
-// non-plaintext. Current code (resolveOps) silently accepts them.
+// A document configured with age privacy accepts only envelopes whose tag says
+// so. These tests pin that: a peer offering a plaintext-tagged envelope to such
+// a document is refused rather than resolved.
 
 func TestTagSpoofPlaintextOnAgeDoc(t *testing.T) {
 	id, err := age.GenerateX25519Identity()
