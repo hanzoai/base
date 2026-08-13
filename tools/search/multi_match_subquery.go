@@ -1,6 +1,7 @@
 package search
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -37,14 +38,33 @@ type MultiMatchSubquery struct {
 	Params           query.Params
 }
 
+// usable reports whether the subquery names everything a SELECT needs, or says
+// what it is missing.
+//
+// A subquery is filled in field by field as a field path is walked, so what it
+// holds is settled only once the walk is done. That is still before it reaches
+// an expression, which is why the shortfall is answerable here and not in Build.
+func (m *MultiMatchSubquery) usable() error {
+	switch {
+	case m == nil:
+		return errors.New("no multi-match subquery")
+	case m.TargetTableAlias == "":
+		return errors.New("multi-match subquery names no target table")
+	case m.FromTableName == "":
+		return errors.New("multi-match subquery names no source table")
+	case m.FromTableAlias == "":
+		return errors.New("multi-match subquery names no source table alias")
+	case m.ValueIdentifier == "":
+		return errors.New("multi-match subquery names no value")
+	}
+
+	return nil
+}
+
 // Build converts the expression into a SQL fragment.
 //
 // Implements [query.Expression] interface.
 func (m *MultiMatchSubquery) Build(db *query.DB, params query.Params) string {
-	if m.TargetTableAlias == "" || m.FromTableName == "" || m.FromTableAlias == "" {
-		return "0=1"
-	}
-
 	if params == nil {
 		params = m.Params
 	} else {

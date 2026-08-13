@@ -18,14 +18,14 @@ type replaceWithExpression struct {
 
 // Build converts the expression into a SQL fragment.
 //
+// What this returns lands wherever the placeholder sat, which is inside a
+// comparison and not the whole predicate, so it has no way to spell "no rows":
+// a fragment means whatever the SQL around it makes it mean. Every part is
+// therefore settled where the expression is constructed — the placeholder is a
+// literal, the replacement is built and its error returned, and "old" is the
+// expression [search.ResolverResult.AfterBuild] is handed.
+//
 // Implements [dbx.Expression] interface.
 func (e *replaceWithExpression) Build(db *dbx.DB, params dbx.Params) string {
-	if e.placeholder == "" || e.old == nil || e.new == nil {
-		return "0=1"
-	}
-
-	oldResult := e.old.Build(db, params)
-	newResult := e.new.Build(db, params)
-
-	return strings.ReplaceAll(oldResult, e.placeholder, newResult)
+	return strings.ReplaceAll(e.old.Build(db, params), e.placeholder, e.new.Build(db, params))
 }
