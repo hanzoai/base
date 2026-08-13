@@ -22,6 +22,7 @@ func bindBackupApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	sub.GET("/{key}", backupDownload) // relies on superuser file token
 	sub.DELETE("/{key}", backupDelete).Bind(RequireSuperuserAuth())
 	sub.POST("/{key}/restore", backupRestore).Bind(RequireSuperuserAuth())
+	sub.GET("/{key}/restore", backupRestoreOutcome).Bind(RequireSuperuserAuth())
 }
 
 type backupFileInfo struct {
@@ -152,4 +153,26 @@ func backupRestore(e *core.RequestEvent) error {
 	})
 
 	return e.NoContent(http.StatusNoContent)
+}
+
+// backupRestoreOutcome answers how the restore of this backup ended.
+//
+// A restore runs past the response that starts it, because a restore that
+// completes replaces the data directory and restarts the process. So the reply
+// that starts one says only that it started, and this is where the answer is:
+// 202 while it runs, 200 with the reason when it stopped, 404 when this process
+// has not restored that backup.
+func backupRestoreOutcome(e *core.RequestEvent) error {
+	key := e.Request.PathValue("key")
+
+	if key != "" && cast.ToString(e.App.Store().Get(core.StoreKeyActiveBackup)) == key {
+		return e.NoContent(http.StatusAccepted)
+	}
+
+	failure, ok := e.App.Store().Get(core.StoreKeyRestoreFailure).(core.RestoreFailure)
+	if !ok || failure.Name != key {
+		return e.NotFoundError("No restore of this backup has been attempted.", nil)
+	}
+
+	return e.JSON(http.StatusOK, failure)
 }
