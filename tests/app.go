@@ -26,6 +26,10 @@ type TestApp struct {
 	EventCalls map[string]int
 
 	TestMailer *TestMailer
+
+	// dropSchema releases the PostgreSQL schema this app was given, and is
+	// a no-op for an app on the embedded file.
+	dropSchema func()
 }
 
 // Cleanup resets the test application state and removes the test
@@ -46,6 +50,10 @@ func (t *TestApp) Cleanup() {
 
 	if t.DataDir() != "" {
 		os.RemoveAll(t.DataDir())
+	}
+
+	if t.dropSchema != nil {
+		t.dropSchema()
 	}
 }
 
@@ -106,6 +114,16 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 	// replace with the clone
 	config.DataDir = tempDir
 
+	// When the suite is pointed at a PostgreSQL server, every app built here
+	// gets a fresh schema on it instead of the embedded file. Nothing else
+	// changes: the same config, the same Bootstrap, the same migrations.
+	dropSchema := func() {}
+	if config.DataDSN == "" {
+		if dsn, drop := postgresSchema(); dsn != "" {
+			config.DataDSN, config.AuxDSN, dropSchema = dsn, dsn, drop
+		}
+	}
+
 	app := core.NewBaseApp(config)
 
 	// load data dir and db connections
@@ -134,6 +152,7 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 		BaseApp:    app,
 		EventCalls: make(map[string]int),
 		TestMailer: &TestMailer{},
+		dropSchema: dropSchema,
 	}
 
 	t.OnBootstrap().Bind(&hook.Handler[*core.BootstrapEvent]{
