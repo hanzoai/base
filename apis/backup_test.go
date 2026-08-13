@@ -14,6 +14,7 @@ import (
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/filesystem/blob"
+	"github.com/hanzoai/base/tools/types"
 )
 
 func TestBackupsList(t *testing.T) {
@@ -767,6 +768,82 @@ func TestBackupsRestore(t *testing.T) {
 				app.Store().Set(core.StoreKeyActiveBackup, "")
 			},
 			ExpectedStatus:  400,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// The reply that starts a restore says only that it started, because a restore
+// that completes replaces the data directory and restarts the process. This is
+// where the answer is.
+func TestBackupsRestoreOutcome(t *testing.T) {
+	t.Parallel()
+
+	superuserToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:            "unauthorized",
+			Method:          http.MethodGet,
+			URL:             "/v1/backups/test1.zip/restore",
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:            "nothing attempted",
+			Method:          http.MethodGet,
+			URL:             "/v1/backups/test1.zip/restore",
+			Headers:         map[string]string{"Authorization": superuserToken},
+			ExpectedStatus:  404,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:    "still running",
+			Method:  http.MethodGet,
+			URL:     "/v1/backups/test1.zip/restore",
+			Headers: map[string]string{"Authorization": superuserToken},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(core.StoreKeyActiveBackup, "test1.zip")
+			},
+			ExpectedStatus: 202,
+			ExpectedEvents: map[string]int{"*": 0},
+		},
+		{
+			Name:    "stopped, with the reason",
+			Method:  http.MethodGet,
+			URL:     "/v1/backups/test1.zip/restore",
+			Headers: map[string]string{"Authorization": superuserToken},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(core.StoreKeyRestoreFailure, core.RestoreFailure{
+					Time:  types.NowDateTime(),
+					Name:  "test1.zip",
+					Error: "data.db file is missing or invalid",
+				})
+			},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"name":"test1.zip"`, `data.db file is missing or invalid`, `"time":`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:    "another backup stopped",
+			Method:  http.MethodGet,
+			URL:     "/v1/backups/test2.zip/restore",
+			Headers: map[string]string{"Authorization": superuserToken},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(core.StoreKeyRestoreFailure, core.RestoreFailure{
+					Time:  types.NowDateTime(),
+					Name:  "test1.zip",
+					Error: "data.db file is missing or invalid",
+				})
+			},
+			ExpectedStatus:  404,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},

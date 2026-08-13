@@ -28,21 +28,29 @@ func (app *BaseApp) runInTransaction(db dbx.Builder, fn func(txApp App) error, i
 		// run as part of the already existing transaction
 		return fn(app)
 	case *dbx.DB:
-		var txApp *BaseApp
-		txErr := txOrDB.Transactional(func(tx *dbx.Tx) error {
-			txApp = app.createTxApp(tx, isForAuxDB)
-			return fn(txApp)
-		})
+		// an engine that rolls a transaction back for conflicting with a
+		// concurrent one is asking for that transaction, and so for fn, to run
+		// again from its first statement; each attempt begins a transaction of
+		// its own, on its own tx app, and settles its own after calls
+		return retry(func(int) (error, bool) {
+			watched, conflicted := watchConflict(txOrDB)
 
-		// execute all after event calls on transaction complete
-		if txApp != nil && txApp.txInfo != nil {
-			afterFuncErr := txApp.txInfo.runAfterFuncs(txErr)
-			if afterFuncErr != nil {
-				return errors.Join(txErr, afterFuncErr)
+			var txApp *BaseApp
+			txErr := watched.Transactional(func(tx *dbx.Tx) error {
+				txApp = app.createTxApp(tx, isForAuxDB)
+				return fn(txApp)
+			})
+
+			// execute all after event calls on transaction complete
+			if txApp != nil && txApp.txInfo != nil {
+				afterFuncErr := txApp.txInfo.runAfterFuncs(txErr)
+				if afterFuncErr != nil {
+					return errors.Join(txErr, afterFuncErr), false
+				}
 			}
-		}
 
-		return txErr
+			return txErr, conflicted()
+		}, defaultMaxLockRetries)
 	default:
 		return errors.New("failed to start transaction (unknown db type)")
 	}

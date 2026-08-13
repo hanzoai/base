@@ -183,19 +183,22 @@ type batchProcessor struct {
 }
 
 func (p *batchProcessor) Process(batch []*core.InternalRequest, timeout time.Duration) error {
-	p.results = make([]*BatchRequestResult, 0, len(batch))
-
-	if p.stopCh != nil {
-		close(p.stopCh)
-	}
-	p.stopCh = make(chan struct{}, 1)
-
-	if p.errCh != nil {
-		close(p.errCh)
-	}
-	p.errCh = make(chan error, 1)
-
 	return p.app.RunInTransaction(func(txApp core.App) error {
+		// the results and the channels carrying one run of the batch belong to
+		// the attempt, not to the call, because the transaction may run again
+		p.results = make([]*BatchRequestResult, 0, len(batch))
+		p.failedIndex = 0
+
+		if p.stopCh != nil {
+			close(p.stopCh)
+		}
+		p.stopCh = make(chan struct{}, 1)
+
+		if p.errCh != nil {
+			close(p.errCh)
+		}
+		p.errCh = make(chan error, 1)
+
 		// used to interupts the recursive processing calls in case of a timeout or connection close
 		defer func() {
 			p.stopCh <- struct{}{}

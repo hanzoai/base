@@ -16,11 +16,45 @@ import (
 	"github.com/hanzoai/base/tools/inflector"
 	"github.com/hanzoai/base/tools/osutils"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/base/tools/types"
+	"github.com/hanzoai/orm/dialect"
 )
 
 const (
 	StoreKeyActiveBackup = "@activeBackup"
+
+	// StoreKeyRestoreFailure holds the [RestoreFailure] of the most recent
+	// restore this process attempted, if it stopped.
+	StoreKeyRestoreFailure = "@restoreFailure"
 )
+
+// RestoreFailure is a restore that stopped, and why.
+//
+// A restore that completes replaces the data directory and restarts the process,
+// so the attempt a running process can still be asked about is the one that did
+// not complete.
+type RestoreFailure struct {
+	Time  types.DateTime `json:"time"`
+	Name  string         `json:"name"`
+	Error string         `json:"error"`
+}
+
+// checkLocalDatabase reports whether d keeps the database in the data directory.
+//
+// A backup is an archive of that directory and a restore replaces it, so both
+// carry the whole database exactly when the engine keeps it in a file there. A
+// server engine keeps it in the server, which is also where it is backed up and
+// restored.
+func checkLocalDatabase(d dialect.Dialect) error {
+	if _, local := d.(dialect.SQLite); local {
+		return nil
+	}
+
+	return fmt.Errorf(
+		"a backup archives the data directory, which holds the database on sqlite; on %s back up and restore the database at the server",
+		d.Name(),
+	)
+}
 
 // CreateBackup creates a new backup of the current app data directory.
 //
@@ -40,6 +74,10 @@ const (
 // take care manually to backup those since they are not part of the data.
 //
 // Backups can be stored on S3 if it is configured in app.Settings().Backups.
+//
+// The archive is the data directory, so a backup is a backup of the database on
+// an engine that keeps the database there. A server engine keeps it in the
+// server, which is where it is backed up.
 func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 	if app.Store().Has(StoreKeyActiveBackup) {
 		return errors.New("try again later - another backup/restore operation has already been started")
@@ -56,6 +94,10 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 	event.Exclude = []string{LocalBackupsDirName, LocalTempDirName, LocalAutocertCacheDirName, LocalNotifyDirName, lostFoundDirName}
 
 	return app.OnBackupCreate().Trigger(event, func(e *BackupEvent) error {
+		if err := checkLocalDatabase(e.App.Dialect()); err != nil {
+			return err
+		}
+
 		// generate a default name if missing
 		if e.Name == "" {
 			e.Name = generateBackupName(e.App, "hz_backup_")
@@ -148,6 +190,12 @@ func (app *BaseApp) CreateBackup(ctx context.Context, name string) error {
 // Note that if your data has custom network mounts as subdirectories, then
 // it is possible the restore to fail during the `os.Rename` operations
 // (see https://github.com/hanzoai/base/issues/4647).
+//
+// A restore replaces the data directory, so it restores the database on an
+// engine that keeps the database there. A server engine keeps it in the server,
+// which is where it is restored. What stopped a restore is recorded under
+// [StoreKeyRestoreFailure], because a restore that completes restarts the
+// process and so cannot report back.
 func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 	if app.Store().Has(StoreKeyActiveBackup) {
 		return errors.New("try again later - another backup/restore operation has already been started")
@@ -163,9 +211,16 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 	// default root dir entries to exclude from the backup restore
 	event.Exclude = []string{LocalBackupsDirName, LocalTempDirName, LocalAutocertCacheDirName, LocalNotifyDirName, lostFoundDirName}
 
-	return app.OnBackupRestore().Trigger(event, func(e *BackupEvent) error {
+	// a restore ends either by replacing the data directory and restarting the
+	// process or by stopping, so the outcome a still-running process can be asked
+	// about is recorded rather than only said once
+	restoreErr := app.OnBackupRestore().Trigger(event, func(e *BackupEvent) error {
 		if runtime.GOOS == "windows" {
 			return errors.New("restore is not supported on Windows")
+		}
+
+		if err := checkLocalDatabase(e.App.Dialect()); err != nil {
+			return err
 		}
 
 		// make sure that the special temp directory exists
@@ -294,6 +349,17 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 
 		return nil
 	})
+	if restoreErr != nil {
+		app.Store().Set(StoreKeyRestoreFailure, RestoreFailure{
+			Time:  types.NowDateTime(),
+			Name:  name,
+			Error: restoreErr.Error(),
+		})
+	} else {
+		app.Store().Remove(StoreKeyRestoreFailure)
+	}
+
+	return restoreErr
 }
 
 // registerAutobackupHooks registers the autobackup app serve hooks.
