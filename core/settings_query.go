@@ -72,7 +72,7 @@ func (s *Settings) loadParam(app App, param *Param) error {
 		}
 
 		// decrypt
-		decrypted, decryptErr := security.Decrypt(string(param.Value), encryptionKey)
+		decrypted, decryptErr := security.Decrypt(cipherText(param.Value), encryptionKey)
 		if decryptErr != nil {
 			return decryptErr
 		}
@@ -91,6 +91,17 @@ func (s *Settings) loadParam(app App, param *Param) error {
 	}
 	s.applyStorageEnv()
 	return nil
+}
+
+// cipherText reads the encrypted settings out of a stored param value, which
+// carries them as a JSON string. A value that is not one is the ciphertext.
+func cipherText(raw []byte) string {
+	var quoted string
+	if err := json.Unmarshal(raw, &quoted); err == nil {
+		return quoted
+	}
+
+	return string(raw)
 }
 
 // applyStorageEnv lets deployment env drive the S3 blob backend so the single

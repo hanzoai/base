@@ -580,8 +580,9 @@ func (app *BaseApp) ConcurrentDB() dbx.Builder {
 
 // NonconcurrentDB returns the nonconcurrent app data.db builder instance.
 //
-// The returned db instance is limited only to a single open connection,
-// meaning that it can process only 1 db operation at a time (other queries queue up).
+// On SQLite the returned db instance holds a single open connection, so it
+// processes one db operation at a time and the rest queue up; on an engine
+// that orders writers itself it holds as many connections as ConcurrentDB().
 //
 // This method is used mainly internally and in the tests to execute write
 // (save/delete) db operations as it helps with minimizing the SQLITE_BUSY errors.
@@ -644,8 +645,9 @@ func (app *BaseApp) AuxConcurrentDB() dbx.Builder {
 
 // AuxNonconcurrentDB returns the nonconcurrent app auxiliary.db builder instance.
 //
-// The returned db instance is limited only to a single open connection,
-// meaning that it can process only 1 db operation at a time (other queries queue up).
+// On SQLite the returned db instance holds a single open connection, so it
+// processes one db operation at a time and the rest queue up; on an engine
+// that orders writers itself it holds as many connections as AuxConcurrentDB().
 //
 // This method is used mainly internally and in the tests to execute write
 // (save/delete) db operations as it helps with minimizing the SQLITE_BUSY errors.
@@ -1240,17 +1242,13 @@ func (app *BaseApp) initDataDB() error {
 	if err != nil {
 		return err
 	}
-	concurrentDB.DB().SetMaxOpenConns(app.config.DataMaxOpenConns)
-	concurrentDB.DB().SetMaxIdleConns(app.config.DataMaxIdleConns)
-	concurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
+	setPoolLimits(concurrentDB, app.config.DataMaxOpenConns, app.config.DataMaxIdleConns)
 
 	nonconcurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
-	nonconcurrentDB.DB().SetMaxOpenConns(1)
-	nonconcurrentDB.DB().SetMaxIdleConns(1)
-	nonconcurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
+	setWritePoolLimits(nonconcurrentDB, app.config.DataMaxOpenConns, app.config.DataMaxIdleConns)
 
 	if app.IsDev() {
 		nonconcurrentDB.QueryLogFunc = func(ctx context.Context, t time.Duration, sql string, rows *sql.Rows, err error) {
@@ -1314,22 +1312,36 @@ func (app *BaseApp) initAuxDB() error {
 	if err != nil {
 		return err
 	}
-	concurrentDB.DB().SetMaxOpenConns(app.config.AuxMaxOpenConns)
-	concurrentDB.DB().SetMaxIdleConns(app.config.AuxMaxIdleConns)
-	concurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
+	setPoolLimits(concurrentDB, app.config.AuxMaxOpenConns, app.config.AuxMaxIdleConns)
 
 	nonconcurrentDB, err := connectFunc()
 	if err != nil {
 		return err
 	}
-	nonconcurrentDB.DB().SetMaxOpenConns(1)
-	nonconcurrentDB.DB().SetMaxIdleConns(1)
-	nonconcurrentDB.DB().SetConnMaxIdleTime(3 * time.Minute)
+	setWritePoolLimits(nonconcurrentDB, app.config.AuxMaxOpenConns, app.config.AuxMaxIdleConns)
 
 	app.auxConcurrentDB = concurrentDB
 	app.auxNonconcurrentDB = nonconcurrentDB
 
 	return nil
+}
+
+// setPoolLimits sizes a connection pool.
+func setPoolLimits(db *dbx.DB, maxOpen, maxIdle int) {
+	db.DB().SetMaxOpenConns(maxOpen)
+	db.DB().SetMaxIdleConns(maxIdle)
+	db.DB().SetConnMaxIdleTime(3 * time.Minute)
+}
+
+// setWritePoolLimits sizes the pool serving writes. SQLite admits one writer at
+// a time, so its pool holds a single connection; an engine that orders writers
+// itself takes the same limits as the pool serving reads.
+func setWritePoolLimits(db *dbx.DB, maxOpen, maxIdle int) {
+	if _, single := dialect.For(db.DriverName()).(dialect.SQLite); single {
+		maxOpen, maxIdle = 1, 1
+	}
+
+	setPoolLimits(db, maxOpen, maxIdle)
 }
 
 // @todo remove after refactoring the FilesManager interface
