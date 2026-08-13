@@ -21,7 +21,7 @@ not an SDK; SDK clients and discovery repos link OUT to it. One impl, one place.
 ## Key entry points
 - `base.New()` / `base.NewWithConfig` — app constructor (root package)
 - `examples/base/main.go` — the prebuilt binary
-- `core/` — app, dialect, storage tier (`ResolveStorageTier`, `BASE_DB_TIER`)
+- `core/` — app, dialect, the SQLite/server split (`BaseAppConfig.DataDSN`)
 - `plugins/org/` — Hanzo IAM (mandatory, one way), per-org Bases at `/v1/bases`
 - `cmd/` — CLI (`AddCLISubcommands`), serve, superuser
 
@@ -251,24 +251,34 @@ box on embedded SQLite, then scales per-instance without a rewrite. AI-native,
 with flows/automations as first-class. Reaches parity with best-in-class CRM and
 headless-CMS products; their code is reference only, the brand is Hanzo only.
 
-### Storage tiering — one model, per-instance upgrade
+### Where a Base keeps its data — embedded here, placed by whoever hosts it
 
-Out of the box every Base (and every tenant/org/user shard) is **embedded
-SQLite / in-memory** — zero-config, fast, the SaaS default. Each instance (or
-per-org / per-user DB) can be **upgraded in place** along one axis, no app
-rewrite — the data plane (`/v1` collections/records/auth/files/SQL/realtime) is
-identical across tiers:
+A Base is embedded SQLite. That is what `base serve` runs, what a local
+developer gets, and what every tenant, org and user shard is. There is no
+setting for it and nothing to misconfigure: run the binary and it works.
 
-| Tier | Backend | When | Status |
-|------|---------|------|--------|
-| 0 (default) | embedded SQLite / `:memory:` | everything out of box | core `dialect.go` |
-| 1 | PostgreSQL | relational scale, multi-writer | dialect is `hanzoai/orm/dialect` (NOT a `core/dialect_postgres.go` — no such file) + `core/db_connect_postgres.go` + `plugins/cloudsql`. Runs the whole `/v1` data plane; see the section below for what a live run settled. **No Postgres in CI and no test opens a connection**, so it is verified by hand and nothing stops it regressing. |
-| 2 | `hanzoai/datastore` | true horizontal OLAP analytics | repo exists; backend adapter = TODO |
-| +doc | `hanzoai/docdb` (FerretDB on `hanzoai/sql`/Postgres) | Mongo-style document API | repo exists; ship as a Base **plugin** = TODO |
+Base can also open a server instead, and the `/v1` data plane is the same
+either way — the same collections, records, rules, filters, realtime and files
+through the same handlers. `Config.DataDSN`/`AuxDSN` name one. Empty is
+embedded.
 
-The dialect abstraction (SQLite + Postgres) and the per-org/per-user encrypted DB
-provisioner (`plugins/org/org_db.go`) already exist — Tier-0/1 are real
-today. Tier-2 (datastore) and the docdb plugin are the wiring gaps.
+**The choice is the host's, not Base's.** Whether an instance belongs on a
+server, and which one, is a question about a deployment, so it is asked by
+whoever places the instance rather than read from this process's environment.
+Cloud embeds Base as a library and pools a Base per tenant, so it answers per
+tenant — and running a server is what a host does: provisioning it, upgrading
+it, backing it up, keeping it alive. None of that is Base's job, and Base
+having an opinion about it is what made the OSS binary look like it needed one.
+
+`BASE_DB_TIER`, `BASE_DB_URL` and `ResolveStorageTier` are gone for that
+reason. So is a `datastore` tier constant, which Base declared publicly and
+never implemented — a promise with nothing behind it. OLAP is a different
+access pattern and a different product; it belongs where it is built, not as a
+reserved word here.
+
+Engine differences are the dialect's (`hanzoai/orm/dialect`), which is estate
+code rather than Base's. **No Postgres in CI and no test opens a connection**,
+so that path is verified by hand and nothing stops it regressing.
 
 ### App layer — App Platform / CMS / CRM on one schema engine
 
@@ -633,9 +643,9 @@ the address it is served at and the redirect it asks for cannot disagree.
 The admin is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default — production
 services are headless `/v1` APIs); the `/v1` data plane is always on.
 
-## Storage tier (`BASE_DB_TIER`) — sqlite and sql both run the data plane
+## Both backends run the same data plane
 
-`BASE_DB_TIER=sql` opens PostgreSQL and serves the whole `/v1` data plane on it:
+Given a DSN, Base opens PostgreSQL and serves the whole `/v1` data plane on it:
 migrations, collection DDL, record CRUD, paging, sorting, filtering, the
 per-hour log rollup. Proved by running it — a collection created over the API
 lands as a real table with `text`/`numeric`/`jsonb` columns and its declared
