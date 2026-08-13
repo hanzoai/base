@@ -191,12 +191,35 @@ is 4000 SQLite handles, and the cold open holds a process-wide write lock across
 a full migration run — measured at ~50ms of stall on every other tenant's
 request. `orm/db.Namespaces` is the primitive to adopt when that binds.
 
-Hooks bound on the platform app do not fire on a tenant's Base. `plugins/org`
-rebinds its own through `declare`; `jsvm` hooks and realtime subscriptions do not
-follow the request onto a tenant Base. `OrgService` is deliberately NOT among
-what `declare` states on a tenant's Base — its methods take an org as an argument
-rather than reading one from the request, so it belongs on the process's own
-Base, where an operator's extension runs, and `Register` sets it there.
+Hooks bound on the platform app do not fire on a tenant's Base, so what every
+Base must do is stated where a Base is built rather than where the router is.
+`core.AppBindings` is that list, read by `core.NewBaseApp` next to
+`registerBaseHooks` and `registerNATSHooks` — the hook counterpart of
+`AppMigrations`, and the reason JS *migrations* already applied per tenant.
+Realtime is its one member: `apis` registers `bindRealtimeEvents` from an init,
+and `bindRealtimeApi` registers the two endpoints and nothing else, because
+binding in both places sends a subscriber the same record twice. A subscriber
+registers on the broker of the Base its request resolved to, so the broadcast has
+to happen on that same Base; two orgs are two brokers, which is what keeps a
+topic name they both use from being one topic. The delete broadcast checks its
+rule against a Base named separately from the one the record was written to, and
+that is now the tenant's own — a rule is a query, and the org's collection exists
+on the org's Base and nowhere else.
+
+`jsvm` hooks are deliberately NOT in that list. An extension body is arbitrary,
+`$os` binds `exec`/`readFile`/`writeFile`, and whether an extension follows a
+request onto a tenant's Base is a question about what an extension may reach —
+putting it in the registry would move the question rather than answer it.
+`OrgService` is out for the same kind of reason: its methods take an org as an
+argument rather than reading one from the request, so it belongs on the process's
+own Base, where an operator's extension runs, and `Register` sets it there.
+
+Open, and upstream of realtime rather than in it: a browser opens the stream with
+`EventSource`, which sends no headers, and `getAuthTokenFromRequest` reads only
+headers — so `GET /v1/realtime` registers the client on the process's Base while
+the `POST /v1/realtime` that names its id carries the token, resolves to the org's
+Base, and looks the id up on that broker. What settles this is how a stream
+authenticates, not where realtime binds.
 
 ### The process answers what is asked of the process
 

@@ -428,9 +428,6 @@ func TestRealtimeAuthRecordDeleteEvent(t *testing.T) {
 	testApp, _ := tests.NewTestApp()
 	defer testApp.Cleanup()
 
-	// init realtime handlers
-	apis.NewRouter(testApp)
-
 	authRecord1, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
 	if err != nil {
 		t.Fatal(err)
@@ -482,9 +479,6 @@ func TestRealtimeAuthRecordDeleteEvent(t *testing.T) {
 func TestRealtimeAuthRecordUpdateEvent(t *testing.T) {
 	testApp, _ := tests.NewTestApp()
 	defer testApp.Cleanup()
-
-	// init realtime handlers
-	apis.NewRouter(testApp)
 
 	authRecord1, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
 	if err != nil {
@@ -550,9 +544,6 @@ func TestRealtimeCustomAuthModelDeleteEvent(t *testing.T) {
 	testApp, _ := tests.NewTestApp()
 	defer testApp.Cleanup()
 
-	// init realtime handlers
-	apis.NewRouter(testApp)
-
 	authRecord1, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
 	if err != nil {
 		t.Fatal(err)
@@ -606,9 +597,6 @@ func TestRealtimeCustomAuthModelDeleteEvent(t *testing.T) {
 func TestRealtimeCustomAuthModelUpdateEvent(t *testing.T) {
 	testApp, _ := tests.NewTestApp()
 	defer testApp.Cleanup()
-
-	// init realtime handlers
-	apis.NewRouter(testApp)
 
 	authRecord, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
 	if err != nil {
@@ -793,9 +781,6 @@ func TestRealtimeRecordResolve(t *testing.T) {
 			testApp, _ := tests.NewTestApp()
 			defer testApp.Cleanup()
 
-			// init realtime handlers
-			apis.NewRouter(testApp)
-
 			// create new test collection with public read access
 			testCollection := core.NewBaseCollection(testCollectionName)
 			testCollection.Fields.Add(&core.AutodateField{Name: "created", OnCreate: true, OnUpdate: true})
@@ -881,5 +866,77 @@ func TestRealtimeRecordResolve(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// One write sends a subscriber on the process's own Base one message.
+//
+// Realtime is bound where a Base is constructed, and the router is built on the
+// Base the process serves from, so this is what pins that the two do not each
+// bind it and send the same record twice.
+func TestRealtimeProcessBasePublishesOnce(t *testing.T) {
+	testApp, _ := tests.NewTestApp()
+	defer testApp.Cleanup()
+
+	if _, err := apis.NewRouter(testApp); err != nil {
+		t.Fatal(err)
+	}
+
+	collection := core.NewBaseCollection("posts")
+	collection.ListRule = types.Pointer("")
+	collection.ViewRule = types.Pointer("")
+	collection.Fields.Add(&core.TextField{Name: "title"})
+	if err := testApp.Save(collection); err != nil {
+		t.Fatal(err)
+	}
+
+	client := subscriptions.NewDefaultClient()
+	client.Subscribe("posts/*")
+	testApp.SubscriptionsBroker().Register(client)
+
+	var mu sync.Mutex
+	var got []string
+
+	// The reader has to be running before the write and stay running after it:
+	// a broadcast is delivered by a send on an unbuffered channel, so a second
+	// one is only observable while something is still reading.
+	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case msg, ok := <-client.Channel():
+				if !ok {
+					return
+				}
+				var data struct{ Action string }
+				_ = json.Unmarshal(msg.Data, &data)
+				mu.Lock()
+				got = append(got, data.Action)
+				mu.Unlock()
+			case <-done:
+				return
+			}
+		}
+	}()
+
+	record := core.NewRecord(collection)
+	record.Set("title", "hello")
+	if err := testApp.Save(record); err != nil {
+		t.Fatal(err)
+	}
+
+	// A send is fired and forgotten, so a duplicate is waited for rather than
+	// joined: the count is only meaningful once the sends have had time to land.
+	time.Sleep(300 * time.Millisecond)
+	close(done)
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || got[0] != "create" {
+		t.Fatalf("one write sent the subscriber %v, want one create", got)
 	}
 }
