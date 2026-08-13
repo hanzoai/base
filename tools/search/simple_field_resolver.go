@@ -36,6 +36,12 @@ type ResolverResult struct {
 	// to the query when building both resolved operands/sides in a single expression.
 	Params query.Params
 
+	// Extracted marks an identifier that reads a value out of a JSON
+	// document. Such a value is text wherever the engine types its columns,
+	// whatever the document held, so a comparison against a number reads it
+	// back as one.
+	Extracted bool
+
 	// MultiMatchSubQuery is an optional sub query expression that will be added
 	// in addition to the combined ResolverResult expression during build.
 	MultiMatchSubQuery *MultiMatchSubquery
@@ -126,6 +132,7 @@ func (r *SimpleFieldResolver) Resolve(field string) (*ResolverResult, error) {
 
 	return &ResolverResult{
 		NullFallback: NullFallbackDisabled,
+		Extracted:    true,
 		Identifier: r.dialect.Extract(
 			"[["+inflector.Columnify(parts[0])+"]]",
 			jsonPath.String(),

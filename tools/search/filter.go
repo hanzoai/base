@@ -10,6 +10,7 @@ import (
 	"github.com/ganigeorgiev/fexpr"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/store"
+	"github.com/hanzoai/orm/dialect"
 	"github.com/hanzoai/orm/query"
 	"github.com/spf13/cast"
 )
@@ -163,15 +164,23 @@ func resolveTokenizedExpr(expr fexpr.Expr, fieldResolver FieldResolver) (query.E
 		return nil, fmt.Errorf("invalid right operand %q - %v", expr.Right.Literal, rErr)
 	}
 
-	return buildResolversExpr(lResult, expr.Op, rResult)
+	return buildResolversExpr(fieldResolver.Dialect(), lResult, expr.Op, rResult)
 }
 
 func buildResolversExpr(
+	d dialect.Dialect,
 	left *ResolverResult,
 	op fexpr.SignOp,
 	right *ResolverResult,
 ) (query.Expression, error) {
 	var expr query.Expression
+
+	// A value read out of a JSON document arrives as text whatever the
+	// document held, so where it is compared to a number it is read as one. A
+	// pattern match is left as it is — it matches text on either side.
+	if !isLikeOp(op) {
+		left, right = readAsNumbers(d, left, right)
+	}
 
 	switch op {
 	case fexpr.SignEq, fexpr.SignAnyEq:
@@ -181,16 +190,16 @@ func buildResolversExpr(
 	case fexpr.SignLike, fexpr.SignAnyLike:
 		// the right side is a column and therefor wrap it with "%" for contains like behavior
 		if len(right.Params) == 0 {
-			expr = query.NewExp(fmt.Sprintf("%s LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
+			expr = query.NewExp(fmt.Sprintf("%s %s ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, d.Like(), right.Identifier), left.Params)
 		} else {
-			expr = query.NewExp(fmt.Sprintf("%s LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
+			expr = query.NewExp(fmt.Sprintf("%s %s %s ESCAPE '\\'", left.Identifier, d.Like(), right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
 		}
 	case fexpr.SignNlike, fexpr.SignAnyNlike:
 		// the right side is a column and therefor wrap it with "%" for not-contains like behavior
 		if len(right.Params) == 0 {
-			expr = query.NewExp(fmt.Sprintf("%s NOT LIKE ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, right.Identifier), left.Params)
+			expr = query.NewExp(fmt.Sprintf("%s NOT %s ('%%' || %s || '%%') ESCAPE '\\'", left.Identifier, d.Like(), right.Identifier), left.Params)
 		} else {
-			expr = query.NewExp(fmt.Sprintf("%s NOT LIKE %s ESCAPE '\\'", left.Identifier, right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
+			expr = query.NewExp(fmt.Sprintf("%s NOT %s %s ESCAPE '\\'", left.Identifier, d.Like(), right.Identifier), mergeParams(left.Params, wrapLikeParams(right.Params)))
 		}
 	case fexpr.SignLt, fexpr.SignAnyLt:
 		expr = query.NewExp(fmt.Sprintf("%s < %s", left.Identifier, right.Identifier), mergeParams(left.Params, right.Params))
@@ -210,15 +219,18 @@ func buildResolversExpr(
 	if !isAnyMatchOp(op) {
 		if left.MultiMatchSubQuery != nil && right.MultiMatchSubQuery != nil {
 			mm := &manyVsManyExpr{
-				left:  left,
-				right: right,
-				op:    op,
+				dialect: d,
+				left:    left,
+				right:   right,
+				op:      op,
 			}
 
 			expr = query.Enclose(query.And(expr, mm))
 		} else if left.MultiMatchSubQuery != nil {
 			mm := &manyVsOneExpr{
+				dialect:      d,
 				nullFallback: left.NullFallback,
+				extracted:    left.Extracted,
 				subQuery:     left.MultiMatchSubQuery,
 				op:           op,
 				otherOperand: right,
@@ -227,7 +239,9 @@ func buildResolversExpr(
 			expr = query.Enclose(query.And(expr, mm))
 		} else if right.MultiMatchSubQuery != nil {
 			mm := &manyVsOneExpr{
+				dialect:      d,
 				nullFallback: right.NullFallback,
+				extracted:    right.Extracted,
 				subQuery:     right.MultiMatchSubQuery,
 				op:           op,
 				otherOperand: left,
@@ -249,13 +263,20 @@ func buildResolversExpr(
 	return expr, nil
 }
 
-var normalizedIdentifiers = map[string]string{
-	// if `null` field is missing, treat `null` identifier as NULL token
-	"null": "NULL",
-	// if `true` field is missing, treat `true` identifier as TRUE token
-	"true": "1",
-	// if `false` field is missing, treat `false` identifier as FALSE token
-	"false": "0",
+// normalizedIdentifier spells the three words that name a value rather than a
+// field, for a collection that has no field by that name. The truth values are
+// the engine's own, which is not the same word on every engine.
+func normalizedIdentifier(d dialect.Dialect, literal string) (string, bool) {
+	switch strings.ToLower(literal) {
+	case "null":
+		return "NULL", true
+	case "true":
+		return d.Bool(true), true
+	case "false":
+		return d.Bool(false), true
+	}
+
+	return "", false
 }
 
 func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResult, error) {
@@ -281,10 +302,8 @@ func resolveToken(token fexpr.Token, fieldResolver FieldResolver) (*ResolverResu
 		// ---
 		result, err := fieldResolver.Resolve(token.Literal)
 		if err != nil || result.Identifier == "" {
-			for k, v := range normalizedIdentifiers {
-				if strings.EqualFold(k, token.Literal) {
-					return &ResolverResult{Identifier: v}, nil
-				}
+			if identifier, ok := normalizedIdentifier(fieldResolver.Dialect(), token.Literal); ok {
+				return &ResolverResult{Identifier: identifier}, nil
 			}
 			return nil, err
 		}
@@ -431,7 +450,7 @@ func isKnownNonEmptyIdentifier(result *ResolverResult) bool {
 	}
 
 	switch strings.ToLower(result.Identifier) {
-	case "1", "0", "false", `true`:
+	case "1", "0", "false", `true`, `'false'`, `'true'`:
 		return true
 	}
 
@@ -445,6 +464,56 @@ func isEmptyIdentifier(result *ResolverResult) bool {
 	default:
 		return false
 	}
+}
+
+// readAsNumbers returns the two operands with a JSON reading that is compared
+// to a number read as a number, so the comparison has two of the same thing on
+// either side of it.
+func readAsNumbers(d dialect.Dialect, left, right *ResolverResult) (*ResolverResult, *ResolverResult) {
+	if left.Extracted && bindsNumber(right) {
+		left = withIdentifier(left, d.Number(left.Identifier))
+	} else if right.Extracted && bindsNumber(left) {
+		right = withIdentifier(right, d.Number(right.Identifier))
+	}
+
+	return left, right
+}
+
+// bindsNumber reports whether the operand is a single bound number.
+func bindsNumber(result *ResolverResult) bool {
+	for key, value := range result.Params {
+		if result.Identifier != "{:"+key+"}" {
+			continue
+		}
+
+		switch value.(type) {
+		case float32, float64,
+			int, int8, int16, int32, int64,
+			uint, uint8, uint16, uint32, uint64:
+			return true
+		}
+	}
+
+	return false
+}
+
+func withIdentifier(result *ResolverResult, identifier string) *ResolverResult {
+	copied := *result
+	copied.Identifier = identifier
+	return &copied
+}
+
+func isLikeOp(op fexpr.SignOp) bool {
+	switch op {
+	case
+		fexpr.SignLike,
+		fexpr.SignAnyLike,
+		fexpr.SignNlike,
+		fexpr.SignAnyNlike:
+		return true
+	}
+
+	return false
 }
 
 func isAnyMatchOp(op fexpr.SignOp) bool {
@@ -622,9 +691,10 @@ var _ query.Expression = (*manyVsManyExpr)(nil)
 // Expects leftSubQuery and rightSubQuery to return a subquery with a
 // single "multiMatchValue" column.
 type manyVsManyExpr struct {
-	left  *ResolverResult
-	right *ResolverResult
-	op    fexpr.SignOp
+	dialect dialect.Dialect
+	left    *ResolverResult
+	right   *ResolverResult
+	op      fexpr.SignOp
 }
 
 // Build converts the expression into a SQL fragment.
@@ -639,13 +709,16 @@ func (e *manyVsManyExpr) Build(db *query.DB, params query.Params) string {
 	rAlias := "__mr" + security.PseudorandomString(8)
 
 	whereExpr, buildErr := buildResolversExpr(
+		e.dialect,
 		&ResolverResult{
 			NullFallback: e.left.NullFallback,
+			Extracted:    e.left.Extracted,
 			Identifier:   "[[" + lAlias + ".multiMatchValue]]",
 		},
 		e.op,
 		&ResolverResult{
 			NullFallback: e.right.NullFallback,
+			Extracted:    e.right.Extracted,
 			Identifier:   "[[" + rAlias + ".multiMatchValue]]",
 			// note: the AfterBuild needs to be handled only once and it
 			// doesn't matter whether it is applied on the left or right subquery operand
@@ -679,10 +752,12 @@ var _ query.Expression = (*manyVsOneExpr)(nil)
 //
 // You can set inverse=false to reverse the condition sides (aka. one<->many).
 type manyVsOneExpr struct {
+	dialect      dialect.Dialect
 	otherOperand *ResolverResult
 	subQuery     query.Expression
 	op           fexpr.SignOp
 	inverse      bool
+	extracted    bool
 	nullFallback NullFallbackPreference
 }
 
@@ -698,6 +773,7 @@ func (e *manyVsOneExpr) Build(db *query.DB, params query.Params) string {
 
 	r1 := &ResolverResult{
 		NullFallback: e.nullFallback,
+		Extracted:    e.extracted,
 		Identifier:   "[[" + alias + ".multiMatchValue]]",
 		AfterBuild:   query.Not, // inverse for the not-exist expression
 	}
@@ -711,9 +787,9 @@ func (e *manyVsOneExpr) Build(db *query.DB, params query.Params) string {
 	var buildErr error
 
 	if e.inverse {
-		whereExpr, buildErr = buildResolversExpr(r2, e.op, r1)
+		whereExpr, buildErr = buildResolversExpr(e.dialect, r2, e.op, r1)
 	} else {
-		whereExpr, buildErr = buildResolversExpr(r1, e.op, r2)
+		whereExpr, buildErr = buildResolversExpr(e.dialect, r1, e.op, r2)
 	}
 
 	if buildErr != nil {

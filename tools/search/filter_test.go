@@ -180,6 +180,81 @@ func TestFilterDataBuildExpr(t *testing.T) {
 	}
 }
 
+// The same filters against an engine that types its columns. What changes is
+// the spelling of a case-insensitive match, of a truth value, and of a value
+// read out of a JSON document that is compared to a number — nothing else, and
+// nothing in the caller.
+func TestFilterDataBuildExprPostgres(t *testing.T) {
+	resolver := search.NewSimpleFieldResolver(dialect.For("postgres"), "test1", "test2", `^test5\.[\w\.\:]*\w+$`)
+
+	scenarios := []struct {
+		name          string
+		filterData    search.FilterData
+		expectPattern string
+	}{
+		{
+			"like",
+			`test1 ~ 'lorem'`,
+			"[[test1]] ILIKE {:TEST} ESCAPE '\\'",
+		},
+		{
+			"not like",
+			`test1 !~ 'lorem'`,
+			"[[test1]] NOT ILIKE {:TEST} ESCAPE '\\'",
+		},
+		{
+			"like with 2 columns",
+			"test1 ~ test2",
+			"[[test1]] ILIKE ('%' || [[test2]] || '%') ESCAPE '\\'",
+		},
+		{
+			"true",
+			"test1 = true",
+			"[[test1]] = 'true'",
+		},
+		{
+			"false",
+			"test1 != false",
+			"[[test1]] IS DISTINCT FROM 'false'",
+		},
+		{
+			"json value vs number",
+			"test5.a > 3",
+			"(CASE WHEN ((CASE WHEN ([[test5]])::text IS JSON THEN jsonb_path_query_first(([[test5]])::jsonb, '$.a'::jsonpath) #>> '{}' ELSE jsonb_path_query_first(jsonb_build_object('base', ([[test5]])::text), '$.base.a'::jsonpath) #>> '{}' END)) ~ '^[+-]?[0-9]+(\\.[0-9]+)?([eE][+-]?[0-9]+)?$' THEN ((CASE WHEN ([[test5]])::text IS JSON THEN jsonb_path_query_first(([[test5]])::jsonb, '$.a'::jsonpath) #>> '{}' ELSE jsonb_path_query_first(jsonb_build_object('base', ([[test5]])::text), '$.base.a'::jsonpath) #>> '{}' END))::numeric END) > {:TEST}",
+		},
+		{
+			"json value vs text",
+			`test5.a = 'lorem'`,
+			"(CASE WHEN ([[test5]])::text IS JSON THEN jsonb_path_query_first(([[test5]])::jsonb, '$.a'::jsonpath) #>> '{}' ELSE jsonb_path_query_first(jsonb_build_object('base', ([[test5]])::text), '$.base.a'::jsonpath) #>> '{}' END) IS NOT DISTINCT FROM {:TEST}",
+		},
+		{
+			"column vs number is not read again",
+			"test1 > 3",
+			"[[test1]] > {:TEST}",
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			expr, err := s.filterData.BuildExpr(resolver)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			rawSql := expr.Build(&query.DB{}, query.Params{})
+
+			pattern := regexp.MustCompile(strings.ReplaceAll(
+				"^"+regexp.QuoteMeta(s.expectPattern)+"$",
+				"TEST",
+				`\w+`,
+			))
+			if !pattern.MatchString(rawSql) {
+				t.Fatalf("[%s] expected\n%v\ngot\n%v", s.name, s.expectPattern, rawSql)
+			}
+		})
+	}
+}
+
 func TestFilterDataBuildExprWithParams(t *testing.T) {
 	// create a dummy db
 	sqlDB, err := sql.Open("sqlite", "file::memory:?cache=shared")
