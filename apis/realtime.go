@@ -27,13 +27,19 @@ const clientsChunkSize = 150
 // RealtimeClientAuthKey is the name of the realtime client store key that holds its auth state.
 const RealtimeClientAuthKey = "auth"
 
+// A record is broadcast on the Base it was written to, and a subscriber is
+// registered on the broker of the Base its request resolved to — which for a
+// caller in an org is that org's Base. So the broadcast hooks belong to every
+// Base rather than to the one the router is built on.
+func init() {
+	core.AppBindings.Register(bindRealtimeEvents)
+}
+
 // bindRealtimeApi registers the realtime api endpoints.
 func bindRealtimeApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	sub := rg.Group("/realtime")
 	sub.GET("", realtimeConnect).Bind(SkipSuccessActivityLog())
 	sub.POST("", realtimeSetSubscriptions)
-
-	bindRealtimeEvents(app)
 }
 
 func realtimeConnect(e *core.RequestEvent) error {
