@@ -935,22 +935,17 @@ func TestAttack_QuasarEnginePerShardMemory(t *testing.T) {
 //
 // Threat: the KMS plumbing caches DEKs in memory LRU; a bug swaps DEKs
 // between shards and org A reads org B's plaintext.
-// Invariant: BASE_ENCRYPT=sqlcipher is not yet wired. Marker asserts
-// config silently ignores the var today — a startup assertion is owed.
+// Invariant: this package decides no key, so a name that reads like one is
+// refused at startup rather than accepted. An operator who sets it and gets
+// no error would take encryption at rest as settled.
 func TestAttack_WrongDEKForShard(t *testing.T) {
 	t.Setenv("BASE_ENCRYPT", "sqlcipher")
 	t.Setenv("BASE_NETWORK", "quasar")
 	t.Setenv("BASE_SHARD_KEY", "user_id")
 	t.Setenv("HOSTNAME", "a")
-	cfg, err := ConfigFromEnv()
-	if err != nil {
-		t.Fatalf("ConfigFromEnv: %v", err)
+	if _, err := ConfigFromEnv(); err == nil {
+		t.Fatal("ConfigFromEnv accepted BASE_ENCRYPT; it must refuse")
 	}
-	// Today's Config has no BASE_ENCRYPT field; the env var is silently
-	// dropped. Blue owes a "BASE_ENCRYPT not implemented yet" startup
-	// error OR a fully wired SQLCipher path. Skip marker.
-	_ = cfg
-	t.Skip(blockedReason)
 }
 
 // TestAttack_KMSNodeImpersonation — rogue node claims to be a KMS member.
