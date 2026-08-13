@@ -59,12 +59,80 @@ test:
       go vet ./...
   - name: go-test
     # The whole tree, not a named list — an allowlist stops covering whatever is
-    # added after it is written. 64 packages carry tests; 24 have none and say so.
+    # added after it is written. 64 packages carry tests; 23 have none and say so.
+    # ./tests/engine is among the 64, which is what makes the Postgres gate below
+    # a comparison: the same assertions have already answered on SQLite here.
     run: |
       set -e
       export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go test -count=1 ./...
-  - name: releases-published
+  - name: go-test-postgres
+    # Base serves the whole /v1 data plane on PostgreSQL as well as SQLite, and
+    # until this gate nothing ran a line of it. Every gate above is SQLite by
+    # construction, and no test in the tree opened a server connection — so the
+    # engine that the dialect, the filter spellings, the write pool and the
+    # backup refusal were all written for was the one nothing ever executed.
+    #
+    # WHAT THIS COVERS: ./tests/engine, a corpus that builds its fixtures through
+    # Base's own API and asserts the same answers whichever engine holds them —
+    # filters (case-insensitive match, truth values, numbers, numbers reached
+    # through a JSON path), paging and sorting, collection DDL down to the
+    # columns and the declared index, a field added to a live collection and
+    # queried in the next breath, eight writers arriving together, settings
+    # encrypted through the round trip, and a backup that refuses where it cannot
+    # hold the database. The same corpus runs on SQLite in `go-test` above, so a
+    # divergence surfaces as one engine disagreeing with the other rather than as
+    # a Postgres-only assertion with nothing to compare against.
+    #
+    # WHAT THIS DOES NOT COVER: every other package. `core` and `apis` cannot be
+    # pointed at a server, because tests/data is a SQLite FILE — demo1..demo5,
+    # the users and the view collections their assertions name live inside it,
+    # and running migrations produces none of them. Pointed at Postgres today,
+    # `core` panics after four tests. `tools/search` asserts the SQL TEXT SQLite
+    # is handed, so it tests a spelling rather than an answer and would have to
+    # be rewritten to mean anything on a second engine. Porting that fixture is
+    # what widens this gate; the mechanism it would need is already here, in
+    # tests.NewTestAppWithConfig.
+    #
+    # postgres:18 and not ghcr.io/hanzoai/sql:18, because Base uses none of what
+    # that image adds — vector, postgis, pg_cron, pgcrypto — and its init script
+    # hard-fails the container over the database name pg_cron pins. What Base
+    # does need from a server is ICU, for the nondeterministic `nocase` collation
+    # the dialect's Prelude creates so that COLLATE NOCASE means the same thing
+    # on both engines, and gen_random_uuid(), which has been core since 13. The
+    # official image carries both; measured, not assumed.
+    #
+    # The server joins the JOB's network namespace instead of publishing a port.
+    # The runner's docker daemon is the host's and is shared with every other job
+    # on that node, so a published 5432 would collide with whatever else is
+    # building and would not be at localhost from in here anyway. One mechanism,
+    # spelled for the two ways a job can be hosted.
+    #
+    # A server this cannot reach is a FAILURE and never a skip: tests/postgres.go
+    # panics rather than falling back to a file, because a gate that quietly
+    # tests SQLite twice is worse than no gate at all.
+    #
+    # Readiness is proved by making the tests' OWN connection — that address,
+    # those credentials, that database — rather than by asking the container
+    # whether it is up. The two answer differently when something else is already
+    # on the port, and then the gate would run against a server it did not make.
+    run: |
+      set -euo pipefail
+      export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
+      export BASE_TEST_POSTGRES='postgres://base:base@127.0.0.1:5432/base?sslmode=disable'
+      pg=base-postgres-$$
+      trap 'docker rm -f "$pg" >/dev/null 2>&1 || true' EXIT
+      if [ -f /.dockerenv ]; then net="container:$(cat /etc/hostname)"; else net=host; fi
+      docker run -d --name "$pg" --network "$net" \
+        -e POSTGRES_USER=base -e POSTGRES_PASSWORD=base -e POSTGRES_DB=base \
+        postgres:18 >/dev/null
+      for i in $(seq 60); do
+        docker exec "$pg" psql "$BASE_TEST_POSTGRES" -tAc 'select 1' >/dev/null 2>&1 && break
+        [ "$i" = 60 ] && { echo "::error::nothing answers as this gate's server at $BASE_TEST_POSTGRES"; docker logs "$pg"; exit 1; }
+        sleep 1
+      done
+      go test -count=1 ./tests/engine/
+  - name: releases
     # A release that builds nothing looks exactly like a release that built.
     # v1.5.17 reached CI and its build died; v1.5.18 and v1.5.24 never reached CI
     # at all. All three cut a Go module while ghcr stayed on v1.5.16 for six days,
@@ -85,15 +153,51 @@ test:
     # image; a literal would be right today and wrong at the release that moves
     # the range. The tag being built right now is excluded — its image is pushed
     # by a later step, so demanding it here would fail every release on principle.
+    #
+    # The second half is the opposite failure, and the reason it is here rather
+    # than anywhere else: THIS gate runs BEFORE the push, so it can prevent the
+    # collision instead of reporting it afterwards.
+    #
+    # Two counters write into one namespace. A `v*` tag publishes verbatim AND as
+    # a bare alias (v1.5.16 + 1.5.16), while every push to main and every pull
+    # request derives the next patch above whatever ghcr already carries and
+    # publishes it bare. So branch builds spend release numbers: git stopped at
+    # v1.5.27 while the bare series ran on to 1.5.46, and a v1.5.28 tag cut today
+    # would republish 1.5.28 onto a different digest — silently changing what
+    # anything pinned to that number resolves to.
+    #
+    # A branch build can never land ON a release, because it derives above every
+    # number the registry carries in either spelling. The corruption only runs
+    # the other way, so that is the direction closed here: a release has to be
+    # strictly above the high-water, and the error says which number is free.
+    #
+    # The cost of settling it this way, rather than by moving branch builds out
+    # of the semver namespace: release numbers are no longer contiguous or freely
+    # chosen. Every push and every PR consumes one, gaps are permanent, and a
+    # patch can never be cut below the current series — this repo ships from main
+    # only, so nothing needs that. What it buys is that no published tag changes
+    # shape, which keeps 40-odd repos on hanzoai/ci untouched; the alternative
+    # fix lives there and alters what every image in five orgs is named.
     run: |
       set -euo pipefail
       img=$(yq -r '.images[0].repo' hanzo.yml)
       pkg=${img#ghcr.io/}
       tok=$(curl -fsSL "https://ghcr.io/token?scope=repository:${pkg}:pull&service=ghcr.io" | jq -r .token)
-      have=$(curl -fsSL -H "Authorization: Bearer $tok" "https://ghcr.io/v2/${pkg}/tags/list?n=1000" \
-             | jq -r '.tags[]' | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V)
+      tags=$(curl -fsSL -H "Authorization: Bearer $tok" "https://ghcr.io/v2/${pkg}/tags/list?n=1000" | jq -r '.tags[]')
+      have=$(printf '%s\n' "$tags" | { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V)
       [ -n "$have" ] || { echo "::error::${img} carries no v* tag — the release lane has never published"; exit 1; }
       floor=$(printf '%s\n' "$have" | head -1)
+      # Both spellings, because a release writes both and a branch build writes
+      # the bare one — reading either alone understates what is taken.
+      water=$(printf '%s\n' "$tags" | sed 's/^v//' | { grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -V | tail -1)
+      if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+        cut=${GITHUB_REF_NAME#v}
+        if [ "$cut" = "$water" ] || [ "$(printf '%s\n%s\n' "$cut" "$water" | sort -V | tail -1)" != "$cut" ]; then
+          echo "::error::${GITHUB_REF_NAME} is not above ${water}, the highest ${img} already carries — its ${cut} alias lands inside the range branch builds have taken, changing what that number resolves to. Cut v${water%.*}.$(( ${water##*.} + 1 )) or above."
+          exit 1
+        fi
+        echo "${GITHUB_REF_NAME} is above the published high-water ${water}"
+      fi
       missing=
       for t in $(git ls-remote --tags "https://github.com/${GITHUB_REPOSITORY}.git" \
                  | sed -n 's#.*refs/tags/\(v[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$#\1#p' | sort -V -u); do
