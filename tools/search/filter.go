@@ -217,37 +217,12 @@ func buildResolversExpr(
 
 	// multi-match expressions
 	if !isAnyMatchOp(op) {
-		if left.MultiMatchSubQuery != nil && right.MultiMatchSubQuery != nil {
-			mm := &manyVsManyExpr{
-				dialect: d,
-				left:    left,
-				right:   right,
-				op:      op,
-			}
+		mm, err := multiMatch(d, left, op, right)
+		if err != nil {
+			return nil, err
+		}
 
-			expr = query.Enclose(query.And(expr, mm))
-		} else if left.MultiMatchSubQuery != nil {
-			mm := &manyVsOneExpr{
-				dialect:      d,
-				nullFallback: left.NullFallback,
-				extracted:    left.Extracted,
-				subQuery:     left.MultiMatchSubQuery,
-				op:           op,
-				otherOperand: right,
-			}
-
-			expr = query.Enclose(query.And(expr, mm))
-		} else if right.MultiMatchSubQuery != nil {
-			mm := &manyVsOneExpr{
-				dialect:      d,
-				nullFallback: right.NullFallback,
-				extracted:    right.Extracted,
-				subQuery:     right.MultiMatchSubQuery,
-				op:           op,
-				otherOperand: left,
-				inverse:      true,
-			}
-
+		if mm != nil {
 			expr = query.Enclose(query.And(expr, mm))
 		}
 	}
@@ -684,61 +659,104 @@ func (e *concatExpr) Build(db *query.DB, params query.Params) string {
 
 // -------------------------------------------------------------------
 
+// multiMatch is the extra condition a multi-valued operand contributes, or nil
+// where neither operand is one.
+//
+// Comparing to a set means comparing to every member of it, and the join alone
+// says only that SOME member matched, so the set is compared again in a
+// subquery. Which of the three forms applies is a property of the operands.
+func multiMatch(d dialect.Dialect, left *ResolverResult, op fexpr.SignOp, right *ResolverResult) (query.Expression, error) {
+	switch {
+	case left.MultiMatchSubQuery != nil && right.MultiMatchSubQuery != nil:
+		return newManyVsMany(d, left, op, right)
+	case left.MultiMatchSubQuery != nil:
+		return newManyVsOne(d, left, op, right, false)
+	case right.MultiMatchSubQuery != nil:
+		return newManyVsOne(d, right, op, left, true)
+	}
+
+	return nil, nil
+}
+
+// -------------------------------------------------------------------
+
 var _ query.Expression = (*manyVsManyExpr)(nil)
 
-// manyVsManyExpr constructs a multi-match many<->many db where expression.
+// manyVsManyExpr pairs two multi-valued operands: no pairing may fail the
+// comparison, which over two sets is what "every value matches" means.
 //
-// Expects leftSubQuery and rightSubQuery to return a subquery with a
-// single "multiMatchValue" column.
+// Each subquery returns a single "multiMatchValue" column.
 type manyVsManyExpr struct {
-	dialect dialect.Dialect
-	left    *ResolverResult
-	right   *ResolverResult
-	op      fexpr.SignOp
+	left       *MultiMatchSubquery
+	right      *MultiMatchSubquery
+	leftAlias  string
+	rightAlias string
+	where      query.Expression
+}
+
+// newManyVsMany assembles a many<->many multi-match, or says why it cannot.
+//
+// Everything that can fail happens here, where saying so is an error the caller
+// turns into a refused filter. [query.Expression.Build] answers a string and
+// nothing else, so a builder that fails there has only a fragment of SQL to say
+// it with — and a fragment means whatever the SQL around it makes it mean. "0=1"
+// reads as "no rows" ANDed and as "every row" negated, and this expression is
+// built out of both.
+func newManyVsMany(d dialect.Dialect, left *ResolverResult, op fexpr.SignOp, right *ResolverResult) (query.Expression, error) {
+	if err := left.MultiMatchSubQuery.usable(); err != nil {
+		return nil, err
+	}
+
+	if err := right.MultiMatchSubQuery.usable(); err != nil {
+		return nil, err
+	}
+
+	e := &manyVsManyExpr{
+		left:       left.MultiMatchSubQuery,
+		right:      right.MultiMatchSubQuery,
+		leftAlias:  "__ml" + security.PseudorandomString(8),
+		rightAlias: "__mr" + security.PseudorandomString(8),
+	}
+
+	var err error
+
+	e.where, err = buildResolversExpr(
+		d,
+		&ResolverResult{
+			NullFallback: left.NullFallback,
+			Extracted:    left.Extracted,
+			Identifier:   "[[" + e.leftAlias + ".multiMatchValue]]",
+		},
+		op,
+		&ResolverResult{
+			NullFallback: right.NullFallback,
+			Extracted:    right.Extracted,
+			Identifier:   "[[" + e.rightAlias + ".multiMatchValue]]",
+			// note: the AfterBuild needs to be handled only once and it
+			// doesn't matter whether it is applied on the left or right subquery operand
+			AfterBuild: query.Not, // inverse for the not-exist expression
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 // Build converts the expression into a SQL fragment.
 //
 // Implements [query.Expression] interface.
 func (e *manyVsManyExpr) Build(db *query.DB, params query.Params) string {
-	if e.left.MultiMatchSubQuery == nil || e.right.MultiMatchSubQuery == nil {
-		return "0=1"
-	}
-
-	lAlias := "__ml" + security.PseudorandomString(8)
-	rAlias := "__mr" + security.PseudorandomString(8)
-
-	whereExpr, buildErr := buildResolversExpr(
-		e.dialect,
-		&ResolverResult{
-			NullFallback: e.left.NullFallback,
-			Extracted:    e.left.Extracted,
-			Identifier:   "[[" + lAlias + ".multiMatchValue]]",
-		},
-		e.op,
-		&ResolverResult{
-			NullFallback: e.right.NullFallback,
-			Extracted:    e.right.Extracted,
-			Identifier:   "[[" + rAlias + ".multiMatchValue]]",
-			// note: the AfterBuild needs to be handled only once and it
-			// doesn't matter whether it is applied on the left or right subquery operand
-			AfterBuild: query.Not, // inverse for the not-exist expression
-		},
-	)
-
-	if buildErr != nil {
-		return "0=1"
-	}
-
 	// the two operand subqueries are paired row by row rather than matched on
 	// anything of their own, and an outer join still has to state a condition
 	return fmt.Sprintf(
 		"NOT EXISTS (SELECT 1 FROM (%s) {{%s}} LEFT JOIN (%s) {{%s}} ON 1=1 WHERE %s)",
-		e.left.MultiMatchSubQuery.Build(db, params),
-		lAlias,
-		e.right.MultiMatchSubQuery.Build(db, params),
-		rAlias,
-		whereExpr.Build(db, params),
+		e.left.Build(db, params),
+		e.leftAlias,
+		e.right.Build(db, params),
+		e.rightAlias,
+		e.where.Build(db, params),
 	)
 }
 
@@ -746,60 +764,64 @@ func (e *manyVsManyExpr) Build(db *query.DB, params query.Params) string {
 
 var _ query.Expression = (*manyVsOneExpr)(nil)
 
-// manyVsOneExpr constructs a multi-match many<->one db where expression.
+// manyVsOneExpr compares every value of a multi-valued operand against a single
+// one: no value may fail the comparison.
 //
-// Expects subQuery to return a subquery with a single "multiMatchValue" column.
-//
-// You can set inverse=false to reverse the condition sides (aka. one<->many).
+// The subquery returns a single "multiMatchValue" column.
 type manyVsOneExpr struct {
-	dialect      dialect.Dialect
-	otherOperand *ResolverResult
-	subQuery     query.Expression
-	op           fexpr.SignOp
-	inverse      bool
-	extracted    bool
-	nullFallback NullFallbackPreference
+	subQuery *MultiMatchSubquery
+	alias    string
+	where    query.Expression
+}
+
+// newManyVsOne assembles a many<->one multi-match, or says why it cannot.
+// Pass inverse to put the single-valued operand on the left.
+//
+// See [newManyVsMany] for why the failures are here rather than in Build.
+func newManyVsOne(d dialect.Dialect, many *ResolverResult, op fexpr.SignOp, one *ResolverResult, inverse bool) (query.Expression, error) {
+	if err := many.MultiMatchSubQuery.usable(); err != nil {
+		return nil, err
+	}
+
+	e := &manyVsOneExpr{
+		subQuery: many.MultiMatchSubQuery,
+		alias:    "__sm" + security.PseudorandomString(8),
+	}
+
+	manyOperand := &ResolverResult{
+		NullFallback: many.NullFallback,
+		Extracted:    many.Extracted,
+		Identifier:   "[[" + e.alias + ".multiMatchValue]]",
+		AfterBuild:   query.Not, // inverse for the not-exist expression
+	}
+
+	oneOperand := &ResolverResult{
+		Identifier: one.Identifier,
+		Params:     one.Params,
+	}
+
+	var err error
+
+	if inverse {
+		e.where, err = buildResolversExpr(d, oneOperand, op, manyOperand)
+	} else {
+		e.where, err = buildResolversExpr(d, manyOperand, op, oneOperand)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return e, nil
 }
 
 // Build converts the expression into a SQL fragment.
 //
 // Implements [query.Expression] interface.
 func (e *manyVsOneExpr) Build(db *query.DB, params query.Params) string {
-	if e.subQuery == nil {
-		return "0=1"
-	}
-
-	alias := "__sm" + security.PseudorandomString(8)
-
-	r1 := &ResolverResult{
-		NullFallback: e.nullFallback,
-		Extracted:    e.extracted,
-		Identifier:   "[[" + alias + ".multiMatchValue]]",
-		AfterBuild:   query.Not, // inverse for the not-exist expression
-	}
-
-	r2 := &ResolverResult{
-		Identifier: e.otherOperand.Identifier,
-		Params:     e.otherOperand.Params,
-	}
-
-	var whereExpr query.Expression
-	var buildErr error
-
-	if e.inverse {
-		whereExpr, buildErr = buildResolversExpr(e.dialect, r2, e.op, r1)
-	} else {
-		whereExpr, buildErr = buildResolversExpr(e.dialect, r1, e.op, r2)
-	}
-
-	if buildErr != nil {
-		return "0=1"
-	}
-
 	return fmt.Sprintf(
 		"NOT EXISTS (SELECT 1 FROM (%s) {{%s}} WHERE %s)",
 		e.subQuery.Build(db, params),
-		alias,
-		whereExpr.Build(db, params),
+		e.alias,
+		e.where.Build(db, params),
 	)
 }

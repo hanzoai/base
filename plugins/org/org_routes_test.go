@@ -225,7 +225,7 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 
 // keyed stands up the half of IAM a key resolves against, so a test can issue
 // one. Every key it answers for belongs to owner.
-func keyed(t *testing.T, owner string) (core.App, http.Handler) {
+func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.App, http.Handler) {
 	t.Helper()
 
 	app, err := tests.NewTestApp()
@@ -253,7 +253,7 @@ func keyed(t *testing.T, owner string) (core.App, http.Handler) {
 		}
 	}
 
-	return app, serve(t, app)
+	return app, serve(t, app, extra...)
 }
 
 // seedOrgConfig puts a real config row in, so a read that is admitted has
@@ -289,7 +289,14 @@ func seedOrgConfig(t *testing.T, app core.App, org, secret string) {
 // printed in a customer's HTML returned that org's provider secrets and every
 // member's billing identity. Read-only was the wrong reading of publishable.
 func TestAPublishableKeyReachesNoBase(t *testing.T) {
-	app, mux := keyed(t, "alpha")
+	app, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
+		// An address this file does not publish, registered the way an
+		// extension does it. What a publishable key reaches is a property of
+		// the prefix, so it holds for whatever route sits under it.
+		e.Router.GET("/v1/bases/{orgId}/usage", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"secret": "alpha-kms-project"})
+		})
+	})
 	seedOrgConfig(t, app, "alpha", "alpha-kms-project")
 
 	for _, r := range orgRoutes {
@@ -307,6 +314,19 @@ func TestAPublishableKeyReachesNoBase(t *testing.T) {
 			if strings.Contains(body, "alpha-kms-project") {
 				t.Errorf("%s %s %s handed a web page's key the org's config: %s", r.method, path, how.name, body)
 			}
+		}
+	}
+
+	for _, how := range []struct{ name, token, query string }{
+		{"as a bearer", "pk-in-the-page", ""},
+		{"in the query", "", "?key=pk-in-the-page"},
+	} {
+		code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/usage"+how.query, how.token, nil)
+		if code != http.StatusForbidden {
+			t.Errorf("a route registered off the router under /v1/bases answered a publishable key %s: %d %s", how.name, code, body)
+		}
+		if strings.Contains(body, "alpha-kms-project") {
+			t.Errorf("that route handed a web page's key the org's config %s: %s", how.name, body)
 		}
 	}
 
@@ -382,11 +402,15 @@ func TestTheRuleFollowsTheAddressAndNotTheGroup(t *testing.T) {
 		}
 	}
 
-	// A route at the same address, registered the way an extension does it.
+	// Two routes at addresses this file does not publish, registered the way an
+	// extension does it. The second continues past a user, which is a shape
+	// only an extension writes.
+	echo := func(re *core.RequestEvent) error {
+		return re.JSON(http.StatusOK, map[string]string{"org": re.Request.PathValue("orgId")})
+	}
 	mux := serve(t, app, func(e *core.ServeEvent) {
-		e.Router.GET("/v1/bases/{orgId}/usage", func(re *core.RequestEvent) error {
-			return re.JSON(http.StatusOK, map[string]string{"org": re.Request.PathValue("orgId")})
-		})
+		e.Router.GET("/v1/bases/{orgId}/usage", echo)
+		e.Router.GET("/v1/bases/{orgId}/customers/{userId}/notes", echo)
 	})
 
 	alpha := iam.token(t, "alpha/ann", "alpha")
@@ -396,6 +420,17 @@ func TestTheRuleFollowsTheAddressAndNotTheGroup(t *testing.T) {
 	}
 	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/usage", alpha, nil); code == http.StatusForbidden {
 		t.Errorf("the same route refused alpha its own org: %s", body)
+	}
+
+	// The user a path names is the caller, at whatever depth the address
+	// continues past it.
+	ann := iam.member(t, "alpha/ann", "alpha")
+
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/alpha%2Fceo/notes", ann, nil); code != http.StatusForbidden {
+		t.Errorf("a member reached another member through a deeper address: %d %s", code, body)
+	}
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/alpha%2Fann/notes", ann, nil); code == http.StatusForbidden {
+		t.Errorf("the same address refused a member itself: %s", body)
 	}
 }
 
