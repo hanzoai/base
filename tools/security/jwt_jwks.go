@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/sync/singleflight"
+
 	"github.com/hanzoai/base/tools/cache"
 )
 
@@ -52,8 +54,10 @@ func (k *JWK) PublicKey() (*rsa.PublicKey, error) {
 // JWKSCache caches fetched JWKS keys with a configurable TTL.
 // Backed by cache.TTL (luxfi/cache LRU + time-based expiration).
 type JWKSCache struct {
-	keys   *cache.TTL[string, *JWK] // keyed by "jwksURL#kid"
-	client *http.Client
+	keys     *cache.TTL[string, *JWK]     // keyed by "jwksURL#kid"
+	docs     *cache.TTL[string, struct{}] // the document this process holds a copy of
+	fetching singleflight.Group           // one fetch per document, however many ask
+	client   *http.Client
 }
 
 // NewJWKSCache creates a new JWKS cache with the given TTL.
@@ -61,6 +65,7 @@ type JWKSCache struct {
 func NewJWKSCache(ttl time.Duration) *JWKSCache {
 	return &JWKSCache{
 		keys: cache.NewTTL[string, *JWK](256, ttl),
+		docs: cache.NewTTL[string, struct{}](16, ttl),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 		},
@@ -68,24 +73,43 @@ func NewJWKSCache(ttl time.Duration) *JWKSCache {
 }
 
 // FetchKey retrieves a JWK by kid from the JWKS endpoint, using the cache.
+//
+// The document is what is cached, not the key, so a kid the issuer does not
+// publish is answered from the copy already held. The kid arrives on an
+// unverified token — it is chosen by whoever sent it — so a key lookup must
+// not be a way to ask this process to make a request.
+//
+// Concurrent lookups that do need the document share one fetch: the key rolls
+// over for every caller at once, so without this a rotation is a burst.
 func (c *JWKSCache) FetchKey(ctx context.Context, jwksURL, kid string) (*JWK, error) {
-	cacheKey := jwksURL + "#" + kid
-
-	if key, ok := c.keys.Get(cacheKey); ok {
+	if key, ok := c.keys.Get(jwksURL + "#" + kid); ok {
 		return key, nil
 	}
+	if _, fresh := c.docs.Get(jwksURL); fresh {
+		return nil, fmt.Errorf("jwks: key with kid %q not found at %s", kid, jwksURL)
+	}
 
-	// Fetch from remote.
-	key, err := c.fetchFromRemote(ctx, jwksURL, kid)
+	keys, err, _ := c.fetching.Do(jwksURL, func() (any, error) {
+		return c.fetchFromRemote(ctx, jwksURL)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	c.keys.Put(cacheKey, key)
-	return key, nil
+	for _, key := range keys.([]*JWK) {
+		c.keys.Put(jwksURL+"#"+key.Kid, key)
+	}
+	c.docs.Put(jwksURL, struct{}{})
+
+	for _, key := range keys.([]*JWK) {
+		if key.Kid == kid {
+			return key, nil
+		}
+	}
+	return nil, fmt.Errorf("jwks: key with kid %q not found at %s", kid, jwksURL)
 }
 
-func (c *JWKSCache) fetchFromRemote(ctx context.Context, jwksURL, kid string) (*JWK, error) {
+func (c *JWKSCache) fetchFromRemote(ctx context.Context, jwksURL string) ([]*JWK, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", jwksURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jwks: create request: %w", err)
@@ -113,13 +137,7 @@ func (c *JWKSCache) fetchFromRemote(ctx context.Context, jwksURL, kid string) (*
 		return nil, fmt.Errorf("jwks: decode: %w", err)
 	}
 
-	for _, key := range jwks.Keys {
-		if key.Kid == kid {
-			return key, nil
-		}
-	}
-
-	return nil, fmt.Errorf("jwks: key with kid %q not found at %s", kid, jwksURL)
+	return jwks.Keys, nil
 }
 
 // ParseJWTWithJWKS validates a JWT against a JWKS endpoint and returns
@@ -146,15 +164,12 @@ func ParseJWTWithJWKS(ctx context.Context, token string, jwksURL string, jwksCac
 		return nil, errors.New("jwks: missing kid in token header")
 	}
 
-	// Fetch the key.
-	var key *JWK
-	if jwksCache != nil {
-		key, err = jwksCache.FetchKey(ctx, jwksURL, kid)
-	} else {
-		key, err = (&JWKSCache{
-			client: &http.Client{Timeout: 10 * time.Second},
-		}).fetchFromRemote(ctx, jwksURL, kid)
+	// A caller that brings no cache gets one for this call, so the document is
+	// still read once and an unpublished kid still costs nothing.
+	if jwksCache == nil {
+		jwksCache = NewJWKSCache(10 * time.Minute)
 	}
+	key, err := jwksCache.FetchKey(ctx, jwksURL, kid)
 	if err != nil {
 		return nil, err
 	}
