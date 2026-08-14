@@ -8,6 +8,18 @@ import { SectionCard } from '~/components/SectionCard';
 
 type CollectionRecord = CollectionModel & Record<string, unknown>;
 
+// An uploaded file is a document until this says otherwise. Both the preview
+// below and the server address an entry by its id or its name, and the preview
+// renders them, so those are what a parsed entry has to carry: text, at least
+// one of the two. Anything else is caught here, where it can be said, rather
+// than in a render, where it cannot.
+function isSchema(entry: unknown): boolean {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+    const { id, name } = entry as { id?: unknown; name?: unknown };
+    const text = (v: unknown) => v === undefined || typeof v === 'string';
+    return text(id) && text(name) && (typeof id === 'string' || typeof name === 'string');
+}
+
 function DataSettings() {
     const qc = useQueryClient();
     const fileRef = useRef<HTMLInputElement>(null);
@@ -86,9 +98,15 @@ function DataSettings() {
     function parseImport(text: string) {
         setImportError('');
         try {
-            const parsed = JSON.parse(text);
+            const parsed: unknown = JSON.parse(text);
             if (!Array.isArray(parsed)) {
                 setImportError('Expected a JSON array of collection schemas.');
+                setImportParsed([]);
+                return;
+            }
+            const wrong = parsed.findIndex((entry) => !isSchema(entry));
+            if (wrong !== -1) {
+                setImportError(`Entry ${wrong + 1} is not a collection schema — id and name are text, and one of them has to be there.`);
                 setImportParsed([]);
                 return;
             }

@@ -23,7 +23,7 @@ not an SDK; SDK clients and discovery repos link OUT to it. One impl, one place.
 - `examples/base/main.go` — the prebuilt binary
 - `core/` — app, dialect, the SQLite/server split (`BaseAppConfig.DataDSN`)
 - `plugins/org/` — Hanzo IAM (mandatory, one way), per-org Bases at `/v1/bases`
-- `cmd/` — CLI (`AddCLISubcommands`), serve, superuser
+- `cmd/` — CLI (`AddCLISubcommands`), serve, login
 
 ## Brand rules (hard)
 - Hanzo is a full **AI SDK / AI cloud**, never an "LLM gateway" or LiteLLM proxy.
@@ -197,7 +197,7 @@ Base must do is stated where a Base is built rather than where the router is.
 `registerBaseHooks` and `registerNATSHooks` — the hook counterpart of
 `AppMigrations`, and the reason JS *migrations* already applied per tenant.
 Realtime is its one member: `apis` registers `bindRealtimeEvents` from an init,
-and `bindRealtimeApi` registers the two endpoints and nothing else, because
+and `bindRealtimeApi` registers the endpoints and nothing else, because
 binding in both places sends a subscriber the same record twice. A subscriber
 registers on the broker of the Base its request resolved to, so the broadcast has
 to happen on that same Base; two orgs are two brokers, which is what keeps a
@@ -214,12 +214,36 @@ putting it in the registry would move the question rather than answer it.
 argument rather than reading one from the request, so it belongs on the process's
 own Base, where an operator's extension runs, and `Register` sets it there.
 
-Open, and upstream of realtime rather than in it: a browser opens the stream with
-`EventSource`, which sends no headers, and `getAuthTokenFromRequest` reads only
-headers — so `GET /v1/realtime` registers the client on the process's Base while
-the `POST /v1/realtime` that names its id carries the token, resolves to the org's
-Base, and looks the id up on that broker. What settles this is how a stream
-authenticates, not where realtime binds.
+### A stream is opened with a grant
+
+`EventSource` sends no headers, so the credential a caller already holds cannot
+travel on the request that opens its stream — and an unauthenticated GET resolves
+to no org, registers on the process's Base, and is not there when the `POST
+/v1/realtime` that names its id resolves to the org's. A grant travels instead.
+`POST /v1/realtime/token` mints one on an ordinary authenticated request; `GET
+/v1/realtime?token=` spends it, once, inside half a minute. The string is random
+and stands for nothing; what it stands FOR is held in the process
+(`apis/realtime_grant.go`) — the Base the minting request resolved to and the
+identity it resolved as — so a stream is opened with exactly the authorization of
+the request that asked for it, and both halves meet on one broker.
+
+The obvious alternative is the caller's own token in `?token=`, which is what
+most SSE APIs do. It spends the wrong thing: an IAM token opens every service in
+the estate for as long as it lives, and a query is read by every proxy, ingress
+and access log between the browser and here, most of them outside Base. A grant
+is worth one stream, on one Base, for thirty seconds — and `logRequest` redacts
+`token` alongside `key`, so `_logs` holds neither. A cookie would also work and is
+the wrong shape: Base is a token API, and a cookie is a second way to
+authenticate. The grant is read by a middleware bound at the one address it
+opens, so what it reaches is a property of the route rather than of a string
+travelling in a URL; a request carrying none is an anonymous subscriber on the
+process's Base, which is what an anonymous caller reads anyway.
+
+The admin does its half in `ui-react/src/lib/api.ts`: mint, open, and reopen with
+a fresh grant when the stream drops, because the browser's own retry replays one
+that is spent. The handshake event is `CONNECT` on both sides — the client
+listened for `PB_CONNECT`, so no `clientId` ever arrived and no subscription was
+ever submitted, and both halves had to be right before anything reached a page.
 
 ### The process answers what is asked of the process
 
@@ -630,6 +654,39 @@ Sending mail is untouched: `$app.newMailClient().send()` is the general sender a
 app's own hook uses, SMTP settings stay, and `POST /v1/settings/test/email` still
 proves they work — it sends a plain message now rather than rendering a template
 for a flow that is gone, which is the question an operator actually has.
+
+## A token secret is minted where it is signed with
+
+The secret on a collection's `authToken` / `fileToken` is half the key Base signs
+those JWTs with (`record.TokenKey()` is the other half), so it is the server's to
+choose. `Collection.MarshalJSON` has always dropped it on the way out; the way in
+now says the same thing. `UnmarshalJSON` keeps the secrets already on the model
+and takes none from the document, so every door that binds a body — create,
+update, `PUT /v1/collections/import` — carries a duration and a rule and never a
+key. A new collection gets its secrets from the factory.
+
+Replacing one is therefore a request that carries nothing:
+`POST /v1/collections/{collection}/rotate` mints a fresh secret for every token
+the collection issues, in one act, because half a rotation is not a thing anyone
+wants. Verification reads the secret off the collection the save reloads into the
+cache, so every token signed with the old one is refused from the next request on
+(`TestRotatingTokenSecretsRefusesTheTokensSignedBefore`).
+
+Base issues two of the four: `auth`, from the refresh endpoint and the sign-in
+helper, and `file`, from `POST /v1/files/token`. `verificationToken` and
+`emailChangeToken` are still fields — they are in the stored options and they
+validate — but nothing in the product mints or reads one; they went quiet with
+the mail above. The admin offers the two that are real.
+
+## The admin stopped managing passwords it does not have
+
+`_superusers` carries email, created and updated — there is no password field in
+`core/` at all, and `resolveJWKSToken` mirrors a verified IAM identity into an
+unsaved record rather than a row. So a settings page that created a superuser
+with a password wrote an email-only row that could never sign in, and one that
+changed a password sent two fields `SetIfFieldExists` drops and reported success.
+It is gone. Who reaches the admin is IAM's `admin` org membership, decided by
+`PlatformSudo()`, and Base has nothing to add to that.
 
 ## Mount prefix (`BASE_API_PREFIX`)
 

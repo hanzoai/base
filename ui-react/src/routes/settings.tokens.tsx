@@ -6,24 +6,25 @@ import { useState } from 'react';
 import { base } from '~/lib/base';
 import { SectionCard } from '~/components/SectionCard';
 
-const tokenTypes = [
-    { key: 'authToken', label: 'Auth token', scope: 'collection' },
-    { key: 'verificationToken', label: 'Verification token', scope: 'collection' },
-    { key: 'passwordResetToken', label: 'Password reset token', scope: 'collection' },
-    { key: 'emailChangeToken', label: 'Email change token', scope: 'collection' },
-    { key: 'fileToken', label: 'File token', scope: 'collection' },
+// The tokens Base issues. `auth` comes back from a sign-in refresh, `file`
+// from POST /v1/files/token. Their signing secrets are server material — the
+// server mints them and never sends them here, so this page sets durations and
+// asks for a rotation.
+const tokens = [
+    { key: 'authToken', label: 'Auth token' },
+    { key: 'fileToken', label: 'File token' },
 ] as const;
 
-type TokenTypeKey = typeof tokenTypes[number]['key'];
+type TokenKey = typeof tokens[number]['key'];
 
-interface TokenForm {
+interface DurationForm {
     duration: number;
 }
 
 function TokenSettings() {
     const qc = useQueryClient();
     const [selectedCollection, setSelectedCollection] = useState<string>('');
-    const [activeToken, setActiveToken] = useState<TokenTypeKey>('authToken');
+    const [active, setActive] = useState<TokenKey>('authToken');
 
     const authCollections = useQuery({
         queryKey: ['collections', 'auth'],
@@ -34,33 +35,23 @@ function TokenSettings() {
     const collectionId = selectedCollection || collections[0]?.id || '';
     const collection = collections.find((c) => c.id === collectionId);
 
-    const tokenConfig = collection
-        ? (collection as Record<string, unknown>)[activeToken] as { duration?: number; secret?: string } | undefined
+    const config = collection
+        ? (collection as Record<string, unknown>)[active] as { duration?: number } | undefined
         : undefined;
 
-    const { register, handleSubmit, formState } = useForm<TokenForm>({
-        values: { duration: tokenConfig?.duration ?? 0 },
+    const { register, handleSubmit, formState } = useForm<DurationForm>({
+        values: { duration: config?.duration ?? 0 },
     });
 
-    const saveMutation = useMutation({
-        mutationFn: async (data: TokenForm) => {
-            await base.collections.update(collectionId, {
-                [activeToken]: { duration: data.duration },
-            });
+    const saveDuration = useMutation({
+        mutationFn: async (data: DurationForm) => {
+            await base.collections.update(collectionId, { [active]: { duration: data.duration } });
         },
         onSuccess: () => { void qc.invalidateQueries({ queryKey: ['collections', 'auth'] }); },
     });
 
-    const regenerateMutation = useMutation({
-        mutationFn: async () => {
-            // Generate a random secret and update the token config
-            const randomBytes = new Uint8Array(32);
-            crypto.getRandomValues(randomBytes);
-            const secret = Array.from(randomBytes).map((b) => b.toString(16).padStart(2, '0')).join('');
-            await base.collections.update(collectionId, {
-                [activeToken]: { secret },
-            });
-        },
+    const rotate = useMutation({
+        mutationFn: () => base.collections.rotate(collectionId),
         onSuccess: () => { void qc.invalidateQueries({ queryKey: ['collections', 'auth'] }); },
     });
 
@@ -72,7 +63,7 @@ function TokenSettings() {
 
     return (
         <div className="page">
-            <SectionCard title="Token options" description="Configure token duration and secrets per auth collection.">
+            <SectionCard title="Token options" description="How long each token stays valid, per auth collection.">
                 <div className="row">
                     <select
                         value={ collectionId }
@@ -86,20 +77,20 @@ function TokenSettings() {
                 </div>
 
                 <div className="row row--wrap row--tight">
-                    { tokenTypes.map((t) => (
+                    { tokens.map((t) => (
                         <button
                             key={ t.key }
                             type="button"
-                            onClick={ () => setActiveToken(t.key) }
+                            onClick={ () => setActive(t.key) }
                             className="chip"
-                            data-active={ activeToken === t.key ? 'true' : undefined }
+                            data-active={ active === t.key ? 'true' : undefined }
                         >
                             { t.label }
                         </button>
                     )) }
                 </div>
 
-                <form onSubmit={ handleSubmit((d) => saveMutation.mutate(d)) } className="stack">
+                <form onSubmit={ handleSubmit((d) => saveDuration.mutate(d)) } className="stack">
                     <label className="field">
                         <span className="field__label">Duration (seconds)</span>
                         <input
@@ -112,37 +103,36 @@ function TokenSettings() {
                         </span>
                     </label>
 
-                    { tokenConfig?.secret && (
-                        <div className="field field--inline">
-                            <span className="field__label">Secret:</span>
-                            <code>
-                                { tokenConfig.secret.slice(0, 8) }...
-                            </code>
-                        </div>
-                    ) }
-
                     <div className="row">
-                        <button type="submit" disabled={ !formState.isDirty || saveMutation.isPending } className="btn">
-                            { saveMutation.isPending ? 'Saving...' : 'Save duration' }
+                        <button type="submit" disabled={ !formState.isDirty || saveDuration.isPending } className="btn">
+                            { saveDuration.isPending ? 'Saving...' : 'Save duration' }
                         </button>
-                        <button
-                            type="button"
-                            onClick={ () => {
-                                if (confirm('Regenerate secret? All existing tokens of this type will be invalidated.')) {
-                                    regenerateMutation.mutate();
-                                }
-                            } }
-                            disabled={ regenerateMutation.isPending }
-                            className="btn btn--danger btn--sm"
-                        >
-                            { regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate secret' }
-                        </button>
-                        { saveMutation.isSuccess && <span className="ok small">Saved.</span> }
-                        { saveMutation.error && <span className="danger small">{ saveMutation.error.message }</span> }
-                        { regenerateMutation.isSuccess && <span className="ok small">Secret regenerated.</span> }
-                        { regenerateMutation.error && <span className="danger small">{ regenerateMutation.error.message }</span> }
+                        { saveDuration.isSuccess && <span className="ok small">Saved.</span> }
+                        { saveDuration.error && <span className="danger small">{ saveDuration.error.message }</span> }
                     </div>
                 </form>
+            </SectionCard>
+
+            <SectionCard
+                title="Signing secrets"
+                description="The server mints the secrets that sign this collection's tokens. Rotating them is how you invalidate what is already out."
+            >
+                <div className="row">
+                    <button
+                        type="button"
+                        onClick={ () => {
+                            if (confirm(`Rotate the signing secrets for "${collection?.name}"? Every token it has issued stops working.`)) {
+                                rotate.mutate();
+                            }
+                        } }
+                        disabled={ rotate.isPending }
+                        className="btn btn--danger btn--sm"
+                    >
+                        { rotate.isPending ? 'Rotating...' : 'Rotate secrets' }
+                    </button>
+                    { rotate.isSuccess && <span className="ok small">Rotated.</span> }
+                    { rotate.error && <span className="danger small">{ rotate.error.message }</span> }
+                </div>
             </SectionCard>
         </div>
     );
