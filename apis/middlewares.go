@@ -726,6 +726,12 @@ func panicRecover() *hook.Handler[*core.RequestEvent] {
 // securityHeaders middleware adds common security headers to the response.
 //
 // This middleware is registered by default for all routes.
+//
+// Who may frame Base is NOT stated here. It is one sentence, and it lives in
+// the admin's `frame-ancestors` (serve.go, BASE_FRAME_ANCESTORS): the admin is
+// the only surface a frame can be pointed at to any effect, and X-Frame-Options
+// has no allow-list form, so saying it here too would be a second, weaker copy
+// of a policy that has to name specific hosts. Two statements of one rule drift.
 func securityHeaders() *hook.Handler[*core.RequestEvent] {
 	return &hook.Handler[*core.RequestEvent]{
 		Id:       DefaultSecurityHeadersMiddlewareId,
@@ -733,7 +739,6 @@ func securityHeaders() *hook.Handler[*core.RequestEvent] {
 		Func: func(e *core.RequestEvent) error {
 			e.Response.Header().Set("X-XSS-Protection", "1; mode=block")
 			e.Response.Header().Set("X-Content-Type-Options", "nosniff")
-			e.Response.Header().Set("X-Frame-Options", "SAMEORIGIN")
 
 			// @todo consider a default HSTS?
 			// (see also https://webkit.org/blog/8146/protecting-against-hsts-abuse/)

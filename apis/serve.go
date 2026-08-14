@@ -23,6 +23,25 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+// frameAncestors reports who may put the admin in a frame, as a CSP source
+// list. Default "'self'", which is this origin and nobody else.
+//
+// It is a knob because the answer is deployment data, like IAM_ENDPOINT: the
+// admin is one UI that renders standalone at its own host AND inside the Hanzo
+// surfaces that offer Base as a section, and a Base someone else runs has
+// different neighbours. base.hanzo.ai names the Hanzo hosts in universe; the
+// repos that embed Base as a library say nothing and stay same-origin.
+//
+// `frame-ancestors` and not X-Frame-Options: XFO can say "nobody" or "same
+// origin" and cannot name a host, so an allow-list is the one thing it cannot
+// express. This is what the ingress already does in front of hanzo.id.
+func frameAncestors() string {
+	if v := strings.TrimSpace(os.Getenv("BASE_FRAME_ANCESTORS")); v != "" {
+		return v
+	}
+	return "'self'"
+}
+
 // ServeConfig defines a configuration struct for apis.Serve().
 type ServeConfig struct {
 	// ShowStartBanner indicates whether to show or hide the server start console message.
@@ -120,7 +139,7 @@ func Serve(app core.App, config ServeConfig) error {
 
 				// add a default CSP
 				if e.Response.Header().Get("Content-Security-Policy") == "" {
-					e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' http://127.0.0.1:* https: data: blob:; connect-src 'self' http://127.0.0.1:* https:; script-src 'self' 'unsafe-inline'")
+					e.Response.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' http://127.0.0.1:* https: data: blob:; connect-src 'self' http://127.0.0.1:* https:; script-src 'self' 'unsafe-inline'; frame-ancestors "+frameAncestors())
 				}
 
 				return e.Next()

@@ -727,6 +727,48 @@ the address it is served at and the redirect it asks for cannot disagree.
 The admin is still gated by `BASE_ENABLE_ADMIN_UI=1` (off by default — production
 services are headless `/v1` APIs); the `/v1` data plane is always on.
 
+## The admin is one UI with three places to be (`BASE_FRAME_ANCESTORS`)
+
+Standalone at base.hanzo.ai, and as a section inside a Hanzo surface that offers
+Base as one of its products. One bundle, one deployment, three mounts — not a
+component every host recompiles.
+
+**Why a frame and not a package.** The admin addresses `/v1` with relative paths
+and carries the bearer in this origin's `localStorage` (`src/lib/api.ts`), so it
+is only ever correct against the Base it was served by. Handed out as a
+component, each host would need CORS, an absolute origin and its own copy of that
+transport — three implementations of the one thing — and a re-pin and a rebuild
+per host every time the admin changes. A frame is the same bytes the Go binary
+already embeds, and every host is current the moment the pin moves.
+
+**Who may frame it** is a CSP source list, `BASE_FRAME_ANCESTORS`, default
+`'self'`. It is stated in exactly one place, the admin's `frame-ancestors`
+(`apis/serve.go`), because the admin is the only surface a frame can be aimed at
+to any effect. `X-Frame-Options` is gone rather than kept alongside: it can say
+"nobody" or "same origin" and cannot name a host, so it cannot express an
+allow-list, and a second weaker copy of a policy is one that drifts. The ingress
+already does exactly this in front of hanzo.id.
+
+**Auth does not change, and nothing is handed across the boundary.** The framed
+admin runs its own PKCE against IAM like always; a signed-in user has a live
+hanzo.id session, so the authorize endpoint 302s straight back with a code and
+renders nothing. That is what "shares the host's session" means here — shared at
+the IdP, which is where sessions live. No token crosses an origin, no host injects
+a credential, no second login. It is the mechanism console.hanzo.ai already uses
+to embed studio.hanzo.ai. Two consequences follow and both are honest limits:
+IAM must name Base in its OWN `frame-ancestors` for the inner leg to load, and a
+host on a different site (hanzo.app is a different registrable domain from
+hanzo.ai) is subject to third-party cookie policy — when the silent leg cannot
+complete, the frame says so and offers the standalone address, rather than
+fabricating a signed-in surface.
+
+**What the frame drops** is the outer chrome only — the brand and the signed-in
+account, because the host already answers both — via `src/lib/embed.ts`, which
+reads `window.self !== window.top` rather than taking a flag. Where the thing is
+is a fact the browser holds; a build flag or query parameter is a second answer
+that can be wrong. The browser itself is identical in all three places, because
+it is the same admin.
+
 ## Both backends run the same data plane
 
 Given a DSN, Base opens PostgreSQL and serves the whole `/v1` data plane on it:
@@ -928,8 +970,16 @@ about what renders. `ui-react/smoke.mjs` (`pnpm --dir ui-react smoke`, needs
 playwright) is the check that catches silence: it serves the committed `dist/`
 at the root exactly as the Go server does, stubs `/v1`, and gates on every route
 painting, every `var(--token)` resolving, zero utility-class residue, every
-control computing real colours and radii, the overlays opening, and the confirm
-dialog measuring the width `DialogContent maxW` asks for. Measure the dialog
+control computing real colours and radii, the overlays opening, the confirm
+dialog measuring the width `DialogContent maxW` asks for, and — `fit` — that the
+nav is a 14rem column at 1280, a full-width strip at 390, and a strip with no
+brand and no account inside a frame.
+
+Measure the NAV, not the document: a 14rem column on a 390px viewport leaves
+166px and the table runs off the side of it, but `.shell__main` owns that
+overflow and scrolls it, so `document.scrollWidth` reports nothing wrong and the
+defect walks straight through a check written against the page. Measure the
+dialog
 **after** the enter animation — gui applies the content's style classes a frame
 late, and reading the box early reports ~viewport width, which looks exactly like
 the dropped-prop failure it is meant to catch.
