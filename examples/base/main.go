@@ -139,6 +139,7 @@ func main() {
 	if iamEndpoint := envAny("IAM_ENDPOINT", "IAM_URL"); iamEndpoint != "" {
 		org.MustRegister(app, org.Config{
 			IAMEndpoint:            iamEndpoint,
+			IAMAddress:             envAny("IAM_ADDRESS"),
 			KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
 			IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
 			IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
