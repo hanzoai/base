@@ -22,10 +22,10 @@ import (
 // seq 50, and asserting the resulting SQLite file has exactly 50
 // rows.
 //
-// Requires the same MinIO container as TestS3IntegrationRoundTrip —
+// Requires the same S3 container as TestS3IntegrationRoundTrip —
 // AWS_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY env.
 func TestPITRRestore(t *testing.T) {
-	bucket := skipWithoutMinIO(t)
+	bucket := skipWithoutS3(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()

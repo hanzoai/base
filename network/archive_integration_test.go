@@ -1,16 +1,17 @@
 //go:build integration
 
-// Integration tests for the S3/MinIO archive backend. Gated behind the
+// Integration tests for the S3 archive backend. Gated behind the
 // "integration" build tag so they never run in the standard go test
-// cycle. To run:
+// cycle. They run against our own S3 server, hanzoai/s3, whose `mini`
+// command brings up the whole stack and creates the bucket for us:
 //
-//	docker run --rm -d --name minio-test -p 9000:9000 -p 9001:9001 \
-//	    -e MINIO_ROOT_USER=minio -e MINIO_ROOT_PASSWORD=minio1234 \
-//	    minio/minio server /data --console-address ":9001"
-//	docker exec minio-test mkdir -p /data/base-archive-test
+//	docker run --rm -d --name s3-test -p 8333:8333 \
+//	    -e AWS_ACCESS_KEY_ID=admin -e AWS_SECRET_ACCESS_KEY=secret \
+//	    -e S3_BUCKET=base-archive-test \
+//	    ghcr.io/hanzoai/s3 mini -dir=/data
 //
-//	AWS_ENDPOINT_URL=http://127.0.0.1:9000 \
-//	AWS_ACCESS_KEY_ID=minio AWS_SECRET_ACCESS_KEY=minio1234 \
+//	AWS_ENDPOINT_URL=http://127.0.0.1:8333 \
+//	AWS_ACCESS_KEY_ID=admin AWS_SECRET_ACCESS_KEY=secret \
 //	go test -tags=integration ./network -run TestS3Integration -v
 
 package network
@@ -23,10 +24,10 @@ import (
 	"time"
 )
 
-func skipWithoutMinIO(t *testing.T) string {
+func skipWithoutS3(t *testing.T) string {
 	t.Helper()
 	if os.Getenv("AWS_ENDPOINT_URL") == "" {
-		t.Skip("AWS_ENDPOINT_URL unset; start a MinIO container per the file header")
+		t.Skip("AWS_ENDPOINT_URL unset; start an S3 container per the file header")
 	}
 	b := os.Getenv("BASE_ARCHIVE_TEST_BUCKET")
 	if b == "" {
@@ -36,7 +37,7 @@ func skipWithoutMinIO(t *testing.T) string {
 }
 
 func TestS3IntegrationRoundTrip(t *testing.T) {
-	bucket := skipWithoutMinIO(t)
+	bucket := skipWithoutS3(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
