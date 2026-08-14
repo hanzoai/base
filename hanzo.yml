@@ -324,8 +324,15 @@ test:
         if [ "${GITHUB_REF_TYPE:-}" = tag ] && [ "$t" = "${GITHUB_REF_NAME:-}" ]; then continue; fi
         printf '%s\n' "$have" | grep -qx -- "$t" || missing="$missing $t"
       done
-      [ -z "$missing" ] || { echo "::error::these release tags published no image to ${img}:$missing"; exit 1; }
-      echo "release tags from $floor up all resolve to an image in ${img}"
+      # A tag that published no image is REPORTED, never gated on. It is a fact
+      # about the past, and the build reading it is the one that would fix the
+      # present — failing here turns one red build into a lane that can never go
+      # green again, which is what happened: a test too slow on a loaded runner
+      # failed one release, and every release after it was refused for that
+      # one's missing image. The collision check above stays hard, because that
+      # one prevents corruption rather than recording it.
+      [ -z "$missing" ] || echo "::warning::these release tags published no image to ${img}:$missing"
+      echo "release tags from $floor up checked against ${img}"
 
 images:
   - name: base
