@@ -52,15 +52,19 @@ function DataSettings() {
         setSelected(next);
     }
 
-    function exportJson() {
-        const exported = allCollections
+    // A schema, without the stamps that say when THIS server last touched it —
+    // `Collection` serializes them as `createdAt`/`updatedAt`, and an import
+    // binds whatever the document names, so carrying them writes one server's
+    // history onto another's. The two deletes here named `created`/`updated`,
+    // which is what the database columns are called and what no document has.
+    function schemas(): CollectionRecord[] {
+        return allCollections
             .filter((c) => selected.has(c.id))
-            .map((c) => {
-                const copy = { ...c };
-                delete copy.created;
-                delete copy.updated;
-                return copy;
-            });
+            .map(({ createdAt: _c, updatedAt: _u, ...schema }) => schema as CollectionRecord);
+    }
+
+    function exportJson() {
+        const exported = schemas();
         const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -71,15 +75,7 @@ function DataSettings() {
     }
 
     function copyExport() {
-        const exported = allCollections
-            .filter((c) => selected.has(c.id))
-            .map((c) => {
-                const copy = { ...c };
-                delete copy.created;
-                delete copy.updated;
-                return copy;
-            });
-        void navigator.clipboard.writeText(JSON.stringify(exported, null, 2));
+        void navigator.clipboard.writeText(JSON.stringify(schemas(), null, 2));
     }
 
     // Import

@@ -1,8 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 
 import type { CollectionModel, CollectionField } from '~/lib/base';
@@ -33,9 +34,12 @@ interface CollectionFormValues {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// The types `core` registers, and only those — `core.Fields` is the whole set.
+// `password` was in this list and is not in that map: local password auth went,
+// its field type went with it, and a migration drops the ones already stored.
 const FIELD_TYPES = [
     'text', 'number', 'bool', 'email', 'url', 'editor',
-    'date', 'select', 'json', 'file', 'relation', 'password',
+    'date', 'select', 'json', 'file', 'relation',
     'autodate', 'geoPoint',
 ] as const;
 
@@ -367,8 +371,6 @@ function IndexesPanel({ indexes, onChange }: {
 // ---------------------------------------------------------------------------
 
 export const Route = createFileRoute('/collections_/$id')({
-    beforeLoad: () => {
-        if (!base.authStore.token) throw redirect({ to: '/login' });
-    },
+    beforeLoad: requireSession,
     component: CollectionEditor,
 });

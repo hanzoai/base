@@ -1,4 +1,5 @@
 // Typed fetch wrappers for the Base API. Replaces the Hanzo Base SDK.
+import { iam, identity } from '~/lib/iam'
 
 const TOKEN_KEY = 'base_auth_token'
 const RECORD_KEY = 'base_auth_record'
@@ -34,12 +35,78 @@ export function setAuth(token: string, record: Record<string, unknown>) {
 export function clearAuth() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(RECORD_KEY)
+  // The issuer's tokens go with it. A refresh token left behind is a session:
+  // the next request would renew off it and sign the user straight back in.
+  iam.clearTokens()
   notify()
 }
 
 export function onAuthChange(fn: Listener): () => void {
   listeners.add(fn)
   return () => { listeners.delete(fn) }
+}
+
+// ---------------------------------------------------------------------------
+// Session — one question, and the renewal that answers it honestly
+// ---------------------------------------------------------------------------
+
+// How close to expiry a bearer stops being worth sending. A request that leaves
+// now should still be accepted when it lands.
+const MARGIN_MS = 30_000
+
+// When the bearer stops being accepted, in ms, or null when it does not say.
+// The signature is the server's to check; this reads only the instant.
+function expiry(token: string): number | null {
+  try {
+    const { exp } = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof exp === 'number' ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+// Is the stored bearer one the server will still take? A token that states no
+// expiry cannot be judged here, so the server judges it.
+export function live(): boolean {
+  const token = getToken()
+  if (!token) return false
+  const exp = expiry(token)
+  return exp === null || exp - MARGIN_MS > Date.now()
+}
+
+let renewing: Promise<void> | null = null
+
+// Renewal is serialized across the whole origin, not merely within this tab.
+// IAM rotates the refresh token on every use and revokes the entire family the
+// first time it sees one twice, with no grace window — so two tabs renewing at
+// once do not race for a token, they sign each other out. A Web Lock is held
+// per origin; the re-check inside it is what makes the loser a no-op, because
+// by then the winner has written the fresh session to the storage both share.
+//
+// A renewal that fails leaves the bearer alone. The server refuses it, and the
+// page that asked offers a way back — losing the session here would take the
+// user's unsaved work with it.
+function renew(): Promise<void> {
+  renewing ??= navigator.locks
+    .request('base:renew', async () => {
+      if (live()) return
+      const token = await iam.refreshAccessToken()
+      setAuth(token.accessToken, identity(token.accessToken))
+    })
+    .catch(() => { /* the bearer stands as it is */ })
+    .finally(() => { renewing = null })
+  return renewing
+}
+
+// Is there a session to act with? Guards and requests ask this one question, so
+// they cannot disagree about the answer. A bearer past its margin is renewed
+// before answering; no bearer at all is signed out rather than expired, and
+// there is nothing to renew.
+export async function session(): Promise<boolean> {
+  if (live()) return true
+  if (!getToken()) return false
+  await renew()
+  return live()
 }
 
 // ---------------------------------------------------------------------------
@@ -58,6 +125,9 @@ class ApiError extends Error {
 }
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // Renew before sending rather than after being refused: the bearer this call
+  // carries should still be good when the server reads it.
+  await session()
   const token = getToken()
   const headers: Record<string, string> = {
     ...(init?.headers as Record<string, string> ?? {}),
@@ -139,7 +209,10 @@ export interface RecordModel {
 export interface LogModel {
   id: string
   created: string
-  level: string
+  // slog's numeric level, which is what `core.Log.Level` is and what the server
+  // sends. Naming it a string here made every comparison against one silently
+  // false.
+  level: number
   message: string
   data: Record<string, unknown>
   [key: string]: unknown
@@ -266,10 +339,13 @@ export async function updateSettings(data: Record<string, unknown>): Promise<Rec
   })
 }
 
-export async function testEmail(collection: string, toEmail: string, template: string): Promise<void> {
+// `forms.TestEmailSend` takes an address and nothing else — it sends a plain
+// message, because the templated flows it used to render were removed with
+// local auth. What this proves is that SMTP works.
+export async function testEmail(toEmail: string): Promise<void> {
   return request<void>('/v1/settings/test/email', {
     method: 'POST',
-    body: JSON.stringify({ email: toEmail, template, collection }),
+    body: JSON.stringify({ email: toEmail }),
   })
 }
 

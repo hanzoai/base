@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
 import { setAuth } from '~/lib/api';
-import { decodeJwtClaims, iam } from '~/lib/iam';
+import { iam, identity } from '~/lib/iam';
 
 // OAuth2 PKCE callback. IAM redirects here with `?code=`; we exchange it for
 // the IAM access-token JWT and bridge it into the Base auth store. Every Base
@@ -23,23 +23,9 @@ function AuthCallback() {
     (async () => {
       try {
         const token = await iam.handleCallback();
-        const claims = decodeJwtClaims(token.accessToken);
-
-        // Mirror the server's admin rule (resolveJWKSToken): global/org admin
-        // or the built-in/superuser org maps to a `_superusers` session.
-        const isAdmin =
-          claims.isGlobalAdmin === true ||
-          claims.isAdmin === true ||
-          claims.owner === 'built-in' ||
-          claims.owner === 'superuser';
-
-        setAuth(token.accessToken, {
-          id: String(claims.sub ?? claims.id ?? ''),
-          email: String(claims.email ?? ''),
-          name: String(claims.name ?? claims.displayName ?? ''),
-          // Base guards key the superuser off collectionName.
-          collectionName: isAdmin ? '_superusers' : 'users',
-        });
+        // Sign-in and renewal describe a session the same way, because they
+        // describe it in the same place.
+        setAuth(token.accessToken, identity(token.accessToken));
 
         await nav({ to: '/', replace: true });
       } catch (err: unknown) {

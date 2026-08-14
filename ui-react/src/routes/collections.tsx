@@ -1,8 +1,9 @@
-import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, Search } from '@hanzogui/lucide-icons-2';
 import { useState } from 'react';
 
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 
 function Collections() {
@@ -76,8 +77,6 @@ function Collections() {
 }
 
 export const Route = createFileRoute('/collections')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: Collections,
 });

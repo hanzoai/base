@@ -1001,6 +1001,54 @@ the dropped-prop failure it is meant to catch.
 - For local testing without IAM, mint a superuser token via
   `record.NewAuthToken()` and set `localStorage.base_auth_token`.
 
+### One session predicate, and one renewal
+
+Every guarded route asks the same question through `~/lib/guard`:
+`requireSession` for the admin at large, `requireSuperuser` for `/settings`,
+which is stated on the layout and inherited rather than restated per page. The
+question itself is `api.session()` — is there a bearer the server will still
+take, renewing one that has run down before answering. Route guards used to
+write their own `beforeLoad`, and most of them asked whether a token STRING
+existed, which an expired session satisfies.
+
+Renewal is the refresh grant (`iam.refreshAccessToken`), taken on demand at the
+moment a session is needed rather than on a timer: a timer fires in every open
+tab at the same instant, and it has to be re-armed against sleep, throttling and
+clock drift. `request()` renews before sending rather than after being refused,
+so the 401 recovery on the record form is the backstop it was built to be
+instead of the normal path.
+
+**Exactly one refresh may leave this browser.** IAM rotates the refresh token on
+every use and revokes the whole family the first time it sees one twice, with no
+grace window (`internal/oidc/refresh.go`) — so two tabs renewing at once do not
+race for a token, they sign each other out. `navigator.locks` is held per origin
+and the re-check inside it makes the loser a no-op, because by then the winner
+has written the fresh session to the storage both tabs share. That sharing is
+also why the SDK's `storage` is `localStorage`: with `sessionStorage` only the
+tab that signed in holds a refresh token, and the recovery this admin offers
+signs in on a NEW tab.
+
+Renewal only reaches as far as the refresh token lives, and IAM's
+`refreshTTL` falls back to the ACCESS lifetime when an application declares no
+`refreshExpireInHours`. An app left that way renews fine for a user who keeps
+working and not at all for one who steps away past the hour, so the `hanzo-base`
+application should declare a refresh lifetime that outlives its access lifetime.
+
+### A form never sends back what the server would not send it
+
+`Settings.MarshalJSON` and `Collection.MarshalJSON` blank every secret and
+`omitempty` drops the key, so `smtp.password`, `s3.secret` and each OAuth2
+provider's `clientSecret` are ABSENT from a GET. A form that round-trips one is
+not re-sending a placeholder, it is sending the empty box it was drawn with —
+and `PATCH` merges onto the stored settings, so that erases the secret. An empty
+box means "leave it": the field is omitted, and the label says so.
+
+The same asymmetry runs the other way. Go drops a JSON key it has no field for
+without a word (`SetIfFieldExists` for records, `BindBody` for everything else —
+`DisallowUnknownFields` appears nowhere), so a control that submits a field no
+struct receives reports success and does nothing. Check a form's field names
+against the struct that receives them, not against what the page used to do.
+
 ### Build notes
 - `dist/` is committed so `go build` is hermetic — CI compiles the binary with no
   Node toolchain. Rebuild it in the same commit as any `src/` change.

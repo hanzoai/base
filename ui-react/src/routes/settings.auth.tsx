@@ -139,7 +139,7 @@ function ProviderEditor({
     const { register, handleSubmit } = useForm<ProviderForm>({
         defaultValues: {
             clientId: (existing?.clientId as string) ?? '',
-            clientSecret: (existing?.clientSecret as string) ?? '',
+            clientSecret: '',
             authURL: (existing?.authURL as string) ?? '',
             tokenURL: (existing?.tokenURL as string) ?? '',
             userInfoURL: (existing?.userInfoURL as string) ?? '',
@@ -167,10 +167,11 @@ function ProviderEditor({
                 userInfoURL: data.userInfoURL,
                 displayName: data.displayName,
             };
-            // Never send the redacted placeholder back — omit to preserve the real secret.
-            if (data.clientSecret !== (existing?.clientSecret as string)) {
-                entry.clientSecret = data.clientSecret;
-            }
+            // `Collection.MarshalJSON` blanks every provider's client secret and
+            // `omitempty` drops the key, so the box starts empty however the
+            // provider is configured. An empty box means "leave it" — the
+            // update merges onto the stored provider entry.
+            if (data.clientSecret) entry.clientSecret = data.clientSecret;
 
             if (idx >= 0) {
                 providers[idx] = { ...providers[idx], ...entry };
@@ -207,7 +208,8 @@ function ProviderEditor({
                     </label>
                     <label className="field">
                         <span className="field__label">Client secret</span>
-                        <input { ...register('clientSecret', { required: true }) } type="password" className="input" />
+                        <input { ...register('clientSecret', { required: !existing }) } type="password" className="input" />
+                        { existing && <span className="muted small">Leave empty to keep the stored secret.</span> }
                     </label>
                 </div>
                 <div className="grid">

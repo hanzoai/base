@@ -60,20 +60,38 @@ function stub(url) {
   if (url === '/v1/backups') return [{ key: 'base_data.zip', size: 1024, modified: '2026-01-01 00:00:00Z' }]
   if (url === '/v1/crons') return [{ id: '__pbDBOptimize__', expression: '0 0 * * *' }]
   if (url === '/v1/realtime/token') return { token: 'a-stream-grant' }
+  if (url === '/v1/files/token') return { token: 'a-file-grant' }
+  if (url === '/v1/bases') return [{ org: 'acme', exists: true, bytes: 40960 }]
   if (url === '/v1/settings') {
     return {
       meta: { appName: 'Base', appURL: 'http://localhost:8090', senderName: 'Support', senderAddress: 'support@example.com' },
+      // No `password` / `secret` keys anywhere: the server blanks them and
+      // `omitempty` drops them, so a form can never read back what is stored.
+      // A form that sends the empty box it started with ERASES the secret.
       smtp: { enabled: false, host: 'smtp.example.com', port: 587, username: '', authMethod: '', tls: true, localName: '' },
       backups: { cron: '', cronMaxKeep: 3, s3: { enabled: false, bucket: '', region: '', endpoint: '', accessKey: '', forcePathStyle: false } },
       s3: { enabled: false, bucket: '', region: '', endpoint: '', accessKey: '', forcePathStyle: false },
       logs: { maxDays: 7, minLevel: 0, logIP: true, logAuthId: false },
       rateLimits: { enabled: false, rules: [{ label: '*:auth', maxRequests: 2, duration: 3, audience: '' }] },
-      trustedProxy: { headers: [], useLeftmostIP: false },
+      // Spelled as `core.TrustedProxyConfig` spells it. A form reading
+      // `useLeftmostIp` finds nothing here and paints the box unchecked.
+      trustedProxy: { headers: [], useLeftmostIP: true },
       batch: { enabled: false, maxRequests: 50, timeout: 3, maxBodySize: 0 },
     }
   }
   return page1([])
 }
+
+// A bearer that states when it stops being accepted, which is what the session
+// predicate reads. `exp` in seconds, like every JWT.
+function bearer(expSeconds) {
+  const part = (o) => {
+    const s = Buffer.from(JSON.stringify(o)).toString('base64url')
+    return s + '='.repeat((4 - (s.length % 4)) % 4)
+  }
+  return `${part({ alg: 'none', typ: 'JWT' })}.${part({ sub: 's1', email: 'z@hanzo.ai', exp: expSeconds })}.sig`
+}
+const superuser = JSON.stringify({ id: 's1', email: 'z@hanzo.ai', collectionName: '_superusers' })
 
 // Every stream the page opened, with its query. A stream is authenticated by
 // the grant it carries and by nothing else, so a stream opened without one is
@@ -86,12 +104,31 @@ const streamed = []
 // a body here would mean the browser chose the material.
 const rotations = []
 
+// Every write the settings pages made, and the bearer every request carried.
+// A form that submits a field the server never sent it is writing over stored
+// material with an empty box; a request carrying a stale bearer is a session
+// that was not renewed before it was spent.
+const wrote = []
+const carried = []
+
+function collect(req, res, done) {
+  let body = ''
+  req.on('data', (chunk) => { body += chunk })
+  req.on('end', () => done(body))
+}
+
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0]
+  if (url.startsWith('/v1/')) carried.push({ url, bearer: req.headers.authorization ?? '' })
+  if ((req.method === 'PATCH' || req.method === 'POST') && (url === '/v1/settings' || url === '/v1/settings/test/email')) {
+    return collect(req, res, (body) => {
+      wrote.push({ url, body })
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(url === '/v1/settings' ? stub('/v1/settings') : {}))
+    })
+  }
   if (req.method === 'POST' && url.endsWith('/rotate')) {
-    let body = ''
-    req.on('data', (chunk) => { body += chunk })
-    return req.on('end', () => {
+    return collect(req, res, (body) => {
       rotations.push({ url, body })
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify(collection))
@@ -141,15 +178,55 @@ const origin = 'http://localhost:4600'
 
 // --- the run ---------------------------------------------------------------
 const routes = [
-  '/login', '/', '/collections', '/collections/c1', '/collections/c1/records',
+  '/login', '/', '/bases', '/collections', '/collections/c1', '/collections/c1/records',
   '/collections/c1/records/r1', '/logs', '/settings', '/settings/application',
   '/settings/auth', '/settings/smtp', '/settings/backups',
   '/settings/tokens', '/settings/crons',
   '/settings/logs', '/settings/rate-limits', '/settings/data',
 ]
 
+// Every route that requires a session. A guard that only asks whether a token
+// STRING exists lets an expired one through, so this is the list that has to
+// bounce when the session is dead and cannot be renewed. `/settings/application`
+// is here because its own guard was removed: it must inherit the layout's.
+const guarded = [
+  '/', '/bases', '/collections', '/collections/c1', '/collections/c1/records',
+  '/collections/c1/records/r1', '/logs', '/settings', '/settings/application',
+]
+
 const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {})
-const page = await browser.newPage()
+// One context, so a second page shares this origin's localStorage and its Web
+// Locks — which is what the cross-tab renewal check below rests on.
+const context = await browser.newContext()
+const page = await context.newPage()
+
+// The issuer, stubbed. Renewal is a refresh grant against IAM's token endpoint;
+// nothing else here reaches hanzo.id. Held open for `renewDelayMs` so two tabs
+// asking at once genuinely overlap.
+const RENEWED = bearer(Math.floor(Date.now() / 1000) + 3600)
+const iamTokens = []
+let renewDelayMs = 0
+await context.route('https://hanzo.id/**', async (route) => {
+  const url = route.request().url()
+  const cors = { 'access-control-allow-origin': '*', 'content-type': 'application/json' }
+  if (url.includes('/.well-known/openid-configuration')) {
+    return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({
+      issuer: 'https://hanzo.id',
+      authorization_endpoint: 'https://hanzo.id/v1/iam/oauth/authorize',
+      token_endpoint: 'https://hanzo.id/v1/iam/oauth/token',
+      userinfo_endpoint: 'https://hanzo.id/v1/iam/oauth/userinfo',
+      jwks_uri: 'https://hanzo.id/v1/iam/.well-known/jwks',
+    }) })
+  }
+  if (url.endsWith('/oauth/token')) {
+    iamTokens.push(route.request().postData() ?? '')
+    if (renewDelayMs) await new Promise((r) => setTimeout(r, renewDelayMs))
+    return route.fulfill({ status: 200, headers: cors, body: JSON.stringify({
+      access_token: RENEWED, refresh_token: 'refresh-2', token_type: 'Bearer', expires_in: 3600,
+    }) })
+  }
+  return route.fulfill({ status: 404, headers: cors, body: '{}' })
+})
 const errors = []
 // The recovery block below asks the server to refuse a save, so the browser's
 // own line about that refusal is the expected outcome rather than a finding.
@@ -179,13 +256,32 @@ styles.computed.panel = await page.evaluate(() => {
   return { backgroundColor: cs.backgroundColor, borderColor: cs.borderColor, borderRadius: cs.borderRadius, padding: cs.padding }
 })
 
+/*
+ * A dead session reaches nothing. The bearer below states an expiry that has
+ * passed and there is no refresh token to renew it with, so every guarded route
+ * has to send this browser to sign in — including the ones whose guard only ever
+ * asked whether a token STRING existed, which this token satisfies.
+ */
+const bounced = {}
+await page.evaluate(([token, record]) => {
+  localStorage.setItem('base_auth_token', token)
+  localStorage.setItem('base_auth_record', record)
+}, [bearer(Math.floor(Date.now() / 1000) - 60), superuser])
+for (const route of guarded) {
+  await page.goto(origin + route, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => (document.getElementById('root')?.innerText ?? '').trim().length > 0, { timeout: 15000 })
+  bounced[route] = new URL(page.url()).pathname
+}
+await page.evaluate(() => localStorage.clear())
+
 // Now signed in as a superuser, so the guarded routes render instead of
 // bouncing. `collectionName` is load-bearing: the /settings guard keys the
 // superuser off it (AuthStore.isSuperuser), exactly as the IAM callback sets it.
-await page.evaluate(() => {
+// The token states no expiry, so it is the server's to judge and nothing renews.
+await page.evaluate((record) => {
   localStorage.setItem('base_auth_token', 'smoke')
-  localStorage.setItem('base_auth_record', JSON.stringify({ id: 's1', email: 'z@hanzo.ai', collectionName: '_superusers' }))
-})
+  localStorage.setItem('base_auth_record', record)
+}, superuser)
 
 for (const route of routes) {
   // Not `networkidle`: the record grid holds an SSE stream open, so the network
@@ -351,6 +447,92 @@ fit.embedded = frame
     }
   })
   : null
+/*
+ * What the settings forms actually put on the wire. Go drops a key it has no
+ * field for without a word and merges the keys it does have onto what is
+ * stored — so a form field that names nothing reports success and does nothing,
+ * and a form field that names a secret the server never sent back reports
+ * success and erases it. Neither shows up in a screenshot.
+ */
+const submits = {}
+
+// A secret the server refuses to send cannot be round-tripped. The box is
+// empty because it is always empty; sending it wipes the stored password.
+await page.goto(`${origin}/settings/smtp`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(300)
+await page.getByText('Use SMTP mail server (recommended)').click()
+await page.getByRole('button', { name: /Save changes/ }).click()
+await page.waitForTimeout(400)
+const patched = wrote.filter((w) => w.url === '/v1/settings').at(-1)
+submits.smtpKeys = patched ? Object.keys(JSON.parse(patched.body).smtp ?? {}).sort() : null
+
+// `forms.TestEmailSend` has one field. The template picker and the auth
+// collection box named two that Go drops, so the page offered a choice that
+// changed nothing about what was sent.
+await page.getByRole('button', { name: 'Send test email' }).click()
+await page.locator('input[type="email"]').last().fill('ops@example.com')
+await page.getByRole('button', { name: 'Send', exact: true }).click()
+await page.waitForTimeout(400)
+submits.testEmail = wrote.filter((w) => w.url === '/v1/settings/test/email').at(-1)?.body ?? null
+
+// Read the setting back under the name the server writes it. The stub says
+// `useLeftmostIP: true`; a form reading `useLeftmostIp` paints it off and then
+// saves that off back over the real one.
+await page.goto(`${origin}/settings/application`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(400)
+submits.leftmostIP = await page.locator('.field--inline input[type="checkbox"]').first().isChecked()
+
+// A backup is addressed by key and authorized by a grant, in that order.
+const opened = []
+page.on('popup', (p) => { opened.push(new URL(p.url()).pathname + new URL(p.url()).search); void p.close() })
+await page.goto(`${origin}/settings/backups`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(300)
+await page.getByRole('button', { name: 'Download' }).first().click()
+await page.waitForTimeout(500)
+submits.download = opened[0] ?? null
+
+/*
+ * Renewal. A bearer inside its margin is renewed against the issuer BEFORE the
+ * request that needs it goes out — the session is kept alive rather than
+ * allowed to die on the clock and be discovered by a 401.
+ *
+ * The cross-tab half is not a nicety: IAM rotates the refresh token on every
+ * use and revokes the whole family the first time it sees one twice, with no
+ * grace window. Two tabs renewing at once would sign each other out, so exactly
+ * one refresh may leave this browser.
+ */
+const renewal = {}
+const seed = async (p) => p.evaluate(([token, record]) => {
+  localStorage.setItem('base_auth_token', token)
+  localStorage.setItem('base_auth_record', record)
+  localStorage.setItem('hanzo_iam_refresh_token', 'refresh-1')
+  localStorage.setItem('hanzo_iam_access_token', token)
+}, [bearer(Math.floor(Date.now() / 1000) + 10), superuser])
+
+await seed(page)
+carried.length = 0
+await page.goto(`${origin}/collections`, { waitUntil: 'domcontentloaded' })
+await page.waitForFunction(() => (document.getElementById('root')?.innerText ?? '').trim().length > 0, { timeout: 15000 })
+await page.waitForTimeout(400)
+renewal.reached = new URL(page.url()).pathname
+renewal.refreshes = iamTokens.length
+renewal.grant = iamTokens[0]?.includes('grant_type=refresh_token') ?? false
+renewal.stored = await page.evaluate(() => localStorage.getItem('base_auth_token'))
+renewal.sent = carried.filter((c) => c.url === '/v1/collections').at(-1)?.bearer ?? null
+
+// Two tabs, one refresh. The issuer is held open long enough that any second
+// request would genuinely overlap the first.
+iamTokens.length = 0
+renewDelayMs = 400
+const second = await context.newPage()
+await seed(page)
+await Promise.all([
+  page.goto(`${origin}/collections`, { waitUntil: 'domcontentloaded' }),
+  second.goto(`${origin}/logs`, { waitUntil: 'domcontentloaded' }),
+])
+await page.waitForTimeout(1200)
+renewal.tabsRefreshes = iamTokens.length
+await second.close()
 
 await browser.close()
 server.close()
@@ -359,6 +541,7 @@ const blank = Object.entries(painted).filter(([, v]) => v === 'BLANK').map(([k])
 // A control probed as `null` was never on screen — the check for it did not
 // pass, it did not run. Report that as loudly as a wrong value.
 const unprobed = Object.entries(styles.computed).filter(([, v]) => !v).map(([k]) => k)
+const stillIn = Object.entries(bounced).filter(([, at]) => at !== '/login').map(([r]) => r)
 console.log(JSON.stringify({
   routes: painted,
   blank,
@@ -370,6 +553,9 @@ console.log(JSON.stringify({
   streamed,
   recovery,
   fit,
+  expiredReached: stillIn,
+  submits,
+  renewal,
   errors: [...new Set(errors)],
 }, null, 1))
 
@@ -388,8 +574,18 @@ const fits = fit.desktop.flow === 'row' && fit.desktop.nav > 200 && fit.desktop.
   && fit.phone.brand && fit.phone.account
   && !!fit.embedded && fit.embedded.flow === 'column' && fit.embedded.overflow <= 0
   && !fit.embedded.brand && !fit.embedded.account && fit.embedded.painted.length > 0
+// Nothing a form submits may name a field the server has no home for, and
+// nothing may submit a secret it was never sent.
+const submitted = submits.smtpKeys?.length > 0 && !submits.smtpKeys.includes('password')
+  && submits.testEmail === JSON.stringify({ email: 'ops@example.com' })
+  && submits.leftmostIP === true
+  && submits.download === '/v1/backups/base_data.zip?token=a-file-grant'
+// One refresh, before the request, and the request carried what came back.
+const renewed = renewal.reached === '/collections' && renewal.refreshes === 1 && renewal.grant
+  && renewal.stored === RENEWED && renewal.sent === RENEWED && renewal.tabsRefreshes === 1
 const ok = !blank.length && !styles.unresolved.length && !styles.utilityClasses.length && !errors.length
   && !unprobed.length && overlays.menuItems > 0 && overlays.dialogVisible
-  && overlays.dialogWidth === overlays.dialogMaxW && granted && recovered && fits
+  && overlays.dialogWidth === overlays.dialogMaxW && granted && recovered
+  && !stillIn.length && submitted && renewed && fits
 console.log(ok ? 'SMOKE OK' : 'SMOKE FAILED')
 process.exit(ok ? 0 : 1)
