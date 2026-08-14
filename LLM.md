@@ -57,7 +57,7 @@ none of the fleet. That is what makes "cheaper" a fact rather than a claim.
 | GoTrue | Hanzo IAM, the one auth path |
 | Realtime | `/v1/realtime` SSE + ZAP |
 | Storage | `/v1/files` + object storage |
-| Edge Functions (Deno) | `extruntime` in-process — goja / wazero / starlark |
+| Edge Functions (Deno) | `/v1/functions` in-process via `extruntime`; sandboxed execution is `hanzoai/runtime` |
 | Postgres (required) | SQLite by default, Postgres optional via `orm/dialect` |
 | RLS (in the engine) | enforced in Base's query path; see below |
 
@@ -270,15 +270,52 @@ credential in the query before writing, which matters because a key may arrive i
 `Logs.MaxDays`, served by `GET /v1/logs`, and included in every backup. A keyed
 request sets `e.Auth`, so a service key's actions are attributed to it.
 
-### Functions — both halves exist, in different packages
+### Functions — a record that reads as whoever invoked it
 
-`jsvm` has every host binding (`$app`, `$http`, `routerAdd`, cron) and no
-invoke-by-name. `gojavm` has `Invoke(ctx, fn, payload)` and no host bindings.
-Neither half is a complete function; joining them is the work, not new invention.
-`extruntime` is a real, tested SPI with three working pure-Go runtimes and is
-used by nothing outside its own tests. Note `jsvm`'s `$os` exposes `exec`,
-`readFile`, `writeFile` and `exit` — whatever a function runtime binds in v1 is
-supported forever, so bind two functions, not `$app`.
+The two halves that existed separately are joined: `gojavm` knew how to invoke
+by name and bound no host, `jsvm` bound every host and could not invoke, and
+`extruntime` was the interface between them, used by nothing but its own tests.
+
+A function is a record in `_functions`, so it is the tenant's own file and the
+collection's rules are the rules — `/v1/functions` and the collection refuse in
+the same words because there is one rule behind both. The source is the
+server's: seeing that a function exists does not return what it says.
+
+**The host is `list` and `one`, and that is all of it.** Not `$app`, not a
+process, not a file, not the network. `jsvm`'s `$os` exposes `exec`, `readFile`,
+`writeFile` and `exit` — right for an operator's hook file, wrong for something
+a tenant may author — and whatever v1 binds is supported forever, so the list is
+what a function needs and nothing anticipated.
+
+It reads as its caller: the collection from the Base the credential already
+resolved, the rule from the caller's own identity. The invocation payload does
+NOT answer a rule — `@request.body` is about a write, and letting a body speak
+for it would let a caller satisfy a read rule by naming a field they sent.
+
+### Sandboxes are Hanzo Runtime's, and a function starts one rather than being one
+
+`hanzoai/runtime` is the estate's sandbox: sub-90ms creation, isolated execution
+for AI-generated code, File/Git/LSP/Execute, with a generated Go client at
+`libs/api-client-go` (module `github.com/hanzoai/apiclient`). **Base must not
+grow a second one.**
+
+The two are opposite by design and that is the point. A function binds two reads
+and is stopped if it overruns, which is exactly why it is safe to run in-process
+at request latency. A coding agent or a research pass needs the four things a
+function refuses — network, a writable filesystem, process execution, and
+minutes rather than a request — so it belongs on the far side of an isolation
+boundary that is a kernel, not a JS engine.
+
+Starting is safe to bind because it hands the function none of that authority.
+The function says what to run; the sandbox runs it in isolation; the result
+arrives back as an ordinary authenticated write, through the same collection
+rules as any other caller. A bot is that with a trigger and an automation is
+that with a schedule.
+
+What a workload's own identity should be — a scoped key minted for a sandbox
+with its lifetime tied to the run — is deliberately separate, because getting a
+workload's authority wrong is the failure that matters. Passing the caller's own
+token into a sandbox is the thing not to do.
 
 ### Postgres tier — a real dialect that has never been run
 
