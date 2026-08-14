@@ -188,11 +188,6 @@ func (api *fileApi) download(e *core.RequestEvent) error {
 		event.ThumbError = fmt.Errorf("the thumb size %q or the original file format are not supported", thumbSize)
 	}
 
-	// clickjacking shouldn't be a concern when serving uploaded files,
-	// so it safe to unset the global X-Frame-Options to allow files embedding
-	// (note: it is out of the hook to allow users to customize the behavior)
-	e.Response.Header().Del("X-Frame-Options")
-
 	return e.App.OnFileDownloadRequest().Trigger(event, func(e *core.FileDownloadRequestEvent) error {
 		err = execAfterSuccessTx(true, e.App, func() error {
 			return fsys.Serve(e.Response, e.Request, e.ServedPath, e.ServedName)

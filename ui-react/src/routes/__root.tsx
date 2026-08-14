@@ -2,6 +2,7 @@ import { Link, Outlet, createRootRoute } from '@tanstack/react-router';
 import { Boxes, Database, LayoutDashboard, ScrollText, Settings } from '@hanzogui/lucide-icons-2';
 
 import { useAuth } from '~/hooks/useAuth';
+import { embedded } from '~/lib/embed';
 import { icon } from '../icon'
 
 const NAV = [
@@ -12,20 +13,29 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: Settings, exact: false },
 ] as const;
 
-// Root layout: sidebar on every page except /login. Auth gate lives here so
-// child routes don't repeat it.
+// Root layout: nav on every page except /login. Auth gate lives here so child
+// routes don't repeat it.
+//
+// The brand and the signed-in account are the OUTER chrome — they say which
+// product you are in and who you are. A host that offers Base as a section
+// already answers both on its own frame, so embedded they are dropped and the
+// host's answer stands; two of each in one page is the frame admitting it is a
+// separate application. The browser itself — the links, and everything under
+// them — is the same either way, because it is the same admin.
 function RootLayout() {
   const { isAuthenticated, record, signOut } = useAuth();
 
   return (
-    <div className="shell">
+    <div className="shell" data-embedded={ embedded ? 'true' : undefined }>
       { isAuthenticated && (
         <aside className="shell__nav">
-          <div className="shell__brand">
-            <img src={icon} alt="Base" />
-            <span>Base</span>
-          </div>
-          <nav className="stack stack--tight">
+          { !embedded && (
+            <div className="shell__brand">
+              <img src={icon} alt="Base" />
+              <span>Base</span>
+            </div>
+          ) }
+          <nav className="shell__links">
             { NAV.map(({ to, label, icon: Icon, exact }) => (
               <Link
                 key={ to }
@@ -39,12 +49,14 @@ function RootLayout() {
               </Link>
             )) }
           </nav>
-          <div className="shell__foot">
-            <div className="truncate">{ String(record?.email ?? '') }</div>
-            <button type="button" onClick={ signOut } className="link">
-              Sign out
-            </button>
-          </div>
+          { !embedded && (
+            <div className="shell__foot">
+              <div className="truncate">{ String(record?.email ?? '') }</div>
+              <button type="button" onClick={ signOut } className="link">
+                Sign out
+              </button>
+            </div>
+          ) }
         </aside>
       ) }
       <main className="shell__main">

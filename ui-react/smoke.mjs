@@ -115,6 +115,14 @@ const server = http.createServer((req, res) => {
     res.writeHead(200, { 'content-type': 'application/json' })
     return res.end(JSON.stringify(stub(url)))
   }
+  // A host page, standing in for the Hanzo surface that offers Base as one of
+  // its sections. Served from this origin so the frame shares the seeded
+  // session — what is under test here is the layout the frame renders, and
+  // `embedded` reads the frame itself, not who serves it.
+  if (url === '/host') {
+    res.writeHead(200, { 'content-type': 'text/html' })
+    return res.end('<!doctype html><style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style><iframe src="/collections"></iframe>')
+  }
   // SPA fallback: anything without a file extension is a client route.
   // This mirrors the Go handler, which serves the bundle at the root. A stale
   // mount here would pass the check against a layout nothing runs.
@@ -289,6 +297,61 @@ await page.getByRole('button', { name: 'Rotate secrets' }).click()
 await page.waitForTimeout(400)
 recovery.rotations = rotations
 
+// --- does it fit where it is put -------------------------------------------
+//
+// The admin has one browser and three places to render it: its own page on a
+// desktop, its own page on a phone, and a section inside a Hanzo surface. The
+// nav is a column in the first and a strip in the other two.
+//
+// The nav's WIDTH is the check that bites. A 14rem column on a 390px viewport
+// leaves 166px and the table runs off the side of it — but `.shell__main` owns
+// that overflow and scrolls it, so the document never grows and `scrollWidth`
+// reports nothing wrong. Measuring the document alone would have passed the
+// defect through; measuring the column is what fails on it. `overflow` stays
+// because it is cheap and it is the thing that must not regress.
+const fit = {}
+const measure = () => page.evaluate(() => {
+  const nav = document.querySelector('.shell__nav')
+  const shell = document.querySelector('.shell')
+  return {
+    nav: nav ? Math.round(nav.getBoundingClientRect().width) : null,
+    flow: shell ? getComputedStyle(shell).flexDirection : null,
+    overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    brand: !!document.querySelector('.shell__brand'),
+    account: !!document.querySelector('.shell__foot'),
+  }
+})
+
+await page.setViewportSize({ width: 1280, height: 900 })
+await page.goto(`${origin}/collections`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(300)
+fit.desktop = await measure()
+
+await page.setViewportSize({ width: 390, height: 844 })
+await page.goto(`${origin}/collections`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(300)
+fit.phone = await measure()
+
+// In the frame, at the width a host panel actually gives it.
+await page.setViewportSize({ width: 1280, height: 900 })
+await page.goto(`${origin}/host`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(600)
+const frame = page.frames().find((f) => f.url().includes('/collections'))
+fit.embedded = frame
+  ? await frame.evaluate(() => {
+    const nav = document.querySelector('.shell__nav')
+    const shell = document.querySelector('.shell')
+    return {
+      nav: nav ? Math.round(nav.getBoundingClientRect().width) : null,
+      flow: shell ? getComputedStyle(shell).flexDirection : null,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      brand: !!document.querySelector('.shell__brand'),
+      account: !!document.querySelector('.shell__foot'),
+      painted: (document.getElementById('root')?.innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 72),
+    }
+  })
+  : null
+
 await browser.close()
 server.close()
 
@@ -306,6 +369,7 @@ console.log(JSON.stringify({
   overlays,
   streamed,
   recovery,
+  fit,
   errors: [...new Set(errors)],
 }, null, 1))
 
@@ -314,8 +378,18 @@ const recovered = recovery.importRefused > 0
   && recovery.editKept === 'edited over a long sitting'
   && recovery.signInOffered > 0
   && recovery.rotations.length === 1 && recovery.rotations[0].body === ''
+// A column on the desktop; a strip that spans the width, and nothing past the
+// right edge, on the phone and in the frame. The frame drops the brand and the
+// account — the host already says which product you are in and who you are —
+// and still paints the browser it was framed for.
+const fits = fit.desktop.flow === 'row' && fit.desktop.nav > 200 && fit.desktop.nav < 260
+  && fit.desktop.brand && fit.desktop.account && fit.desktop.overflow <= 0
+  && fit.phone.flow === 'column' && fit.phone.nav > 320 && fit.phone.overflow <= 0
+  && fit.phone.brand && fit.phone.account
+  && !!fit.embedded && fit.embedded.flow === 'column' && fit.embedded.overflow <= 0
+  && !fit.embedded.brand && !fit.embedded.account && fit.embedded.painted.length > 0
 const ok = !blank.length && !styles.unresolved.length && !styles.utilityClasses.length && !errors.length
   && !unprobed.length && overlays.menuItems > 0 && overlays.dialogVisible
-  && overlays.dialogWidth === overlays.dialogMaxW && granted && recovered
+  && overlays.dialogWidth === overlays.dialogMaxW && granted && recovered && fits
 console.log(ok ? 'SMOKE OK' : 'SMOKE FAILED')
 process.exit(ok ? 0 : 1)
