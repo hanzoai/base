@@ -113,7 +113,7 @@ Master KEK (32 bytes, never on disk)
 | Vault file | AES-256-GCM | Per-entry encryption in SQLite shard |
 | ZapDB | ChaCha20-Poly1305 | MPC key share storage |
 | Key wrapping | ML-KEM-768 (FIPS 203) | Post-quantum KEK distribution |
-| Transport | ZAP + mTLS | Node-to-node encrypted communication |
+| Transport | — | No node-to-node path yet (`Session.Sync` is a no-op); ops are sealed before one could carry them |
 | CRDT sync | Ciphertext relay | Peers see encrypted ops, not plaintext |
 | Chain anchor | SHA-256 Merkle root | Commitment only, no data |
 
