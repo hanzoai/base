@@ -37,11 +37,17 @@ import (
 )
 
 // hooksBinds adds wrapped "on*" hook methods by reflecting on core.App.
-func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
+//
+// A hook is a statement about a Base — "when a record is created here, do this"
+// — and which Base it is about arrives with the event, not with the file. So
+// each declaration is recorded as a function that will state the same hook on
+// any Base, and stated straight away on app. The returned list is those
+// statements; registerHooks says which other Bases hear them.
+func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) *core.BindingsList {
 	fm := FieldMapper{}
+	declared := &core.BindingsList{}
 
 	appType := reflect.TypeOf(app)
-	appValue := reflect.ValueOf(app)
 	totalMethods := appType.NumMethod()
 	excludeHooks := []string{"OnServe"}
 
@@ -64,38 +70,50 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 				tagsAsValues[i] = reflect.ValueOf(tag)
 			}
 
-			hookInstance := appValue.MethodByName(method.Name).Call(tagsAsValues)[0]
-			hookBindFunc := hookInstance.MethodByName("BindFunc")
-
-			handlerType := hookBindFunc.Type().In(0)
-
-			handler := reflect.MakeFunc(handlerType, func(args []reflect.Value) (results []reflect.Value) {
-				handlerArgs := make([]any, len(args))
-				for i, arg := range args {
-					handlerArgs[i] = arg.Interface()
+			bind := func(target core.App) {
+				hookValue := reflect.ValueOf(target).MethodByName(method.Name)
+				if !hookValue.IsValid() {
+					return // a hook a Base does not have is not one it can fire
 				}
 
-				err := executors.run(func(executor *goja.Runtime) error {
-					executor.Set("$app", goja.Undefined())
-					executor.Set("__args", handlerArgs)
-					res, err := executor.RunProgram(pr)
-					executor.Set("__args", goja.Undefined())
+				hookInstance := hookValue.Call(tagsAsValues)[0]
+				hookBindFunc := hookInstance.MethodByName("BindFunc")
 
-					// check for returned Go error value
-					if resErr := checkGojaValueForError(app, res); resErr != nil {
-						return resErr
+				handlerType := hookBindFunc.Type().In(0)
+
+				handler := reflect.MakeFunc(handlerType, func(args []reflect.Value) (results []reflect.Value) {
+					handlerArgs := make([]any, len(args))
+					for i, arg := range args {
+						handlerArgs[i] = arg.Interface()
 					}
 
-					return normalizeException(err)
+					err := executors.run(func(executor *goja.Runtime) error {
+						executor.Set("$app", goja.Undefined())
+						executor.Set("__args", handlerArgs)
+						res, err := executor.RunProgram(pr)
+						executor.Set("__args", goja.Undefined())
+
+						// check for returned Go error value
+						if resErr := checkGojaValueForError(target, res); resErr != nil {
+							return resErr
+						}
+
+						return normalizeException(err)
+					})
+
+					return []reflect.Value{reflect.ValueOf(&err).Elem()}
 				})
 
-				return []reflect.Value{reflect.ValueOf(&err).Elem()}
-			})
+				// register the wrapped hook handler
+				hookBindFunc.Call([]reflect.Value{handler})
+			}
 
-			// register the wrapped hook handler
-			hookBindFunc.Call([]reflect.Value{handler})
+			bind(app)
+			declared.Register(bind)
 		})
 	}
+
+	return declared
 }
 
 func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
