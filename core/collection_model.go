@@ -539,7 +539,23 @@ func (m *Collection) UnmarshalJSON(b []byte) error {
 		*m = *blank
 	}
 
-	return json.Unmarshal(b, (*alias)(m))
+	// A token secret is minted where it is signed with: by the factory above
+	// for a new collection, by [Collection.RotateTokenSecrets] after that.
+	// MarshalJSON emits none of them, so a document carries none either and
+	// the secrets already on the model are what an unmarshal leaves behind.
+	tokens := m.tokens()
+	kept := make([]string, len(tokens))
+	for i, t := range tokens {
+		kept[i] = t.Secret
+	}
+
+	err := json.Unmarshal(b, (*alias)(m))
+
+	for i, t := range m.tokens() {
+		t.Secret = kept[i]
+	}
+
+	return err
 }
 
 // MarshalJSON implements the [json.Marshaler] interface.

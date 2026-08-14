@@ -1513,6 +1513,129 @@ func TestCollectionScaffolds(t *testing.T) {
 	}
 }
 
+// A token secret signs JWTs Base mints, so the update door does not take one
+// from a request body — the rest of the same token config still applies — and
+// rotation is the verb that replaces it.
+func TestCollectionTokenSecretsAreTheServersToMint(t *testing.T) {
+	t.Parallel()
+
+	const superuserToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio"
+	const userToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo"
+
+	secrets := func(t testing.TB, app *tests.TestApp) map[string]string {
+		c, err := app.FindCollectionByNameOrId("users")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return map[string]string{
+			"authToken":         c.AuthToken.Secret,
+			"fileToken":         c.FileToken.Secret,
+			"emailChangeToken":  c.EmailChangeToken.Secret,
+			"verificationToken": c.VerificationToken.Secret,
+		}
+	}
+
+	var stated map[string]string
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "update naming a secret keeps the stored one and applies the rest",
+			Method: http.MethodPatch,
+			URL:    "/v1/collections/users",
+			Body: strings.NewReader(`{
+				"authToken":{"secret":"` + strings.Repeat("z", 50) + `","duration":1234}
+			}`),
+			Headers:            map[string]string{"Authorization": superuserToken},
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"duration":1234`},
+			NotExpectedContent: []string{`"secret":"`},
+			ExpectedEvents: map[string]int{
+				"*":                              0,
+				"OnCollectionUpdateRequest":      1,
+				"OnCollectionUpdate":             1,
+				"OnCollectionUpdateExecute":      1,
+				"OnCollectionAfterUpdateSuccess": 1,
+				"OnCollectionValidate":           1,
+				"OnModelUpdate":                  1,
+				"OnModelUpdateExecute":           1,
+				"OnModelAfterUpdateSuccess":      1,
+				"OnModelValidate":                1,
+			},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				stated = secrets(t, app)
+			},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				for name, secret := range secrets(t, app) {
+					if secret != stated[name] {
+						t.Fatalf("Expected the stored %s secret to be untouched, got %q", name, secret)
+					}
+				}
+			},
+		},
+		{
+			Name:            "rotate unauthorized",
+			Method:          http.MethodPost,
+			URL:             "/v1/collections/users/rotate",
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:            "rotate as regular user",
+			Method:          http.MethodPost,
+			URL:             "/v1/collections/users/rotate",
+			Headers:         map[string]string{"Authorization": userToken},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:            "rotate a collection that issues no tokens",
+			Method:          http.MethodPost,
+			URL:             "/v1/collections/demo1/rotate",
+			Headers:         map[string]string{"Authorization": superuserToken},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:               "rotate as superuser",
+			Method:             http.MethodPost,
+			URL:                "/v1/collections/users/rotate",
+			Headers:            map[string]string{"Authorization": superuserToken},
+			ExpectedStatus:     200,
+			ExpectedContent:    []string{`"name":"users"`},
+			NotExpectedContent: []string{`"secret":"`},
+			ExpectedEvents: map[string]int{
+				"*":                              0,
+				"OnCollectionUpdateRequest":      1,
+				"OnCollectionUpdate":             1,
+				"OnCollectionUpdateExecute":      1,
+				"OnCollectionAfterUpdateSuccess": 1,
+				"OnCollectionValidate":           1,
+				"OnModelUpdate":                  1,
+				"OnModelUpdateExecute":           1,
+				"OnModelAfterUpdateSuccess":      1,
+				"OnModelValidate":                1,
+			},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				stated = secrets(t, app)
+			},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				for name, secret := range secrets(t, app) {
+					if secret == stated[name] {
+						t.Fatalf("Expected a fresh %s secret", name)
+					}
+				}
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestCollectionTruncate(t *testing.T) {
 	t.Parallel()
 

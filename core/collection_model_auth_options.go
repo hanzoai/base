@@ -65,6 +65,27 @@ func (m *Collection) setDefaultAuthOptions() {
 	}
 }
 
+// tokens returns every token the collection issues, so anything that must
+// treat them alike states the set once.
+func (m *Collection) tokens() []*TokenConfig {
+	return []*TokenConfig{
+		&m.AuthToken,
+		&m.FileToken,
+		&m.EmailChangeToken,
+		&m.VerificationToken,
+	}
+}
+
+// RotateTokenSecrets mints a fresh signing secret for every token the
+// collection issues. Tokens signed with the previous secrets stop verifying as
+// soon as the collection is saved, since verification reads the secret off the
+// collection a save reloads into the cache.
+func (m *Collection) RotateTokenSecrets() {
+	for _, t := range m.tokens() {
+		t.Secret = security.RandomString(50)
+	}
+}
+
 var _ optionsValidator = (*collectionAuthOptions)(nil)
 
 // collectionAuthOptions defines the options for the "auth" type collection.

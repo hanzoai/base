@@ -251,6 +251,124 @@ func TestEmailTemplateResolve(t *testing.T) {
 	}
 }
 
+// A token secret signs JWTs the server mints, so it is server material and a
+// document is not where it comes from. MarshalJSON emits none, and an
+// unmarshal leaves the ones already on the model alone — while everything else
+// on the same token config still loads.
+func TestATokenSecretIsNotReadFromADocument(t *testing.T) {
+	t.Parallel()
+
+	collection := core.NewAuthCollection("test")
+
+	before := map[string]string{}
+	for name, config := range namedTokens(collection) {
+		if config.Secret == "" {
+			t.Fatalf("Expected the factory to mint a %s secret", name)
+		}
+		before[name] = config.Secret
+	}
+
+	claimed := strings.Repeat("z", 50)
+	raw := fmt.Sprintf(`{
+		"authToken":{"secret":%[1]q,"duration":111},
+		"fileToken":{"secret":%[1]q,"duration":222},
+		"emailChangeToken":{"secret":%[1]q,"duration":333},
+		"verificationToken":{"secret":%[1]q,"duration":444}
+	}`, claimed)
+
+	if err := json.Unmarshal([]byte(raw), collection); err != nil {
+		t.Fatal(err)
+	}
+
+	durations := map[string]int64{
+		"authToken": 111, "fileToken": 222, "emailChangeToken": 333, "verificationToken": 444,
+	}
+
+	for name, config := range namedTokens(collection) {
+		if config.Secret != before[name] {
+			t.Fatalf("Expected the %s secret to survive the unmarshal, got %q", name, config.Secret)
+		}
+		if config.Duration != durations[name] {
+			t.Fatalf("Expected %s duration %d, got %d", name, durations[name], config.Duration)
+		}
+	}
+
+	// and the same door on an existing collection, where there is no factory
+	// to fall back on
+	stored := core.NewAuthCollection("stored")
+	storedSecret := stored.AuthToken.Secret
+	stored.Id = "hbc_stored"
+	stored.MarkAsNotNew()
+
+	if err := json.Unmarshal([]byte(raw), stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.AuthToken.Secret != storedSecret {
+		t.Fatalf("Expected the stored secret to survive, got %q", stored.AuthToken.Secret)
+	}
+}
+
+// Rotation is how a secret is replaced, and the tokens signed with the old one
+// stop verifying as soon as the collection carrying it is saved.
+func TestRotatingTokenSecretsRefusesTheTokensSignedBefore(t *testing.T) {
+	t.Parallel()
+
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	collection, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	record, err := app.FindFirstRecordByFilter(collection, "1=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	token, err := record.NewAuthToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.FindAuthRecordByToken(token, core.TokenTypeAuth); err != nil {
+		t.Fatalf("Expected the fresh token to verify, got %v", err)
+	}
+
+	before := namedTokens(collection)
+	kept := map[string]string{}
+	for name, config := range before {
+		kept[name] = config.Secret
+	}
+
+	collection.RotateTokenSecrets()
+
+	for name, config := range namedTokens(collection) {
+		if config.Secret == kept[name] {
+			t.Fatalf("Expected a fresh %s secret", name)
+		}
+		if len(config.Secret) != 50 {
+			t.Fatalf("Expected a 50 character %s secret, got %d", name, len(config.Secret))
+		}
+	}
+
+	if err := app.Save(collection); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := app.FindAuthRecordByToken(token, core.TokenTypeAuth); err == nil {
+		t.Fatal("Expected the token signed with the previous secret to be refused")
+	}
+}
+
+func namedTokens(c *core.Collection) map[string]*core.TokenConfig {
+	return map[string]*core.TokenConfig{
+		"authToken":         &c.AuthToken,
+		"fileToken":         &c.FileToken,
+		"emailChangeToken":  &c.EmailChangeToken,
+		"verificationToken": &c.VerificationToken,
+	}
+}
+
 func TestTokenConfigValidate(t *testing.T) {
 	scenarios := []struct {
 		name           string
