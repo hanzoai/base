@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 
 	zipjs "github.com/zap-proto/zip/js"
 
@@ -35,24 +36,98 @@ import (
 // construction in the steady state.
 const defaultPoolSize = 8
 
-// NewRuntime constructs a goja-backed extruntime.Runtime. The goja engine
-// is zip's *js.JSRuntime; one process-wide pool is shared by every
-// module this runtime loads. require()/console/process are provided by
-// zip's VM provisioning, so migrated TypeScript backends that
-// `require(...)`, `console.log(...)` or read `process.env` run unchanged.
-func NewRuntime() extruntime.Runtime {
-	size := defaultPoolSize
+// poolSize is how many VMs the engine keeps warm, and therefore how many
+// functions run at once — see [Run]. BASE_GOJAVM_POOL_SIZE overrides it.
+func poolSize() int {
 	if v := os.Getenv("BASE_GOJAVM_POOL_SIZE"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			size = n
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
 		}
 	}
+	return defaultPoolSize
+}
 
-	rt, err := zipjs.NewJSRuntime(zipjs.JSOptions{PoolSize: size})
+var (
+	sharedOnce sync.Once
+	sharedRT   *zipjs.JSRuntime
+	sharedErr  error
+
+	// admit holds one slot per warm VM. [Run] takes one for the length of a call.
+	admit chan struct{}
+)
+
+// shared is the engine this process runs JS on. One pool, built once: the VMs it
+// holds are what both the extension path and the function path borrow, so the
+// number of goja VMs in a Base is a constant of the deployment rather than a
+// function of its traffic.
+func shared() (*zipjs.JSRuntime, error) {
+	sharedOnce.Do(func() {
+		size := poolSize()
+		admit = make(chan struct{}, size)
+		sharedRT, sharedErr = zipjs.NewJSRuntime(zipjs.JSOptions{
+			PoolSize: size,
+			HostFns:  map[string]any{dispatch: call},
+		})
+	})
+	return sharedRT, sharedErr
+}
+
+// hosts is what a running call's token names. A call registers its host on the
+// way in and drops it on the way out, so a token is an answer only while the
+// call that owns it is still running.
+type hosts struct {
+	mu sync.RWMutex
+	m  map[string]extruntime.Host
+}
+
+var live = &hosts{m: map[string]extruntime.Host{}}
+
+func (t *hosts) put(tok string, h extruntime.Host) {
+	t.mu.Lock()
+	t.m[tok] = h
+	t.mu.Unlock()
+}
+
+func (t *hosts) del(tok string) {
+	t.mu.Lock()
+	delete(t.m, tok)
+	t.mu.Unlock()
+}
+
+func (t *hosts) get(tok string) extruntime.Host {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.m[tok]
+}
+
+// call is the one host global. It resolves the calling function's own host from
+// its token, so what a name reaches is decided by whoever built that host and
+// two calls running at once on two Bases never see each other's.
+func call(tok, name, arg string) (string, error) {
+	fn, ok := live.get(tok)[name]
+	if !ok {
+		return "", fmt.Errorf("gojavm: %q is not something this function may ask for", name)
+	}
+
+	out, err := fn([]byte(arg))
 	if err != nil {
-		// NewJSRuntime only fails if a host fn / module fails to bind; we
-		// register none here, so this is unreachable in practice. Fall
-		// back to a default runtime rather than panic at package use.
+		return "", err
+	}
+	if len(out) == 0 {
+		return "null", nil
+	}
+	return string(out), nil
+}
+
+// NewRuntime constructs a goja-backed extruntime.Runtime over [shared]. The
+// engine is zip's *js.JSRuntime; require()/console/process are provided by zip's
+// VM provisioning, so migrated TypeScript backends that `require(...)`,
+// `console.log(...)` or read `process.env` run unchanged.
+func NewRuntime() extruntime.Runtime {
+	rt, err := shared()
+	if err != nil {
+		// NewJSRuntime only fails when a host fn fails to bind. Fall back to a
+		// default runtime rather than panic at package use.
 		rt, _ = zipjs.NewJSRuntime(zipjs.JSOptions{})
 	}
 
