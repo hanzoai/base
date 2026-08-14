@@ -70,34 +70,26 @@ physical files plus a fixed logical consensus grouping:
   tail-sync (not a file copy — new pod subscribes to the vshard's
   DAG and materialises from frames).
 
-**Per-file encryption** (SQLCipher, opt-in):
+**Encryption at rest is decided a layer up, and not here.**
 
-- `BASE_ENCRYPT=sqlcipher` activates per-file page-level encryption.
-- Each physical file has its own 256-bit Data Encryption Key (DEK).
-- DEKs are wrapped by a per-org Key Encryption Key (KEK) held in
-  KMS; KEK is wrapped by a platform KEK-of-KEKs. On `open(shard)`:
-  1. If `<shard>.dekwrap` exists on disk: fetch KEK from KMS,
-     unwrap DEK.
-  2. If not: generate DEK, wrap with KEK, persist `<shard>.dekwrap`.
-- DEKs cached in memory, per-shard, with LRU eviction (default
-  4096 hot files). Cold files drop their DEK; re-fetch on next
-  access costs one KMS round-trip.
-- WAL frames leaving the pod carry **ciphertext** pages only —
-  quasar replication, gateway transit, and archive storage never
-  see plaintext. PQ sig from quasar is over the ciphertext.
-- Right-to-be-forgotten = delete the `.dekwrap` (+ quasar tombstone
-  for the vshard's frame range). Ciphertext becomes unreadable
-  globally, including in archive segments.
+This section used to describe a per-file scheme with its own DEKs, `.dekwrap`
+files beside each shard, an LRU of unwrapped keys and a KEK-of-KEKs — and an
+env table for driving it. None of that was ever built, and the variables the
+table listed (`BASE_VSHARDS`, `BASE_KMS_URL`, `BASE_KEK_SCOPE`,
+`BASE_DEK_CACHE_SIZE`) are read by no code in this repo. A knob that does
+nothing is worse than a missing one: it reads as a control an operator has
+already exercised.
 
-**Env additions for this layer:**
+What is real: an org's Base opens under a key derived for that org
+(`plugins/org`, `hanzoai/cek`), so one tenant's file is unreadable with
+another's key. The process's own database takes its protection from the volume
+it sits on. `BASE_ENCRYPT` is **refused at startup** rather than ignored,
+because setting it and seeing no complaint is how a deployment comes to believe
+it has page encryption.
 
-| var                      | values                                        | notes |
-|--------------------------|-----------------------------------------------|-------|
-| `BASE_VSHARDS`           | `256` default, power-of-two                   | fixed at deploy; resharding is a separate tool. |
-| `BASE_ENCRYPT`           | `sqlcipher` \| `off` (default)                | opt-in page encryption. |
-| `BASE_KMS_URL`           | `https://kms.<env>.<your-domain>`              | for KEK fetch/wrap. |
-| `BASE_KEK_SCOPE`         | `platform` \| `org` (default)                 | grain of the KEK. |
-| `BASE_DEK_CACHE_SIZE`    | `4096` default                                | LRU cap for unwrapped DEKs in RAM. |
+A frame leaving a pod therefore carries whatever the page held. Treat the
+replication plane and the archive bucket as holding the same data the database
+does.
 
 ### Write path
 
@@ -244,11 +236,11 @@ Standing properties of the design, each with the thing you do about it.
   anything but local dev** — those derive from the verified JWT, which
   the caller cannot pick.
 
-- **`BASE_ENCRYPT` does nothing.** `config.go` does not read it, so
-  setting it buys no encryption and no error. The encryption that is
-  real is a layer up: per-org Base shards open under a per-org DEK.
-  **Put the data directory on an encrypted volume** and do not treat
-  this variable as having enabled anything.
+- **`BASE_ENCRYPT` is refused.** Setting it stops the process with a
+  message naming what actually protects data at rest, rather than
+  starting quietly and leaving the operator to assume. The encryption
+  that is real is a layer up: per-org Base shards open under a per-org
+  key. **Put the data directory on an encrypted volume.**
 
 - **A shard costs an engine.** Each holds a 1024-entry channel, and
   nothing has been exercised past single-digit shard counts. **Pick a
@@ -256,8 +248,12 @@ Standing properties of the design, each with the thing you do about it.
   where a tenant is the natural unit — and size before you scale.
 
 - **`network/attack_vectors_test.go` is the executable half of this
-  section.** Run it with the package; the tests that pass are the
-  defences listed above. Nothing runs it on a schedule.
+  section.** The tests that pass are the defences listed above; the
+  tests that skip name what this package does not defend, and print
+  themselves on every CI run. The `network-attack-suite` gate in
+  `hanzo.yml` holds the two apart — a defence that stopped holding
+  cannot become a skip, and a marker cannot quietly become an
+  assertion.
 
 ## Layout
 

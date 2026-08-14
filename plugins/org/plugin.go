@@ -3,8 +3,10 @@
 // An org's Base is a Base of its own under {DataDir}/orgs/{org}/, opened the
 // first time a request arrives carrying that org. Isolation is physical: a
 // different org is a different file, so there is no query that can read across
-// two. Physical is all it is — OrgDEK derives a key from KMS that nothing opens
-// a file with, so the files are plaintext at rest.
+// two. The file is opened under that org's own key — see [encryptedConnect] —
+// so one org's data is unreadable with another's, and a deployment that
+// configures no master key opens plaintext and says so rather than pretending
+// otherwise.
 //
 // Orgs and members are IAM's, read off the validated token. This package never
 // writes them — a local copy is a second answer to "who is in this org", and
@@ -170,26 +172,6 @@ func Register(app core.App, config Config) error {
 		p.bases.close()
 		return e.Next()
 	})
-
-	// A backup carries the Base it is taken on. An org's Base sits in a
-	// subdirectory of this one but is a different Base — its own handles, its
-	// own write-ahead log, outside the transaction this archive is taken in —
-	// so it is not what this archive holds. Each org's Base backs up on that
-	// Base, where the data directory is its own.
-	//
-	// One statement on both hooks, because the two have to name the same thing:
-	// a restore moves aside everything it is about to replace, so an archive
-	// that leaves the orgs out and a restore that does not spare them would
-	// delete every one of them.
-	//
-	// Bound here rather than in declare — this is the only data directory with
-	// orgs under it. What the archive does carry, it says: see tools/archive.
-	omitOrgs := func(e *core.BackupEvent) error {
-		e.Exclude = append(e.Exclude, orgsDirName)
-		return e.Next()
-	}
-	app.OnBackupCreate().BindFunc(omitOrgs)
-	app.OnBackupRestore().BindFunc(omitOrgs)
 
 	// Which Base serves an org. Reading it is how a request reaches the right
 	// one; without it every read lands on the process's own Base, which is what
@@ -424,6 +406,39 @@ func (p *plugin) declare(app core.App) {
 	// principal — never from client body/headers. A caller cannot attribute a
 	// record to another user or org.
 	app.OnRecordCreateRequest().BindFunc(stampOrgOwnership)
+
+	omitNested(app)
+}
+
+// omitNested states what a Base's backup does not carry: the stores that sit in
+// its data directory and are not it.
+//
+// A backup quiesces one Base — its transaction, its write-ahead log checkpoint.
+// An org's Base under the platform's data directory, and a user's database
+// under that org's, each have their own handles and their own log, outside
+// both. Copying one anyway takes it mid-write and pairs it with a log copied at
+// another instant, so the archive holds a torn file and says nothing about it.
+// Each is backed up where it is quiesced: on itself.
+//
+// One statement for every Base, rather than one per level. The platform has no
+// users directory and an org has no orgs directory, so each Base names one
+// thing it has and one it does not — which is cheaper than two statements that
+// have to be kept in step, and the next level down cannot be the one somebody
+// forgets.
+//
+// Both hooks, and it is the same function on each: a restore moves aside
+// everything it is about to replace, so an archive that leaves a store out
+// while a restore does not spare it would delete it.
+//
+// What the archive DOES carry, it says — see tools/archive, which writes the
+// list into the zip's own comment.
+func omitNested(app core.App) {
+	omit := func(e *core.BackupEvent) error {
+		e.Exclude = append(e.Exclude, orgsDirName, usersDirName)
+		return e.Next()
+	}
+	app.OnBackupCreate().BindFunc(omit)
+	app.OnBackupRestore().BindFunc(omit)
 }
 
 // --------------------------------------------------------------------------
