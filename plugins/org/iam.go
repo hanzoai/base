@@ -47,10 +47,7 @@ const (
 // This is a convenience function that creates a one-off HTTP request. For
 // production use with caching, use the IAMClient returned by NewIAMClient.
 func ValidateIAMToken(token string, config Config) (*IAMUser, error) {
-	endpoint := config.IAMEndpoint
-	if endpoint == "" {
-		endpoint = "https://hanzo.id"
-	}
+	endpoint, client := resolveIAM(config.IAMEndpoint, 10*time.Second)
 
 	req, err := http.NewRequest("GET", endpoint+"/v1/iam/oauth/userinfo", nil)
 	if err != nil {
@@ -58,7 +55,7 @@ func ValidateIAMToken(token string, config Config) (*IAMUser, error) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("iam: request failed: %w", err)
 	}
@@ -83,10 +80,27 @@ func ValidateIAMToken(token string, config Config) (*IAMUser, error) {
 // ExchangeOAuth2Token exchanges an authorization code for tokens using the
 // IAM OAuth2 token endpoint.
 func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, refreshToken string, err error) {
-	endpoint := config.IAMEndpoint
+	// Minting addresses the BRAND, so this one stays on the brand's public
+	// origin and does not take the in-cluster wire.
+	//
+	// IAM resolves the issuer per brand from the request Host (internal/oidc:
+	// resolveIssuer(c.Host())) because a relying party that discovered through
+	// lux.id pins `iss` to lux.id and rejects a hanzo.id-issued token. The ZAP
+	// request frame carries no Host — zap-proto/http encodes method, target,
+	// proto, headers and body, and Host is skipped from the headers as
+	// frame-owned without a frame slot to own it — so a token minted over that
+	// wire would carry the default brand's issuer whatever host was asked for.
+	// Reads are unaffected: nothing below reads `iss`.
+	endpoint := strings.TrimRight(strings.TrimSpace(config.IAMEndpoint), "/")
 	if endpoint == "" {
 		endpoint = "https://hanzo.id"
 	}
+	if low := strings.ToLower(endpoint); !strings.HasPrefix(low, "http://") && !strings.HasPrefix(low, "https://") {
+		return "", "", fmt.Errorf("iam: token exchange needs the brand's public origin, "+
+			"not the in-cluster address %q: the issuer is derived from the request host, "+
+			"so a token minted through the cluster address carries the wrong brand", config.IAMEndpoint)
+	}
+	client := &http.Client{Timeout: 10 * time.Second}
 
 	data := url.Values{
 		"grant_type":    {"authorization_code"},
@@ -96,7 +110,7 @@ func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, 
 		"client_secret": {config.IAMClientSecret},
 	}
 
-	resp, err := http.PostForm(endpoint+"/v1/iam/oauth/token", data)
+	resp, err := client.PostForm(endpoint+"/v1/iam/oauth/token", data)
 	if err != nil {
 		return "", "", fmt.Errorf("iam: token exchange request failed: %w", err)
 	}
@@ -155,22 +169,20 @@ func NewIAMClient(baseURL string) *IAMClient {
 // NewIAMClientWithCache creates a new IAM client with a custom cache capacity.
 // cacheSize must be > 0; values <= 0 fall back to defaultCacheSize.
 func NewIAMClientWithCache(baseURL string, cacheSize int) *IAMClient {
-	if baseURL == "" {
-		baseURL = "https://hanzo.id"
-	}
-	// Trim trailing slash.
-	baseURL = strings.TrimRight(baseURL, "/")
 	if cacheSize <= 0 {
 		cacheSize = defaultCacheSize
 	}
 
+	// The endpoint's scheme names the wire (see iam_transport.go): https:// is
+	// net/http as before, a bare host:port or zap:// is ZAP. Every method below
+	// is written against net/http and is unchanged by the choice.
+	baseURL, httpClient := resolveIAM(baseURL, 10*time.Second)
+
 	return &IAMClient{
-		baseURL: baseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-		tokens: expirable.NewLRU[string, *IAMUser](cacheSize, nil, tokenCacheTTL),
-		keys:   expirable.NewLRU[string, *IAMUser](cacheSize, nil, keyCacheTTL),
+		baseURL:    baseURL,
+		httpClient: httpClient,
+		tokens:     expirable.NewLRU[string, *IAMUser](cacheSize, nil, tokenCacheTTL),
+		keys:       expirable.NewLRU[string, *IAMUser](cacheSize, nil, keyCacheTTL),
 	}
 }
 
