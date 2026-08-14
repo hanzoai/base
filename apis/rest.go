@@ -109,7 +109,7 @@ func restCount(e *core.RequestEvent) bool {
 func restList(e *core.RequestEvent) error {
 	q, preds, err := restQuery(e.Request.URL.Query(), restCount(e))
 	if err != nil {
-		return restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
+		return restError(e, http.StatusBadRequest, "bad_query", err.Error(), "")
 	}
 
 	e.Request.URL.RawQuery = q.Encode()
@@ -491,10 +491,10 @@ const restWriteCeiling = 500
 func restCreate(e *core.RequestEvent) error {
 	body, err := io.ReadAll(io.LimitReader(e.Request.Body, 1<<20))
 	if err != nil {
-		return restError(e, http.StatusBadRequest, "PGRST102", "unreadable request body", err.Error())
+		return restError(e, http.StatusBadRequest, "bad_body", "unreadable request body", err.Error())
 	}
 	if bytes.HasPrefix(bytes.TrimLeft(body, " \t\r\n"), []byte("[")) {
-		return restError(e, http.StatusNotImplemented, "PGRST100",
+		return restError(e, http.StatusNotImplemented, "bad_query",
 			"inserting several rows in one request is not supported here",
 			"send one object per request; a true bulk insert has to be one statement to roll back as one")
 	}
@@ -508,9 +508,9 @@ func restCreate(e *core.RequestEvent) error {
 	}
 
 	if restWantsObject(e) && len(call.rows) != 1 {
-		return restError(e, http.StatusNotAcceptable, "PGRST116",
+		return restError(e, http.StatusNotAcceptable, "not_one_row",
 			"JSON object requested, multiple (or no) rows returned",
-			fmt.Sprintf("Results contain %d rows, application/vnd.pgrst.object+json requires 1 row", len(call.rows)))
+			fmt.Sprintf("Results contain %d rows, application/vnd.hanzo.object+json requires 1 row", len(call.rows)))
 	}
 	if !restReturns(e) {
 		return e.NoContent(http.StatusCreated)
@@ -548,13 +548,13 @@ func restWriteOverRows(e *core.RequestEvent, apply func(*core.RequestEvent, stri
 
 	preds, err := restPredicates(e.Request.URL.Query())
 	if err != nil {
-		return restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
+		return restError(e, http.StatusBadRequest, "bad_query", err.Error(), "")
 	}
 	// An unfiltered PATCH or DELETE means every row. this wire allows it and the
 	// client sends it without comment, so the first time anyone discovers it is
 	// after the table is empty. This refuses instead, and says how to mean it.
 	if len(preds) == 0 {
-		return restError(e, http.StatusBadRequest, "PGRST100",
+		return restError(e, http.StatusBadRequest, "bad_query",
 			"a filtered write needs a filter; add one (e.g. ?id=eq.<id>) to say which rows you mean",
 			"without a filter this would touch every row in the table")
 	}
@@ -605,7 +605,7 @@ func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []
 
 	where, err := restWhere(resolver, preds)
 	if err != nil {
-		return nil, restError(e, http.StatusBadRequest, "PGRST100", err.Error(), "")
+		return nil, restError(e, http.StatusBadRequest, "bad_query", err.Error(), "")
 	}
 	if where != nil {
 		q.AndWhere(where)
@@ -619,7 +619,7 @@ func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []
 		return nil, firstApiError(err, e.InternalServerError("Failed to resolve the affected rows.", err))
 	}
 	if len(records) > restWriteCeiling {
-		return nil, restError(e, http.StatusBadRequest, "PGRST100",
+		return nil, restError(e, http.StatusBadRequest, "bad_query",
 			fmt.Sprintf("this filter selects more than %d rows", restWriteCeiling),
 			"narrow the filter, or make the change in batches")
 	}
@@ -631,12 +631,19 @@ func restMatchingIDs(e *core.RequestEvent, collection *core.Collection, preds []
 	return ids, nil
 }
 
-// restFault is The wire's error body. The field names are not decoration: a
-// client BRANCHES on `code` (PGRST1xx, or a raw SQLSTATE like 23505 for a unique
-// violation), and a client recovers a zero-row single-row write by string-matching `details` for "0 rows". Base's own {data,message,status} body
-// carries neither, so on that body every `error.code === '23505'` branch in a
-// migrated app is dead and every maybeSingle write surfaces an error where
-// another store returns {data: null, error: null}.
+// restFault is the wire's error body, and its field names are not decoration: a
+// client BRANCHES on `code`.
+//
+// Two vocabularies meet there, and the split is the point. A constraint the
+// STORE refused answers with the store's own SQLSTATE — `23505` for a duplicate
+// — because that is a fact about the data and every SQL engine already agrees
+// on how to say it. A request the WIRE would not accept answers with a word of
+// ours (`bad_query`, `bad_body`, `not_one_row`, `refused`, `not_found`,
+// `store_failed`), because that is a fact about this API and nobody else gets
+// to name it. `details` carries the specifics a person acts on.
+//
+// Base's own {data,message,status} body carries neither, which is why this is a
+// second rendering rather than the same body under another name.
 type restFault struct {
 	Message string `json:"message"`
 	Details string `json:"details"`
@@ -651,7 +658,7 @@ func restError(e *core.RequestEvent, status int, code, message, details string) 
 // restWantsObject reports whether the caller asked for a bare object rather than
 // an array — .single(), and .maybeSingle() on anything but a GET.
 func restWantsObject(e *core.RequestEvent) bool {
-	return strings.Contains(e.Request.Header.Get("Accept"), "application/vnd.pgrst.object+json")
+	return strings.Contains(e.Request.Header.Get("Accept"), "application/vnd.hanzo.object+json")
 }
 
 // restReturns reports what the caller wants back. The wire returns nothing unless asked, and a client reads an empty body as
@@ -667,15 +674,15 @@ func restReturns(e *core.RequestEvent) bool {
 
 // restWriteRender answers a filtered write once, whatever it touched.
 //
-// The cardinality rules are the client's, not ours: an Accept of
-// pgrst.object+json is a claim that the write hits exactly one row, and anything
-// else is 406 PGRST116 with the row count in `details` — which is the string the
-// client parses to turn "no rows" back into a null result.
+// Cardinality is the CALLER's claim: an Accept of `application/vnd.hanzo.object
+// +json` says the write hits exactly one row, and anything else is 406
+// not_one_row carrying the count in `details`, so a caller that meant to touch
+// one row is told how many it actually would have.
 func restWriteRender(e *core.RequestEvent, rows []*core.Record, affected int) error {
 	if restWantsObject(e) && len(rows) != 1 {
-		return restError(e, http.StatusNotAcceptable, "PGRST116",
+		return restError(e, http.StatusNotAcceptable, "not_one_row",
 			"JSON object requested, multiple (or no) rows returned",
-			fmt.Sprintf("Results contain %d rows, application/vnd.pgrst.object+json requires 1 row", len(rows)))
+			fmt.Sprintf("Results contain %d rows, application/vnd.hanzo.object+json requires 1 row", len(rows)))
 	}
 
 	if !restReturns(e) {
@@ -708,7 +715,7 @@ func restFail(e *core.RequestEvent, err error) error {
 
 	var apiErr *router.ApiError
 	if !errors.As(err, &apiErr) {
-		return restError(e, http.StatusInternalServerError, "PGRST000", err.Error(), "")
+		return restError(e, http.StatusInternalServerError, "store_failed", err.Error(), "")
 	}
 
 	if field, ok := restNotUnique(apiErr); ok {
@@ -741,19 +748,21 @@ func restNotUnique(apiErr *router.ApiError) (string, bool) {
 	return "", false
 }
 
-// restCodeFor gives a failure the PGRST code its status implies. The wire's own codes are finer than this, but a wrong specific code is worse than an honest
-// general one — a client branching on it would take the wrong path.
+// restCodeFor gives a failure the code its status implies, for the errors that
+// arrive already carrying a status and nothing else. It is deliberately coarse:
+// a wrong specific code is worse than an honest general one, because a client
+// branching on it would take the wrong path with confidence.
 func restCodeFor(status int) string {
 	switch status {
 	case http.StatusBadRequest:
-		return "PGRST100"
+		return "bad_query"
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return "PGRST301"
+		return "refused"
 	case http.StatusNotFound:
-		return "PGRST202"
+		return "not_found"
 	case http.StatusNotAcceptable:
-		return "PGRST116"
+		return "not_one_row"
 	default:
-		return "PGRST000"
+		return "store_failed"
 	}
 }

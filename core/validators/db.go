@@ -114,7 +114,7 @@ func NormalizeUniqueIndexError(err error, tableOrAlias string, fieldNames []stri
 // The two engines this store runs on word it completely differently, and the
 // literal match this used to be ("unique constraint failed") is SQLite's alone —
 // so on Postgres a duplicate never normalized into a field error and surfaced as
-// a 500 instead of a 400. It is also what the /rest/v1 door reads to answer with
+// a 500 instead of a 400. It is also what the table wire reads to answer with
 // SQLSTATE 23505, which is the code REST clients branch on.
 func IsUniqueViolation(err error) bool {
 	if err == nil {

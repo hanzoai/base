@@ -19,11 +19,12 @@ import (
 // X-User-IsAdmin / X-User-Permissions), serves it through h, and returns the
 // buffered response as a ZAP Response.
 //
-// This is additive and orthogonal to the legacy native handlers
-// (Collections=100 / Records=101 / Auth=102 / Realtime=103): MsgTypeForward
-// (0x80) is a distinct message type, so it shares the same node and socket
-// without touching them. No-op when the node is absent or h is nil — base's
-// HTTP behavior is unchanged either way.
+// It is the ONLY thing this node answers. Four other message types once served
+// collections, records, auth and realtime by calling the store directly — see
+// plugin.start for why they are gone rather than mended — so a peer reaches
+// exactly the surface an HTTP caller reaches, under exactly the same chain, and
+// the table wire arrives here like every other route. No-op when the node is
+// absent or h is nil; base's HTTP behavior is unchanged either way.
 func (p *plugin) bridgeForward(h http.Handler) {
 	if p.node == nil || h == nil {
 		return
