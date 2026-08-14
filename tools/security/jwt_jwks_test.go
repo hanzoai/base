@@ -6,9 +6,12 @@ import (
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -276,5 +279,75 @@ func TestJWKSCache_Eviction(t *testing.T) {
 	}
 	if key.Kid != kid {
 		t.Fatalf("expected kid=%q, got %q", kid, key.Kid)
+	}
+}
+
+// A kid arrives on a token nobody has verified yet, so it is chosen by whoever
+// sent the request. Looking one up must therefore not be a way to make this
+// process fetch: the document is read once and every unpublished kid after
+// that is answered from the copy already held.
+func TestAnUnpublishedKidIsNotAFetch(t *testing.T) {
+	privKey := generateTestRSAKey(t)
+
+	var fetches atomic.Int64
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fetches.Add(1)
+		n := base64.RawURLEncoding.EncodeToString(privKey.PublicKey.N.Bytes())
+		e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privKey.PublicKey.E)).Bytes())
+		fmt.Fprintf(w, `{"keys":[{"kty":"RSA","kid":"real","use":"sig","alg":"RS256","n":%q,"e":%q}]}`, n, e)
+	})
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	cache := NewJWKSCache(5 * time.Minute)
+	for i := 0; i < 50; i++ {
+		if _, err := cache.FetchKey(context.Background(), ts.URL, fmt.Sprintf("made-up-%d", i)); err == nil {
+			t.Fatal("a kid the issuer does not publish was accepted")
+		}
+	}
+
+	if got := fetches.Load(); got != 1 {
+		t.Fatalf("50 unpublished kids asked the issuer %d times, want 1", got)
+	}
+
+	// The document that was read is the one still in use.
+	if _, err := cache.FetchKey(context.Background(), ts.URL, "real"); err != nil {
+		t.Fatalf("the published kid was not found: %v", err)
+	}
+	if got := fetches.Load(); got != 1 {
+		t.Fatalf("the published kid cost another fetch: %d", got)
+	}
+}
+
+// Every caller learns of a rotation at once, so the fetch they share is one.
+func TestConcurrentLookupsShareOneFetch(t *testing.T) {
+	privKey := generateTestRSAKey(t)
+
+	var fetches atomic.Int64
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fetches.Add(1)
+		time.Sleep(20 * time.Millisecond) // wide enough for the others to arrive
+		n := base64.RawURLEncoding.EncodeToString(privKey.PublicKey.N.Bytes())
+		e := base64.RawURLEncoding.EncodeToString(big.NewInt(int64(privKey.PublicKey.E)).Bytes())
+		fmt.Fprintf(w, `{"keys":[{"kty":"RSA","kid":"rolled","use":"sig","alg":"RS256","n":%q,"e":%q}]}`, n, e)
+	}))
+	defer ts.Close()
+
+	cache := NewJWKSCache(5 * time.Minute)
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := cache.FetchKey(context.Background(), ts.URL, "rolled"); err != nil {
+				t.Errorf("lookup failed: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := fetches.Load(); got != 1 {
+		t.Fatalf("32 concurrent lookups asked the issuer %d times, want 1", got)
 	}
 }
