@@ -405,16 +405,27 @@ recovery.rotations = rotations
 // reports nothing wrong. Measuring the document alone would have passed the
 // defect through; measuring the column is what fails on it. `overflow` stays
 // because it is cheap and it is the thing that must not regress.
+// `account` is the second half, and width alone does not catch it. Give the
+// STRIP the overflow instead of the links and every box is still exactly the
+// size it asked for — the links simply run to 532px inside a 390px strip and
+// carry the account out to 610, off the side of the phone. It is reachable by
+// dragging the strip sideways, which nobody discovers, so signing out is gone.
+// The document does not grow, `.shell__main` does not overflow, and the nav
+// still measures a correct full-width 390: nothing already measured moves.
+// Asking whether the account's right edge is inside the viewport is what fails.
 const fit = {}
 const measure = () => page.evaluate(() => {
   const nav = document.querySelector('.shell__nav')
   const shell = document.querySelector('.shell')
+  const foot = document.querySelector('.shell__foot')
   return {
     nav: nav ? Math.round(nav.getBoundingClientRect().width) : null,
     flow: shell ? getComputedStyle(shell).flexDirection : null,
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     brand: !!document.querySelector('.shell__brand'),
-    account: !!document.querySelector('.shell__foot'),
+    account: !!foot,
+    accountRight: foot ? Math.round(foot.getBoundingClientRect().right) : null,
+    viewport: window.innerWidth,
   }
 })
 
@@ -568,10 +579,12 @@ const recovered = recovery.importRefused > 0
 // right edge, on the phone and in the frame. The frame drops the brand and the
 // account — the host already says which product you are in and who you are —
 // and still paints the browser it was framed for.
+const onScreen = (f) => f.accountRight !== null && f.accountRight <= f.viewport + 1
 const fits = fit.desktop.flow === 'row' && fit.desktop.nav > 200 && fit.desktop.nav < 260
   && fit.desktop.brand && fit.desktop.account && fit.desktop.overflow <= 0
+  && onScreen(fit.desktop)
   && fit.phone.flow === 'column' && fit.phone.nav > 320 && fit.phone.overflow <= 0
-  && fit.phone.brand && fit.phone.account
+  && fit.phone.brand && fit.phone.account && onScreen(fit.phone)
   && !!fit.embedded && fit.embedded.flow === 'column' && fit.embedded.overflow <= 0
   && !fit.embedded.brand && !fit.embedded.account && fit.embedded.painted.length > 0
 // Nothing a form submits may name a field the server has no home for, and
