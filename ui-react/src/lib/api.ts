@@ -331,9 +331,15 @@ export async function listSuperusers(params?: { sort?: string }): Promise<Record
 // ---------------------------------------------------------------------------
 // Realtime — Base SSE protocol at /v1/realtime.
 //
-// One shared EventSource per page. On PB_CONNECT the server hands back a
-// clientId; we POST the active topic set to bind subscriptions. Events arrive
-// as named SSE messages (event name == topic). Reference-counted per topic.
+// One shared EventSource per page, reference-counted per topic. On CONNECT the
+// server hands back a clientId; we POST the active topic set to bind
+// subscriptions. Events arrive as named SSE messages, the name being the topic.
+//
+// EventSource sends no headers, so the stream cannot carry the bearer every
+// other call carries. It is opened with a grant instead: POST /v1/realtime/token
+// mints one on an ordinary authenticated request and the stream spends it, once.
+// Because it is spent, a dropped stream is reopened here with a fresh grant
+// rather than by the browser's own retry, which would replay one that is gone.
 // ---------------------------------------------------------------------------
 
 export interface RealtimeEvent {
@@ -344,7 +350,28 @@ type RealtimeCallback = (e: RealtimeEvent) => void
 
 let es: EventSource | null = null
 let clientId = ''
+let opening = false
+let retry: ReturnType<typeof setTimeout> | undefined
+let backoff = 1000
 const topics = new Map<string, Set<RealtimeCallback>>()
+const listening = new Set<string>()
+
+function deliver(topic: string, ev: Event): void {
+  const bucket = topics.get(topic)
+  if (!bucket) return
+  try {
+    const evt = JSON.parse((ev as MessageEvent).data) as RealtimeEvent
+    for (const fn of bucket) fn(evt)
+  } catch { /* ignore malformed frame */ }
+}
+
+// One listener per topic per stream. The set is emptied with the stream, so a
+// reopened one is listened to afresh and a live one is never doubled up.
+function listen(source: EventSource, topic: string): void {
+  if (listening.has(topic)) return
+  listening.add(topic)
+  source.addEventListener(topic, (ev) => deliver(topic, ev))
+}
 
 async function submitSubscriptions(): Promise<void> {
   if (!clientId) return
@@ -354,34 +381,55 @@ async function submitSubscriptions(): Promise<void> {
   }).catch(() => { /* transient; resent on next change */ })
 }
 
-function ensureConnection(): void {
-  if (es) return
-  es = new EventSource('/v1/realtime')
-  es.addEventListener('PB_CONNECT', (ev) => {
-    try {
-      clientId = JSON.parse((ev as MessageEvent).data).clientId as string
-      void submitSubscriptions()
-    } catch { /* malformed handshake */ }
-  })
+function drop(): void {
+  es?.close()
+  es = null
+  clientId = ''
+  listening.clear()
+}
+
+function reopen(): void {
+  if (retry !== undefined || topics.size === 0) return
+  retry = setTimeout(() => { retry = undefined; void connect() }, backoff)
+  backoff = Math.min(backoff * 2, 30_000)
+}
+
+async function connect(): Promise<void> {
+  if (es || opening || topics.size === 0) return
+  opening = true
+  try {
+    const { token } = await request<{ token: string }>('/v1/realtime/token', { method: 'POST' })
+    if (topics.size === 0) return
+    const source = new EventSource(`/v1/realtime?token=${encodeURIComponent(token)}`)
+    source.addEventListener('CONNECT', (ev) => {
+      try {
+        clientId = JSON.parse((ev as MessageEvent).data).clientId as string
+        backoff = 1000
+        void submitSubscriptions()
+      } catch { /* malformed handshake */ }
+    })
+    source.onerror = () => { drop(); reopen() }
+    for (const topic of topics.keys()) listen(source, topic)
+    es = source
+  } catch {
+    reopen()
+  } finally {
+    opening = false
+  }
 }
 
 export function subscribeRecords(topic: string, cb: RealtimeCallback): () => void {
-  ensureConnection()
   let subs = topics.get(topic)
   if (!subs) {
     subs = new Set()
     topics.set(topic, subs)
-    es?.addEventListener(topic, (ev) => {
-      const bucket = topics.get(topic)
-      if (!bucket) return
-      try {
-        const evt = JSON.parse((ev as MessageEvent).data) as RealtimeEvent
-        for (const fn of bucket) fn(evt)
-      } catch { /* ignore malformed frame */ }
-    })
-    void submitSubscriptions()
+    if (es) {
+      listen(es, topic)
+      void submitSubscriptions()
+    }
   }
   subs.add(cb)
+  void connect()
 
   return () => {
     const bucket = topics.get(topic)
@@ -390,11 +438,7 @@ export function subscribeRecords(topic: string, cb: RealtimeCallback): () => voi
     if (bucket.size === 0) {
       topics.delete(topic)
       void submitSubscriptions()
-      if (topics.size === 0) {
-        es?.close()
-        es = null
-        clientId = ''
-      }
+      if (topics.size === 0) drop()
     }
   }
 }

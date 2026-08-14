@@ -10,6 +10,17 @@ export type { CollectionField, CollectionModel, ListResult, RecordModel } from '
 type Data = FormData | Record<string, unknown>
 type ListOpts = { sort?: string; filter?: string }
 
+// When the bearer stops being accepted, in ms, or null when it does not say.
+// The signature is the server's to check; this reads only the instant.
+function expiry(token: string): number | null {
+  try {
+    const { exp } = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof exp === 'number' ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
 class CollectionHandle {
   constructor(private readonly name: string) {}
 
@@ -53,8 +64,15 @@ class AuthStore {
     return api.getRecord()
   }
 
+  // A session, not a string. The route guards read this to decide whether to
+  // send someone to sign in, so it has to answer about a credential the server
+  // will still accept rather than about the presence of one. A token that
+  // states no expiry cannot be judged here, so the server judges it.
   get isValid(): boolean {
-    return Boolean(api.getToken())
+    const token = api.getToken()
+    if (!token) return false
+    const exp = expiry(token)
+    return exp === null || exp > Date.now()
   }
 
   get isSuperuser(): boolean {
@@ -85,6 +103,10 @@ export class BaseClient {
       api.updateCollection(id, data),
     delete: (id: string): Promise<void> => api.deleteCollection(id),
     import: (collections: CollectionModel[]): Promise<void> => api.importCollections(collections),
+    // Mints fresh signing secrets for the collection's tokens. Carries no
+    // value — a secret is the server's to choose.
+    rotate: (id: string): Promise<CollectionModel> =>
+      api.request<CollectionModel>(`/v1/collections/${encodeURIComponent(id)}/rotate`, { method: 'POST' }),
   }
 
   readonly settings = {

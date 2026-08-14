@@ -38,7 +38,7 @@ function RecordEditor() {
 
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ message: string; status?: number } | null>(null);
   const files = useRef<Record<string, File[]>>({});
 
   // Seed the form once the schema (and record, when editing) resolve.
@@ -65,7 +65,10 @@ function RecordEditor() {
       qc.invalidateQueries({ queryKey: ['records', name] });
       nav({ to: '/collections/$id/records', params: { id } });
     },
-    onError: (e) => setError(String((e as Error)?.message ?? e)),
+    onError: (e) => setError({
+      message: String((e as Error)?.message ?? e),
+      status: (e as { status?: number })?.status,
+    }),
   });
 
   const del = useMutation({
@@ -78,7 +81,7 @@ function RecordEditor() {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
     try {
       // Validate JSON fields up-front so we fail before the network call.
       for (const f of editable) {
@@ -89,9 +92,16 @@ function RecordEditor() {
       }
       save.mutate();
     } catch {
-      setError('Invalid JSON in one of the fields');
+      setError({ message: 'Invalid JSON in one of the fields' });
     }
   };
+
+  // An expired bearer is the one failure that must not cost the edit. Signing
+  // in happens in another tab, so this one keeps every value on screen; the
+  // session lands in the storage every tab on this origin shares, and the next
+  // Save carries it. The stale bearer is cleared on the way out, because the
+  // sign-in page sends a live session back to the dashboard.
+  const expired = error?.status === 401;
 
   if (collection.isPending) return <div className="muted">Loading schema…</div>;
   if (collection.error) return <div className="danger">{ String(collection.error) }</div>;
@@ -116,7 +126,24 @@ function RecordEditor() {
         </div>
       </header>
 
-      { error && <p className="danger">{ error }</p> }
+      { error && (
+        <div className="row">
+          <p className="danger">
+            { expired ? 'Your session expired. Sign in again and press Save — nothing here is lost.' : error.message }
+          </p>
+          { expired && (
+            <a
+              href={ `${import.meta.env.BASE_URL}login` }
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn--sm"
+              onClick={ () => base.authStore.clear() }
+            >
+              Sign in again
+            </a>
+          ) }
+        </div>
+      ) }
 
       <div className="card stack">
         { !isNew && record.data && <ReadonlyRow label="id" value={ record.data.id } mono /> }

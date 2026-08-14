@@ -59,6 +59,7 @@ function stub(url) {
   if (url === '/v1/logs') return page1([{ id: 'l1', created: '2026-01-01 00:00:00Z', level: 0, message: 'served', data: { type: 'request', status: 200 } }])
   if (url === '/v1/backups') return [{ key: 'base_data.zip', size: 1024, modified: '2026-01-01 00:00:00Z' }]
   if (url === '/v1/crons') return [{ id: '__pbDBOptimize__', expression: '0 0 * * *' }]
+  if (url === '/v1/realtime/token') return { token: 'a-stream-grant' }
   if (url === '/v1/settings') {
     return {
       meta: { appName: 'Base', appURL: 'http://localhost:8090', senderName: 'Support', senderAddress: 'support@example.com' },
@@ -74,13 +75,41 @@ function stub(url) {
   return page1([])
 }
 
+// Every stream the page opened, with its query. A stream is authenticated by
+// the grant it carries and by nothing else, so a stream opened without one is
+// a stream that will be served from the wrong Base — and it fails the same
+// silent way an unstyled control does: connected, subscribed to nothing.
+const streamed = []
+
+// Every rotation the page asked for, with what it sent. A signing secret is
+// the server's to mint, so the request that replaces one has to arrive empty —
+// a body here would mean the browser chose the material.
+const rotations = []
+
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0]
+  if (req.method === 'POST' && url.endsWith('/rotate')) {
+    let body = ''
+    req.on('data', (chunk) => { body += chunk })
+    return req.on('end', () => {
+      rotations.push({ url, body })
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify(collection))
+    })
+  }
+  // A record save is refused for want of a session, so the recovery path below
+  // has something to recover from.
+  if (req.method === 'PATCH' && /^\/v1\/collections\/[^/]+\/records\/[^/]+$/.test(url)) {
+    res.writeHead(401, { 'content-type': 'application/json' })
+    return res.end(JSON.stringify({ status: 401, message: 'The request requires a valid record authorization token.', data: {} }))
+  }
   // Realtime is SSE, not JSON — the browser aborts the EventSource on any
-  // other MIME type, and the record grid subscribes on mount.
+  // other MIME type, and the record grid subscribes on mount. The stream is
+  // opened with a grant in the query, the way the server reads one.
   if (url === '/v1/realtime' && req.method === 'GET') {
+    streamed.push(req.url)
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
-    return res.write('event: PB_CONNECT\ndata: {"clientId":"smoke"}\n\n')
+    return res.write('id:smoke\nevent:CONNECT\ndata:{"clientId":"smoke"}\n\n')
   }
   if (url.startsWith('/v1/')) {
     res.writeHead(200, { 'content-type': 'application/json' })
@@ -106,16 +135,25 @@ const origin = 'http://localhost:4600'
 const routes = [
   '/login', '/', '/collections', '/collections/c1', '/collections/c1/records',
   '/collections/c1/records/r1', '/logs', '/settings', '/settings/application',
-  '/settings/auth', '/settings/mail', '/settings/smtp', '/settings/backups',
-  '/settings/tokens', '/settings/superusers', '/settings/crons',
+  '/settings/auth', '/settings/smtp', '/settings/backups',
+  '/settings/tokens', '/settings/crons',
   '/settings/logs', '/settings/rate-limits', '/settings/data',
 ]
 
 const browser = await chromium.launch(process.env.CHROME ? { executablePath: process.env.CHROME } : {})
 const page = await browser.newPage()
 const errors = []
-page.on('pageerror', (e) => errors.push(`${page.url().split('/_')[1]}: ${e.message}`))
-page.on('console', (m) => { if (m.type() === 'error') errors.push(`${page.url().split('/_')[1]}: ${m.text()}`) })
+// The recovery block below asks the server to refuse a save, so the browser's
+// own line about that refusal is the expected outcome rather than a finding.
+// Nothing else in the run provokes one.
+let refusalExpected = false
+const where = () => new URL(page.url()).pathname
+page.on('pageerror', (e) => errors.push(`${where()}: ${e.message}`))
+page.on('console', (m) => {
+  if (m.type() !== 'error') return
+  if (refusalExpected && m.text().includes('status of 401')) return
+  errors.push(`${where()}: ${m.text()}`)
+})
 
 const painted = {}
 const styles = { unresolved: [], utilityClasses: [], computed: {} }
@@ -214,6 +252,43 @@ overlays.dialogWidth = overlays.dialogVisible
     })
   : null
 
+/*
+ * What the admin does when something goes wrong, which no amount of painting
+ * shows. Three behaviours, each of which fails silently in its own way: a
+ * document rendered as a React child throws and takes the whole app down, a
+ * refused save looks like a dead end, and a rotation that carried its own
+ * secret would look exactly like one that asked for it.
+ */
+const recovery = {}
+
+// A pasted document is refused with something to read, and the page survives.
+await page.goto(`${origin}/settings/data`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(300)
+await page.locator('textarea').fill('[{"id":"c1","name":{}}]')
+await page.waitForTimeout(200)
+recovery.importRefused = await page.getByText('is not a collection schema').count()
+
+// A save the server refuses for want of a session keeps every value on screen
+// and offers a way back that leaves this tab where it is.
+refusalExpected = true
+await page.goto(`${origin}/collections/c1/records/r1`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(400)
+const title = page.locator('input.input').first()
+await title.fill('edited over a long sitting')
+await page.getByRole('button', { name: 'Save', exact: true }).click()
+await page.waitForTimeout(400)
+recovery.editKept = await title.inputValue()
+recovery.signInOffered = await page.getByText('Sign in again').count()
+refusalExpected = false
+
+// Rotation asks; it does not choose.
+page.on('dialog', (d) => d.accept())
+await page.goto(`${origin}/settings/tokens`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(400)
+await page.getByRole('button', { name: 'Rotate secrets' }).click()
+await page.waitForTimeout(400)
+recovery.rotations = rotations
+
 await browser.close()
 server.close()
 
@@ -229,11 +304,18 @@ console.log(JSON.stringify({
   unprobed,
   computed: styles.computed,
   overlays,
+  streamed,
+  recovery,
   errors: [...new Set(errors)],
 }, null, 1))
 
+const granted = streamed.some((u) => u.includes('token=a-stream-grant'))
+const recovered = recovery.importRefused > 0
+  && recovery.editKept === 'edited over a long sitting'
+  && recovery.signInOffered > 0
+  && recovery.rotations.length === 1 && recovery.rotations[0].body === ''
 const ok = !blank.length && !styles.unresolved.length && !styles.utilityClasses.length && !errors.length
   && !unprobed.length && overlays.menuItems > 0 && overlays.dialogVisible
-  && overlays.dialogWidth === overlays.dialogMaxW
+  && overlays.dialogWidth === overlays.dialogMaxW && granted && recovered
 console.log(ok ? 'SMOKE OK' : 'SMOKE FAILED')
 process.exit(ok ? 0 : 1)

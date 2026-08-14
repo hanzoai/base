@@ -11,10 +11,12 @@ interface LogSettingsForm {
     logIP: boolean;
 }
 
+// slog's levels, by their numeric value — which is what the server stores.
+// INFO is zero, so it is also what an unset setting means; there is no
+// separate "default" to pick, and a level appears here exactly once.
 const logLevels = [
-    { value: 0, label: 'Default' },
     { value: -4, label: 'DEBUG (-4)' },
-    { value: 0, label: 'INFO (0)' },
+    { value: 0, label: 'INFO (0) — default' },
     { value: 4, label: 'WARN (4)' },
     { value: 8, label: 'ERROR (8)' },
 ] as const;
@@ -70,8 +72,8 @@ function LogSettings() {
                     <label className="field">
                         <span className="field__label">Minimum log level</span>
                         <select { ...register('logMinLevel', { valueAsNumber: true }) } className="input">
-                            { logLevels.map((l, i) => (
-                                <option key={ i } value={ l.value }>{ l.label }</option>
+                            { logLevels.map((l) => (
+                                <option key={ l.value } value={ l.value }>{ l.label }</option>
                             )) }
                         </select>
                         <span className="muted small">Only log entries at or above this level will be persisted.</span>

@@ -46,9 +46,10 @@ function LoginPage() {
 }
 
 export const Route = createFileRoute('/login')({
-  // Already signed in → straight to the dashboard.
+  // Already signed in → straight to the dashboard. A session, not a leftover
+  // token: someone whose bearer has expired came here to fix exactly that.
   beforeLoad: () => {
-    if (base.authStore.token) throw redirect({ to: '/' });
+    if (base.authStore.isValid) throw redirect({ to: '/' });
   },
   component: LoginPage,
 });
