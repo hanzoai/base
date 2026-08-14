@@ -224,6 +224,11 @@ const (
 
 	// StoreKeyBases holds the [Bases] of the deployment. Set by the org plugin.
 	StoreKeyBases = "bases"
+
+	// StoreKeySandboxes holds the [Sandboxes] of the deployment — where work a
+	// function starts actually runs. A deployment that sets none runs no work
+	// and says so; see [Sandboxes].
+	StoreKeySandboxes = "sandboxes"
 )
 
 // Bases answers which Base serves an org.
