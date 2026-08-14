@@ -97,7 +97,7 @@ func (s *OrgStorage) UserSSEKey(orgSlug, userId string) (string, error) {
 	return s.sseKey(ns)
 }
 
-// BucketPolicy returns a MinIO/S3 bucket policy JSON that enforces per-org
+// BucketPolicy returns an S3 bucket policy JSON that enforces per-org
 // path isolation. Uses encoding/json to prevent injection via orgSlug/iamUser.
 func (s *OrgStorage) BucketPolicy(orgSlug, iamUser string) string {
 	if err := validateSlug(orgSlug); err != nil {

@@ -161,7 +161,7 @@ that `txseq`. PITR for free.
 
 Backend is pluggable via `github.com/hanzoai/s3` client surface:
 
-- S3 (`s3://…`) — MinIO-protocol, used by `~/work/hanzo/storage`.
+- S3 (`s3://…`) — the S3 API, served by `hanzoai/s3`.
 - GCS (`gs://…`) — native client, used for production in GCP-hosted
   clusters.
 - off — archive disabled; durability = quasar DAG only.

@@ -157,9 +157,9 @@ func BindArchiveMetrics(m *Metrics) *ArchiveMetrics {
 }
 
 // NewArchive dispatches on the URL scheme. s3:// is the only one — every
-// Hanzo and Lux deploy ships MinIO-protocol S3 (hanzoai/s3) for storage.
+// Hanzo and Lux deploy ships S3 (hanzoai/s3) for storage.
 // Currently supported:
-// s3://   → MinIO-protocol S3 (hanzoai/s3 self-hosted or AWS).
+// s3://   → S3 (hanzoai/s3 self-hosted or AWS).
 // off     → nil Archive, disabled (call sites treat as no-op).
 // Anything else is a config error.
 func NewArchive(ctx context.Context, cfg ArchiveConfig, svc string, m *ArchiveMetrics) (Archive, error) {
