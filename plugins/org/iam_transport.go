@@ -132,3 +132,16 @@ func (z *zapTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 		Request:       r,
 	}, nil
 }
+
+// readAddress is where a read goes: the service, if it was named separately
+// from the brand, and the brand otherwise.
+//
+// Only minting has to address the brand, because the issuer it stamps comes
+// from the host it was asked on. Everything else answers about the credential
+// presented, so it can take the shorter path.
+func readAddress(c Config) string {
+	if addr := strings.TrimSpace(c.IAMAddress); addr != "" {
+		return addr
+	}
+	return c.IAMEndpoint
+}
