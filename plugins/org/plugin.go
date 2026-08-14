@@ -52,7 +52,20 @@ const (
 // Config defines the configuration for the platform plugin.
 type Config struct {
 	// IAMEndpoint is the base URL for Hanzo IAM (default: "https://hanzo.id").
+	//
+	// It names the BRAND, so minting a token always addresses it: IAM derives
+	// the issuer from the request host, and a relying party that discovered
+	// through one brand refuses a token issued by another.
 	IAMEndpoint string
+
+	// IAMAddress is where the service answers, when that is not where the brand
+	// lives. Reading takes it — validating a token, resolving a key — because
+	// none of those answers depend on which brand was addressed.
+	//
+	// A brand's public origin leaves the cluster and comes back to a pod one
+	// hop away. "iam.hanzo.svc.cluster.local:9653" is the pod, over ZAP, which
+	// is what a bare address means. Empty means read the brand's origin.
+	IAMAddress string
 
 	// KMSEndpoint is the KMS ZAP address — "host:port", "zap://host:port" or
 	// "zap+mdns://_kms._tcp" (default: "zap.kms.svc.cluster.local:9999").
@@ -149,7 +162,7 @@ func Register(app core.App, config Config) error {
 	p := &plugin{
 		app:        app,
 		config:     config,
-		iam:        NewIAMClient(config.IAMEndpoint),
+		iam:        NewIAMClient(readAddress(config)),
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
 		orgDB:      NewOrgDB(app, config.principalKey()),
