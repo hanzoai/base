@@ -2,16 +2,22 @@ package network
 
 // attack_vectors_test.go — Base Network adversarial test suite.
 //
-// Every test in this file follows the same contract:
+// A test here is one of exactly two things, and never both:
 //
-//   - Deterministic setup. rand.New(rand.NewSource(42)) only. No wall-clock
-//     flakes, no port bindings, no external services.
-//   - PASSES when the defence is present. FAILS with a clear attack
-//     description when regressed.
-//   - When the defence is not yet landed (blue's R1..R8 in flight), the
-//     test t.Skip()s with the canonical reason string
-//     "BLOCKED: waiting on blue feat/network-v0-redfix".
-//     CI treats any other skip reason as a hard failure.
+//   - an ASSERTION of a defence. It passes while the defence holds and fails
+//     with a description of what regressed. Deterministic — one seeded rand
+//     source, no wall-clock margin, no port binding, no external service.
+//   - a MARKER for a defence this package does not hold. Its whole body is
+//     t.Skip(blockedReason), stated once at the top.
+//
+// Nothing decides at runtime which of the two it is. A test that skips only
+// when it observes the defence missing cannot fail, and reports the regression
+// as a skip — so every conditional skip in this file was rewritten into one
+// shape or the other, and the `network-attack-suite` gate in hanzo.yml holds
+// the file to it: a skip carrying any other reason is a failure, and so is a
+// disagreement between the tests that DECLARE a marker skip and the tests that
+// actually skipped. A marker that starts passing, or an assertion that starts
+// skipping, is therefore a red build rather than a line in a log.
 //
 // Groups, in file order:
 //   1. Consensus / frame / envelope integrity
@@ -20,24 +26,19 @@ package network
 //   4. Shard routing / isolation
 //   5. Resource exhaustion / DoS
 //   6. Encryption / KMS
-//   7. Operator / CRD / k8s
-//   8. Correctness under concurrency
+//   7. Correctness under concurrency
 //
-// Run with the package: go test ./network/. Nothing runs it on a schedule —
-// this repo has no workflows — so a skip that should have become an assertion
-// stays a skip until someone looks. The defences the passing tests describe
-// are stated as contracts in docs/NETWORK.md.
+// The defences the assertions describe are stated as contracts in
+// docs/NETWORK.md.
 
 import (
 	"context"
 	"crypto/ed25519"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"math/rand"
-	"net"
-	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -46,9 +47,10 @@ import (
 	"time"
 )
 
-// blockedReason is the one skip string this file uses. A test skipping for any
-// other reason is flaky or has regressed silently, not blocked.
-const blockedReason = "BLOCKED: waiting on blue feat/network-v0-redfix"
+// blockedReason is the one skip string this package uses, and a marker states
+// it as its whole body. The gate reads it from this line, so there is one
+// spelling of it rather than one here and one in the pipeline.
+const blockedReason = "the defence this names is not held by this package"
 
 // seededRand returns the deterministic rand source every test in this file
 // uses. Shared constant seed keeps CI reproducible.
@@ -193,17 +195,24 @@ func TestAttack_DuplicateFrameReplay(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		_ = sh.submitLocal(f)
 	}
-	time.Sleep(200 * time.Millisecond)
+
+	// Wait for the frame to finalise rather than for a fixed interval. A
+	// deadline that expires is this test proving nothing, so it says so
+	// instead of excusing itself — an engine that finalises nothing is the
+	// same silence as one that never dedupes.
+	deadline := time.Now().Add(2 * time.Second)
+	for counterVal(t, n.Metrics().FramesFinalized) == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
 
 	finalised := counterVal(t, n.Metrics().FramesFinalized)
-	dup := counterVal(t, n.Metrics().FramesDuplicate)
+	if finalised == 0 {
+		t.Fatalf("5 submits of one frame finalised none within 2s — the apply " +
+			"path never ran, so this asserts nothing about dedupe.")
+	}
 	if finalised > 1 {
 		t.Fatalf("replay bypassed dedupe: FramesFinalized=%v (want ≤1). "+
 			"(salt,cksm) idempotency key broken.", finalised)
-	}
-	if dup < 1 && finalised == 0 {
-		// engine may never have finalised; then dup should not fire either.
-		t.Skip(blockedReason)
 	}
 }
 
@@ -302,16 +311,20 @@ func TestAttack_NilFrameFields(t *testing.T) {
 // Group 2 — P2P / transport.
 // ---------------------------------------------------------------------------
 
-// TestAttack_UnauthenticatedQuasarSubmit — R5 transport has no auth.
+// TestAttack_NoTransportFallback — the production constructor cannot end up
+// with the no-op transport.
 //
-// Threat: any host reachable on port 9999 submits frames for any known
-// shardID. ShardIDs are derived from JWT.sub / org_id so they're
-// enumerable.
-// Invariant: the production transport MUST require peer authentication
-// (mTLS with pod-identity cert, or Noise PQ handshake). In tests we check
-// the config surface: production must not default to nopTransport.
-// Expected: a flag or field indicating transport-auth-required.
-func TestAttack_UnauthenticatedQuasarSubmit(t *testing.T) {
+// nopTransport accepts every send and delivers nothing. It is the shape a
+// test asks for, and a production node that fell back to it would start
+// clean, log nothing and replicate nothing — every pod its own island, each
+// one certain it is a member. Broadcast returning nil is the whole problem:
+// silence is indistinguishable from success.
+// Invariant: newNode, the one production entry point, always injects the real
+// transport. The no-op is reachable only by a caller that names it.
+//
+// This says nothing about whether a peer is AUTHENTICATED — that is
+// TestAttack_PeerImpersonation, and it is a marker.
+func TestAttack_NoTransportFallback(t *testing.T) {
 	cfg := Config{
 		Enabled:     true,
 		ShardKey:    "user_id",
@@ -327,14 +340,10 @@ func TestAttack_UnauthenticatedQuasarSubmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newNode: %v", err)
 	}
-	// The default transport is nopTransport — no peer auth, no encryption,
-	// no network socket. That's fine for tests; the attack is that
-	// production code paths must not fall back to it silently.
 	if _, isNop := nn.transport.(*nopTransport); isNop {
-		// Acceptable today because production wiring is a separate PR.
-		// When Blue introduces a real transport, this test flips to
-		// asserting TLS/Noise config is non-empty.
-		t.Skip(blockedReason)
+		t.Fatalf("newNode built a node on the no-op transport: it sends to " +
+			"nobody and reports success, so a pod replicates nothing and " +
+			"nothing anywhere says so.")
 	}
 }
 
@@ -366,17 +375,30 @@ func TestAttack_ReplayOldFrame(t *testing.T) {
 	}
 }
 
-// TestAttack_PeerImpersonation — transport ID vs consensus identity.
+// TestAttack_PeerImpersonation — a peer's claimed NodeID is not attested.
 //
-// Threat: a peer claims NodeID "honest-a" but the transport connection is
-// unauthenticated.
-// Invariant: peer identity must be attested (TLS cert CN, Noise static
-// key). Today's memoryTransport carries the claimed NodeID in t.self with
-// no crypto; the real transport must do better. This test is the marker —
-// it skips until Blue replaces nopTransport.
+// MARKER. A peer is whatever answers at an address in BASE_PEERS, and the
+// NodeID it states in the handshake is its own word. The p2p plane is what its
+// operator makes it: a cluster-internal port whose reachability is a
+// NetworkPolicy question.
+//
+// This file used to carry an mTLS surface with SAN pinning that nothing
+// constructed. It was deleted rather than wired, because it could not be wired
+// here. The transport is a luxfi/zap node, which takes ONE *tls.Config and
+// uses it for both the listener it binds and every peer it dials — and Go
+// dials with the config verbatim, so a single config cannot name the peer it
+// is dialling. Measured, on zap v1.2.7: a client config with no ServerName
+// refuses to handshake at all; one carrying a peer's name verifies against
+// that peer and fails hostname verification against every other; and
+// InsecureSkipVerify, the usual way out, leaves VerifyPeerCertificate with an
+// empty chain on the dialling side, so the pinning hook had no leaf to pin.
+//
+// Closing it needs the transport to build a config per destination, which is
+// upstream, and certificates need an issuer, which is a deployment. Both have
+// to land together: a config threaded through while nothing fills it reads as
+// mTLS and is plaintext. The names that promised it now refuse — see
+// TestAttack_TLSNamesRefused.
 func TestAttack_PeerImpersonation(t *testing.T) {
-	// Production transport not yet introduced — same gate as
-	// TestAttack_UnauthenticatedQuasarSubmit.
 	t.Skip(blockedReason)
 }
 
@@ -415,31 +437,38 @@ func TestAttack_QuasarFloodDOS(t *testing.T) {
 	}
 }
 
-// TestAttack_GatewayMembershipPoisoning — malicious /-/base/members
-// response.
+// TestAttack_GatewayMembershipPoisoning — a peer cannot add itself.
 //
-// Threat: a compromised pod returns a crafted /-/base/members list that
-// includes attacker-controlled endpoints.
-// Invariant: gateways MUST NOT accept members outside the headless service
-// RRset; the members list is advisory only, validated against DNS.
-// This test is the marker; the HTTP surface is in core, not network, so
-// this is a documentation-level assertion today.
+// Threat: a pod on the p2p plane announces membership, or answers a members
+// probe with endpoints it chose, and the routing ring absorbs them.
+// Invariant: the ring is built from the Membership source (DNS over
+// BASE_PEERS) and from nothing a peer says. Frames arriving from an
+// unannounced node are handled on their merits and change no routing.
+// Expected: after traffic naming a node the ring has never heard of, the
+// member set is byte-identical to what it was.
 func TestAttack_GatewayMembershipPoisoning(t *testing.T) {
-	// The network.Network.MembersFor API returns a consistent-hash derived
-	// list; there's no /-/base/members HTTP handler in this package yet.
-	// Guard: assert the router returns a deterministic, non-empty member
-	// list for non-empty shardID, and empty for empty (no silent
-	// "everyone" fallthrough).
-	members := []NodeID{"a", "b", "c"}
-	r := newRouter(members, 3)
-	if got := r.membersFor(""); got == nil {
-		// Empty shardID should NOT return the full member set silently.
-		// Current impl returns the full ring (sorted) which lets a forged
-		// shardKey="" request route to every pod — low-sev info leak.
-		t.Skip(blockedReason)
+	_, _, nodes, _ := mustStartCluster(t, 2, 2)
+	n := nodes[0]
+
+	before := n.MembersFor("shard-x")
+
+	// A frame that arrives claiming a shard, from a node nobody listed.
+	n.onPeerFrame(Envelope{
+		ShardID: "shard-x",
+		Frame:   newFrame("shard-x", 1, 0, []byte("from nowhere")),
+	})
+	time.Sleep(200 * time.Millisecond)
+
+	after := n.MembersFor("shard-x")
+	if len(before) != len(after) {
+		t.Fatalf("peer traffic changed the member set: %v → %v. Routing is "+
+			"supposed to come from the membership source and from nothing a "+
+			"peer sends.", before, after)
 	}
-	if len(r.membersFor("x")) == 0 {
-		t.Fatalf("valid shardID returned empty member set")
+	for i := range before {
+		if before[i] != after[i] {
+			t.Fatalf("peer traffic changed the member set: %v → %v", before, after)
+		}
 	}
 }
 
@@ -500,23 +529,29 @@ func TestAttack_ArchiveSegmentForgery(t *testing.T) {
 		t.Fatalf("attacker put: %v", err)
 	}
 
-	// PITR replays. Expectation: Range yields an error on the attacker's
-	// segment OR skips it — it must not return the injected frame as if
-	// it were legitimate.
+	// PITR replays. The forged segment must not be yielded — and the five
+	// legitimate frames must still be, because a reader that rejects
+	// everything also refuses the forgery and has destroyed the archive to
+	// do it. Both halves or neither.
 	it, err := w.Range(context.Background(), "victim-shard", 1, 6000)
 	if err != nil {
 		t.Fatalf("range: %v", err)
 	}
+	var seen []uint64
 	for f, ferr := range it {
 		if ferr != nil {
-			// Reader rejected the bad segment — that's the win.
-			return
+			t.Fatalf("iter: %v", ferr)
 		}
 		if f.Seq == 5000 && string(f.Payload) == "INJECTED-PITR-ROWS" {
 			t.Fatalf("EXPLOIT: forged segment accepted during PITR; " +
 				"attacker payload replayed as if quasar-finalised. " +
 				"Signature verification absent or trust set too wide.")
 		}
+		seen = append(seen, f.Seq)
+	}
+	if len(seen) != 5 {
+		t.Fatalf("the writer's own history did not survive verification: "+
+			"got seqs %v, want the five legitimate frames", seen)
 	}
 }
 
@@ -595,13 +630,15 @@ func TestAttack_ArchiveOutOfOrderSegments(t *testing.T) {
 	}
 }
 
-// TestAttack_PITRReplayCrossShard — PITR restore cross-shard bleed.
+// TestAttack_PITRReplayCrossShard — a restore reads only its own shard.
 //
-// Threat: restore for shard A reads segments whose inner shardID is B due
-// to a bucket prefix typo or attacker rename.
-// Invariant: decodeSegment already records ShardID; Range callers must
-// assert it matches the requested shard. If Range silently yields
-// cross-shard frames, PITR corrupts the wrong DB.
+// Threat: a segment for shard B is placed at shard A's path — a bucket
+// prefix typo, a rename by anyone holding bucket write. It is validly
+// signed, so signature verification passes it.
+// Invariant: a segment names its shard INSIDE the signature and the object
+// key names one too. Only the signed half counts, so Range refuses a segment
+// whose declared shard is not the one being read, exactly as it refuses one
+// it cannot verify.
 func TestAttack_PITRReplayCrossShard(t *testing.T) {
 	signer, _ := testSignerPair(t)
 	up := newMemUploader()
@@ -611,13 +648,15 @@ func TestAttack_PITRReplayCrossShard(t *testing.T) {
 		FlushInterval:      time.Hour,
 		RetryDeadline:      time.Second,
 		SigningKey:         signer.priv,
+		TrustedSegmentKeys: []ed25519.PublicKey{signer.pub},
 	}
 	w := newArchiveWriter(up, "svc", cfg, nil)
 	t.Cleanup(func() { _ = w.Close() })
 
-	// Place a segment encoded for shard "B" but at shard "A"'s path.
+	// Place a segment encoded for shard "B" — signed by a key the reader
+	// trusts — at shard "A"'s path.
 	sb := newSegmentBuffer("B", 1)
-	f := newFrame("B", 1, 0, []byte("B-secret"))
+	f := newFrame("B", 1, 0, []byte("B's rows"))
 	_ = sb.append(1, f.encode())
 	enc, err := sb.encode(signer)
 	if err != nil {
@@ -628,85 +667,58 @@ func TestAttack_PITRReplayCrossShard(t *testing.T) {
 		t.Fatalf("put: %v", err)
 	}
 
-	// Range for shard A — must not yield shard B's frames.
 	it, err := w.Range(context.Background(), "A", 1, 10)
 	if err != nil {
 		t.Fatalf("range: %v", err)
 	}
 	for f, ferr := range it {
 		if ferr != nil {
-			// Rejected — acceptable.
-			continue
+			t.Fatalf("iter: %v", ferr)
 		}
-		if f.ShardID == "B" {
-			// Blue owes the shardID cross-check. Until landed, skip —
-			// this is a known gap flagged in the review.
-			t.Skip(blockedReason)
-		}
+		t.Fatalf("restoring shard A yielded a frame from segment %q (seq %d) — "+
+			"a restore writes what it is handed, so B's rows land in A's "+
+			"database. Range must compare the segment's own ShardID with the "+
+			"shard being read.", f.ShardID, f.Seq)
 	}
 }
 
-// TestAttack_ArchiveBucketPermissionLeak — cross-bucket write via mis-set
-// URL.
+// TestAttack_ArchiveBucketPermissionLeak — BASE_ARCHIVE names any bucket.
 //
-// Threat: BASE_ARCHIVE is an env var; an operator error or supply-chain
-// compromise sets it to s3://attacker-bucket. The pod's broad IAM uploads
-// data to an untrusted bucket.
-// Invariant: NewArchive should host-allowlist in production. Today the
-// dispatch accepts any URL. This test asserts the allowlist interface
-// exists (or, when absent, skips).
+// MARKER. NewArchive dispatches on scheme and accepts whatever host follows
+// it, so where a pod ships its frames is settled entirely by the value of an
+// environment variable. There is no allowlist here and this package is the
+// wrong place for one: it knows a URL, not which buckets the deployment owns.
+// That belongs to whatever writes the variable — the operator validating a
+// spec against the buckets it provisioned.
+//
+// It previously read as an assertion and was not one. It called NewArchive
+// with an s3:// URL, which resolves credentials and asks the endpoint whether
+// the bucket exists — so it passed by failing to reach AWS, and would have
+// started skipping on any runner that could. A suite whose first line is
+// "no external services" cannot settle this by dialling one.
 func TestAttack_ArchiveBucketPermissionLeak(t *testing.T) {
-	_, err := NewArchive(context.Background(), ArchiveConfig{
-		URL: "s3://attacker-controlled-bucket",
-	}, "svc", nil)
-	// Expect err when an allowlist is in place. Until Blue ships one,
-	// the dispatch reaches the s3 constructor which is best-effort IMDS.
-	// We skip: the defence is not code in this package yet — it belongs
-	// in the operator (spec validation against known-buckets).
-	if err == nil {
-		t.Skip(blockedReason)
-	}
+	t.Skip(blockedReason)
 }
 
 // ---------------------------------------------------------------------------
 // Group 4 — Shard routing / isolation.
 // ---------------------------------------------------------------------------
 
-// TestAttack_ShardKeySpoofingViaHeader — client sets X-User-Id to another
-// base.
+// The marker that stood here said a client can name its own shard, because
+// core.shardResolver read the identity first and fell back to the header
+// X-<Shard-Key> when there was none. BASE_SHARD_KEY now names ONE source and
+// names it in the value: ShardKeyHeader ("header:") reads the request header
+// an operator wrote, and every other form reads the verified identity and
+// nothing else. The assertion is where the resolver is — core's
+// TestShardResolverIdentityReadsNothingElse — because this package cannot
+// import core, and a marker here for a defence held there would be reporting
+// on a file it cannot see.
 //
-// Threat: gateway config `shard_key_source: header:X-User-Id` lets the
-// client choose their shard. In dev this is fine; in prod it's base
-// bypass.
-// Invariant: production configs MUST NOT use `header:*` as shard key
-// source; the only safe source is `jwt.sub` or `jwt.org_id` (cryptographic
-// binding).
-// This is a lint — the test asserts the gateway config parser would
-// reject, but that code lives in hanzo/gateway. Skip with a note.
-func TestAttack_ShardKeySpoofingViaHeader(t *testing.T) {
-	// Gateway config is outside this package. The network package's
-	// Config.ShardKey is a bare string ("user_id" | "org_id" | "<hdr>").
-	// Production safety requires a CI lint on deploy configs rejecting
-	// `header:*` sources. Asserted elsewhere; marker only.
-	t.Skip(blockedReason)
-}
-
-// TestAttack_ShardKeyMissingHTTPFallback — empty shardKey → fallthrough.
-//
-// Threat: request arrives with no shardID; gateway falls back to the full
-// member set, enabling info-leak / scatter attack.
-// Invariant: empty shardID MUST 400 at the gateway or yield an empty
-// member set at the router.
-func TestAttack_ShardKeyMissingHTTPFallback(t *testing.T) {
-	r := newRouter([]NodeID{"a", "b", "c"}, 3)
-	ms := r.membersFor("")
-	if len(ms) == len(r.members) {
-		// Current behaviour: empty shardID still hashes and returns full
-		// ring. This is a router-level info disclosure. Skip until Blue
-		// wires an explicit empty-key rejection.
-		t.Skip(blockedReason)
-	}
-}
+// What a shard reaches, for whoever reads that test next: the resolved id goes
+// to writeForward and nowhere else, so it selects WHICH POD serves a write and
+// no part of what that pod will let the caller read or write. Isolation is the
+// org's Base and the collection rules. What it selects among is this ring, so
+// the pod is always a member of BASE_PEERS.
 
 // TestAttack_OwnerConsistencyAcrossPods — deterministic routing invariant.
 //
@@ -856,16 +868,20 @@ func TestAttack_UnboundedShardBacklog(t *testing.T) {
 	backlogLen := len(q.backlog)
 	w.mu.Unlock()
 
-	if backlogBytes > cfg.BacklogMaxBytes*2 {
-		t.Fatalf("backlog bytes %d > 2x cap %d; cap not enforced. "+
-			"Under S3 outage the pod OOMs.", backlogBytes, cfg.BacklogMaxBytes)
+	// The cap plus at most the one segment that crossed it before the shed.
+	// A slacker bound passes while the cap is off by a factor.
+	if backlogBytes > cfg.BacklogMaxBytes+cfg.SegmentTargetBytes {
+		t.Fatalf("backlog bytes %d over cap %d (+1 segment of %d); the cap is "+
+			"not bounding memory. Under a storage outage the pod OOMs.",
+			backlogBytes, cfg.BacklogMaxBytes, cfg.SegmentTargetBytes)
 	}
-	if backlogLen > cfg.BacklogMaxSegments*2 {
-		t.Fatalf("backlog segments %d > 2x cap %d", backlogLen, cfg.BacklogMaxSegments)
+	if backlogLen > cfg.BacklogMaxSegments+1 {
+		t.Fatalf("backlog segments %d over cap %d", backlogLen, cfg.BacklogMaxSegments)
 	}
 	if drops.Load() == 0 {
 		t.Fatalf("4000 appends against failing uploader produced 0 drops; " +
-			"either the cap is absent or IncDrops wiring is missing.")
+			"either the cap is absent or IncDrops wiring is missing, and the " +
+			"bound above holds vacuously.")
 	}
 }
 
@@ -902,33 +918,28 @@ func TestAttack_ApplyLoopStarvation(t *testing.T) {
 		"noisy shard's 500 were in flight. Per-shard apply isolation broken.")
 }
 
-// TestAttack_ManySmallShards — O(shards) engine memory.
+// TestAttack_ManySmallShards — nothing bounds how many shards a pod holds.
 //
-// Threat: a base creates thousands of shards (e.g. per-user when the
-// shard key is too fine-grained); each allocates a Quasar engine with a
-// 1024-cap channel.
-// Invariant: shard creation is bounded by base-scoped limits; runaway
-// creation does not OOM the pod.
-// Today: no cap exists. This is the pre-scale debt flagged in the review.
+// MARKER, and capacity rather than confidentiality. A shard is created by
+// being named, and each one is a Quasar engine holding a 1024-slot channel,
+// so the pod's floor is that product. A shard key of the wrong grain — per
+// user rather than per org — reaches it without an adversary. Nothing in the
+// tree is exercised above three shards.
+//
+// Two markers used to say this: one for the count and one for the per-shard
+// cost. They are one sentence, and the product is the only thing either of
+// them meant.
 func TestAttack_ManySmallShards(t *testing.T) {
-	// The fix is a per-base shard-count cap; no such cap is in the code
-	// today. Marker only.
-	t.Skip(blockedReason)
-}
-
-// TestAttack_QuasarEnginePerShardMemory — channel-cap × shard-count.
-//
-// Threat: 1024-cap finalized channel per shard × 100k shards = ~20 GB
-// lower bound just for channel buffers.
-// Invariant: engine channel cap should be tuned to expected fanout, or
-// shards should share a channel.
-func TestAttack_QuasarEnginePerShardMemory(t *testing.T) {
-	// Design-level debt; no runtime check today. Marker.
 	t.Skip(blockedReason)
 }
 
 // ---------------------------------------------------------------------------
-// Group 6 — Encryption / KMS (SQLCipher + base/plugins/kms).
+// Group 6 — Names this package refuses.
+//
+// Each asserts the same thing about a different variable: a name that promises
+// a property this package does not deliver is an error at startup and never a
+// no-op, because an operator who sets one and sees no complaint has been told
+// the property holds.
 // ---------------------------------------------------------------------------
 
 // TestAttack_WrongDEKForShard — per-shard DEK misbinding.
@@ -948,117 +959,39 @@ func TestAttack_WrongDEKForShard(t *testing.T) {
 	}
 }
 
-// TestAttack_KMSNodeImpersonation — rogue node claims to be a KMS member.
+// TestAttack_TLSNamesRefused — the peer plane presents no certificate, and
+// every name that offered one says so.
 //
-// Threat: an attacker joins the KMS consensus cluster as a validator and
-// extracts key shares.
-// Invariant: KMS membership must be cryptographically attested. Lives in
-// base/plugins/kms; test is a marker.
-func TestAttack_KMSNodeImpersonation(t *testing.T) {
-	// base/plugins/kms is a sibling package. Marker.
-	t.Skip(blockedReason)
-}
-
-// TestAttack_DeletedDEKReadAttempt — right-to-be-forgotten.
-//
-// Threat: a compliance request deletes a user's DEK wrapper; an attacker
-// with archive access replays pre-deletion ciphertext expecting the KEK
-// to still unwrap.
-// Invariant: once the .dekwrap is deleted, the ciphertext is unreadable;
-// the quasar tombstone for the vshard's frame range prevents replay.
-func TestAttack_DeletedDEKReadAttempt(t *testing.T) {
-	// Requires SQLCipher wiring. Marker.
-	t.Skip(blockedReason)
-}
-
-// TestAttack_CrossOrgKEKLeak — KEK grain violation.
-//
-// Threat: BASE_KEK_SCOPE=platform means one KEK protects every org; a
-// KEK leak is fleetwide.
-// Invariant: org-scope KEK is the default; platform-scope requires an
-// explicit confirmation. Marker until BASE_KEK_SCOPE wired.
-func TestAttack_CrossOrgKEKLeak(t *testing.T) {
-	t.Skip(blockedReason)
-}
-
-// ---------------------------------------------------------------------------
-// Group 7 — Operator / CRD / k8s.
-// ---------------------------------------------------------------------------
-
-// TestAttack_HPAWrongKindSilent — R7 operator hardcodes kind=Deployment.
-//
-// Threat: HPA / KEDA scaleTargetRef.kind = "Deployment" hardcoded; when
-// the underlying workload is a StatefulSet, the autoscaler never binds
-// and capacity never grows.
-// Invariant: WorkloadMeta.Kind is threaded through the builder.
-// This suite can only assert against operator source; we read it as a
-// file and grep. When the operator tree is absent in the build env, skip.
-func TestAttack_HPAWrongKindSilent(t *testing.T) {
-	opSrc := operatorControllerPath(t)
-	if opSrc == "" {
-		t.Skip(blockedReason)
-	}
-	data, err := os.ReadFile(opSrc)
-	if err != nil {
-		t.Skip(blockedReason)
-	}
-	// If `kind: "Deployment"` appears hardcoded in build_base_hpa or
-	// build_keda_scaled_object, the regression is live. Search for the
-	// specific patterns.
-	text := string(data)
-	if !strings.Contains(text, "build_base_hpa") || !strings.Contains(text, "build_keda_scaled_object") {
-		t.Skip(blockedReason)
-	}
-	// Blue's fix will change these to accept a workload-kind param.
-	// Until then, the string `kind: "Deployment"` hardcoded in the HPA
-	// builder indicates the bug is still live.
-	hpaIdx := strings.Index(text, "fn build_base_hpa")
-	if hpaIdx < 0 {
-		t.Skip(blockedReason)
-	}
-	nextFn := strings.Index(text[hpaIdx:], "\nfn ")
-	if nextFn < 0 {
-		nextFn = len(text) - hpaIdx
-	}
-	body := text[hpaIdx : hpaIdx+nextFn]
-	if strings.Contains(body, `kind: "Deployment".to_string()`) {
-		// Live bug. Skip rather than fail so the suite still passes in
-		// CI; the network review catalog tracks the open finding.
-		t.Skip(blockedReason)
+// Threat: an operator reads that the p2p transport does mTLS, mounts a CA and
+// a keypair, sets these, and gets a process that starts clean. Nothing it does
+// authenticates a peer, and the quiet start is what says otherwise.
+// Invariant: each name is an error at startup. One at a time, because an
+// operator setting only the one they read about must hit it too.
+func TestAttack_TLSNamesRefused(t *testing.T) {
+	for _, name := range tlsNames {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("BASE_NETWORK", "quasar")
+			t.Setenv("BASE_SHARD_KEY", "user_id")
+			t.Setenv("HOSTNAME", "a")
+			t.Setenv(name, "/etc/base/peer.pem")
+			if _, err := ConfigFromEnv(); err == nil {
+				t.Fatalf("ConfigFromEnv accepted %s. A name that reads as peer "+
+					"authentication and does nothing tells an operator the "+
+					"property holds; it must refuse", name)
+			}
+		})
 	}
 }
 
-// TestAttack_BasePeersDNSResolvable — R4 StatefulSet vs Deployment DNS.
-//
-// Threat: BASE_PEERS expands to pod-ordinal FQDNs that only resolve for
-// StatefulSets; Deployments have no per-pod DNS records.
-// Invariant: either the workload MUST be a StatefulSet (enforced by the
-// operator) or BASE_PEERS uses headless-service RRset lookup (not pod
-// ordinals).
-// Test: offline name-format check — if the code still produces
-// `<name>-<i>.<svc>.<ns>.svc.cluster.local`, the bug lives.
-func TestAttack_BasePeersDNSResolvable(t *testing.T) {
-	opSrc := operatorControllerPath(t)
-	if opSrc == "" {
-		t.Skip(blockedReason)
-	}
-	data, err := os.ReadFile(opSrc)
-	if err != nil {
-		t.Skip(blockedReason)
-	}
-	text := string(data)
-	if !strings.Contains(text, "build_base_peers") {
-		t.Skip(blockedReason)
-	}
-	// The pattern `{}-{}.{}.{}.svc.cluster.local` is the pod-ordinal
-	// DNS format that requires StatefulSets.
-	if strings.Contains(text, "svc.cluster.local:{}") &&
-		strings.Contains(text, "{}-{}") {
-		// Bug still live; Blue owes either a workload-kind check or a
-		// switch to the SRV-record RRset approach. Skip marker.
-		t.Skip(blockedReason)
-	}
-}
+// The three markers that stood here — a rogue KMS cluster member, a deleted
+// DEK, a platform-wide KEK — all named base/plugins/kms and the env variable
+// BASE_KEK_SCOPE. Neither exists. A key is DERIVED per org from a master key
+// (hanzoai/cek, one derivation for the platform), so there is no wrapper to
+// delete and no scope to choose, and the separation the third one asked for is
+// asserted where the derivation is: plugins/org's TestOrgDB_OrgDEK_UniquePerOrg
+// and TestOrgDB_UserDEK_UniquePerUser. Whether the KMS a Base talks to is
+// authenticated is the KMS client's question, in plugins/org, not the
+// replication plane's.
 
 // TestAttack_FeatureGateEscape — BASE_NETWORK accepts only known modes.
 //
@@ -1076,7 +1009,7 @@ func TestAttack_FeatureGateEscape(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// Group 8 — Correctness under concurrency.
+// Group 7 — Correctness under concurrency.
 // ---------------------------------------------------------------------------
 
 // TestAttack_WriterChurnLostCommits — concurrent submits must all finalise.
@@ -1266,23 +1199,6 @@ func TestAttack_NilVerifier(t *testing.T) {
 	}
 }
 
-// TestAttack_P2PPortBindLocalOnly — accidental 0.0.0.0 exposure.
-//
-// Threat: the default ListenP2P is `:9999`, which binds every interface;
-// on a per-org node this is a lateral-movement surface.
-// Invariant: production must bind to the pod IP only. Config default is a
-// CI lint.
-func TestAttack_P2PPortBindLocalOnly(t *testing.T) {
-	cfg, err := ConfigFromEnv()
-	if err == nil && cfg.Enabled {
-		if strings.HasPrefix(cfg.ListenP2P, ":") {
-			// Blue owes explicit bind-address selection in the operator.
-			// Marker.
-			t.Skip(blockedReason)
-		}
-	}
-}
-
 // TestAttack_FrameSeqZero — Seq=0 must not collide with "not yet applied".
 //
 // Threat: a frame with Seq=0 is valid by the decoder; localSeq starts at
@@ -1308,35 +1224,19 @@ func TestAttack_FrameSeqZero(t *testing.T) {
 // Helpers.
 // ---------------------------------------------------------------------------
 
-// operatorControllerPath returns the absolute path to the operator's
-// controller.rs, or "" if not accessible (CI may not check out the
-// operator repo).
-func operatorControllerPath(t *testing.T) string {
-	t.Helper()
-	candidates := []string{
-		os.Getenv("BASE_OPERATOR_CONTROLLER_PATH"),
-		filepath.Join(os.Getenv("HOME"), "work", "hanzo", "operator", "src", "controller.rs"),
-	}
-	for _, p := range candidates {
-		if p == "" {
-			continue
-		}
-		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
-			return p
-		}
-	}
-	return ""
+// failingUploader refuses every upload, which is what a storage outage or a
+// revoked credential looks like from in here.
+type failingUploader struct {
+	attempts atomic.Uint64
 }
 
-// netListenerUsable is a tiny helper used only by tests that want to
-// probe an actual socket surface — kept here rather than test-binary
-// bloat elsewhere. Currently unused but referenced by integration
-// variants in the CI workflow.
-var _ = func() bool {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		return false
-	}
-	_ = l.Close()
-	return true
+func (u *failingUploader) put(context.Context, string, []byte) error {
+	u.attempts.Add(1)
+	return fmt.Errorf("injected failure #%d", u.attempts.Load())
 }
+func (*failingUploader) get(context.Context, string) ([]byte, error) {
+	return nil, errors.New("injected failure")
+}
+func (*failingUploader) list(context.Context, string) ([]string, error) { return nil, nil }
+func (*failingUploader) close() error                                   { return nil }
+func (*failingUploader) scheme() string                                 { return "fail" }

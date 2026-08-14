@@ -66,6 +66,125 @@ test:
       set -e
       export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       go test -count=1 ./...
+  - name: network-attack-suite
+    # A second reading of a package `go-test` already ran, asking the one
+    # question a green suite cannot answer about itself: were its SKIPS honest?
+    #
+    # network/attack_vectors_test.go is adversarial, and a test there is either
+    # an ASSERTION of a defence or a MARKER for one this package does not hold.
+    # A marker skips, so `go test` reports the same word — SKIP — for "we chose
+    # not to defend this" and for "the defence went away and I quietly stopped
+    # checking". Nothing in `go test` separates those, exit status least of all:
+    # a package whose every test skipped is `ok`.
+    #
+    # The file used to assert this was enforced by a workflow. It named
+    # `.github/workflows/network-attack-suite.yml`, which has never existed in
+    # this repo — so the sentence "CI treats any other skip reason as a hard
+    # failure" was, for as long as anyone had read it, describing this gate's
+    # absence. It is the shape it warned about: an uncovered case with a comment
+    # saying it is watched.
+    #
+    # TWO THINGS ARE ENFORCED, and both fail the build.
+    #
+    # First, the REASON. A marker's whole body is t.Skip(blockedReason), so
+    # exactly one string may appear, and it is read out of the Go source rather
+    # than repeated here — one spelling, and a gate that follows the file it
+    # polices. Any other reason is a test that met a condition it did not expect
+    # and excused itself, which is the failure it exists to report.
+    #
+    # Second, the SET, and this is what a count could not do. The declared set
+    # is every test whose source states the canonical skip; the observed set is
+    # every test that skipped. They must be equal, in both directions:
+    #   - skipped without declaring  → a conditional skip fired. An assertion
+    #     stopped asserting and reported it as a choice.
+    #   - declared without skipping  → the marker's body did not run to the
+    #     skip, so the test is not the shape it claims.
+    # The second half is what forbids the conditional shape structurally: a test
+    # that skips only WHEN it finds the defence missing passes on the day it is
+    # written and is caught here, before it can ever be the thing that hides a
+    # regression. Six tests in this file were that shape; one of them passed by
+    # failing to reach AWS.
+    #
+    # Why not pin the count. A number cannot tell one defence landing apart from
+    # another regressing — those net to zero and the gate stays green through
+    # both. It also has to be edited by hand on every legitimate change, so it
+    # rots into a number nobody trusts. The set costs nothing to maintain
+    # because it is DERIVED from the same file the tests live in: land a defence
+    # by deleting its marker, and the two sets agree again with nothing else to
+    # update. The count is printed, because the map of what is undefended is
+    # worth reading; it is the set that is held.
+    #
+    # The names are printed on every run, pass or fail. That list IS the map of
+    # what this package does not defend, and a map only anyone can see by
+    # digging is how the last one went stale.
+    run: |
+      set -euo pipefail
+      export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
+      log="${RUNNER_TEMP:-/tmp}/network-attack.json"
+      code=0
+      go test -count=1 -json ./network/ > "$log" || code=$?
+      if [ "$code" != 0 ]; then
+        # What the failing tests said, and only them. Everything printed after
+        # the first failure belongs to tests that were fine.
+        jq -sr '
+          map(select(.Test != null)) as $e
+          | ($e | map(select(.Action == "fail") | .Test) | unique)
+          | map(. as $t | $e | map(select(.Test == $t and .Action == "output") | .Output) | join(""))
+          | .[]' "$log" > "$log.failed" 2>/dev/null || true
+        # Empty when the package did not build, and then the whole stream is
+        # the message.
+        if [ -s "$log.failed" ]; then cat "$log.failed"; else cat "$log"; fi
+        echo "::error::the network attack suite failed — a defence it asserts has regressed"
+        exit 1
+      fi
+      # The one spelling of the skip reason, read from the constant itself.
+      reason=$(sed -n 's/^const blockedReason = "\(.*\)"$/\1/p' network/attack_vectors_test.go)
+      [ -n "$reason" ] || { echo "::error::network/attack_vectors_test.go declares no blockedReason for the suite to skip on"; exit 1; }
+      # Each skipped test and the message it skipped with: the last line it
+      # printed carrying a file:line, which is what t.Skip emits.
+      jq -sr '
+        map(select(.Test != null)) as $e
+        | ($e | map(select(.Action == "skip") | .Test) | unique)
+        | map(. as $t | "\($t)\t" + (
+            $e | map(select(.Test == $t and .Action == "output") | .Output)
+               | map(select(test("\\.go:[0-9]+: ")))
+               | last // ""
+               | sub("^\\s+\\S+\\.go:[0-9]+: "; "")
+               | rtrimstr("\n")))
+        | .[]' "$log" > "$log.skips"
+      bad=0
+      while IFS=$'\t' read -r name said; do
+        [ -n "$name" ] || continue
+        if [ "$said" != "$reason" ]; then
+          echo "::error::$name skipped saying \"$said\" — the suite skips for one reason, \"$reason\", and anything else is a test excusing itself"
+          bad=1
+        fi
+      done < "$log.skips"
+      cut -f1 "$log.skips" | sort > "$log.observed"
+      # Declared: the tests whose source states the canonical skip. The match is
+      # a whole statement on its own line, so prose about the shape — this
+      # gate's own comment, the suite's header — is not mistaken for the shape.
+      # And the enclosing function resets per file, or the last test of one file
+      # answers for the first line of the next.
+      awk 'FNR == 1 { fn = "" }
+           /^func Test/ { fn = $2; sub(/\(.*/, "", fn) }
+           /^[[:space:]]*t\.Skip\(blockedReason\)[[:space:]]*$/ && fn != "" { print fn }' \
+        network/*_test.go | sort -u > "$log.declared"
+      while read -r name; do
+        echo "::error::$name skipped but declares no marker — an assertion stopped asserting and reported it as a skip"
+        bad=1
+      done < <(comm -23 "$log.observed" "$log.declared")
+      while read -r name; do
+        echo "::error::$name declares a marker but did not skip — a marker's whole body is the skip, so a test that reaches past it is a different shape than it claims"
+        bad=1
+      done < <(comm -13 "$log.observed" "$log.declared")
+      [ "$bad" = 0 ] || exit 1
+      # The map of what this package does not defend, on every run.
+      echo "not defended by ./network, each one declared:"
+      sed 's/^/  /' "$log.observed"
+      p=$(jq -r 'select(.Action=="pass" and .Test != null)' "$log" | jq -s length)
+      s=$(wc -l < "$log.observed" | tr -d ' ')
+      echo "network: $p passed, $s skipped, 0 failed"
   - name: go-test-postgres
     # Base serves the whole /v1 data plane on PostgreSQL as well as SQLite, and
     # until this gate nothing ran a line of it. Every gate above is SQLite by

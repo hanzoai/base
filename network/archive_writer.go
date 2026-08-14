@@ -464,6 +464,13 @@ func (w *archiveWriter) Range(ctx context.Context, shardID string, fromSeq, toSe
 				return
 			}
 			dec, err := decodeSegment(data, w.verifier)
+			if err == nil && dec.ShardID != shardID {
+				// A segment names its own shard inside the signature, and the
+				// object key names one too. A restore is for one shard, so the
+				// two have to agree: whoever laid the object out is not who
+				// signed it, and only the signed half counts.
+				err = fmt.Errorf("segment is %q, read under %q", dec.ShardID, shardID)
+			}
 			if err != nil {
 				// R3: forged / truncated / foreign-signed segments are
 				// SILENTLY SKIPPED. Halting PITR on a single poisoned
