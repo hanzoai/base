@@ -29,7 +29,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:            "a missing table is a 404, as on the other door",
 			Method:          http.MethodGet,
-			URL:             "/rest/v1/missing",
+			URL:             "/v1/rest/missing",
 			ExpectedStatus:  404,
 			ExpectedContent: []string{`"code":"PGRST202"`, `"details"`, `"hint"`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -42,7 +42,7 @@ func TestRestApiList(t *testing.T) {
 			// look like a feature.
 			Name:            "a collection with no list rule still needs superuser auth",
 			Method:          http.MethodGet,
-			URL:             "/rest/v1/demo1",
+			URL:             "/v1/rest/demo1",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"code":"PGRST301"`, `Only superusers`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -53,7 +53,7 @@ func TestRestApiList(t *testing.T) {
 			// client depends on.
 			Name:           "a public table answers a bare array",
 			Method:         http.MethodGet,
-			URL:            "/rest/v1/demo2",
+			URL:            "/v1/rest/demo2",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`[{`,
@@ -75,7 +75,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:           "limit narrows the window",
 			Method:         http.MethodGet,
-			URL:            "/rest/v1/demo2?limit=1",
+			URL:            "/v1/rest/demo2?limit=1",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`[{`,
@@ -92,7 +92,7 @@ func TestRestApiList(t *testing.T) {
 			// never receives real rows for a range it did not ask for.
 			Name:               "an offset off a page boundary is refused",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?limit=25&offset=30",
+			URL:                "/v1/rest/demo2?limit=25&offset=30",
 			ExpectedStatus:     400,
 			ExpectedContent:    []string{`"code":"PGRST100"`, `page boundary`},
 			NotExpectedContent: []string{`"data":{}`, `"status":400`},
@@ -104,7 +104,7 @@ func TestRestApiList(t *testing.T) {
 			// demo2 holds test1/test2/test3, so eq on a title returns exactly one.
 			Name:           "a filter that should match, matches",
 			Method:         http.MethodGet,
-			URL:            "/rest/v1/demo2?title=eq.test2",
+			URL:            "/v1/rest/demo2?title=eq.test2",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"achvryl401bhse3"`,
@@ -120,7 +120,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:               "like matches on a wildcard",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?title=like.*est3*",
+			URL:                "/v1/rest/demo2?title=like.*est3*",
 			ExpectedStatus:     200,
 			ExpectedContent:    []string{`"id":"0yxhwia2amd8gec"`},
 			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`},
@@ -133,7 +133,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:               "in matches several",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?title=in.(test1,test3)",
+			URL:                "/v1/rest/demo2?title=in.(test1,test3)",
 			ExpectedStatus:     200,
 			ExpectedContent:    []string{`"id":"llvuca81nly1qls"`, `"id":"0yxhwia2amd8gec"`},
 			NotExpectedContent: []string{`"id":"achvryl401bhse3"`},
@@ -146,7 +146,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:               "a boolean column filters on is",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?active=is.false",
+			URL:                "/v1/rest/demo2?active=is.false",
 			ExpectedStatus:     200,
 			ExpectedContent:    []string{`"id":"llvuca81nly1qls"`},
 			NotExpectedContent: []string{`"id":"achvryl401bhse3"`},
@@ -161,7 +161,7 @@ func TestRestApiList(t *testing.T) {
 			// resolver, so a caller cannot name arbitrary SQL as a column.
 			Name:            "an unknown column is refused",
 			Method:          http.MethodGet,
-			URL:             "/rest/v1/demo2?nosuchcolumn=eq.x",
+			URL:             "/v1/rest/demo2?nosuchcolumn=eq.x",
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"code":"PGRST100"`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -169,7 +169,7 @@ func TestRestApiList(t *testing.T) {
 		{
 			Name:               "an unknown operator is refused",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?title=matches.x",
+			URL:                "/v1/rest/demo2?title=matches.x",
 			ExpectedStatus:     400,
 			ExpectedContent:    []string{`"code":"PGRST100"`, `unknown operator`},
 			NotExpectedContent: []string{`"data":{}`, `"status":400`},
@@ -192,7 +192,7 @@ func TestRestApiCount(t *testing.T) {
 		{
 			Name:               "no Prefer means no count, and the header says so",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2",
+			URL:                "/v1/rest/demo2",
 			ExpectedStatus:     200,
 			AfterTestFunc:      wantRange("0-2/*"),
 			ExpectedContent:    []string{`[{`, `"id":"llvuca81nly1qls"`},
@@ -206,7 +206,7 @@ func TestRestApiCount(t *testing.T) {
 		{
 			Name:   "Prefer: count=exact reports the total",
 			Method: http.MethodGet,
-			URL:    "/rest/v1/demo2",
+			URL:    "/v1/rest/demo2",
 			Headers: map[string]string{
 				"Prefer": "count=exact",
 			},
@@ -225,7 +225,7 @@ func TestRestApiCount(t *testing.T) {
 			// second page reports where it really starts rather than 0.
 			Name:   "the second page reports its own offset",
 			Method: http.MethodGet,
-			URL:    "/rest/v1/demo2?limit=2&offset=2",
+			URL:    "/v1/rest/demo2?limit=2&offset=2",
 			Headers: map[string]string{
 				"Prefer": "count=exact",
 			},
@@ -259,7 +259,7 @@ func TestRestApiWrites(t *testing.T) {
 			// anyone learns what it means is after the table is empty.
 			Name:            "an unfiltered delete is refused",
 			Method:          http.MethodDelete,
-			URL:             "/rest/v1/demo2",
+			URL:             "/v1/rest/demo2",
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`, `every row`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -267,7 +267,7 @@ func TestRestApiWrites(t *testing.T) {
 		{
 			Name:            "an unfiltered update is refused the same way",
 			Method:          http.MethodPatch,
-			URL:             "/rest/v1/demo2",
+			URL:             "/v1/rest/demo2",
 			Body:            strings.NewReader(`{"title":"x"}`),
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`},
@@ -278,7 +278,7 @@ func TestRestApiWrites(t *testing.T) {
 			// hint/code, never Base's {data,message,status}.
 			Name:               "an error carries the fields a client reads",
 			Method:             http.MethodDelete,
-			URL:                "/rest/v1/demo2",
+			URL:                "/v1/rest/demo2",
 			ExpectedStatus:     400,
 			ExpectedContent:    []string{`"message"`, `"details"`, `"hint"`, `"code"`},
 			NotExpectedContent: []string{`"data":{}`, `"status":400`},
@@ -290,7 +290,7 @@ func TestRestApiWrites(t *testing.T) {
 			// rows, let alone change them.
 			Name:            "a filtered delete on a guarded collection still refuses",
 			Method:          http.MethodDelete,
-			URL:             "/rest/v1/demo1?id=eq.imy661ixudk5izi",
+			URL:             "/v1/rest/demo1?id=eq.imy661ixudk5izi",
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`Only superusers`},
 			ExpectedEvents:  map[string]int{"*": 0},
@@ -298,7 +298,7 @@ func TestRestApiWrites(t *testing.T) {
 		{
 			Name:            "a bulk insert is refused rather than half-applied",
 			Method:          http.MethodPost,
-			URL:             "/rest/v1/demo2",
+			URL:             "/v1/rest/demo2",
 			Body:            strings.NewReader(`[{"title":"a"},{"title":"b"}]`),
 			ExpectedStatus:  501,
 			ExpectedContent: []string{`"code":"PGRST100"`, `one object per request`},
@@ -323,7 +323,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 			// empty body as exactly that. 201, no body.
 			Name:           "insert returns 201 and no body by default",
 			Method:         http.MethodPost,
-			URL:            "/rest/v1/demo2",
+			URL:            "/v1/rest/demo2",
 			Body:           strings.NewReader(`{"title":"from-rest"}`),
 			ExpectedStatus: 201,
 			ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
@@ -331,7 +331,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 		{
 			Name:   "insert returns the row when asked",
 			Method: http.MethodPost,
-			URL:    "/rest/v1/demo2",
+			URL:    "/v1/rest/demo2",
 			Body:   strings.NewReader(`{"title":"from-rest"}`),
 			Headers: map[string]string{
 				"Prefer": "return=representation",
@@ -346,7 +346,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 			// where they wrote data.id.
 			Name:   "insert answers a bare object for .single()",
 			Method: http.MethodPost,
-			URL:    "/rest/v1/demo2",
+			URL:    "/v1/rest/demo2",
 			Body:   strings.NewReader(`{"title":"single-rest"}`),
 			Headers: map[string]string{
 				"Prefer": "return=representation",
@@ -360,7 +360,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 		{
 			Name:           "a filtered update changes the rows the filter selects",
 			Method:         http.MethodPatch,
-			URL:            "/rest/v1/demo2?title=eq.test1",
+			URL:            "/v1/rest/demo2?title=eq.test1",
 			Body:           strings.NewReader(`{"title":"renamed"}`),
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{"OnRecordUpdateRequest": 1},
@@ -368,7 +368,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 		{
 			Name:   "a filtered update returns the changed rows when asked",
 			Method: http.MethodPatch,
-			URL:    "/rest/v1/demo2?title=eq.test1",
+			URL:    "/v1/rest/demo2?title=eq.test1",
 			Body:   strings.NewReader(`{"title":"renamed"}`),
 			Headers: map[string]string{
 				"Prefer": "return=representation",
@@ -381,7 +381,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 		{
 			Name:           "a filtered delete removes them",
 			Method:         http.MethodDelete,
-			URL:            "/rest/v1/demo2?title=eq.test1",
+			URL:            "/v1/rest/demo2?title=eq.test1",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{"OnRecordDeleteRequest": 1},
 		},
@@ -390,7 +390,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 			// count says so.
 			Name:           "a filter that matches nothing changes nothing",
 			Method:         http.MethodDelete,
-			URL:            "/rest/v1/demo2?title=eq.nosuchtitle",
+			URL:            "/v1/rest/demo2?title=eq.nosuchtitle",
 			ExpectedStatus: 204,
 			ExpectedEvents: map[string]int{"*": 0},
 		},
@@ -412,7 +412,7 @@ func TestRestApiDuplicateIsSQLState23505(t *testing.T) {
 		{
 			Name:           "a unique violation answers 409 with the SQLSTATE",
 			Method:         http.MethodPost,
-			URL:            "/rest/v1/demo2",
+			URL:            "/v1/rest/demo2",
 			Body:           strings.NewReader(`{"title":"test1"}`),
 			ExpectedStatus: 409,
 			ExpectedContent: []string{
@@ -451,7 +451,7 @@ func TestRestApiHeadIsTheCountQuery(t *testing.T) {
 		{
 			Name:   "HEAD answers the count in the header and no body",
 			Method: http.MethodHead,
-			URL:    "/rest/v1/demo2",
+			URL:    "/v1/rest/demo2",
 			Headers: map[string]string{
 				"Prefer": "count=exact",
 			},
@@ -468,7 +468,7 @@ func TestRestApiHeadIsTheCountQuery(t *testing.T) {
 			// answers for the rows the filter selects rather than the table.
 			Name:   "a filtered count counts only what matches",
 			Method: http.MethodHead,
-			URL:    "/rest/v1/demo2?title=eq.test2",
+			URL:    "/v1/rest/demo2?title=eq.test2",
 			Headers: map[string]string{
 				"Prefer": "count=exact",
 			},
@@ -498,7 +498,7 @@ func TestRestApiNotPrefix(t *testing.T) {
 		{
 			Name:               "not.eq excludes the matching row",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?title=not.eq.test1",
+			URL:                "/v1/rest/demo2?title=not.eq.test1",
 			ExpectedStatus:     200,
 			ExpectedContent:    []string{`"id":"achvryl401bhse3"`, `"id":"0yxhwia2amd8gec"`},
 			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`},
@@ -511,7 +511,7 @@ func TestRestApiNotPrefix(t *testing.T) {
 		{
 			Name:               "not.in excludes every named value",
 			Method:             http.MethodGet,
-			URL:                "/rest/v1/demo2?title=not.in.(test1,test2)",
+			URL:                "/v1/rest/demo2?title=not.in.(test1,test2)",
 			ExpectedStatus:     200,
 			ExpectedContent:    []string{`"id":"0yxhwia2amd8gec"`},
 			NotExpectedContent: []string{`"id":"llvuca81nly1qls"`, `"id":"achvryl401bhse3"`},
@@ -525,7 +525,7 @@ func TestRestApiNotPrefix(t *testing.T) {
 			// The one the grid actually offers.
 			Name:           "not.is.null is how the wire spells IS NOT NULL",
 			Method:         http.MethodGet,
-			URL:            "/rest/v1/demo2?title=not.is.null",
+			URL:            "/v1/rest/demo2?title=not.is.null",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"id":"llvuca81nly1qls"`,

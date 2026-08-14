@@ -74,11 +74,13 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 
 	// Platform-standard health check at root level (outside the mount
 	// prefix so liveness probes don't have to know the app name).
-	// The Supabase data wire, at the path supabase-js builds for itself. It is
-	// bound on the ROOT router rather than under the api prefix because that
-	// client appends /rest/v1 to whatever host it is given — serving it here is
-	// what makes a Supabase client work against Base by changing a hostname.
-	bindRestApi(app, baseRouter)
+	// The table wire, under the api prefix like everything else: `<prefix>/rest/
+	// {collection}`. It used to bind on the ROOT router at `/rest/v1` so a REST
+	// client pointed at a bare hostname would find it unconfigured — one client's
+	// convenience, paid for by a second address scheme in a fleet where every
+	// other address begins `/v1`. The clients are ours and can be told where the
+	// API is rooted.
+	bindRestApi(app, apiGroup)
 
 	BindHealthzRoute(baseRouter)
 
