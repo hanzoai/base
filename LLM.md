@@ -43,51 +43,65 @@ instance. Web5 client runtime at its core.
 
 Not a fork, not a wrapper.
 
-## Program: swap Supabase for one Go binary
+## One binary, one file
 
-The direction, decided 2026-08-11: Base serves the Supabase wire, so a Supabase
-user changes a hostname and their client works. Supabase is roughly seven
-services — PostgREST, GoTrue, Realtime, Storage, Edge Functions, Kong, and a
-Postgres you must run. Base is one binary and a file. Same API, same policies,
-none of the fleet. That is what makes "cheaper" a fact rather than a claim.
+The whole backend of an app in a single process: the data, the rules that guard
+it, realtime, files, functions, crons and backups, over a store that is a file
+on disk. There is no cluster underneath it and no database to run beside it, so
+deploying is copying a binary and backing up is copying a file. That is what
+makes it cheap to run, and the reason is arithmetic rather than a claim.
 
-| Supabase | Base |
+Auth is Hanzo IAM and nothing else. Base verifies the token IAM signs and holds
+no password of its own.
+
+| surface | address |
 |---|---|
-| PostgREST | `/rest/v1/{table}` — `apis/rest.go` |
-| GoTrue | Hanzo IAM, the one auth path |
-| Realtime | `/v1/realtime` SSE + ZAP |
-| Storage | `/v1/files` + object storage |
-| Edge Functions (Deno) | `/v1/functions` in-process via `extruntime`; sandboxed execution is `hanzoai/runtime` |
-| Postgres (required) | SQLite by default, Postgres optional via `orm/dialect` |
-| RLS (in the engine) | enforced in Base's query path; see below |
+| collections and records | `/v1/collections`, `/v1/collections/{c}/records` |
+| the table wire | `<prefix>/rest/{table}` — `apis/rest.go` |
+| realtime | `/v1/realtime`, SSE + ZAP |
+| files | `/v1/files`, over object storage |
+| functions | `/v1/functions`, in-process via `extruntime`; sandboxed execution is `hanzoai/runtime` |
+| store | SQLite, and any dialect `orm/dialect` speaks |
+| rules | Base's own query path, in Go — below |
 
-Shipped: the read path. `/rest/v1/{table}` with select, order, limit/offset,
+Shipped: the read path. `<prefix>/rest/{table}` with select, order, limit/offset,
 `Prefer: count=exact` → `Content-Range`, a bare array rather than the
 `{items,page,…}` envelope, and predicates that bind as data rather than render
 into text. It is a second RENDERING of `recordsList`, never a second read — one
 collection lookup, one rule, one field resolver. The test that matters asserts a
 collection with no list rule refuses on both doors.
 
-`/rest/v1` is a NEW mount, not a rename: supabase-js hard-codes that path, so
-nothing that speaks `/v1/collections` breaks. The 23 Go repos embedding Base
-consume Go types, not URLs.
+It is a NEW mount, not a rename: nothing that speaks `/v1/collections` breaks,
+and the 23 Go repos embedding Base consume Go types rather than URLs.
 
-### RLS — one enforcement path, in Go
+It sits UNDER the api prefix, like everything else Base serves, so a Base alone
+on its origin answers at `/v1/rest/{table}` and each org's Base on Hanzo Cloud
+answers at `/v1/base/rest/{table}`. It was at the root, `/rest/v1/{table}`,
+because a REST client appends that path to whatever host it is handed — so
+serving it there let one reach a Base by naming a hostname and nothing else.
+That bought one client's convenience and cost a second address scheme in a
+fleet where every other address begins `/v1`, plus a second prefix for every
+host in front of it to claim. The clients are ours and take the prefix as a
+value (`prefix` on `@hanzo/base`, `BASE_API_PREFIX` here — one fact, read from
+both ends), so there is one address scheme and nothing to keep in step.
 
-Postgres enforces RLS in the engine. SQLite has none, so Base enforces policies
-itself. **Do not delegate to native Postgres RLS on the sql tier**: Base rules
-reference `@request.body.*`, `@request.headers.*`, `@request.method` and
-`:changed`, none of which survive translation into a policy expression; nothing
-pins a connection per request, so `SET LOCAL` is unsafe, and the count and rows
-queries deliberately run concurrently. Base already works hard to make `=`/`!=`
-null-safe identically on both engines — delegating would throw away exactly that.
-One enforcement path in Go. Native RLS is worth enabling only as a backstop
-against connections that are not Base.
+### Rules — one enforcement path, in Go
 
-Rules ARE predicates, ANDed into the query before pagination and before the
-count; a joined collection contributes its own list rule; `?expand=` applies the
-related collection's view rule. Base is RLS-on-by-default, which is better than
-parity.
+A rule is a predicate on the collection, ANDed into the query before pagination
+and before the count, so a row a caller may not see is not counted either. A
+joined collection contributes its own list rule, and `?expand=` applies the
+related collection's view rule. Every collection is ruled unless someone says
+otherwise, so the closed door is the default.
+
+They are enforced HERE, in Go, on every engine — never delegated down to an
+engine's own row-level security, even where one exists. A rule reads
+`@request.body.*`, `@request.headers.*`, `@request.method` and `:changed`, none
+of which survive translation into a policy expression; nothing pins a connection
+per request, so a session-scoped `SET` is unsafe; and the count and the rows are
+run concurrently on purpose. Base already works to make `=` and `!=` null-safe
+identically whatever the store is, and pushing enforcement down would throw away
+exactly that. Engine-side security is worth turning on only as a backstop
+against connections that are not Base at all.
 
 **An absent identity matches no row.** `@request.auth.*` with nobody signed in
 resolves to a comparison that excludes everything
@@ -813,8 +827,8 @@ migrations, collection DDL, record CRUD, paging, sorting, filtering, the
 per-hour log rollup. Proved by running it — a collection created over the API
 lands as a real table with `text`/`numeric`/`jsonb` columns and its declared
 index, and records list, page, sort, filter, update and delete through the same
-handlers SQLite serves. Realtime, files, auth records, crons, batch and
-`/rest/v1` were exercised the same way, against PostgreSQL 18.3.
+handlers SQLite serves. Realtime, files, auth records, crons, batch and the
+table wire were exercised the same way, against PostgreSQL 18.3.
 
 Three things a live run settled, each of them a place where SQLite's shape had
 been assumed:

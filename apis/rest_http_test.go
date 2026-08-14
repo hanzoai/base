@@ -31,7 +31,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/v1/rest/missing",
 			ExpectedStatus:  404,
-			ExpectedContent: []string{`"code":"PGRST202"`, `"details"`, `"hint"`},
+			ExpectedContent: []string{`"code":"not_found"`, `"details"`, `"hint"`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -44,7 +44,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/v1/rest/demo1",
 			ExpectedStatus:  403,
-			ExpectedContent: []string{`"code":"PGRST301"`, `Only superusers`},
+			ExpectedContent: []string{`"code":"refused"`, `Only superusers`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -94,7 +94,7 @@ func TestRestApiList(t *testing.T) {
 			Method:             http.MethodGet,
 			URL:                "/v1/rest/demo2?limit=25&offset=30",
 			ExpectedStatus:     400,
-			ExpectedContent:    []string{`"code":"PGRST100"`, `page boundary`},
+			ExpectedContent:    []string{`"code":"bad_query"`, `page boundary`},
 			NotExpectedContent: []string{`"data":{}`, `"status":400`},
 			ExpectedEvents:     map[string]int{"*": 0},
 		},
@@ -163,7 +163,7 @@ func TestRestApiList(t *testing.T) {
 			Method:          http.MethodGet,
 			URL:             "/v1/rest/demo2?nosuchcolumn=eq.x",
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"code":"PGRST100"`},
+			ExpectedContent: []string{`"code":"bad_query"`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -171,7 +171,7 @@ func TestRestApiList(t *testing.T) {
 			Method:             http.MethodGet,
 			URL:                "/v1/rest/demo2?title=matches.x",
 			ExpectedStatus:     400,
-			ExpectedContent:    []string{`"code":"PGRST100"`, `unknown operator`},
+			ExpectedContent:    []string{`"code":"bad_query"`, `unknown operator`},
 			NotExpectedContent: []string{`"data":{}`, `"status":400`},
 			ExpectedEvents:     map[string]int{"*": 0},
 		},
@@ -261,7 +261,7 @@ func TestRestApiWrites(t *testing.T) {
 			Method:          http.MethodDelete,
 			URL:             "/v1/rest/demo2",
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`, `every row`},
+			ExpectedContent: []string{`"code":"bad_query"`, `needs a filter`, `every row`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -270,7 +270,7 @@ func TestRestApiWrites(t *testing.T) {
 			URL:             "/v1/rest/demo2",
 			Body:            strings.NewReader(`{"title":"x"}`),
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"code":"PGRST100"`, `needs a filter`},
+			ExpectedContent: []string{`"code":"bad_query"`, `needs a filter`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
@@ -301,7 +301,7 @@ func TestRestApiWrites(t *testing.T) {
 			URL:             "/v1/rest/demo2",
 			Body:            strings.NewReader(`[{"title":"a"},{"title":"b"}]`),
 			ExpectedStatus:  501,
-			ExpectedContent: []string{`"code":"PGRST100"`, `one object per request`},
+			ExpectedContent: []string{`"code":"bad_query"`, `one object per request`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 	}
@@ -350,7 +350,7 @@ func TestRestApiWritesThatSucceed(t *testing.T) {
 			Body:   strings.NewReader(`{"title":"single-rest"}`),
 			Headers: map[string]string{
 				"Prefer": "return=representation",
-				"Accept": "application/vnd.pgrst.object+json",
+				"Accept": "application/vnd.hanzo.object+json",
 			},
 			ExpectedStatus:     201,
 			ExpectedContent:    []string{`"title":"single-rest"`},
