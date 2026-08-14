@@ -71,8 +71,11 @@ function BackupsSettings() {
     const saveOptions = useMutation({
         mutationFn: (data: BackupOptionsForm) => {
             const s3Payload: Record<string, unknown> = { ...data.s3 };
-            // Never send the redacted placeholder back — omit to preserve the real secret.
-            if (s3Payload.secret === (s3Config.secret as string)) delete s3Payload.secret;
+            // The server never sends the stored secret back, so the box starts
+            // empty whatever is configured and an empty box means "leave it".
+            // Sending it erased the secret — including on a save made with S3
+            // switched off, where the field is not even on screen.
+            if (!s3Payload.secret) delete s3Payload.secret;
             return base.settings.update({ backups: { ...data, s3: s3Payload } });
         },
         onSuccess: () => { void qc.invalidateQueries({ queryKey: ['settings'] }); },
@@ -99,8 +102,7 @@ function BackupsSettings() {
     const downloadBackup = useMutation({
         mutationFn: async (key: string) => {
             const token = await base.files.getToken();
-            const url = base.backups.getDownloadURL(token, key);
-            window.open(url, '_blank');
+            window.open(base.backups.getDownloadURL(key, token), '_blank');
         },
     });
 
@@ -254,7 +256,8 @@ function BackupsSettings() {
                                 </label>
                                 <label className="field">
                                     <span className="field__label">Secret</span>
-                                    <input { ...register('s3.secret', { required: true }) } type="password" className="input" />
+                                    <input { ...register('s3.secret') } type="password" className="input" />
+                                    <span className="muted small">Leave empty to keep the stored secret.</span>
                                 </label>
                                 <label className="field field--inline span-2">
                                     <input { ...register('s3.forcePathStyle') } type="checkbox"  />

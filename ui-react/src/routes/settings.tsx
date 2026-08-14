@@ -1,6 +1,6 @@
-import { createFileRoute, Link, Outlet, redirect, useMatches } from '@tanstack/react-router';
+import { createFileRoute, Link, Outlet, useMatches } from '@tanstack/react-router';
 
-import { base } from '~/lib/base';
+import { requireSuperuser } from '~/lib/guard';
 
 const navItems = [
     { to: '/settings/smtp', label: 'SMTP' },
@@ -40,9 +40,10 @@ function SettingsLayout() {
     );
 }
 
+// Every page under /settings is a child of this layout, so this runs before all
+// of them. Restating it on a child is a second place for it to drift, which is
+// what `/settings/application` and `/settings/crons` were doing.
 export const Route = createFileRoute('/settings')({
-    beforeLoad: () => {
-        if (!base.authStore.isValid || !base.authStore.isSuperuser) throw redirect({ to: '/login' });
-    },
+    beforeLoad: requireSuperuser,
     component: SettingsLayout,
 });

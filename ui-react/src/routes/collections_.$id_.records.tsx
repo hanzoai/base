@@ -1,4 +1,4 @@
-import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Trash2, X } from '@hanzogui/lucide-icons-2';
 import {
@@ -12,6 +12,7 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 
 import { RecordGrid } from '~/components/grid/RecordGrid';
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 import type { CollectionField, ListResult, RecordModel } from '~/lib/base';
 
@@ -245,8 +246,6 @@ function RecordsList() {
 }
 
 export const Route = createFileRoute('/collections_/$id_/records')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: RecordsList,
 });
