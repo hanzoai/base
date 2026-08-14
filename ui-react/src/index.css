@@ -85,26 +85,36 @@ ol {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   flex-shrink: 0;
-  overflow-x: auto;
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
 }
 
-/* The links keep their own row rather than borrowing `.stack`, which is a
-   column — one owner for one box, and no specificity argument to win. */
+/*
+ * The links keep their own row rather than borrowing `.stack`, which is a
+ * column — one owner for one box, and no specificity argument to win.
+ *
+ * The LINKS are what scrolls when the strip is too narrow, not the strip. Put
+ * the overflow on the strip instead and the brand and the account are laid out
+ * past its edge and drawn over by the links, which is a collision no width
+ * measurement reports: every box is the size it asked for, they simply occupy
+ * the same place. `min-width: 0` is what lets this box become smaller than its
+ * content, and is the half a flex child does not do on its own.
+ */
 .shell__links {
   display: flex;
   flex-direction: row;
   gap: var(--space-1);
-  min-width: max-content;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 .shell__brand {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
   padding: var(--space-1) var(--space-2);
   font-weight: var(--weight-semibold);
 }
@@ -118,6 +128,7 @@ ol {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
   padding: var(--space-2);
   border-radius: var(--radius-md);
   color: var(--text-helper);
@@ -158,7 +169,7 @@ ol {
     flex-direction: column;
     align-items: stretch;
     width: 14rem;
-    overflow-x: visible;
+    gap: var(--space-1);
     padding: var(--space-3);
     border-bottom: 0;
     border-right: 1px solid var(--border);
@@ -166,6 +177,7 @@ ol {
 
   .shell:not([data-embedded]) .shell__links {
     flex-direction: column;
+    overflow-x: visible;
   }
 
   .shell:not([data-embedded]) .shell__brand {
