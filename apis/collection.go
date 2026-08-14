@@ -19,6 +19,7 @@ func bindCollectionApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 	subGroup.POST("", collectionCreate)
 	subGroup.GET("/{collection}", collectionView)
 	subGroup.PATCH("/{collection}", collectionUpdate)
+	subGroup.POST("/{collection}/rotate", collectionRotate)
 	subGroup.DELETE("/{collection}", collectionDelete)
 	subGroup.DELETE("/{collection}/truncate", collectionTruncate)
 	subGroup.PUT("/import", collectionsImport)
@@ -134,6 +135,36 @@ func collectionUpdate(e *core.RequestEvent) error {
 
 			// other generic db error
 			return e.BadRequestError("Failed to update collection. Raw error: \n"+err.Error(), nil)
+		}
+
+		return execAfterSuccessTx(true, e.App, func() error {
+			return e.JSON(http.StatusOK, e.Collection)
+		})
+	})
+}
+
+// collectionRotate mints a fresh signing secret for every token the collection
+// issues. A secret is server material, so replacing one is a request that
+// carries no value; every token already issued stops verifying.
+func collectionRotate(e *core.RequestEvent) error {
+	collection, err := e.App.FindCollectionByNameOrId(e.Request.PathValue("collection"))
+	if err != nil || collection == nil {
+		return e.NotFoundError("", err)
+	}
+
+	if !collection.IsAuth() {
+		return e.BadRequestError("Only auth collections issue tokens.", nil)
+	}
+
+	collection.RotateTokenSecrets()
+
+	event := new(core.CollectionRequestEvent)
+	event.RequestEvent = e
+	event.Collection = collection
+
+	return event.App.OnCollectionUpdateRequest().Trigger(event, func(e *core.CollectionRequestEvent) error {
+		if err := e.App.Save(e.Collection); err != nil {
+			return e.BadRequestError("Failed to rotate the collection token secrets.", err)
 		}
 
 		return execAfterSuccessTx(true, e.App, func() error {
