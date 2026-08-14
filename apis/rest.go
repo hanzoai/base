@@ -26,10 +26,17 @@ import (
 // every new caller reimplements, so the translation belongs here, once, on the
 // wire the clients already know.
 //
-// It is mounted OUTSIDE the api prefix, at the root, because a REST client builds its own URL:
-// given a base host it calls /rest/v1/{table} unprompted. Serving exactly that
-// path is what lets a client reach Base by naming a hostname and nothing else —
-// no adapter, no per-call rewrite.
+// It is mounted UNDER the api prefix, so its address is `<prefix>/rest/{collection}`
+// — `/v1/rest/...` on a Base that has its origin to itself, `/v1/base/rest/...`
+// where a host mounts several apps. One address scheme, `/v1` first, the same one
+// every other wire here answers on.
+//
+// It used to sit at the root, at `/rest/v1/{collection}`, so that a REST client
+// pointed at a bare hostname would find it with no configuration. That bought
+// exactly one thing — a client that hardcodes its own path — and cost the rule
+// that every address this fleet serves begins `/v1`. The clients are ours; they
+// can be told where the API is rooted, and now are. A path that spells a prefix
+// before its version is a second scheme, and there is one.
 //
 // This is a rendering of the SAME read, not a second one. The door rewrites the
 // query into Base's own dialect and then runs recordsList — the same collection
@@ -39,8 +46,8 @@ import (
 // own answers the {items,page,perPage,totalItems,totalPages} envelope. Duplicating
 // the handler to change one line is how two doors come to disagree about who may
 // read a row, which is the one disagreement that matters.
-func bindRestApi(app core.App, rg *router.Router[*core.RequestEvent]) {
-	sub := rg.Group("/rest/v1")
+func bindRestApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
+	sub := rg.Group("/rest")
 	sub.GET("/{collection}", restList)
 	// A count query is a HEAD: a REST client's .select('*', {count, head: true})
 	// issues one and reads the total out of Content-Range, because the rows are
