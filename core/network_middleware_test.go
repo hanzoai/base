@@ -2,10 +2,9 @@
 // See the file LICENSE for licensing terms.
 //
 // Tests for per-user writer-pin middleware. Exercises:
-//   - shard resolver: JWT claim → header → query fallback
+//   - shard resolver: the one source BASE_SHARD_KEY names, and no other
 //   - write-forward: local / 307 / 503 branches
 //   - URL derivation for writer endpoints (explicit map + convention)
-//   - header name conversion
 //   - PeerHTTPEndpoints env parsing edge cases
 
 package core
@@ -92,23 +91,6 @@ func TestResolveWriterURL(t *testing.T) {
 	}
 }
 
-// ── toHTTPHeader ───────────────────────────────────────────────────
-
-func TestToHTTPHeader(t *testing.T) {
-	cases := map[string]string{
-		"user_id": "User-Id",
-		"org_id":  "Org-Id",
-		"x":       "X",
-		"":        "",
-		"a_b_c_d": "A-B-C-D",
-	}
-	for in, want := range cases {
-		if got := toHTTPHeader(in); got != want {
-			t.Errorf("toHTTPHeader(%q): got %q, want %q", in, got, want)
-		}
-	}
-}
-
 // ── shardResolver ──────────────────────────────────────────────────
 
 func newTestReq(method, url string) *RequestEvent {
@@ -128,27 +110,41 @@ func newTestReq(method, url string) *RequestEvent {
 	// middleware called Next() and no one wrote.
 }
 
-// TestShardResolverFromHeader: no auth record, header carries shard.
-func TestShardResolverFromHeader(t *testing.T) {
-	fn := shardResolver("user_id")
-	e := newTestReq(http.MethodGet, "/v1/some")
-	e.Request.Header.Set("X-User-Id", "u-abc")
-
-	if err := fn(e); err != nil {
-		t.Fatalf("fn: %v", err)
+// authRecord builds the shape shardResolver reads an identity off.
+func authRecord(t *testing.T, id string, fields map[string]any) *Record {
+	t.Helper()
+	r := NewRecord(NewAuthCollection("users"))
+	r.Id = id
+	for k, v := range fields {
+		r.Set(k, v)
 	}
-	if got := e.Get(RequestEventKeyShardID); got != "u-abc" {
-		t.Errorf("shard stash: got %v, want u-abc", got)
+	return r
+}
+
+// TestShardResolverFromIdentity: the id of the authenticated record IS the
+// shard for the two keys that name it.
+func TestShardResolverFromIdentity(t *testing.T) {
+	for _, key := range []string{"user_id", "id"} {
+		t.Run(key, func(t *testing.T) {
+			e := newTestReq(http.MethodGet, "/v1/some")
+			e.Auth = authRecord(t, "u-abc", nil)
+
+			if err := shardResolver(key)(e); err != nil {
+				t.Fatalf("fn: %v", err)
+			}
+			if got := e.Get(RequestEventKeyShardID); got != "u-abc" {
+				t.Errorf("shard stash: got %v, want u-abc", got)
+			}
+		})
 	}
 }
 
-// TestShardResolverFromHeaderOrgID: different shard key.
-func TestShardResolverFromHeaderOrgID(t *testing.T) {
-	fn := shardResolver("org_id")
+// TestShardResolverFromIdentityField: any other key is a field on the record.
+func TestShardResolverFromIdentityField(t *testing.T) {
 	e := newTestReq(http.MethodGet, "/v1/data")
-	e.Request.Header.Set("X-Org-Id", "o-123")
+	e.Auth = authRecord(t, "u-abc", map[string]any{"org_id": "o-123"})
 
-	if err := fn(e); err != nil {
+	if err := shardResolver("org_id")(e); err != nil {
 		t.Fatalf("fn: %v", err)
 	}
 	if got := e.Get(RequestEventKeyShardID); got != "o-123" {
@@ -156,7 +152,78 @@ func TestShardResolverFromHeaderOrgID(t *testing.T) {
 	}
 }
 
-// TestShardResolverMissing: no auth, no header, no query → no stash.
+// TestShardResolverIdentityReadsNothingElse — a shard key that names the
+// verified identity reads the verified identity, whatever the request says.
+//
+// The shard picks which pod serves a write. A caller that can name its own
+// shard picks its own writer, and the writer-pin is what keeps one pod
+// serializing a shard's commits. So a key naming an identity must resolve from
+// the identity alone: a request carrying none resolves no shard and runs
+// local. Saying so is `header:<Name>`, which the operator writes on purpose.
+func TestShardResolverIdentityReadsNothingElse(t *testing.T) {
+	cases := []struct {
+		name  string
+		key   string
+		apply func(*RequestEvent)
+	}{
+		{"header named for the key", "user_id", func(e *RequestEvent) {
+			e.Request.Header.Set("X-User-Id", "u-victim")
+		}},
+		{"header named for a key the gateway does not strip", "tenant", func(e *RequestEvent) {
+			e.Request.Header.Set("X-Tenant", "t-victim")
+		}},
+		{"a field the record does not carry", "org_id", func(e *RequestEvent) {
+			e.Request.Header.Set("X-Org-Id", "o-victim")
+			e.Auth = authRecord(t, "u-abc", nil)
+		}},
+		{"query parameter", "user_id", func(e *RequestEvent) {
+			e.Request.URL.RawQuery = "shard=u-victim"
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newTestReq(http.MethodPost, "/v1/collections/x/records")
+			tc.apply(e)
+
+			if err := shardResolver(tc.key)(e); err != nil {
+				t.Fatalf("fn: %v", err)
+			}
+			if got := e.Get(RequestEventKeyShardID); got != nil {
+				t.Errorf("BASE_SHARD_KEY=%q resolved the shard %v off the "+
+					"request. A key naming an identity reads the identity; a "+
+					"caller states its own shard only where the operator "+
+					"wrote %s<Name>", tc.key, got, network.ShardKeyHeader)
+			}
+		})
+	}
+}
+
+// TestShardResolverFromNamedHeader: header:<Name> reads that header, and only
+// that one.
+func TestShardResolverFromNamedHeader(t *testing.T) {
+	fn := shardResolver(network.ShardKeyHeader + "X-Tenant")
+
+	e := newTestReq(http.MethodGet, "/v1/x")
+	e.Request.Header.Set("X-Tenant", "t-1")
+	if err := fn(e); err != nil {
+		t.Fatalf("fn: %v", err)
+	}
+	if got := e.Get(RequestEventKeyShardID); got != "t-1" {
+		t.Errorf("named header: got %v, want t-1", got)
+	}
+
+	other := newTestReq(http.MethodGet, "/v1/x")
+	other.Request.Header.Set("X-User-Id", "u-abc")
+	if err := fn(other); err != nil {
+		t.Fatalf("fn: %v", err)
+	}
+	if got := other.Get(RequestEventKeyShardID); got != nil {
+		t.Errorf("a header the key did not name resolved %v", got)
+	}
+}
+
+// TestShardResolverMissing: nothing to resolve from → no stash.
 func TestShardResolverMissing(t *testing.T) {
 	fn := shardResolver("user_id")
 	e := newTestReq(http.MethodGet, "/v1/x")
@@ -166,32 +233,6 @@ func TestShardResolverMissing(t *testing.T) {
 	}
 	if got := e.Get(RequestEventKeyShardID); got != nil {
 		t.Errorf("unexpected stash: %v", got)
-	}
-}
-
-// TestShardResolverQueryGate: query fallback disabled by default.
-func TestShardResolverQueryGate(t *testing.T) {
-	fn := shardResolver("user_id")
-	e := newTestReq(http.MethodGet, "/v1/x?shard=u-query")
-	if err := fn(e); err != nil {
-		t.Fatalf("fn: %v", err)
-	}
-	if got := e.Get(RequestEventKeyShardID); got != nil {
-		t.Error("query fallback should be off by default")
-	}
-}
-
-// TestShardResolverQueryEnabled: BASE_SHARD_QUERY_OK=true lets query
-// param set the shard (dev/test convenience).
-func TestShardResolverQueryEnabled(t *testing.T) {
-	t.Setenv("BASE_SHARD_QUERY_OK", "true")
-	fn := shardResolver("user_id")
-	e := newTestReq(http.MethodGet, "/v1/x?shard=u-query")
-	if err := fn(e); err != nil {
-		t.Fatalf("fn: %v", err)
-	}
-	if got := e.Get(RequestEventKeyShardID); got != "u-query" {
-		t.Errorf("query-enabled: got %v, want u-query", got)
 	}
 }
 

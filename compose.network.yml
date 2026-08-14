@@ -31,7 +31,7 @@ services:
     image: ghcr.io/hanzoai/base:dev
     environment:
       BASE_NETWORK: quasar
-      BASE_SHARD_KEY: user_id
+      BASE_SHARD_KEY: header:X-User-Id
       BASE_REPLICATION: "3"
       BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
       BASE_ARCHIVE: "off"
@@ -56,7 +56,7 @@ services:
     <<: *base-node
     environment:
       BASE_NETWORK: quasar
-      BASE_SHARD_KEY: user_id
+      BASE_SHARD_KEY: header:X-User-Id
       BASE_REPLICATION: "3"
       BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
       BASE_ARCHIVE: "off"
@@ -73,7 +73,7 @@ services:
     <<: *base-node
     environment:
       BASE_NETWORK: quasar
-      BASE_SHARD_KEY: user_id
+      BASE_SHARD_KEY: header:X-User-Id
       BASE_REPLICATION: "3"
       BASE_PEERS: base-a:9651,base-b:9651,base-c:9651
       BASE_ARCHIVE: "off"
