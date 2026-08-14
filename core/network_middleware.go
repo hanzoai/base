@@ -5,10 +5,10 @@
 // to 307 mutating requests to the pod that currently owns the user's
 // shard. Reads stay local (any replica converges via WAL frames).
 //
-// Shard key extraction: reads BASE_SHARD_KEY (env), looks for a
-// matching JWT claim on the authenticated record, falls back to a
-// request header named X-{SHARD_KEY}. No match = no routing (the
-// request runs local, which is safe for anonymous / unscoped paths).
+// Shard key extraction: BASE_SHARD_KEY names one source and names it
+// explicitly — a field on the verified identity, or `header:<Name>` for
+// a header the caller writes. No match = no routing (the request runs
+// local, which is safe for anonymous / unscoped paths).
 //
 // Writer endpoint resolution: BASE_PEER_HTTP_ENDPOINTS is a
 // comma-separated list of `nodeID=url` pairs. Without it we derive
@@ -28,6 +28,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hanzoai/base/network"
 	luxlog "github.com/luxfi/log"
 )
 
@@ -69,48 +70,43 @@ func (app *BaseApp) installNetworkMiddleware(se *ServeEvent) error {
 	return nil
 }
 
-// shardResolver looks up shardKey on the request and stashes it on
-// RequestEvent.Get. Order of precedence:
-//  1. Authenticated record field named exactly shardKey (for
-//     shardKey=user_id and an auth record on the `users` collection,
-//     this is just Auth.Id).
-//  2. JWT claim named shardKey on e.Auth.Claims — not all records
-//     expose claims directly, so we also check a request-scoped store.
-//  3. Header `X-{Shard-Key}` (X-User-Id, X-Org-Id, etc.).
-//  4. Query parameter `shard=<id>` — last resort, only honoured in
-//     non-production environments (controlled by BASE_SHARD_QUERY_OK).
+// shardResolver stashes the shard a request belongs to, from the ONE source
+// BASE_SHARD_KEY names. The source is part of the name:
+//
+//	user_id, id      the authenticated record's id
+//	<field>          that field on the authenticated record
+//	header:<Name>    the named request header
+//
+// A header is whatever the caller sends, so naming one is the operator saying
+// callers pick their own shard — which compose dev needs, having no token to
+// derive one from. Every other form reads the verified identity and nothing
+// else: a request that carries no identity resolves no shard, and writeForward
+// runs it local.
 func shardResolver(shardKey string) func(*RequestEvent) error {
-	headerName := "X-" + toHTTPHeader(shardKey)
-	allowQuery := strings.ToLower(os.Getenv("BASE_SHARD_QUERY_OK")) == "true"
+	if name, ok := strings.CutPrefix(shardKey, network.ShardKeyHeader); ok {
+		header := http.CanonicalHeaderKey(strings.TrimSpace(name))
+		return func(e *RequestEvent) error {
+			if v := e.Request.Header.Get(header); v != "" {
+				e.Set(RequestEventKeyShardID, v)
+			}
+			return e.Next()
+		}
+	}
 
 	return func(e *RequestEvent) error {
-		var shardID string
-
 		if e.Auth != nil {
 			// user_id → Auth.Id is the canonical resolution for the
 			// most common shard key. Other keys (org_id) may come
 			// from a non-id field on the record.
+			var shardID string
 			if strings.EqualFold(shardKey, "user_id") || strings.EqualFold(shardKey, "id") {
 				shardID = e.Auth.Id
-			} else if v := e.Auth.GetString(shardKey); v != "" {
-				shardID = v
+			} else {
+				shardID = e.Auth.GetString(shardKey)
 			}
-		}
-
-		if shardID == "" {
-			if v := e.Request.Header.Get(headerName); v != "" {
-				shardID = v
+			if shardID != "" {
+				e.Set(RequestEventKeyShardID, shardID)
 			}
-		}
-
-		if shardID == "" && allowQuery {
-			if v := e.Request.URL.Query().Get("shard"); v != "" {
-				shardID = v
-			}
-		}
-
-		if shardID != "" {
-			e.Set(RequestEventKeyShardID, shardID)
 		}
 		return e.Next()
 	}
@@ -207,17 +203,4 @@ func resolveWriterURL(owner string, endpoints map[string]string) string {
 		host = owner[:i]
 	}
 	return fmt.Sprintf("http://%s:%s", host, httpPort)
-}
-
-// toHTTPHeader converts a snake_case key (user_id, org_id) to the
-// PascalCase form expected in HTTP headers (User-Id, Org-Id).
-func toHTTPHeader(key string) string {
-	parts := strings.Split(key, "_")
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		parts[i] = strings.ToUpper(p[:1]) + p[1:]
-	}
-	return strings.Join(parts, "-")
 }
