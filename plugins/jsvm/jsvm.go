@@ -316,7 +316,7 @@ func (p *plugin) registerHooks() error {
 	// initialize the loader vm
 	loader := goja.New()
 	sharedBinds(loader)
-	hooksBinds(p.app, loader, executors)
+	declared := hooksBinds(p.app, loader, executors)
 	cronBinds(p.app, loader, executors)
 	routerBinds(p.app, loader, executors)
 
@@ -340,6 +340,17 @@ func (p *plugin) registerHooks() error {
 			}
 		}()
 	}
+
+	// An extension's hooks belong to every Base this process opens. hooksBinds
+	// stated them on the one that loaded the files; this states them on each
+	// org's Base as it is opened, the same way JS migrations already apply to
+	// all of them. Inside a hook body $app is the Base the event fired on, so
+	// what a hook reads and writes is that Base and no other.
+	//
+	// cronAdd and routerAdd stay on this Base alone. A tick arrives on no Base
+	// and a process has one router, so neither has anything per-Base to be
+	// handed; a hook does, and that is the whole difference.
+	core.AppBindings.Register(declared.Apply)
 
 	return nil
 }
