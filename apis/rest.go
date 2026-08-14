@@ -657,6 +657,20 @@ func restError(e *core.RequestEvent, status int, code, message, details string) 
 
 // restWantsObject reports whether the caller asked for a bare object rather than
 // an array — .single(), and .maybeSingle() on anything but a GET.
+//
+// The media type is OURS, and renaming it from the vendor spelling this wire was
+// modelled on carried a cost worth writing down, because the two halves of that
+// rename fail differently. The ADDRESS moved too, so a client built against the
+// old wire asks for a path nothing serves and gets a 404 — loud, and the first
+// thing anyone debugs. This header does not fail that way: an unrecognised Accept
+// simply is not a request for one row, so the cardinality check below is skipped
+// and the caller receives a 200 carrying an ARRAY where it expected an object.
+//
+// Nothing reaches that today — the 404 lands first, and both ends moved in the
+// same release — so it is a trap rather than a bug. It springs if anyone ever
+// serves the old address again for compatibility: the path would answer, and this
+// would quietly change the shape of the answer. Restore the header with it, or do
+// not restore the path.
 func restWantsObject(e *core.RequestEvent) bool {
 	return strings.Contains(e.Request.Header.Get("Accept"), "application/vnd.hanzo.object+json")
 }
