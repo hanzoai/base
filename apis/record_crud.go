@@ -186,26 +186,7 @@ func recordView(e *core.RequestEvent) error {
 		return e.ForbiddenError("Only superusers can perform this action.", nil)
 	}
 
-	ruleFunc := func(q *dbx.SelectQuery) error {
-		if !requestInfo.HasSuperuserAuth() && collection.ViewRule != nil && *collection.ViewRule != "" {
-			resolver := core.NewRecordFieldResolver(e.App, collection, requestInfo, true)
-
-			expr, err := search.FilterData(*collection.ViewRule).BuildExpr(resolver)
-			if err != nil {
-				return err
-			}
-
-			q.AndWhere(expr)
-
-			err = resolver.UpdateQuery(q)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	}
-
-	record, fetchErr := e.App.FindRecordById(collection, recordId, ruleFunc)
+	record, fetchErr := e.App.FindRecordById(collection, recordId, viewGate(e.App, collection, requestInfo))
 	if fetchErr != nil || record == nil {
 		return firstApiError(err, e.NotFoundError("", fetchErr))
 	}

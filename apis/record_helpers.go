@@ -228,33 +228,7 @@ func expandFetch(app core.App, originalRequestInfo *core.RequestInfo) core.Expan
 	requestInfoPtr.Context = core.RequestInfoContextExpand
 
 	return func(relCollection *core.Collection, relIds []string) ([]*core.Record, error) {
-		records, findErr := app.FindRecordsByIds(relCollection.Id, relIds, func(q *dbx.SelectQuery) error {
-			if requestInfoPtr.Auth != nil && requestInfoPtr.Auth.IsSuperuser() {
-				return nil // superusers can access everything
-			}
-
-			if relCollection.ViewRule == nil {
-				return fmt.Errorf("only superusers can view collection %q records", relCollection.Name)
-			}
-
-			if *relCollection.ViewRule != "" {
-				resolver := core.NewRecordFieldResolver(app, relCollection, requestInfoPtr, true)
-
-				expr, err := search.FilterData(*(relCollection.ViewRule)).BuildExpr(resolver)
-				if err != nil {
-					return err
-				}
-
-				q.AndWhere(expr)
-
-				err = resolver.UpdateQuery(q)
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
-		})
+		records, findErr := app.FindRecordsByIds(relCollection.Id, relIds, viewGate(app, relCollection, requestInfoPtr))
 		if findErr != nil {
 			return nil, findErr
 		}
@@ -353,6 +327,44 @@ func autoResolveRecordsFlags(app core.App, records []*core.Record, requestInfo *
 	}
 
 	return nil
+}
+
+// viewGate applies a collection's view rule to a read, so a row the caller may
+// not view is not found rather than found and then hidden.
+//
+// It is the one answer to that question. A read that states the rule itself is a
+// second answer, and three of them had drifted apart before this existed: the
+// view route, the expand fetch and now the function host all ask here.
+//
+// A superuser reads everything and an empty rule admits everyone, which is what
+// each of those says. A nil rule is not a permissive rule — it means nobody but
+// a superuser — so it refuses rather than matching nothing, and a caller who
+// forgets to check for it still cannot read the row.
+func viewGate(app core.App, collection *core.Collection, requestInfo *core.RequestInfo) func(*dbx.SelectQuery) error {
+	return func(q *dbx.SelectQuery) error {
+		if requestInfo.HasSuperuserAuth() {
+			return nil
+		}
+
+		if collection.ViewRule == nil {
+			return fmt.Errorf("only superusers can view collection %q records", collection.Name)
+		}
+
+		if *collection.ViewRule == "" {
+			return nil
+		}
+
+		resolver := core.NewRecordFieldResolver(app, collection, requestInfo, true)
+
+		expr, err := search.FilterData(*collection.ViewRule).BuildExpr(resolver)
+		if err != nil {
+			return err
+		}
+
+		q.AndWhere(expr)
+
+		return resolver.UpdateQuery(q)
+	}
 }
 
 var ruleQueryParams = []string{search.FilterQueryParam, search.SortQueryParam}

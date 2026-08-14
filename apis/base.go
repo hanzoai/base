@@ -69,6 +69,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindTasksApi(app, apiGroup)
 	bindHealthApi(app, apiGroup)
 	bindRealtimeApi(app, apiGroup)
+	bindFunctionsApi(app, apiGroup)
 	bindPrivateApi(app, apiGroup)
 
 	// Platform-standard health check at root level (outside the mount
