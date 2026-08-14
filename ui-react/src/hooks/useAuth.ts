@@ -6,10 +6,19 @@ export function useAuth() {
   const [record, setRecord] = useState(getRecord)
 
   useEffect(() => {
-    return onAuthChange(() => {
+    const sync = () => {
       setToken(getToken())
       setRecord(getRecord())
-    })
+    }
+    const stop = onAuthChange(sync)
+    // The session lives in localStorage, which every tab on this origin shares.
+    // A `storage` event is how this tab hears that another one signed in — the
+    // tab that did the signing is not the tab that needs to know.
+    window.addEventListener('storage', sync)
+    return () => {
+      stop()
+      window.removeEventListener('storage', sync)
+    }
   }, [])
 
   return {
