@@ -311,3 +311,32 @@ func createTestDir(t *testing.T) string {
 
 	return dir
 }
+
+// Two routes cannot claim one address. Go's mux panics on a duplicate pattern
+// rather than returning an error, so a second registration at an address that
+// already exists takes the process down at startup — after every plugin has
+// registered, which is well past anything a package test reaches.
+//
+// It is checked where the whole tree becomes a mux, because the tree is the
+// only place the conflict exists: each registration is individually fine.
+func TestNoTwoRoutesClaimOneAddress(t *testing.T) {
+	t.Parallel()
+
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	pm, err := apis.NewRouter(app)
+	if err != nil {
+		t.Fatalf("NewRouter: %v", err)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("two routes claim one address: %v", r)
+		}
+	}()
+
+	if _, err := pm.BuildMux(); err != nil {
+		t.Fatalf("BuildMux: %v", err)
+	}
+}
