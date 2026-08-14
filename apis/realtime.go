@@ -36,10 +36,14 @@ func init() {
 }
 
 // bindRealtimeApi registers the realtime api endpoints.
+//
+// The stream is opened with a grant because EventSource sends no headers; the
+// other two carry the caller's own credential the ordinary way. See [grant].
 func bindRealtimeApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	sub := rg.Group("/realtime")
-	sub.GET("", realtimeConnect).Bind(SkipSuccessActivityLog())
+	sub.GET("", realtimeConnect).Bind(SkipSuccessActivityLog(), spendGrant())
 	sub.POST("", realtimeSetSubscriptions)
+	sub.POST("/token", realtimeGrant).Bind(RequireAuth())
 }
 
 func realtimeConnect(e *core.RequestEvent) error {
