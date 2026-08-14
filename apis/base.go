@@ -72,8 +72,6 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindFunctionsApi(app, apiGroup)
 	bindPrivateApi(app, apiGroup)
 
-	// Platform-standard health check at root level (outside the mount
-	// prefix so liveness probes don't have to know the app name).
 	// The table wire, under the api prefix like everything else: `<prefix>/rest/
 	// {collection}`. It used to bind on the ROOT router at `/rest/v1` so a REST
 	// client pointed at a bare hostname would find it unconfigured — one client's
@@ -82,6 +80,8 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	// API is rooted.
 	bindRestApi(app, apiGroup)
 
+	// Platform-standard health check at root level (outside the mount
+	// prefix so liveness probes don't have to know the app name).
 	BindHealthzRoute(baseRouter)
 
 	return baseRouter, nil
