@@ -191,10 +191,6 @@ func TestSnapshotBypassesPrivacy(t *testing.T) {
 	}
 }
 
-// // WSCRDTSyncPayload has no Envelopes field. All WS traffic is bare Ops.
-// This means every WS client bypasses Privacy even after resolveOps is
-// fixed, unless the WS handler is also updated.
-
 // TestBareOpsStillWorkForPlaintextDoc confirms the fix is surgical —
 // plaintext documents continue to accept legacy bare-Ops messages for
 // backwards compatibility with callers that predate the privacy layer.
