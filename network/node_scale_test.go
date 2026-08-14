@@ -201,7 +201,12 @@ func TestNodeMembershipNotSet(t *testing.T) {
 // a channel; this keeps tests non-flaky without hard-coded sleeps.
 func waitForMemberCount(t *testing.T, n *node, want int) {
 	t.Helper()
-	deadline := time.Now().Add(500 * time.Millisecond)
+	// A deadline here is a timeout, not a measurement: it returns the moment the
+	// count is right, so a generous one costs nothing when the machine is idle
+	// and is the difference between a pass and a false failure when it is not.
+	// Half a second was enough alone and not enough beside the rest of the
+	// package, which made this the test that failed a release for being slow.
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if len(n.MembersFor("probe")) == want {
 			return
