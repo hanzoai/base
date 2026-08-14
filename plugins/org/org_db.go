@@ -50,8 +50,15 @@ func NewOrgDB(app core.App, masterKey string) *OrgDB {
 	}
 }
 
-// orgsDirName is where the orgs' Bases sit under the platform's data directory.
-const orgsDirName = "orgs"
+// Where a store of its own sits under the data directory of the Base above it:
+// the orgs' Bases under the platform's, a user's database under its org's.
+//
+// Both are named here because both are the same fact — see [omitNested], which
+// is what keeps either of them out of the archive above it.
+const (
+	orgsDirName  = "orgs"
+	usersDirName = "users"
+)
 
 // OrgsDir returns the base directory for all org databases.
 func (t *OrgDB) OrgsDir() string {
@@ -138,7 +145,7 @@ func (t *OrgDB) ProvisionOrg(orgSlug string) (string, error) {
 		return "", fmt.Errorf("create org dir %q: %w", dir, err)
 	}
 	// Create users subdirectory
-	if err := os.MkdirAll(filepath.Join(dir, "users"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, usersDirName), 0700); err != nil {
 		return "", fmt.Errorf("create org users dir: %w", err)
 	}
 
@@ -150,9 +157,9 @@ func (t *OrgDB) ProvisionOrg(orgSlug string) (string, error) {
 // UserDir returns the directory for a specific user within an org.
 func (t *OrgDB) UserDir(orgSlug, userId string) string {
 	if err := validateSlug(userId); err != nil {
-		return filepath.Join(t.OrgDir(orgSlug), "users", "_invalid")
+		return filepath.Join(t.OrgDir(orgSlug), usersDirName, "_invalid")
 	}
-	return filepath.Join(t.OrgDir(orgSlug), "users", userId)
+	return filepath.Join(t.OrgDir(orgSlug), usersDirName, userId)
 }
 
 // UserDBPath returns the per-user SQLite database path.
@@ -290,7 +297,7 @@ func (t *OrgDB) ListOrgs() ([]string, error) {
 
 // ListUsers returns all provisioned user IDs within an org.
 func (t *OrgDB) ListUsers(orgSlug string) ([]string, error) {
-	usersDir := filepath.Join(t.OrgDir(orgSlug), "users")
+	usersDir := filepath.Join(t.OrgDir(orgSlug), usersDirName)
 	entries, err := os.ReadDir(usersDir)
 	if err != nil {
 		if os.IsNotExist(err) {
