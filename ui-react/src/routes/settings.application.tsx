@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
@@ -12,7 +12,7 @@ import { SectionCard } from '~/components/SectionCard';
 interface AppForm {
     trustedProxy: {
         headers: string[];
-        useLeftmostIp: boolean;
+        useLeftmostIP: boolean;
     };
     batch: {
         enabled: boolean;
@@ -31,7 +31,7 @@ function Application() {
 
     const { register, handleSubmit, reset, control, watch, formState } = useForm<AppForm>({
         defaultValues: {
-            trustedProxy: { headers: [], useLeftmostIp: false },
+            trustedProxy: { headers: [], useLeftmostIP: false },
             batch: { enabled: false, maxRequests: 50, timeout: 3, maxBodySize: 0 },
         },
     });
@@ -42,7 +42,7 @@ function Application() {
         reset({
             trustedProxy: {
                 headers: s.trustedProxy?.headers ?? [],
-                useLeftmostIp: s.trustedProxy?.useLeftmostIp ?? false,
+                useLeftmostIP: s.trustedProxy?.useLeftmostIP ?? false,
             },
             batch: {
                 enabled: s.batch?.enabled ?? false,
@@ -105,7 +105,7 @@ function Application() {
                 </div>
 
                 <label className="field field--inline">
-                    <input type="checkbox" { ...register('trustedProxy.useLeftmostIp') } />
+                    <input type="checkbox" { ...register('trustedProxy.useLeftmostIP') } />
                     <span>Use leftmost IP (vs rightmost) when the header lists multiple</span>
                 </label>
             </SectionCard>
@@ -156,9 +156,4 @@ function Application() {
     );
 }
 
-export const Route = createFileRoute('/settings/application')({
-    beforeLoad: () => {
-        if (!base.authStore.isValid || !base.authStore.isSuperuser) throw redirect({ to: '/login' });
-    },
-    component: Application,
-});
+export const Route = createFileRoute('/settings/application')({ component: Application });

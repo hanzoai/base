@@ -1,8 +1,8 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 
+import { requireSession } from '~/lib/guard';
 import { request } from '~/lib/api';
-import { base } from '~/lib/base';
 
 // A Base is what an org gets: its own SQLite file, its own key, opened the first
 // time a request arrives carrying that org. So this page answers two questions
@@ -102,8 +102,6 @@ function Bases() {
 }
 
 export const Route = createFileRoute('/bases')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: Bases,
 });

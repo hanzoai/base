@@ -1,6 +1,7 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 
 function Dashboard() {
@@ -45,8 +46,6 @@ function Dashboard() {
 }
 
 export const Route = createFileRoute('/')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: Dashboard,
 });

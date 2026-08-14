@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { base } from '~/lib/base';
@@ -67,9 +67,4 @@ function Crons() {
     );
 }
 
-export const Route = createFileRoute('/settings/crons')({
-    beforeLoad: () => {
-        if (!base.authStore.isValid || !base.authStore.isSuperuser) throw redirect({ to: '/login' });
-    },
-    component: Crons,
-});
+export const Route = createFileRoute('/settings/crons')({ component: Crons });

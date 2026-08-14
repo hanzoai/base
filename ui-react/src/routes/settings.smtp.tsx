@@ -23,22 +23,12 @@ interface MetaForm {
 }
 
 interface TestEmailForm {
-    collection: string;
     toEmail: string;
-    template: string;
 }
 
 const authMethods = [
     { label: 'PLAIN (default)', value: 'PLAIN' },
     { label: 'LOGIN', value: 'LOGIN' },
-];
-
-const templateOptions = [
-    { label: 'Verification', value: 'verification' },
-    { label: 'Password reset', value: 'password-reset' },
-    { label: 'Confirm email change', value: 'email-change' },
-    { label: 'OTP', value: 'otp' },
-    { label: 'Login alert', value: 'login-alert' },
 ];
 
 function SmtpSettings() {
@@ -75,7 +65,7 @@ function SmtpSettings() {
     });
 
     const { register: regTest, handleSubmit: submitTest, formState: fsTest } = useForm<TestEmailForm>({
-        defaultValues: { collection: '_superusers', toEmail: '', template: 'verification' },
+        defaultValues: { toEmail: '' },
     });
 
     const smtpEnabled = watchSmtp('enabled');
@@ -83,16 +73,19 @@ function SmtpSettings() {
     const saveMutation = useMutation({
         mutationFn: (data: { smtp: SmtpForm; meta: MetaForm }) => {
             const smtpPayload: Record<string, unknown> = { ...data.smtp };
-            // Never send the redacted placeholder back — omit to preserve the real secret.
-            if (smtpPayload.password === (smtp?.password as string)) delete smtpPayload.password;
+            // The server never sends the stored password back — `MarshalJSON`
+            // blanks it and `omitempty` drops the key — so the box starts empty
+            // whatever is configured, and an empty box means "leave it". Sending
+            // it would erase the password on every save. PATCH merges onto the
+            // stored settings, so omitting the key keeps what is there.
+            if (!smtpPayload.password) delete smtpPayload.password;
             return base.settings.update({ smtp: smtpPayload, meta: { senderName: data.meta.senderName, senderAddress: data.meta.senderAddress } });
         },
         onSuccess: () => { void qc.invalidateQueries({ queryKey: ['settings'] }); },
     });
 
     const testMutation = useMutation({
-        mutationFn: (data: TestEmailForm) =>
-            base.settings.testEmail(data.collection, data.toEmail, data.template),
+        mutationFn: (data: TestEmailForm) => base.settings.testEmail(data.toEmail),
         onSuccess: () => { setTestStatus('Test email sent.'); },
         onError: (err: Error) => { setTestStatus(err.message); },
     });
@@ -155,6 +148,7 @@ function SmtpSettings() {
                                 <label className="field">
                                     <span className="field__label">Password</span>
                                     <input { ...regSmtp('password') } type="password" className="input" />
+                                    <span className="muted small">Leave empty to keep the stored password.</span>
                                 </label>
                             </div>
                             <div className="grid">
@@ -184,29 +178,15 @@ function SmtpSettings() {
                 </form>
             </SectionCard>
 
-            <SectionCard title="Test email" description="Send a test email to verify your SMTP configuration.">
+            <SectionCard title="Test email" description="Send a plain message to prove the SMTP settings above work.">
                 <button type="button" onClick={ () => setTestOpen(!testOpen) } className="btn btn--outline">
                     { testOpen ? 'Hide test form' : 'Send test email' }
                 </button>
                 { testOpen && (
                     <form onSubmit={ submitTest((d) => testMutation.mutate(d)) } className="stack">
-                        <div className="grid">
-                            <label className="field">
-                                <span className="field__label">To email</span>
-                                <input { ...regTest('toEmail', { required: true }) } type="email" className="input" />
-                            </label>
-                            <label className="field">
-                                <span className="field__label">Template</span>
-                                <select { ...regTest('template') } className="input">
-                                    { templateOptions.map((t) => (
-                                        <option key={ t.value } value={ t.value }>{ t.label }</option>
-                                    )) }
-                                </select>
-                            </label>
-                        </div>
                         <label className="field">
-                            <span className="field__label">Auth collection</span>
-                            <input { ...regTest('collection') } className="input" placeholder="_superusers" />
+                            <span className="field__label">To email</span>
+                            <input { ...regTest('toEmail', { required: true }) } type="email" className="input" />
                         </label>
                         <div className="row">
                             <button type="submit" disabled={ fsTest.isSubmitting || testMutation.isPending } className="btn">

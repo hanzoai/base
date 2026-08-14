@@ -1,12 +1,23 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 
-// A log line's level is the one place this admin colours by meaning rather than
-// by rank, so it maps to the design system's state hues, not to a palette.
-const LEVEL_CLASS: Record<string, string> = { ERROR: 'danger', WARN: 'warn' };
+// slog's levels, which is what `core.Log.Level` stores and sends — a number,
+// not a name. Keying this by 'ERROR'/'WARN' meant no line was ever coloured and
+// every line printed a bare integer.
+const LEVELS = [
+  { at: 8, name: 'ERROR', className: 'danger' },
+  { at: 4, name: 'WARN', className: 'warn' },
+  { at: 0, name: 'INFO', className: '' },
+  { at: -4, name: 'DEBUG', className: 'muted' },
+] as const;
+
+function level(value: number) {
+  return LEVELS.find((l) => value >= l.at) ?? LEVELS[LEVELS.length - 1];
+}
 
 function Logs() {
   const [ filter, setFilter ] = useState('');
@@ -48,7 +59,7 @@ function Logs() {
         { logs.data?.items.map((l) => (
           <li key={ l.id } className="row">
             <span className="muted num">{ l.created }</span>
-            <span className={ LEVEL_CLASS[l.level] ?? '' }>{ l.level }</span>
+            <span className={ level(l.level).className }>{ level(l.level).name }</span>
             <span className="truncate">{ l.message }</span>
           </li>
         )) }
@@ -74,8 +85,6 @@ function Logs() {
 }
 
 export const Route = createFileRoute('/logs')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: Logs,
 });

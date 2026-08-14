@@ -1,7 +1,8 @@
-import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { requireSession } from '~/lib/guard';
 import { base } from '~/lib/base';
 import { editorKind, isMultiValue, selectValues, toEditorString } from '~/lib/fields';
 import type { CollectionField } from '~/lib/base';
@@ -20,7 +21,6 @@ function RecordEditor() {
     queryFn: () => base.collections.getOne(id),
   });
   const name = collection.data?.name ?? id;
-  const isAuth = collection.data?.type === 'auth';
 
   const record = useQuery({
     queryKey: ['records', name, recordId],
@@ -31,13 +31,12 @@ function RecordEditor() {
   const editable = useMemo<CollectionField[]>(
     () =>
       (collection.data?.fields ?? []).filter(
-        (f) => f.type !== 'autodate' && !HIDDEN.has(f.name) && f.type !== 'password',
+        (f) => f.type !== 'autodate' && !HIDDEN.has(f.name),
       ),
     [collection.data],
   );
 
   const [values, setValues] = useState<Record<string, unknown>>({});
-  const [password, setPassword] = useState('');
   const [error, setError] = useState<{ message: string; status?: number } | null>(null);
   const files = useRef<Record<string, File[]>>({});
 
@@ -55,10 +54,6 @@ function RecordEditor() {
   const save = useMutation({
     mutationFn: () => {
       const fd = buildFormData(editable, values, files.current);
-      if (isAuth && password) {
-        fd.append('password', password);
-        fd.append('passwordConfirm', password);
-      }
       return isNew ? base.collection(name).create(fd) : base.collection(name).update(recordId, fd);
     },
     onSuccess: () => {
@@ -157,21 +152,6 @@ function RecordEditor() {
             onFiles={ (fl) => { files.current[field.name] = fl; } }
           />
         )) }
-
-        { isAuth && (
-          <label className="field">
-            <span className="field__label">
-              { isNew ? 'Password' : 'New password (blank keeps current)' }
-            </span>
-            <input
-              type="password"
-              className="input"
-              autoComplete="new-password"
-              value={ password }
-              onChange={ (e) => setPassword(e.target.value) }
-            />
-          </label>
-        ) }
 
         { !isNew && record.data && (
           <div className="grid">
@@ -298,8 +278,6 @@ function buildFormData(
 }
 
 export const Route = createFileRoute('/collections_/$id_/records_/$recordId')({
-  beforeLoad: () => {
-    if (!base.authStore.token) throw redirect({ to: '/login' });
-  },
+  beforeLoad: requireSession,
   component: RecordEditor,
 });

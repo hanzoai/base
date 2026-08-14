@@ -28,14 +28,19 @@ function redirectUri(): string {
   return `${window.location.origin}${mount}auth/callback`;
 }
 
-// PKCE verifier + state ride sessionStorage across the cross-origin redirect
-// round-trip (survives same-tab navigation to IAM and back).
+// `storage` is where the SESSION lives — access token, refresh token, expiry.
+// localStorage, because every tab on this origin shares it and the refresh
+// token is what renews the bearer: with sessionStorage only the tab that signed
+// in could renew, and the recovery this admin offers signs in on a NEW tab, so
+// the tab holding the user's work would be the one that never could.
+// (The PKCE verifier is a separate store the SDK resolves itself; it has always
+// been localStorage so it survives the cross-origin redirect.)
 export const iam = new IAM({
   serverUrl,
   clientId,
   redirectUri: redirectUri(),
   scope: 'openid profile email',
-  storage: sessionStorage,
+  storage: localStorage,
 });
 
 // Minimal JWT payload decode (no verification — the Base server verifies the
@@ -49,4 +54,29 @@ export function decodeJwtClaims(token: string): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+// Who a bearer says it belongs to, for this browser's own use — the sidebar's
+// name and the settings guard. Sign-in and renewal both land here, so the two
+// paths cannot describe the same session differently.
+//
+// The server does not take this browser's word for any of it: `resolveJWKSToken`
+// decides authority from IAM membership and mirrors the caller into
+// `_superusers` or `users` itself. This is the local echo of that decision, and
+// it is the one place in the admin that echoes it.
+export function identity(accessToken: string): Record<string, unknown> {
+  const claims = decodeJwtClaims(accessToken);
+  const admin =
+    claims.isGlobalAdmin === true ||
+    claims.isAdmin === true ||
+    claims.owner === 'built-in' ||
+    claims.owner === 'superuser';
+
+  return {
+    id: String(claims.sub ?? claims.id ?? ''),
+    email: String(claims.email ?? ''),
+    name: String(claims.name ?? claims.displayName ?? ''),
+    // Base guards key the superuser off collectionName.
+    collectionName: admin ? '_superusers' : 'users',
+  };
 }
