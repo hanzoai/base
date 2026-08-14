@@ -295,11 +295,17 @@ collection's rules are the rules — `/v1/functions` and the collection refuse i
 the same words because there is one rule behind both. The source is the
 server's: seeing that a function exists does not return what it says.
 
-**The host is `list` and `one`, and that is all of it.** Not `$app`, not a
-process, not a file, not the network. `jsvm`'s `$os` exposes `exec`, `readFile`,
-`writeFile` and `exit` — right for an operator's hook file, wrong for something
-a tenant may author — and whatever v1 binds is supported forever, so the list is
-what a function needs and nothing anticipated.
+**The host is `list`, `one` and `start`, and that is all of it.** Not `$app`,
+not a process, not a file, not the network. `jsvm`'s `$os` exposes `exec`,
+`readFile`, `writeFile` and `exit` — right for an operator's hook file, wrong
+for something a tenant may author — and whatever v1 binds is supported forever,
+so the list is what a function needs and nothing anticipated.
+
+Measured rather than asserted: the guest's globals are the ECMAScript intrinsics,
+the host dispatch, and `require`, which resolves none of `http`, `https`, `net`,
+`dgram`, `child_process`, `fs` or `os`. There is no `fetch`, no `process`, no
+`XMLHttpRequest`. `TestFunctionReachesNoNetworkAndNoProcess` asserts that list
+is empty on both sides of a `start`, so it stays a fact rather than a memory.
 
 It reads as its caller: the collection from the Base the credential already
 resolved, the rule from the caller's own identity. The invocation payload does
@@ -326,10 +332,64 @@ arrives back as an ordinary authenticated write, through the same collection
 rules as any other caller. A bot is that with a trigger and an automation is
 that with a schedule.
 
+`start` is that verb and it does not block. A run is minutes and an invoke is
+five seconds, so what comes back is the name the work is known by; the caller
+looks under that name once the work has written. Two things about it are worth
+keeping:
+
+- **It is counted separately, and capped whether or not it is counted.**
+  `_functions:start` is its own rate-limit label, because a read is a query
+  against an open file and a run is a machine held for as long as the work
+  takes. A limit reached mid-function is answered as the limit it is — the host
+  records the refusal and `functionInvoke` returns it rather than reporting the
+  deployment broken for a rule doing its job. Under that sits `functionMaxRuns`
+  = 8 per call, unconditional, because `RateLimits.Enabled` is false out of the
+  box: measured before it existed, one invoke started 5000. It is the same move
+  `functionMaxRows` makes for a read — the host bounds itself rather than
+  trusting a setting nobody has written yet.
+- **Whose work it is is not something a function can say.** `apis.Sandboxes.Start`
+  takes the org beside the spec, off `RequestEventKeyOrg`, which the credential
+  resolved before any function ran. `apis.Sandbox` has three fields — `snapshot`,
+  `env`, `labels` — and anything else is refused rather than dropped, as is any
+  label under `hanzo.ai/`, which is where a run's owner gets stamped. No resources,
+  no `public`, no volumes: those are cost and exposure, and they are the
+  deployment's to choose. The whole ask is bounded by `functionMaxPayload`,
+  because it is built inside the runtime and so carries none of the invocation
+  body's bound.
+- **An unowned run is refused where there are owners.** A collection rule of `""`
+  admits a guest, and a guest carries no org, so `start` asks the DEPLOYMENT
+  rather than the request: `StoreKeyBases` set means orgs are told apart and an
+  empty one is refused. A Base serving one tenant names an org on no request and
+  is unaffected. Asking the request instead would have attributed that work to
+  `""` on a multi-tenant Base.
+- **What failed where the work runs stays there.** `Start`'s error is logged
+  whole and the function is told only that the run did not start. A function is
+  the tenant's and may catch what `start` raises, while its caller may be anyone
+  the rule admits — so an upstream error string is one `try/catch` from an end
+  user's response body. Same discipline `functionInvoke` already applies to a
+  function that fails outright, one call earlier.
+
+**The seam has no implementation, and the reason is not a design question.**
+`apis.Sandboxes` + `StoreKeySandboxes` are the contract a deployment installs
+into, the way `Bases` is; nothing installs one yet, so every `start` refuses in
+as many words. `github.com/hanzoai/apiclient` does not resolve — 404 on
+proxy.golang.org, "Repository not found" from git, and it is a nested module
+whose declared path does not match its location under `hanzoai/runtime`, so it
+is excluded from the parent module too. Its own cost is nothing (134 files,
+51,441 lines, **zero** third-party requires), but a `replace` to a local path in
+a library 23 repos embed breaks all of them, and copying a generated client into
+a public repo is the second sandbox client this file just said not to grow.
+Publishing it is the whole remaining step; `plugins/org` then gets a
+`RuntimeEndpoint`/`RuntimeKey` beside `IAMEndpoint`/`KMSEndpoint` and one
+`Start` that maps org onto the request and returns `Sandbox.Id`.
+
 What a workload's own identity should be — a scoped key minted for a sandbox
 with its lifetime tied to the run — is deliberately separate, because getting a
 workload's authority wrong is the failure that matters. Passing the caller's own
-token into a sandbox is the thing not to do.
+token into a sandbox is the thing not to do. Until that exists, `Sandbox.Env` is
+where a credential would go and nothing puts one there, so a started run can
+compute but cannot yet write its result back — the seam is defined and honestly
+empty rather than filled with the caller's own authority.
 
 ### Postgres tier — a real dialect that has never been run
 
