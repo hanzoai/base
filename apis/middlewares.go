@@ -429,7 +429,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// is read off the platform's store here, before the request moves onto a
 	// tenant's Base and that store becomes the tenant's.
 	collectionName := core.CollectionNameSuperusers
-	if !verified.PlatformSudo() {
+	if !verified.Sudo() {
 		collectionName = "users"
 		if v, _ := e.App.Store().Get(StoreKeyAuthUsersCollection).(string); v != "" {
 			collectionName = v
@@ -560,7 +560,7 @@ func orgOf(c *authz.Claims, stated string) (string, error) {
 // platformSudo reports whether verified claims carry platform authority — the
 // one cross-tenant scope, and the only thing that mirrors onto _superusers.
 //
-// The question is asked, not restated: authz.Claims.PlatformSudo is the estate's
+// The question is asked, not restated: authz.Claims.Sudo is the estate's
 // published predicate, the same one the gateway mints X-User-IsAdmin from and
 // cloud reads. Base holding a second definition is how platform authority comes
 // to mean two things in two places, so it holds none — it decodes the verified

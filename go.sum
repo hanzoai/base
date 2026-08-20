@@ -243,6 +243,8 @@ github.com/hablullah/go-juliandays v1.0.0 h1:A8YM7wIj16SzlKT0SRJc9CD29iiaUzpBLzh
 github.com/hablullah/go-juliandays v1.0.0/go.mod h1:0JOYq4oFOuDja+oospuc61YoX+uNEn7Z6uHYTbBzdGc=
 github.com/hanzoai/authz v1.10.29 h1:b4vWtI9g4Mvay1zizW7cwly/hDk06r+oAdA/y+317Do=
 github.com/hanzoai/authz v1.10.29/go.mod h1:xkzFdiIFx4UQMlU0NkmSRz0dgRQYqSXpKgVjn8ijn3E=
+github.com/hanzoai/authz v1.10.31 h1:kWq4iCF+XR6ZLnG5OJ4mlathKU2F68+YmKgsD6s44n0=
+github.com/hanzoai/authz v1.10.31/go.mod h1:rhZo/LvDXdUZG3/6+ujfJ1RHgLyfOpw2te+ebX3KSFs=
 github.com/hanzoai/cek v0.2.3 h1:wOVav3abWAWiIyqTr9pKK/b4PjUCT1j3mdU5LzKpxSQ=
 github.com/hanzoai/cek v0.2.3/go.mod h1:T9c9qr9x+0kHsk0J57KElY7l2jgWF08onbxZ3ck5nxM=
 github.com/hanzoai/csqlite v0.1.2 h1:4DzdgUfKADhzEP66Y30/HwepuBLrwt7NsemJMfrPGl4=
