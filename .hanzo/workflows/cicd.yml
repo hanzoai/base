@@ -11,12 +11,12 @@ name: CI/CD
 #     `hanzo-build-linux-amd64` there is never claimed. An unclaimable job does
 #     not fail — it waits out the 24h timeout while the next push queues behind
 #     it. Silence, not an error.
-#   * The `git-runner` StatefulSet registers against the FORGE only
+#   * The `git-runner` StatefulSet registers against the GIT.HANZO.AI only
 #     (GIT_INSTANCE_URL=http://hanzo-git.hanzo.svc), and that is the pool which
 #     actually advertises that label.
 #   * Gitea collects workflows from the FIRST of WORKFLOW_DIRS present in the
 #     commit (modules/actions/workflows.go, listWorkflowsInDirs breaks on the
-#     first hit). `.hanzo/workflows` already existed here, so on this forge the
+#     first hit). `.hanzo/workflows` already existed here, so on Hanzo Git the
 #     whole of `.github/workflows` was already dark.
 #
 # The `uses:` path points at .hanzo/workflows for the same reason: reusables
