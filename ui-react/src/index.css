@@ -300,6 +300,24 @@ ol {
   color: var(--text-helper);
 }
 
+/* What a call answered — the function's own JSON, or the server's account of
+   why there is none. It grows with the answer and scrolls past a point rather
+   than clipping it, because a truncated error is the half that does not say
+   what went wrong. */
+.result {
+  margin: 0;
+  max-height: 18rem;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, monospace);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ─── layout primitives ──────────────────────────────────────────────────── */
 
 /* A vertical run of things. `--gap` retunes the rhythm at the call site, which
