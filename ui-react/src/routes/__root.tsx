@@ -32,7 +32,8 @@ function RootLayout() {
         <aside className="shell__nav">
           { !embedded && (
             <div className="shell__brand">
-              <img src={icon} alt="Base" />
+              <span className="mark" role="img" aria-label="Base"
+                style={ { ['--mark' as string]: `url(${icon})` } } />
               <span>Base</span>
             </div>
           ) }
