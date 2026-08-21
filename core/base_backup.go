@@ -46,7 +46,7 @@ type RestoreFailure struct {
 // server engine keeps it in the server, which is also where it is backed up and
 // restored.
 func checkLocalDatabase(d dialect.Dialect) error {
-	if _, local := d.(dialect.SQLite); local {
+	if LocalDatabase(d) {
 		return nil
 	}
 
@@ -294,7 +294,7 @@ func (app *BaseApp) RestoreBackup(ctx context.Context, name string) error {
 		}
 
 		// ensure that at least a database file exists
-		extractedDB := filepath.Join(extractedDataDir, "data.db")
+		extractedDB := filepath.Join(extractedDataDir, dataFile)
 		if _, err := os.Stat(extractedDB); err != nil {
 			return fmt.Errorf("data.db file is missing or invalid: %w", err)
 		}

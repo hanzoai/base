@@ -395,7 +395,7 @@ empty rather than filled with the caller's own authority.
 
 The dialect is `hanzoai/orm/dialect`, not the `core/dialect_postgres.go` this
 file used to name; 15 methods, ~40 call sites, migrations parameterized through
-it. There is no Postgres in CI and no test opens a connection. Known blockers:
+it. Known blockers:
 `core/validators/db.go` matches SQLite's `"unique constraint failed"`, so every
 duplicate is a 500 instead of a 400 field error; `db_retry.go` retries only
 SQLite lock messages; and `CreateBackup` archives `DataDir`, which on Postgres
@@ -435,8 +435,36 @@ access pattern and a different product; it belongs where it is built, not as a
 reserved word here.
 
 Engine differences are the dialect's (`hanzoai/orm/dialect`), which is estate
-code rather than Base's. **No Postgres in CI and no test opens a connection**,
-so that path is verified by hand and nothing stops it regressing.
+code rather than Base's. Both are gated: `hanzo.yml` stands a PostgreSQL 18
+container up and runs `./tests/engine/` against it, and `tests/postgres.go`
+panics rather than falling back to a file, because a gate that quietly tests
+SQLite twice is worse than none. That corpus builds every fixture through the
+API for the same reason — `tests/data` is a SQLite file, which is what stops the
+REST of the suite being pointed at a server.
+
+`/v1/database` is what a superuser can ask about any of this, and the admin's
+Settings -> Data page is where it is read. `core.DescribeDatabase` measures the
+engine, the files while the app holds them, and a count per collection through
+`CountRecords`, so both engines answer the same questions and the answer has one
+shape; a collection the engine refuses to count reads as unknown rather than as
+empty. `core.ReclaimDatabase` rewrites both databases and folds the log back
+into them, returning the size either side so the page reports what it freed
+rather than claiming something. `core.LocalDatabase` is the one place that asks
+whether the app holds the database — backup asks it too — and it is the only
+difference the page shows.
+
+**The rewrite goes before the fold.** A VACUUM lands through the log like any
+other write, so folding first leaves the whole rewrite sitting in the log and
+the app holding MORE than it started with: measured at 2,068,480 bytes going to
+2,665,912 in that order and to 593,920 in this one. Both orders shrink
+something — the wrong one shrinks the auxiliary database's log, which is why
+`TestDatabaseReclaim` measures each database on its own and a few kilobytes off
+one cannot stand in for the other.
+
+There is no switch on that page and there will not be one while the answer is
+the host's. DocDB and Datastore are not backends Base opens, so the page does
+not name them; a disabled control for one would be the `datastore` tier constant
+again, in a place a customer can see.
 
 ### App layer — App Platform / CMS / CRM on one schema engine
 

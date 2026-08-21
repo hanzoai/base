@@ -5,7 +5,18 @@ import (
 	"fmt"
 
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/dialect"
 )
+
+// LocalDatabase reports whether d keeps the database in the app's data
+// directory as files. SQLite does, so its size, its backup and its restore are
+// all the app's to do. A server engine keeps the database in the server, which
+// is where it is sized, backed up and restored instead.
+func LocalDatabase(d dialect.Dialect) bool {
+	_, local := d.(dialect.SQLite)
+
+	return local
+}
 
 // TableColumns returns all column names of a single table by its name.
 func (app *BaseApp) TableColumns(tableName string) ([]string, error) {

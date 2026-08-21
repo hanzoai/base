@@ -130,6 +130,11 @@ export class BaseClient {
     run: (jobId: string): Promise<void> => api.runCron(jobId),
   }
 
+  readonly database = {
+    get: (): Promise<api.DatabaseModel> => api.getDatabase(),
+    reclaim: (): Promise<api.Reclaimed> => api.reclaimDatabase(),
+  }
+
   readonly files = {
     getToken: (): Promise<string> => api.getFileToken(),
   }

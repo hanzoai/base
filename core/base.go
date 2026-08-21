@@ -1233,7 +1233,7 @@ func (app *BaseApp) initDataDB() error {
 			return PostgresDBConnect(app.config.DataDSN)
 		}
 	} else {
-		dbPath := filepath.Join(app.DataDir(), "data.db")
+		dbPath := filepath.Join(app.DataDir(), dataFile)
 		connectFunc = func() (*dbx.DB, error) {
 			return app.config.DBConnect(dbPath)
 		}
@@ -1303,7 +1303,7 @@ func (app *BaseApp) initAuxDB() error {
 	} else {
 		// note: renamed to "auxiliary" because "aux" is a reserved Windows filename
 		// (see https://github.com/hanzoai/base/issues/5607)
-		dbPath := filepath.Join(app.DataDir(), "auxiliary.db")
+		dbPath := filepath.Join(app.DataDir(), auxFile)
 		connectFunc = func() (*dbx.DB, error) {
 			return app.config.DBConnect(dbPath)
 		}
