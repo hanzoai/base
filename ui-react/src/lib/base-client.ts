@@ -5,7 +5,7 @@
 import * as api from '~/lib/api'
 import type { CollectionModel, ListResult, RecordModel } from '~/lib/api'
 
-export type { CollectionField, CollectionModel, ListResult, RecordModel } from '~/lib/api'
+export type { CollectionField, CollectionModel, FunctionModel, ListResult, RecordModel } from '~/lib/api'
 
 type Data = FormData | Record<string, unknown>
 type ListOpts = { sort?: string; filter?: string }
@@ -115,6 +115,14 @@ export class BaseClient {
     delete: (key: string): Promise<void> => api.deleteBackup(key),
     restore: (key: string): Promise<void> => api.restoreBackup(key),
     getDownloadURL: (key: string, token: string): string => api.getBackupDownloadURL(key, token),
+  }
+
+  readonly functions = {
+    getFullList: (): Promise<api.FunctionModel[]> => api.listFunctions(),
+    create: (id: string, source: string): Promise<api.FunctionModel> => api.createFunction(id, source),
+    update: (id: string, source: string): Promise<api.FunctionModel> => api.updateFunction(id, source),
+    delete: (id: string): Promise<void> => api.deleteFunction(id),
+    invoke: (id: string, payload: string): Promise<unknown> => api.invokeFunction(id, payload),
   }
 
   readonly crons = {
