@@ -369,3 +369,83 @@ func TestBackup(t *testing.T) {
 		t.Fatalf("expected a file-held database to archive itself, got %v", err)
 	}
 }
+
+// What a Base can say about where it keeps records is one report whichever
+// engine is under it: the same collections, counted the same way. The engine is
+// visible in exactly one place, and it is the place a host has to act on — an
+// embedded database is files the app can size, back up and rewrite, while a
+// server's are the server's — so that is stated rather than averaged over.
+func TestDescribe(t *testing.T) {
+	app := newApp(t)
+	items(t, app)
+
+	db, err := core.DescribeDatabase(app)
+	if err != nil {
+		t.Fatalf("describe: %v", err)
+	}
+
+	if db.Engine != app.Dialect().Name() {
+		t.Fatalf("expected the report to name the connected engine %q, got %q", app.Dialect().Name(), db.Engine)
+	}
+
+	var counted *int64
+	for _, c := range db.Collections {
+		if c.Name == "items" {
+			counted = c.Records
+		}
+	}
+	if counted == nil {
+		t.Fatal("expected the report to count the collection that was just written")
+	}
+	if *counted != 3 {
+		t.Fatalf("expected the 3 records written, got %d", *counted)
+	}
+
+	if tests.Postgres() {
+		if db.Local {
+			t.Fatal("expected a server-held database to report that the app does not hold it")
+		}
+		if db.Data.Path != "" || db.Data.Size != 0 {
+			t.Fatalf("expected no file to be named for a server-held database, got %q at %d bytes", db.Data.Path, db.Data.Size)
+		}
+		return
+	}
+
+	if !db.Local {
+		t.Fatal("expected a file-held database to report that the app holds it")
+	}
+	if !strings.HasPrefix(db.Data.Path, app.DataDir()) {
+		t.Fatalf("expected the database to be named in the data directory %q, got %q", app.DataDir(), db.Data.Path)
+	}
+	if db.Data.Size == 0 || db.Aux.Size == 0 {
+		t.Fatalf("expected both files to be sized, got data=%d aux=%d", db.Data.Size, db.Aux.Size)
+	}
+}
+
+// A reclaim is the app rewriting what it holds, so it runs on whichever engine
+// holds it and reports what it freed. On a server it holds nothing, and says so
+// with a zero rather than by refusing: the rewrite still happens, at the server,
+// which is also where its size is read.
+func TestReclaim(t *testing.T) {
+	app := newApp(t)
+	items(t, app)
+
+	before, after, err := core.ReclaimDatabase(app)
+	if err != nil {
+		t.Fatalf("reclaim: %v", err)
+	}
+
+	if tests.Postgres() {
+		if before != 0 || after != 0 {
+			t.Fatalf("expected a server-held database to be no size of the app's, got %d then %d", before, after)
+		}
+		return
+	}
+
+	if before == 0 || after == 0 {
+		t.Fatalf("expected a file-held database to be sized either side of the rewrite, got %d then %d", before, after)
+	}
+	if after > before {
+		t.Fatalf("expected the rewrite to leave no more than it started with, got %d from %d", after, before)
+	}
+}
