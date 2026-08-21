@@ -3,7 +3,7 @@
 // same bundle works against any Base deploy since the fetch layer is relative.
 import { BaseClient } from '~/lib/base-client'
 
-export type { CollectionField, CollectionModel, ListResult, RecordModel } from '~/lib/base-client'
+export type { CollectionField, CollectionModel, FunctionModel, ListResult, RecordModel } from '~/lib/base-client'
 
 export const base = new BaseClient()
 

@@ -218,6 +218,21 @@ export interface LogModel {
   [key: string]: unknown
 }
 
+export interface FunctionModel {
+  // The name is the id: one row is one function, addressed at
+  // /v1/functions/{name}. The collection's own pattern is what a name must
+  // match, restated in FUNCTION_NAME below so a bad one is answered before the
+  // round trip rather than after it.
+  id: string
+  // What the function runs. It is a hidden field, so it comes back for a
+  // superuser and not for anyone else — a caller may learn that a function
+  // exists without learning what it says.
+  source: string
+  createdAt: string
+  updatedAt: string
+  [key: string]: unknown
+}
+
 export interface BackupModel {
   key: string
   size: number
@@ -379,6 +394,54 @@ export function getBackupDownloadURL(key: string, token: string): string {
 export async function getFileToken(): Promise<string> {
   const res = await request<{ token: string }>('/v1/files/token', { method: 'POST' })
   return res.token
+}
+
+// ---------------------------------------------------------------------------
+// Functions
+//
+// A function is a record in `_functions` and /v1/functions is the record path
+// with a nicer address — the same handlers, so the same rules decide who may
+// write one and who may call one. The five management calls below are that
+// address; `invokeFunction` is the one verb that is genuinely different, and it
+// is a POST to the function itself.
+// ---------------------------------------------------------------------------
+
+// What a function may be called, as the collection's id field spells it.
+export const FUNCTION_NAME = /^[a-z0-9][a-z0-9_-]*$/
+
+export async function listFunctions(): Promise<FunctionModel[]> {
+  const res = await request<ListResult<FunctionModel>>(`/v1/functions${qs({ perPage: 200, sort: 'id' })}`)
+  return res.items
+}
+
+export async function createFunction(id: string, source: string): Promise<FunctionModel> {
+  return request<FunctionModel>('/v1/functions', {
+    method: 'POST',
+    body: JSON.stringify({ id, source }),
+  })
+}
+
+// Only the source is sent. The name is the record's primary key, so renaming is
+// writing a different function, and PATCHing one here would quietly leave the
+// old name behind.
+export async function updateFunction(id: string, source: string): Promise<FunctionModel> {
+  return request<FunctionModel>(`/v1/functions/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ source }),
+  })
+}
+
+export async function deleteFunction(id: string): Promise<void> {
+  return request<void>(`/v1/functions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+// Run one function and answer with whatever it answered. The result is the
+// function's own JSON — any shape — so it is returned unread.
+export async function invokeFunction(id: string, payload: string): Promise<unknown> {
+  return request<unknown>(`/v1/functions/${encodeURIComponent(id)}`, {
+    method: 'POST',
+    body: payload,
+  })
 }
 
 // ---------------------------------------------------------------------------
