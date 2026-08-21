@@ -50,7 +50,7 @@ func newMockIAM(t *testing.T) *httptest.Server {
 		body, _ := io.ReadAll(r.Body)
 
 		switch r.URL.Path {
-		case "/v1/iam/send-verification-code":
+		case "/v1/iam/verification-codes":
 			if r.Method != http.MethodPost {
 				w.WriteHeader(http.StatusMethodNotAllowed)
 				return

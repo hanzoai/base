@@ -81,7 +81,7 @@ func (p *plugin) proxyToIAM(e *core.RequestEvent, method, path string, body []by
 
 // handleVerifyPhone proxies a phone verification request to IAM.
 //
-// Maps { countryCode, phone } to IAM /v1/iam/send-verification-code.
+// Maps { countryCode, phone } to IAM /v1/iam/verification-codes.
 func (p *plugin) handleVerifyPhone(e *core.RequestEvent) error {
 	raw, err := io.ReadAll(e.Request.Body)
 	if err != nil {
@@ -109,7 +109,7 @@ func (p *plugin) handleVerifyPhone(e *core.RequestEvent) error {
 		"method":        "login",
 	})
 
-	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/send-verification-code", iamBody)
+	return p.proxyToIAM(e, http.MethodPost, "/v1/iam/verification-codes", iamBody)
 }
 
 // handleVerifyCode proxies OTP verification to IAM login.
