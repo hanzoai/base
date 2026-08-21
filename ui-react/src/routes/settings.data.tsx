@@ -49,8 +49,10 @@ function Storage() {
     const freed = reclaim.data ? reclaim.data.before - reclaim.data.after : 0;
 
     // Biggest first: the reason to look at this list is to find what is using
-    // the space, and a name is easier to find in a list than a number is.
-    const collections = [...data.collections].sort((a, b) => (b.records ?? -1) - (a.records ?? -1));
+    // the space, and a name is easier to find in a list than a number is. A
+    // collection nobody could count leads, because that is a thing to go and
+    // look at and the bottom of a scrolling list is where it would not be seen.
+    const collections = [...data.collections].sort((a, b) => (b.records ?? Infinity) - (a.records ?? Infinity));
 
     return (
         <SectionCard title="Storage" description="Where this Base keeps its records.">
@@ -66,7 +68,12 @@ function Storage() {
             <div className="grid" style={ { ['--cols' as string]: 3 } }>
                 <div className="stack stack--tight">
                     <span className="eyebrow">Records</span>
-                    <span className="num">{ count(records) }{ uncounted > 0 && '+' }</span>
+                    <span className="num">
+                        { count(records) }
+                        { uncounted > 0 && (
+                            <span title={ `${uncounted} of the collections could not be counted, so this is a floor` }>+</span>
+                        ) }
+                    </span>
                 </div>
                 <div className="stack stack--tight">
                     <span className="eyebrow">Collections</span>
