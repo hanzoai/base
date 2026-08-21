@@ -29,8 +29,8 @@ type IAMUser struct {
 // service has its own IAMClient instance and a single token is shared
 // across many requests, so the working set stays well under cap).
 const (
-	tokenCacheTTL     = 5 * time.Minute
-	defaultCacheSize  = 10_000
+	tokenCacheTTL    = 5 * time.Minute
+	defaultCacheSize = 10_000
 )
 
 // ValidateIAMToken validates a bearer token against the IAM userinfo endpoint
@@ -240,7 +240,7 @@ func (c *IAMClient) InvalidateToken(token string) {
 type IAMKey struct {
 	Owner       string `json:"owner"`
 	Name        string `json:"name"`
-	Type        string `json:"type"`        // Organization, Application, User
+	Type        string `json:"type"` // Organization, Application, User
 	Org         string `json:"organization"`
 	Application string `json:"application"`
 	User        string `json:"user"`
@@ -288,7 +288,7 @@ func IsWidgetKey(token string) bool {
 }
 
 // ResolveAPIKey resolves an IAM API key to user + org context via IAM's
-// GET /v1/iam/resolve-user?accessKey= endpoint. Results are cached for
+// GET /v1/iam/keys/principal?accessKey= endpoint. Results are cached for
 // tokenCacheTTL; concurrent resolves of the same key are coalesced via
 // singleflight.
 //
@@ -322,9 +322,9 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 	q := url.Values{}
 	q.Set("accessKey", accessKey)
 
-	req, err := c.s2sRequest(context.Background(), "GET", "/v1/iam/resolve-user", q, nil)
+	req, err := c.s2sRequest(context.Background(), "GET", "/v1/iam/keys/principal", q, nil)
 	if err != nil {
-		return nil, fmt.Errorf("iam: resolve-user: %w", err)
+		return nil, fmt.Errorf("iam: keys/principal: %w", err)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -335,7 +335,7 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("iam: resolve-user returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("iam: keys/principal returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	// A key resolver is told exactly what it needs to attribute the request and

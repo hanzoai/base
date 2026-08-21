@@ -55,9 +55,9 @@ func (f *fakeIAM) callCount(path string) int64 {
 // Route names, spelled once. IAM's user surface is noun-shaped: the collection
 // is POSTed to for a create, and one person is read at its /get leaf.
 const (
-	routeUsers       = "/v1/iam/users"
-	routeUserGet     = "/v1/iam/users/get"
-	routeResolveUser = "/v1/iam/resolve-user"
+	routeUsers        = "/v1/iam/users"
+	routeUserGet      = "/v1/iam/users/get"
+	routeKeyPrincipal = "/v1/iam/keys/principal"
 )
 
 // writeUser writes a user record the way IAM's user routes answer: the masked
@@ -227,7 +227,7 @@ func TestResolveAPIKey(t *testing.T) {
 	// boundary, and IAM admits only a confidential service to it — so the
 	// credential is as load-bearing here as the path.
 	f := newFakeIAM(t)
-	f.setHandler(routeResolveUser, func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler(routeKeyPrincipal, func(w http.ResponseWriter, r *http.Request) {
 		wantBasic(t, r)
 		if got := r.URL.Query().Get("accessKey"); got != "sk-live-abc" {
 			t.Errorf("accessKey: got %q want sk-live-abc", got)
@@ -259,7 +259,7 @@ func TestResolveAPIKey(t *testing.T) {
 	if _, err := c.ResolveAPIKey("sk-live-abc"); err != nil {
 		t.Fatalf("second resolve: %v", err)
 	}
-	if got := f.callCount(routeResolveUser); got != 1 {
+	if got := f.callCount(routeKeyPrincipal); got != 1 {
 		t.Errorf("resolve calls: got %d want 1 (second must be cached)", got)
 	}
 }
@@ -270,7 +270,7 @@ func TestResolveAPIKey_RefusalDoesNotPoisonTheCache(t *testing.T) {
 	// being minted.
 	f := newFakeIAM(t)
 	var calls int64
-	f.setHandler(routeResolveUser, func(w http.ResponseWriter, r *http.Request) {
+	f.setHandler(routeKeyPrincipal, func(w http.ResponseWriter, r *http.Request) {
 		if atomic.AddInt64(&calls, 1) == 1 {
 			refuse(w, http.StatusBadRequest, "the entity does not exist")
 			return
