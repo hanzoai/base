@@ -119,6 +119,7 @@ ol {
   font-weight: var(--weight-semibold);
 }
 
+.shell__brand .mark,
 .shell__brand img {
   width: 1.5rem;
   height: 1.5rem;
@@ -880,4 +881,15 @@ textarea.cell__edit {
 /* Only inset the text when there is actually an icon sitting in the gutter. */
 .search:has(svg) .input {
   padding-left: var(--space-8);
+}
+
+/* The brand marks are drawn in `currentColor` so one file serves a light page
+   and a dark one. An <img> is a separate document and does not inherit it — the
+   mark resolved to black and vanished against the black the admin renders on.
+   As a mask the colour comes from CSS, which is the only side that knows. */
+.mark {
+  display: inline-block;
+  background-color: currentColor;
+  mask: var(--mark) center / contain no-repeat;
+  -webkit-mask: var(--mark) center / contain no-repeat;
 }

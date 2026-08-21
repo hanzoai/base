@@ -22,5 +22,5 @@ const slug = typeof window === 'undefined' ? '' : ((window as { __brand?: string
 // allowed it is fixed in apis/serve.go, but a stored answer cannot be fixed from
 // the origin, only stepped around. Bump this if it ever happens again.
 export const icon = slug
-  ? `${import.meta.env.BASE_URL}brands/${slug}/logo.svg?v=1`
+  ? `${import.meta.env.BASE_URL}brands/${slug}/logo.svg?v=2`
   : `${import.meta.env.BASE_URL}icon.svg`

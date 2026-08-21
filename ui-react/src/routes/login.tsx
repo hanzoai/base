@@ -58,13 +58,18 @@ function LoginPage() {
     <div className="shell shell--centered">
       <div className="panel stack">
         <div className="row">
-          <img src={icon} alt="Base" width={ 24 } height={ 24 } />
+          <span
+            className="mark"
+            role="img"
+            aria-label="Base"
+            style={ { ['--mark' as string]: `url(${icon})`, width: 24, height: 24 } }
+          />
           <h1 className="page__title">Sign in to Base</h1>
         </div>
         <p className="muted">
           { embedded
             ? 'Base could not pick up your session in this panel. Open it directly to sign in.'
-            : 'Base uses Hanzo IAM for authentication. Sign in with your Hanzo account to reach the admin.' }
+            : 'Base signs you in with Hanzo ID. Use your Hanzo account to reach the admin.' }
         </p>
         { error && <p className="danger">{ error }</p> }
         { embedded ? (
