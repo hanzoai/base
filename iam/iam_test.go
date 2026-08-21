@@ -55,8 +55,9 @@ func (f *fakeIAM) callCount(path string) int64 {
 // Route names, spelled once. IAM's user surface is noun-shaped: the collection
 // is POSTed to for a create, and one person is read at its /get leaf.
 const (
-	routeUsers   = "/v1/iam/users"
-	routeUserGet = "/v1/iam/users/get"
+	routeUsers       = "/v1/iam/users"
+	routeUserGet     = "/v1/iam/users/get"
+	routeResolveUser = "/v1/iam/resolve-user"
 )
 
 // writeUser writes a user record the way IAM's user routes answer: the masked
@@ -214,6 +215,84 @@ func TestLookupByAttribute_AmbiguousAddressPropagates(t *testing.T) {
 	}
 	if len(out) != 0 {
 		t.Fatalf("an ambiguous address must resolve to nobody, got %+v", out)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// ResolveAPIKey
+// ──────────────────────────────────────────────────────────────────────
+
+func TestResolveAPIKey(t *testing.T) {
+	// Resolving a secret key to the person it belongs to is an authentication
+	// boundary, and IAM admits only a confidential service to it — so the
+	// credential is as load-bearing here as the path.
+	f := newFakeIAM(t)
+	f.setHandler(routeResolveUser, func(w http.ResponseWriter, r *http.Request) {
+		wantBasic(t, r)
+		if got := r.URL.Query().Get("accessKey"); got != "sk-live-abc" {
+			t.Errorf("accessKey: got %q want sk-live-abc", got)
+		}
+		// This door kept its envelope: the projection rides under `data`.
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ok",
+			"data": map[string]any{
+				"owner": "hanzo", "name": "alice", "email": "alice@x.com",
+				"isAdmin": false, "billing_account": "hanzo", "scope": "",
+			},
+		})
+	})
+
+	c := iam.NewClient(f.server.URL)
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
+
+	user, err := c.ResolveAPIKey("sk-live-abc")
+	if err != nil {
+		t.Fatalf("ResolveAPIKey: %v", err)
+	}
+	if user.Name != "alice" || user.Email != "alice@x.com" {
+		t.Errorf("got %+v want alice/alice@x.com", user)
+	}
+	if len(user.OrgIDs) != 1 || user.OrgIDs[0] != "hanzo" {
+		t.Errorf("OrgIDs: got %v want [hanzo]", user.OrgIDs)
+	}
+	// Cached: a second resolve must not go back to IAM.
+	if _, err := c.ResolveAPIKey("sk-live-abc"); err != nil {
+		t.Fatalf("second resolve: %v", err)
+	}
+	if got := f.callCount(routeResolveUser); got != 1 {
+		t.Errorf("resolve calls: got %d want 1 (second must be cached)", got)
+	}
+}
+
+func TestResolveAPIKey_RefusalDoesNotPoisonTheCache(t *testing.T) {
+	// IAM refuses an unknown or wrong-door key. That must reach the caller as an
+	// error and leave nothing behind — a cached refusal would outlive the key
+	// being minted.
+	f := newFakeIAM(t)
+	var calls int64
+	f.setHandler(routeResolveUser, func(w http.ResponseWriter, r *http.Request) {
+		if atomic.AddInt64(&calls, 1) == 1 {
+			refuse(w, http.StatusBadRequest, "the entity does not exist")
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status": "ok",
+			"data":   map[string]any{"owner": "hanzo", "name": "alice", "email": "alice@x.com"},
+		})
+	})
+
+	c := iam.NewClient(f.server.URL)
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
+
+	if _, err := c.ResolveAPIKey("sk-live-abc"); err == nil {
+		t.Fatal("a refused key must error")
+	}
+	user, err := c.ResolveAPIKey("sk-live-abc")
+	if err != nil {
+		t.Fatalf("retry after refusal: %v", err)
+	}
+	if user.Name != "alice" {
+		t.Errorf("got %+v want alice", user)
 	}
 }
 
