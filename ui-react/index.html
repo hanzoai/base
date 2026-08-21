@@ -14,8 +14,8 @@
     <script>
       (function () {
         var h = location.hostname
-        var brand = /(^|\.)lux\.(network|finance)$/.test(h) ? 'Lux'
-          : /(^|\.)zoo\.(ngo|network)$/.test(h) ? 'Zoo'
+        var brand = /(^|\.)(lux\.(network|finance|id))$/.test(h) ? 'Lux'
+          : /(^|\.)(zoo\.(ngo|network)|zoolabs\.id)$/.test(h) ? 'Zoo'
           : /(^|\.)hanzo\.(ai|id)$/.test(h) ? 'Hanzo'
           : ''
         if (brand) document.title = brand + ' Base'

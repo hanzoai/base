@@ -5,7 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Base Admin</title>
+    <title>Base</title>
+    <!-- The page carries the brand of the host it was served from. Base is shared
+         infrastructure: the same binary answers on hanzo.ai, lux.network and
+         zoo.ngo, so a name compiled into the page is right on one of them and
+         wrong on the rest. Inline and before the bundle, because the tab is
+         titled while React is still downloading. -->
+    <script>
+      (function () {
+        var h = location.hostname
+        var brand = /(^|\.)(lux\.(network|finance|id))$/.test(h) ? 'Lux'
+          : /(^|\.)(zoo\.(ngo|network)|zoolabs\.id)$/.test(h) ? 'Zoo'
+          : /(^|\.)hanzo\.(ai|id)$/.test(h) ? 'Hanzo'
+          : ''
+        if (brand) document.title = brand + ' Base'
+      })()
+    </script>
     <script type="module" crossorigin src="/assets/index-DPUOfdJ-.js"></script>
     <link rel="stylesheet" crossorigin href="/assets/index-7Zn13fNS.css">
   </head>
