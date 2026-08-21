@@ -458,6 +458,48 @@ export async function runCron(jobId: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Database
+// ---------------------------------------------------------------------------
+
+export interface DatabaseFile {
+  path: string
+  size: number
+}
+
+export interface DatabaseCollection {
+  // null for a collection the engine refused to count, which is unknown rather
+  // than empty and is shown as unknown.
+  records: number | null
+  id: string
+  name: string
+  type: string
+  system: boolean
+}
+
+export interface DatabaseModel {
+  engine: string
+  // The app holds the database as files it can size and rewrite. False when a
+  // server holds it, and then path and size are empty rather than invented.
+  local: boolean
+  data: DatabaseFile
+  aux: DatabaseFile
+  collections: DatabaseCollection[]
+}
+
+export interface Reclaimed {
+  before: number
+  after: number
+}
+
+export async function getDatabase(): Promise<DatabaseModel> {
+  return request<DatabaseModel>('/v1/database')
+}
+
+export async function reclaimDatabase(): Promise<Reclaimed> {
+  return request<Reclaimed>('/v1/database/reclaim', { method: 'POST' })
+}
+
+// ---------------------------------------------------------------------------
 // Superusers (convenience)
 // ---------------------------------------------------------------------------
 

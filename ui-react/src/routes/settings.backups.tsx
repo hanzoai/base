@@ -5,6 +5,7 @@ import { useState } from 'react';
 
 import { base } from '~/lib/base';
 import { SectionCard } from '~/components/SectionCard';
+import { bytes } from '~/lib/format';
 
 interface S3Form {
     enabled: boolean;
@@ -20,14 +21,6 @@ interface BackupOptionsForm {
     cron: string;
     cronMaxKeep: number;
     s3: S3Form;
-}
-
-function formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
 
 function BackupsSettings() {
@@ -154,7 +147,7 @@ function BackupsSettings() {
                             { backupsList.data.map((b) => (
                                 <tr key={ b.key }>
                                     <td className="mono">{ b.key }</td>
-                                    <td className="muted">{ formatBytes(b.size) }</td>
+                                    <td className="muted">{ bytes(b.size) }</td>
                                     <td align="right">
                                         <div className="row">
                                             <button

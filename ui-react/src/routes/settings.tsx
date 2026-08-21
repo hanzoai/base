@@ -7,7 +7,7 @@ const navItems = [
     { to: '/settings/backups', label: 'Backups' },
     { to: '/settings/auth', label: 'Auth providers' },
     { to: '/settings/tokens', label: 'Token options' },
-    { to: '/settings/data', label: 'Import / Export' },
+    { to: '/settings/data', label: 'Data' },
     { to: '/settings/logs', label: 'Log settings' },
     { to: '/settings/rate-limits', label: 'Rate limits' },
     { to: '/settings/crons', label: 'Cron jobs' },

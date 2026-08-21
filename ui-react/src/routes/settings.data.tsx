@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 
 import { base } from '~/lib/base';
 import { SectionCard } from '~/components/SectionCard';
+import { bytes, count } from '~/lib/format';
 
 type CollectionRecord = CollectionModel & Record<string, unknown>;
 
@@ -18,6 +19,122 @@ function isSchema(entry: unknown): boolean {
     const { id, name } = entry as { id?: unknown; name?: unknown };
     const text = (v: unknown) => v === undefined || typeof v === 'string';
     return text(id) && text(name) && (typeof id === 'string' || typeof name === 'string');
+}
+
+// What the engine is called where it is bought, as against what it is called
+// where SQL is written: the report names the dialect, because that is what
+// builds the SQL, and this is the product it belongs to. An engine with no
+// product name reads as itself rather than as nothing.
+const PRODUCT: Record<string, string> = {
+    sqlite: 'Hanzo SQLite',
+    postgres: 'Hanzo SQL',
+};
+
+function Storage() {
+    const qc = useQueryClient();
+    const db = useQuery({ queryKey: ['database'], queryFn: () => base.database.get() });
+
+    const reclaim = useMutation({
+        mutationFn: () => base.database.reclaim(),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['database'] }),
+    });
+
+    if (db.isPending) return <SectionCard title="Storage"><div className="muted">Loading...</div></SectionCard>;
+    if (db.error) return <SectionCard title="Storage"><div className="danger">{ db.error.message }</div></SectionCard>;
+
+    const data = db.data!;
+    const counted = data.collections.filter((c) => c.records !== null);
+    const records = counted.reduce((sum, c) => sum + (c.records ?? 0), 0);
+    const uncounted = data.collections.length - counted.length;
+    const freed = reclaim.data ? reclaim.data.before - reclaim.data.after : 0;
+
+    // Biggest first: the reason to look at this list is to find what is using
+    // the space, and a name is easier to find in a list than a number is.
+    const collections = [...data.collections].sort((a, b) => (b.records ?? -1) - (a.records ?? -1));
+
+    return (
+        <SectionCard title="Storage" description="Where this Base keeps its records.">
+            <div className="row">
+                <span className="tag ok">{ PRODUCT[data.engine] ?? data.engine }</span>
+                <span className="muted small">
+                    { data.local
+                        ? 'Embedded — the files below are this Base\'s own. The same API runs on Hanzo SQL, once a deployment points an instance at a server.'
+                        : 'On a server — sizing it, backing it up and rewriting it happen there.' }
+                </span>
+            </div>
+
+            <div className="grid" style={ { ['--cols' as string]: 3 } }>
+                <div className="stack stack--tight">
+                    <span className="eyebrow">Records</span>
+                    <span className="num">{ count(records) }{ uncounted > 0 && '+' }</span>
+                </div>
+                <div className="stack stack--tight">
+                    <span className="eyebrow">Collections</span>
+                    <span className="num">{ count(data.collections.length) }</span>
+                </div>
+                <div className="stack stack--tight">
+                    <span className="eyebrow">On disk</span>
+                    <span className="num">{ data.local ? bytes(data.data.size + data.aux.size) : '—' }</span>
+                </div>
+            </div>
+
+            { data.local && (
+                <ul className="stack stack--tight small">
+                    { [data.data, data.aux].map((file) => (
+                        <li key={ file.path } className="row">
+                            <span className="mono truncate grow">{ file.path }</span>
+                            <span className="muted num">{ bytes(file.size) }</span>
+                        </li>
+                    )) }
+                </ul>
+            ) }
+
+            <div className="row">
+                <button
+                    onClick={ () => reclaim.mutate() }
+                    disabled={ reclaim.isPending }
+                    className="btn btn--outline"
+                >
+                    { reclaim.isPending ? 'Reclaiming...' : 'Reclaim unused space' }
+                </button>
+                <span className="muted small">
+                    Rewrites both databases without the pages deleted records left behind.
+                </span>
+                { reclaim.isSuccess && (
+                    <span className="ok small">
+                        { data.local ? `Freed ${bytes(freed)}.` : 'Rewritten at the server.' }
+                    </span>
+                ) }
+                { reclaim.error && <span className="danger small">{ reclaim.error.message }</span> }
+            </div>
+
+            <div className="table-wrap" style={ { maxHeight: '18rem' } }>
+                <table className="table">
+                    <thead>
+                        <tr>
+                            <th>Collection</th>
+                            <th>Type</th>
+                            <th align="right">Records</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        { collections.map((c) => (
+                            <tr key={ c.id }>
+                                <td>
+                                    { c.name }
+                                    { c.system && <span className="type-tag"> system</span> }
+                                </td>
+                                <td className="muted">{ c.type }</td>
+                                <td align="right" className="num">
+                                    { c.records === null ? <span className="muted" title="the engine refused to count this one">?</span> : count(c.records) }
+                                </td>
+                            </tr>
+                        )) }
+                    </tbody>
+                </table>
+            </div>
+        </SectionCard>
+    );
 }
 
 function DataSettings() {
@@ -133,6 +250,8 @@ function DataSettings() {
 
     return (
         <div className="page">
+            <Storage />
+
             <SectionCard title="Export collections" description="Download your collection schemas as JSON.">
                 <div className="row">
                     <label className="field field--inline">
