@@ -287,10 +287,14 @@ func IsWidgetKey(token string) bool {
 	return strings.HasPrefix(token, "hz-")
 }
 
-// ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
-// Uses IAM's GET /v1/iam/get-user?accessKey= endpoint. Results are cached for
+// ResolveAPIKey resolves an IAM API key to user + org context via IAM's
+// GET /v1/iam/resolve-user?accessKey= endpoint. Results are cached for
 // tokenCacheTTL; concurrent resolves of the same key are coalesced via
 // singleflight.
+//
+// That door resolves a SECRET key. A publishable pk- names an organization and
+// never a person — which is what makes it safe to ship in a browser — so it
+// resolves to nobody here and IAM answers it at its own door.
 func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
 	if user, ok := c.cache.Get(accessKey); ok {
 		return user, nil
@@ -315,11 +319,12 @@ func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
 }
 
 func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
-	u := c.baseURL + "/v1/iam/get-user?accessKey=" + url.QueryEscape(accessKey)
+	q := url.Values{}
+	q.Set("accessKey", accessKey)
 
-	req, err := http.NewRequest("GET", u, nil)
+	req, err := c.s2sRequest(context.Background(), "GET", "/v1/iam/resolve-user", q, nil)
 	if err != nil {
-		return nil, fmt.Errorf("iam: create key request: %w", err)
+		return nil, fmt.Errorf("iam: resolve-user: %w", err)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -330,15 +335,18 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("iam: get-user returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("iam: resolve-user returned %d: %s", resp.StatusCode, string(body))
 	}
 
+	// A key resolver is told exactly what it needs to attribute the request and
+	// nothing more: who the key belongs to, and which organization pays. There is
+	// no opaque subject in this projection — deliberately, so resolving one
+	// credential can never disclose the holder's other credentials.
 	var result struct {
 		Data struct {
 			Owner string `json:"owner"`
 			Name  string `json:"name"`
 			Email string `json:"email"`
-			ID    string `json:"id"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -350,7 +358,6 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 	}
 
 	return &IAMUser{
-		ID:     result.Data.ID,
 		Name:   result.Data.Name,
 		Email:  result.Data.Email,
 		OrgIDs: []string{result.Data.Owner},
