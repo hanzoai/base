@@ -1,0 +1,12 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .bg { fill: #000; }
+    @media (prefers-color-scheme: light) {
+      .bg { fill: #fff; }
+    }
+  </style>
+  <rect class="bg" width="64" height="64" rx="8"/>
+  <circle cx="32" cy="22" r="12" fill="#00A652"/>
+  <circle cx="21" cy="40" r="12" fill="#ED1C24"/>
+  <circle cx="43" cy="40" r="12" fill="#2E3192"/>
+</svg>
