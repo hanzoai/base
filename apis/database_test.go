@@ -68,6 +68,35 @@ func TestDatabaseRead(t *testing.T) {
 	}
 }
 
+// A collection the engine will not count does not take the report down with it:
+// the count is reported as unknown and the rest of the collections still carry
+// theirs. A dropped table is the cheap way to make one, and it makes three —
+// the collection itself and the two views reading from it.
+func TestDatabaseUncountable(t *testing.T) {
+	t.Parallel()
+
+	scenario := tests.ApiScenario{
+		Name:    "a collection the engine will not count",
+		Method:  http.MethodGet,
+		URL:     "/v1/database",
+		Headers: map[string]string{"Authorization": databaseSuperuser},
+		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			if _, err := app.NonconcurrentDB().NewQuery("DROP TABLE demo1").Execute(); err != nil {
+				t.Fatal(err)
+			}
+		},
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`{"records":null,"id":"wsmn24bux7wo113","name":"demo1","type":"base","system":false}`,
+			`{"records":null,"id":"v9gwnfh02gjq1q0","name":"view1","type":"view","system":false}`,
+			`{"records":4,"id":"hbc_3142635823","name":"_superusers","type":"auth","system":true}`,
+		},
+		ExpectedEvents: map[string]int{"*": 0},
+	}
+
+	scenario.Test(t)
+}
+
 func TestDatabaseReclaim(t *testing.T) {
 	t.Parallel()
 
