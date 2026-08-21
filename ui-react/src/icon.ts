@@ -16,6 +16,11 @@
 // our logo to a lookalike domain is worse than showing a generic glyph.
 const slug = typeof window === 'undefined' ? '' : ((window as { __brand?: string }).__brand ?? '')
 
+// ?v is a CACHE EVICTION, not decoration. The edge cached the SPA fallback under
+// /brands/hanzo/logo.svg — it was requested before the release that added the
+// file — and that entry answers HTML at 200 for a fortnight. The header that
+// allowed it is fixed in apis/serve.go, but a stored answer cannot be fixed from
+// the origin, only stepped around. Bump this if it ever happens again.
 export const icon = slug
-  ? `${import.meta.env.BASE_URL}brands/${slug}/logo.svg`
+  ? `${import.meta.env.BASE_URL}brands/${slug}/logo.svg?v=1`
   : `${import.meta.env.BASE_URL}icon.svg`
