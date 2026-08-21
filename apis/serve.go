@@ -132,9 +132,31 @@ func Serve(app core.App, config ServeConfig) error {
 		// the SPA index.html and let React Router resolve them client-side.
 		baseRouter.GET("/{path...}", Static(uireact.DistDirFS(), true)).
 			BindFunc(func(e *core.RequestEvent) error {
-				// ignore root path
-				if e.Request.PathValue(StaticWildcardParam) != "" {
+				// A FORTNIGHT'S CACHE BELONGS TO CONTENT-ADDRESSED FILES ONLY.
+				//
+				// This route falls back to index.html for any path it cannot
+				// find, which is what makes deep links work — but the fallback
+				// is served UNDER THE REQUESTED URL, at 200. Cached for two
+				// weeks, a path that does not exist YET becomes HTML for two
+				// weeks after the release that adds it.
+				//
+				// Measured, not hypothetical: /brands/hanzo/logo.svg was
+				// requested before the release carrying it, the edge stored the
+				// fallback, and after the release it still answered
+				// text/html at 200 with age=2888 — the logo rendering broken
+				// with nothing in the console, exactly as ui-react/src/icon.ts
+				// warns. Its siblings, never requested early, were fine.
+				//
+				// Only /assets carries a content hash in the name, so only
+				// /assets can be immutable. Everything else gets a short cache:
+				// long enough to spare the origin, short enough that a stale
+				// answer heals itself.
+				switch path := e.Request.PathValue(StaticWildcardParam); {
+				case path == "": // root
+				case strings.HasPrefix(path, "assets/"):
 					e.Response.Header().Set("Cache-Control", "max-age=1209600, stale-while-revalidate=86400")
+				default:
+					e.Response.Header().Set("Cache-Control", "max-age=300, stale-while-revalidate=300")
 				}
 
 				// add a default CSP
