@@ -2,23 +2,36 @@
 <html lang="en" class="dark" style="background:#000;color-scheme:dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link id="favicon" rel="icon" type="image/svg+xml" href="/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <title>Base</title>
-    <!-- The page carries the brand of the host it was served from. Base is shared
-         infrastructure: the same binary answers on hanzo.ai, lux.network and
-         zoo.ngo, so a name compiled into the page is right on one of them and
-         wrong on the rest. Inline and before the bundle, because the tab is
-         titled while React is still downloading. -->
+    <!-- The page carries the mark and the name of the host it was served from.
+         Base is shared infrastructure: the same binary answers on hanzo.ai,
+         lux.network and zoo.ngo, so anything compiled in is right on one of them
+         and wrong on the rest.
+
+         THE BRAND IS RESOLVED HERE, ONCE, and left on window for the app to
+         read. The alternative was this map plus a second copy in the bundle, and
+         two copies of "which brand is this host" is how a page ends up titled
+         Hanzo over somebody else's mark.
+
+         Inline and ahead of the bundle, because the tab is titled and the icon
+         swapped while React is still downloading. -->
     <script>
       (function () {
         var h = location.hostname
-        var brand = /(^|\.)(lux\.(network|finance|id))$/.test(h) ? 'Lux'
-          : /(^|\.)(zoo\.(ngo|network)|zoolabs\.id)$/.test(h) ? 'Zoo'
-          : /(^|\.)hanzo\.(ai|id)$/.test(h) ? 'Hanzo'
+        var slug = /(^|\.)(lux\.(network|finance|id))$/.test(h) ? 'lux'
+          : /(^|\.)(zoo\.(ngo|network)|zoolabs\.id)$/.test(h) ? 'zoo'
+          : /(^|\.)hanzo\.(ai|id)$/.test(h) ? 'hanzo'
           : ''
-        if (brand) document.title = brand + ' Base'
+        // Unknown host keeps the unbranded mark. A lookalike domain must not be
+        // handed our logo, so the patterns anchor to the registrable domain.
+        window.__brand = slug
+        if (!slug) return
+        document.title = { lux: 'Lux', zoo: 'Zoo', hanzo: 'Hanzo' }[slug] + ' Base'
+        var link = document.getElementById('favicon')
+        if (link) link.href = '/brands/' + slug + '/favicon.svg'
       })()
     </script>
   </head>
