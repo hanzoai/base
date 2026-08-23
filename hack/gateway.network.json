@@ -17,13 +17,13 @@
   },
   "endpoints": [
     {
-      "endpoint": "/api/{path}",
+      "endpoint": "/v1/{path}",
       "method": "GET",
       "input_headers": ["*"],
       "output_encoding": "no-op",
       "backend": [
         {
-          "url_pattern": "/api/{path}",
+          "url_pattern": "/v1/{path}",
           "host": ["http://base-a:8090"],
           "encoding": "no-op",
           "extra_config": {
@@ -36,13 +36,13 @@
       ]
     },
     {
-      "endpoint": "/api/{path}",
+      "endpoint": "/v1/{path}",
       "method": "POST",
       "input_headers": ["*"],
       "output_encoding": "no-op",
       "backend": [
         {
-          "url_pattern": "/api/{path}",
+          "url_pattern": "/v1/{path}",
           "host": ["http://base-a:8090"],
           "encoding": "no-op",
           "extra_config": {
@@ -55,13 +55,13 @@
       ]
     },
     {
-      "endpoint": "/api/{path}",
+      "endpoint": "/v1/{path}",
       "method": "DELETE",
       "input_headers": ["*"],
       "output_encoding": "no-op",
       "backend": [
         {
-          "url_pattern": "/api/{path}",
+          "url_pattern": "/v1/{path}",
           "host": ["http://base-a:8090"],
           "encoding": "no-op",
           "extra_config": {
