@@ -31,9 +31,9 @@ echo "--- wait for gateway + all 3 pods healthy ---"
 deadline=$((SECONDS + 60))
 while [[ $SECONDS -lt $deadline ]]; do
   # Any response at all (including 404/400) means gateway is listening.
-  if curl -s -o /dev/null -w '%{http_code}' "$GATEWAY/api/__probe" | grep -qE '^[0-9]+$'; then
+  if curl -s -o /dev/null -w '%{http_code}' "$GATEWAY/v1/__probe" | grep -qE '^[0-9]+$'; then
     # Probe each pod directly to confirm it's up.
-    if curl -fsS "http://localhost:18090/api/health" >/dev/null 2>&1 \
+    if curl -fsS "http://localhost:18090/v1/health" >/dev/null 2>&1 \
       || curl -fsS "http://localhost:18090/-/base/members" >/dev/null 2>&1; then
       break
     fi
@@ -52,7 +52,7 @@ for pod in 18090 18091 18092; do
 done
 
 echo "--- write a row via gateway ---"
-write_resp=$(curl -fsS -XPOST "$GATEWAY/api/collections/_pbc/records" \
+write_resp=$(curl -fsS -XPOST "$GATEWAY/v1/collections/_pbc/records" \
   -H "Content-Type: application/json" \
   -H "X-User-Id: $USER" \
   -d '{"payload":"smoke"}')
@@ -63,7 +63,7 @@ $COMPOSE kill base-b
 sleep 2
 
 echo "--- read back via gateway (must still succeed with 2/3 quorum) ---"
-if ! curl -fsS "$GATEWAY/api/collections/_pbc/records?filter=payload=smoke" \
+if ! curl -fsS "$GATEWAY/v1/collections/_pbc/records?filter=payload=smoke" \
   -H "X-User-Id: $USER" >/dev/null; then
   echo "FAIL: read after node kill did not succeed" >&2
   $COMPOSE logs --tail=50 base-a base-c gateway >&2 || true
@@ -71,7 +71,7 @@ if ! curl -fsS "$GATEWAY/api/collections/_pbc/records?filter=payload=smoke" \
 fi
 
 echo "--- shard_key_missing is enforced (no X-User-Id → 400) ---"
-status=$(curl -s -o /dev/null -w '%{http_code}' -XPOST "$GATEWAY/api/collections/_pbc/records" \
+status=$(curl -s -o /dev/null -w '%{http_code}' -XPOST "$GATEWAY/v1/collections/_pbc/records" \
   -H "Content-Type: application/json" -d '{}')
 if [[ "$status" != "400" ]]; then
   echo "FAIL: expected 400 for missing shard key, got $status" >&2

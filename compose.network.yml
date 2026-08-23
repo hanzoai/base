@@ -8,8 +8,8 @@
 #
 #   docker compose -f compose.network.yml up -d
 #   # wait a few seconds for members to register, then:
-#   curl -H 'X-User-Id: alice' -XPOST localhost:18080/api/collections/_pbc/records -d '{}'
-#   curl -H 'X-User-Id: alice'         localhost:18080/api/collections/_pbc/records/last
+#   curl -H 'X-User-Id: alice' -XPOST localhost:18080/v1/collections/_pbc/records -d '{}'
+#   curl -H 'X-User-Id: alice'         localhost:18080/v1/collections/_pbc/records/last
 #
 # Simulate a node failure:
 #
@@ -46,7 +46,7 @@ services:
     healthcheck:
       # Soft probe: any response (incl. 404 before Agent #1's /-/base/members
       # lands) counts as "up". Real quorum health is surfaced by the gateway.
-      test: ["CMD-SHELL", "curl -sfo /dev/null http://localhost:8090/ || curl -sfo /dev/null http://localhost:8090/api/health || [ $? -lt 22 ]"]
+      test: ["CMD-SHELL", "curl -sfo /dev/null http://localhost:8090/ || curl -sfo /dev/null http://localhost:8090/v1/health || [ $? -lt 22 ]"]
       interval: 5s
       timeout: 2s
       retries: 20
