@@ -20,8 +20,8 @@ import (
 // The two endpoints kept here are read-only or refresh existing
 // sessions and do not issue new credentials:
 //
-//   - GET  /api/collections/{c}/auth-methods  — discovery metadata
-//   - POST /api/collections/{c}/auth-refresh  — rotate an existing JWT
+//   - GET  /v1/collections/{c}/auth-methods  — discovery metadata
+//   - POST /v1/collections/{c}/auth-refresh  — rotate an existing JWT
 //
 // Any client that hits a stale local-auth URL gets a generic 404 from
 // the router, which is the correct signal for a permanently-removed
