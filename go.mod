@@ -170,7 +170,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/zap-proto/http v0.3.5
-	github.com/zap-proto/zip v1.34.1
+	github.com/zap-proto/zip v1.34.2
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.37.0 // indirect
