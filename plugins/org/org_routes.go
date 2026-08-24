@@ -89,15 +89,24 @@ func actsForUser(e *core.RequestEvent, user string) bool {
 		return true
 	}
 
+	return actsForOrg(e)
+}
+
+// actsForOrg reports whether the credential carries authority over the org it
+// acts in rather than only over its own subject: an org admin's token, the
+// org's own secret key, or a platform operator. A member's token is not that.
+func actsForOrg(e *core.RequestEvent) bool {
 	admin, _ := e.Get(apis.RequestEventKeyOrgAdmin).(bool)
 	return admin || e.HasSuperuserAuth()
 }
 
-// addressed is what an address under /v1/bases names: the org, and — where the
-// address has one — the user. Either may be empty.
+// addressed is what an address under /v1/bases names: the org, whether the
+// address names the org's own credentials, and — where the address has one —
+// the user.
 type addressed struct {
-	org  string
-	user string
+	org   string
+	creds bool
+	user  string
 }
 
 // address reads what the ROUTER matched as an address under /v1/bases,
@@ -129,7 +138,10 @@ func address(r *http.Request) (addressed, bool) {
 	segments := strings.Split(strings.Trim(matched, "/"), "/") // v1, bases, ...
 
 	a := addressed{org: matchedSegment(r, segments, 2)}
-	if len(segments) >= 5 && segments[3] == "customers" {
+	switch matchedSegment(r, segments, 3) {
+	case "creds":
+		a.creds = true
+	case "customers":
 		a.user = matchedSegment(r, segments, 4)
 	}
 
@@ -231,6 +243,34 @@ func namesItsOwnUser(e *core.RequestEvent) error {
 
 	if !actsForUser(e, named.user) {
 		return e.ForbiddenError("The credential acts for its own user only.", nil)
+	}
+
+	return e.Next()
+}
+
+// secretsBelongToTheOrg refuses the org's provider credentials to a credential
+// that carries only membership.
+//
+// A provider credential is the ORG's — the key its Stripe account charges on,
+// the secret its webhooks are verified with — and every member of an org held
+// one. Belonging to an org is not the same fact as speaking for it, which is
+// the same distinction /customers/{userId} draws and the same one an org admin
+// exists to hold.
+//
+// Read and write are one fact here, so both are refused together: whoever reads
+// the key can spend it, and whoever writes it points the org's integration at
+// an account of their own choosing.
+//
+// An org admin's token, the org's own secret key, and a platform operator all
+// act for the org and reach them.
+func secretsBelongToTheOrg(e *core.RequestEvent) error {
+	named, ok := address(e.Request)
+	if !ok || !named.creds {
+		return e.Next()
+	}
+
+	if !actsForOrg(e) {
+		return e.ForbiddenError("The organization's credentials are reached by a credential that acts for the organization.", nil)
 	}
 
 	return e.Next()

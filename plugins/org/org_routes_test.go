@@ -348,6 +348,53 @@ func TestAPublishableKeyReachesNoBase(t *testing.T) {
 	}
 }
 
+// credRoutes is every address that reads or writes the org's own provider
+// credentials.
+var credRoutes = []struct{ method, path string }{
+	{http.MethodGet, "/v1/bases/alpha/creds/stripe"},
+	{http.MethodPost, "/v1/bases/alpha/creds/stripe"},
+	{http.MethodDelete, "/v1/bases/alpha/creds"},
+}
+
+// TestAMemberReachesNoOrgCredential pins that a provider credential belongs to
+// the org and not to everyone in it.
+//
+// The key the org's Stripe account charges on is the org's. A member holding it
+// can spend it; a member writing it points the org's integration at an account
+// of their own. Membership is not authority over the org, which is the same
+// distinction the customer route draws between a person and their colleagues.
+func TestAMemberReachesNoOrgCredential(t *testing.T) {
+	_, iam, mux, _ := twoOrgs(t)
+
+	ann := iam.member(t, "alpha/ann", "alpha")
+	for _, r := range credRoutes {
+		code, body := call(t, mux, r.method, r.path, ann, nil)
+		if code != http.StatusForbidden {
+			t.Errorf("%s %s as a member answered %d %s, want 403", r.method, r.path, code, body)
+		}
+	}
+
+	// The org's own admin acts for the org and holds them.
+	boss := iam.token(t, "alpha/boss", "alpha")
+	for _, r := range credRoutes {
+		if code, body := call(t, mux, r.method, r.path, boss, nil); code == http.StatusForbidden {
+			t.Errorf("%s %s refused the org's own admin: %s", r.method, r.path, body)
+		}
+	}
+}
+
+// TestASecretKeyReachesItsOrgCredentials is the other half: an sk- key is the
+// org's own server credential, so it acts for the org the way its admin does.
+func TestASecretKeyReachesItsOrgCredentials(t *testing.T) {
+	_, _, mux := keyed(t, "alpha")
+
+	for _, r := range credRoutes {
+		if code, body := call(t, mux, r.method, r.path, "sk-the-orgs-own-key", nil); code == http.StatusForbidden {
+			t.Errorf("%s %s refused the org's own secret key: %s", r.method, r.path, body)
+		}
+	}
+}
+
 // TestAMemberReachesOnlyItsOwnCustomerRow pins the second half of the customer
 // route, which compared orgs and said nothing whatever about users.
 //
