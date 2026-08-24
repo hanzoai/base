@@ -1244,6 +1244,16 @@ against the struct that receives them, not against what the page used to do.
 ### Build notes
 - `dist/` is committed so `go build` is hermetic — CI compiles the binary with no
   Node toolchain. Rebuild it in the same commit as any `src/` change.
+- **Rebuild it on Linux.** The bundle is platform-dependent: same source, same
+  lockfile, same rolldown 1.2.2, same `pnpm build`, and the darwin-arm64 binding
+  emits about 10% more than the linux one — measured, 842,225 bytes against
+  914,541, and 136,931 tokens against 150,173. It is the SAME CODE: the two
+  bundles carry identical string literals and their unique identifiers differ by
+  exactly one. What differs is how hard the emitter worked, not what it emitted.
+  Rebuilding on a mac therefore lands 72 KB of diff that says nothing and that the
+  next Linux rebuild reverts, so the artifact ping-pongs between machines and
+  every such commit has to be read to find out it means nothing. Both bundles
+  pass `pnpm smoke`.
 - TypeScript **7.0.2** (the native Go compiler; `tsc` and `tsgo` are the same
   binary). Do NOT add `@typescript/native-preview` — it is 7.0.0-dev, behind
   stable.
