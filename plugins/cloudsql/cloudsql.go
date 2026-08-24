@@ -27,8 +27,10 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/dbx"
 )
 
 // Config defines the configuration for the Cloud SQL plugin.
@@ -213,7 +215,13 @@ func (p *plugin) ensureCollections() error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
+	// Every address below answers about one org's database, and a database is
+	// reached with the password that opens it — so every request has to name
+	// an org, and the only org it may name is the one its credential carries.
+	// The rule is stated once per group, so a route added to either group
+	// inherits it, and each handler asks the same question again for the value.
 	api := r.Group("/v1/cloud-sql")
+	api.BindFunc(actsInAnOrg)
 
 	api.POST("/databases", p.handleCreateDatabase)
 	api.GET("/databases", p.handleListDatabases)
@@ -226,6 +234,7 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 
 	// Register specific methods to avoid conflict with the static catch-all GET /{path...}
 	meta := r.Group("/v1/meta")
+	meta.BindFunc(actsInAnOrg)
 	meta.GET("/{path...}", p.handleMetaProxy)
 	meta.POST("/{path...}", p.handleMetaProxy)
 	meta.PUT("/{path...}", p.handleMetaProxy)
@@ -233,14 +242,61 @@ func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	meta.DELETE("/{path...}", p.handleMetaProxy)
 }
 
+// orgOf is the organization a request acts in: the one the door resolved from
+// the verified credential and published on the event, whichever door read it —
+// an IAM token over JWKS, or an IAM key. A request carrying no credential
+// resolves no org, and no org is not every org.
+//
+// It is never read off the request. X-Org-Id states what a caller MEANT; the
+// door has already answered with what the credential SAYS, and that is the
+// answer a database is handed out on.
+func orgOf(e *core.RequestEvent) (string, error) {
+	if org, _ := e.Get(apis.RequestEventKeyOrg).(string); org != "" {
+		return org, nil
+	}
+
+	return "", e.UnauthorizedError("The request requires a credential that carries an organization.", nil)
+}
+
+// actsInAnOrg refuses a request that carries no organization, before it reaches
+// a handler.
+func actsInAnOrg(e *core.RequestEvent) error {
+	if _, err := orgOf(e); err != nil {
+		return err
+	}
+
+	return e.Next()
+}
+
+// database is the row {id} names, read for the org the credential acts in. A
+// row another org owns is refused rather than described, so an id is worth
+// nothing to a caller who is not in the org that holds it.
+func (p *plugin) database(e *core.RequestEvent) (*core.Record, error) {
+	org, err := orgOf(e)
+	if err != nil {
+		return nil, err
+	}
+
+	record, err := p.app.FindRecordById(collectionCloudSQLDBs, e.Request.PathValue("id"))
+	if err != nil {
+		return nil, e.NotFoundError("database not found", err)
+	}
+
+	if record.GetString("orgId") != org {
+		return nil, e.ForbiddenError("The credential does not act in the requested organization.", nil)
+	}
+
+	return record, nil
+}
+
 // --------------------------------------------------------------------------
 // Database provisioning
 // --------------------------------------------------------------------------
 
 func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
-	authHeader := e.Request.Header.Get("Authorization")
-	if !strings.HasPrefix(authHeader, "Bearer ") {
-		return e.UnauthorizedError("missing authorization", nil)
+	org, err := orgOf(e)
+	if err != nil {
+		return err
 	}
 
 	var body struct {
@@ -250,11 +306,16 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	if err := e.BindBody(&body); err != nil {
 		return e.BadRequestError("invalid request body", err)
 	}
-	if body.OrgID == "" || body.DatabaseName == "" {
-		return e.BadRequestError("orgId and databaseName are required", nil)
+	// A request may state the org it means, and stating another one is refused
+	// rather than quietly filed under the caller's own.
+	if body.OrgID != "" && body.OrgID != org {
+		return e.ForbiddenError("The credential does not act in the requested organization.", nil)
+	}
+	if body.DatabaseName == "" {
+		return e.BadRequestError("databaseName is required", nil)
 	}
 
-	existing, _ := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", body.OrgID)
+	existing, _ := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", org)
 	if existing != nil {
 		return e.BadRequestError("base already has a database", nil)
 	}
@@ -262,7 +323,7 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	dbName := "t_" + sanitizeDBName(body.DatabaseName)
 	if err := p.createDatabase(dbName); err != nil {
 		p.app.Logger().Error("failed to create Cloud SQL database",
-			"orgId", body.OrgID,
+			"orgId", org,
 			"error", err.Error(),
 		)
 		return e.InternalServerError("failed to provision database", err)
@@ -274,7 +335,7 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	}
 
 	record := core.NewRecord(col)
-	record.Set("orgId", body.OrgID)
+	record.Set("orgId", org)
 	record.Set("databaseName", dbName)
 	record.Set("host", p.config.ComputeHost)
 	record.Set("port", p.config.ComputePort)
@@ -288,7 +349,7 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	}
 
 	tdb := &OrgDatabase{
-		OrgID:        body.OrgID,
+		OrgID:        org,
 		DatabaseName: dbName,
 		Host:         p.config.ComputeHost,
 		Port:         p.config.ComputePort,
@@ -296,11 +357,11 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 		Password:     p.config.DefaultPGPass,
 		SSLMode:      "disable",
 	}
-	p.orgDB.Set(body.OrgID, tdb)
+	p.orgDB.Set(org, tdb)
 
 	return e.JSON(http.StatusCreated, map[string]any{
 		"id":               record.Id,
-		"orgId":            body.OrgID,
+		"orgId":            org,
 		"databaseName":     dbName,
 		"host":             p.config.ProxyHost,
 		"port":             p.config.ProxyPort,
@@ -310,7 +371,13 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 }
 
 func (p *plugin) handleListDatabases(e *core.RequestEvent) error {
-	records, err := p.app.FindRecordsByFilter(collectionCloudSQLDBs, "", "", 0, 0, nil)
+	org, err := orgOf(e)
+	if err != nil {
+		return err
+	}
+
+	records, err := p.app.FindRecordsByFilter(
+		collectionCloudSQLDBs, "orgId = {:org}", "", 0, 0, dbx.Params{"org": org})
 	if err != nil {
 		return e.InternalServerError("failed to list databases", err)
 	}
@@ -330,10 +397,9 @@ func (p *plugin) handleListDatabases(e *core.RequestEvent) error {
 }
 
 func (p *plugin) handleGetDatabase(e *core.RequestEvent) error {
-	id := e.Request.PathValue("id")
-	record, err := p.app.FindRecordById(collectionCloudSQLDBs, id)
+	record, err := p.database(e)
 	if err != nil {
-		return e.NotFoundError("database not found", err)
+		return err
 	}
 	return e.JSON(http.StatusOK, map[string]any{
 		"id":           record.Id,
@@ -346,10 +412,9 @@ func (p *plugin) handleGetDatabase(e *core.RequestEvent) error {
 }
 
 func (p *plugin) handleDeleteDatabase(e *core.RequestEvent) error {
-	id := e.Request.PathValue("id")
-	record, err := p.app.FindRecordById(collectionCloudSQLDBs, id)
+	record, err := p.database(e)
 	if err != nil {
-		return e.NotFoundError("database not found", err)
+		return err
 	}
 
 	dbName := record.GetString("databaseName")
@@ -370,11 +435,13 @@ func (p *plugin) handleDeleteDatabase(e *core.RequestEvent) error {
 	return e.JSON(http.StatusOK, map[string]bool{"deleted": true})
 }
 
+// handleGetConnection hands back the string that opens the database, password
+// and all. It reaches a caller the org owning that database resolved to, and
+// nobody else.
 func (p *plugin) handleGetConnection(e *core.RequestEvent) error {
-	id := e.Request.PathValue("id")
-	record, err := p.app.FindRecordById(collectionCloudSQLDBs, id)
+	record, err := p.database(e)
 	if err != nil {
-		return e.NotFoundError("database not found", err)
+		return err
 	}
 
 	tdb := &OrgDatabase{
@@ -401,9 +468,8 @@ func (p *plugin) handleGetConnection(e *core.RequestEvent) error {
 // --------------------------------------------------------------------------
 
 func (p *plugin) handleCreateBranch(e *core.RequestEvent) error {
-	id := e.Request.PathValue("id")
-	if _, err := p.app.FindRecordById(collectionCloudSQLDBs, id); err != nil {
-		return e.NotFoundError("database not found", err)
+	if _, err := p.database(e); err != nil {
+		return err
 	}
 
 	var body struct {
@@ -424,9 +490,8 @@ func (p *plugin) handleCreateBranch(e *core.RequestEvent) error {
 }
 
 func (p *plugin) handleListBranches(e *core.RequestEvent) error {
-	id := e.Request.PathValue("id")
-	if _, err := p.app.FindRecordById(collectionCloudSQLDBs, id); err != nil {
-		return e.NotFoundError("database not found", err)
+	if _, err := p.database(e); err != nil {
+		return err
 	}
 	return e.JSON(http.StatusOK, []map[string]any{
 		{"name": "main", "status": "ready", "primary": true},
@@ -437,39 +502,38 @@ func (p *plugin) handleListBranches(e *core.RequestEvent) error {
 // postgres-meta proxy
 // --------------------------------------------------------------------------
 
+// handleMetaProxy forwards a schema request to postgres-meta on the connection
+// that opens ONE database: the one belonging to the org the credential carries.
+// Every statement postgres-meta runs therefore runs inside that database.
+//
+// An org with no database of its own gets that answer. There is no wider
+// connection to fall back to — the admin connection reaches every database on
+// the server, so lending it to a request is lending the whole server.
 func (p *plugin) handleMetaProxy(e *core.RequestEvent) error {
-	// Canonical 3 identity contract: per-base routing uses X-Org-Id (the
-	// JWT "owner" claim), injected by the gateway after JWKS validation.
-	// The legacy X-Base-ID header is no longer read here.
-	orgID := e.Request.Header.Get("X-Org-Id")
-
-	var connStr string
-	if orgID != "" {
-		tdb, ok := p.orgDB.Get(orgID)
-		if !ok {
-			record, err := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", orgID)
-			if err != nil {
-				return e.NotFoundError("no database found for base", err)
-			}
-			tdb = &OrgDatabase{
-				OrgID:        orgID,
-				DatabaseName: record.GetString("databaseName"),
-				Host:         record.GetString("host"),
-				Port:         int(record.GetFloat("port")),
-				User:         record.GetString("pgUser"),
-				Password:     record.GetString("pgPassword"),
-				SSLMode:      record.GetString("sslMode"),
-			}
-			p.orgDB.Set(orgID, tdb)
-		}
-		connStr = tdb.ConnectionString()
-	} else {
-		connStr = fmt.Sprintf("postgres://%s:%s@%s:%d/postgres?sslmode=disable",
-			p.config.DefaultPGUser, p.config.DefaultPGPass,
-			p.config.ComputeHost, p.config.ComputePort)
+	org, err := orgOf(e)
+	if err != nil {
+		return err
 	}
 
-	e.Request.Header.Set("X-Connection-Encrypted", connStr)
+	tdb, ok := p.orgDB.Get(org)
+	if !ok {
+		record, err := p.app.FindFirstRecordByData(collectionCloudSQLDBs, "orgId", org)
+		if err != nil {
+			return e.NotFoundError("no database found for this organization", err)
+		}
+		tdb = &OrgDatabase{
+			OrgID:        org,
+			DatabaseName: record.GetString("databaseName"),
+			Host:         record.GetString("host"),
+			Port:         int(record.GetFloat("port")),
+			User:         record.GetString("pgUser"),
+			Password:     record.GetString("pgPassword"),
+			SSLMode:      record.GetString("sslMode"),
+		}
+		p.orgDB.Set(org, tdb)
+	}
+
+	e.Request.Header.Set("X-Connection-Encrypted", tdb.ConnectionString())
 
 	path := e.Request.PathValue("path")
 	e.Request.URL.Path = "/" + path
