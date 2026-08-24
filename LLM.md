@@ -794,6 +794,19 @@ contract, and Base implements no part of OIDC either way.
 The `@hanzo/iam/browser` SDK does a PKCE redirect against whatever that
 endpoint is, with no client-side branching.
 
+`/auth-methods` is the one survivor that still speaks OAuth2, and it only
+ADVERTISES. It builds a discovery response from a collection's configured
+providers — display name, auth URL, a fresh `state`, a PKCE verifier and
+challenge — while the endpoint that would spend them, `auth-with-oauth2`, is
+gone with the rest of the rip and 404s (guarded in `apis/middlewares_test.go`
+alongside `auth-with-password`, `auth-with-otp` and `oauth2-redirect`). A client
+that followed one of those URLs would come back to nothing. It is inert rather
+than broken: the response is empty unless a collection sets `OAuth2.Enabled`,
+which nothing does under IAM, and the code says it is kept so a standalone Base's
+admin panel can still list what was registered. `tools/auth` carries ~30 provider
+implementations for the same reason, of which only `DisplayName`/`PKCE` and the
+URL builder are ever reached — no `FetchAuthUser` in that package has a caller.
+
 `resolveJWKSToken` (`apis/middlewares.go`) mirrors the verified token into an
 ephemeral auth record — nothing is written, IAM stays the user store. The
 collection it lands in is the whole authorization decision: `_superusers` for a
