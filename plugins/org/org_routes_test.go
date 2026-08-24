@@ -527,6 +527,74 @@ func TestTheRuleFollowsTheAddressAndNotTheGroup(t *testing.T) {
 	}
 }
 
+// TestASubtreeRouteBindsNoOrgAndIsRefused pins the third state an address under
+// this prefix can be in.
+//
+// http.ServeMux reads a pattern ending in "/" as a SUBTREE, so /v1/bases/
+// matches every address beneath it and binds nothing: the org sits in a later
+// segment where a rule reading position 2 cannot see it. The rule then compared
+// no org against the credential's org, and a caller with no org at all made
+// that comparison true. jsvm's routerAdd takes a path string from an extension
+// and validates none of it, so that pattern is one an extension can register.
+//
+// Only /v1/bases itself may name no org — it is the collection, and answers the
+// membership question. Everywhere else under the prefix, an address that binds
+// no org is one the rule cannot answer about, and it refuses.
+func TestASubtreeRouteBindsNoOrgAndIsRefused(t *testing.T) {
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	iam := newIssuer(t)
+	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+		t.Fatal(err)
+	}
+
+	db := NewOrgDB(app, "")
+	for _, org := range []string{"alpha", "beta"} {
+		if _, err := db.ProvisionOrg(org); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The subtree pattern an extension can register, on a method the published
+	// routes do not take, so it is the pattern the router chooses.
+	mux := serve(t, app, func(e *core.ServeEvent) {
+		e.Router.Route(http.MethodPut, basesPath+"/", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"secret": "beta-provider-key"})
+		})
+	})
+
+	alpha := iam.token(t, "alpha/ann", "alpha")
+
+	for _, path := range []string{
+		basesPath + "/beta/creds/stripe",
+		basesPath + "/beta/customers/beta%2Fbob",
+		basesPath + "/beta",
+	} {
+		code, body := call(t, mux, http.MethodPut, path, alpha, nil)
+		if code != http.StatusForbidden {
+			t.Errorf("PUT %s as alpha answered %d %s, want 403", path, code, body)
+		}
+		if strings.Contains(body, "beta-provider-key") {
+			t.Errorf("PUT %s handed alpha what sits under beta: %s", path, body)
+		}
+	}
+
+	// A caller with no credential compares no org against no org, which is the
+	// comparison that used to match.
+	if code, body := call(t, mux, http.MethodPut, basesPath+"/beta/creds/stripe", "", nil); code != http.StatusForbidden {
+		t.Errorf("PUT with no credential answered %d %s, want 403", code, body)
+	}
+
+	// The collection itself still names no org, and still answers.
+	if code, body := call(t, mux, http.MethodGet, basesPath, alpha, nil); code == http.StatusForbidden {
+		t.Errorf("the collection root was refused: %s", body)
+	}
+}
+
 // requestLog waits for the row a served request writes and hands it back.
 //
 // The write is handed to a goroutine and then held by a batching handler, so it
