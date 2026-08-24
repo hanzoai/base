@@ -3,6 +3,7 @@ package apis
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -109,5 +110,39 @@ func TestQueryForwardsTheCredentialItWasJudgedOn(t *testing.T) {
 		if got := Credential(forwarded); got != c.judged {
 			t.Errorf("%s: the forwarded query presents %q, judged on %q", c.how, got, c.judged)
 		}
+	}
+}
+
+// TestCredentialsIsEveryChannel pins the difference between the two questions.
+// Credential is which credential a door resolves; Credentials is what the
+// request presents — and a proxy forwards all of it, so a refusal reads this one.
+func TestCredentialsIsEveryChannel(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/anywhere?key=first&b=2;key=second", nil)
+	r.Header.Add("Authorization", "nonsense")
+	r.Header.Add("Authorization", "Bearer second-value")
+	r.Header.Set("X-Authorization", "Basic dXNlcjpwYXNz") // no token: a scheme we do not read
+	r.Header.Set("X-Auth-Token", "legacy")
+	r.Header.Set("X-API-Key", "machine")
+
+	want := []string{"nonsense", "second-value", "legacy", "machine", "first", "second"}
+	got := Credentials(r)
+	if !slices.Equal(got, want) {
+		t.Errorf("Credentials = %q, want %q", got, want)
+	}
+
+	// The door resolves the first, which is exactly the decoy that hid the rest.
+	if c := Credential(r); c != "nonsense" {
+		t.Errorf("Credential = %q, want %q", c, "nonsense")
+	}
+}
+
+// TestCredentialsIsEmptyWhenNothingIsPresented pins the other end: a request
+// carrying no credential presents none, so nothing is held to anything.
+func TestCredentialsIsEmptyWhenNothingIsPresented(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/anywhere?a=1&key=", nil)
+	r.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+
+	if got := Credentials(r); len(got) != 0 {
+		t.Errorf("Credentials = %q, want none", got)
 	}
 }
