@@ -58,3 +58,16 @@ func TestCredentialReadsEverySpelling(t *testing.T) {
 		}
 	}
 }
+
+// TestCredentialReadsPastAnUnreadableValue pins that a repeated header does not
+// hide the credential. Both values are forwarded whole, so a value this side
+// cannot read must not stop it reading the next one.
+func TestCredentialReadsPastAnUnreadableValue(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/anywhere", nil)
+	r.Header.Add("Authorization", "Basic dXNlcjpwYXNz")
+	r.Header.Add("Authorization", "Bearer tok")
+
+	if got := Credential(r); got != "tok" {
+		t.Errorf("Credential = %q, want %q", got, "tok")
+	}
+}

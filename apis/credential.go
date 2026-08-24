@@ -35,8 +35,14 @@ var credentialHeaders = [...]string{
 // where a request carries both.
 func Credential(r *http.Request) string {
 	for _, name := range credentialHeaders {
-		if token := bearer(r.Header.Get(name)); token != "" {
-			return token
+		// Every value, not the first. A header may repeat, and a repeat is
+		// forwarded whole — so reading only the first lets a request put
+		// something unreadable in front of the credential it means to use and
+		// have this side see no credential while the far side sees one.
+		for _, value := range r.Header.Values(name) {
+			if token := bearer(value); token != "" {
+				return token
+			}
 		}
 	}
 
