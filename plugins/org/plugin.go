@@ -218,7 +218,7 @@ func Register(app core.App, config Config) error {
 					return re.Next()
 				}
 
-				token := credential(re.Request)
+				token := apis.Credential(re.Request)
 				if token == "" || !IsAPIKey(token) {
 					return re.Next()
 				}

@@ -2,7 +2,6 @@ package org
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
@@ -34,21 +33,13 @@ func publishableReachesOnlyPublic(e *core.RequestEvent) error {
 // not run at every address — /v1/iam unbinds them so the proxy hands IAM the
 // caller's own credential — and what a credential reaches has to be answerable
 // where nothing resolved it.
+//
+// It reads it through [apis.Credential], which is the same reader the doors use.
+// A rule and a door that read a credential differently disagree about what
+// arrived, and the rule's half of that disagreement is a key travelling on to an
+// upstream in a spelling the rule never saw.
 func publishable(r *http.Request) bool {
-	return IsPublishableKey(credential(r))
-}
-
-// credential is the key a request carries: the bearer token, or the `key` query
-// parameter. A publishable key travels in the query — that is what makes the
-// page source the credential — so both spellings are read in one place, and a
-// rule reading one while a door reads the other cannot disagree about what
-// arrived.
-func credential(r *http.Request) string {
-	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok && token != "" {
-		return token
-	}
-
-	return r.URL.Query().Get("key")
+	return IsPublishableKey(apis.Credential(r))
 }
 
 // public is every address a publishable key reaches, and the whole of it.

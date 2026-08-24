@@ -17,9 +17,7 @@
 package bootnode
 
 import (
-	"net/http"
-	"strings"
-
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/iam"
 	"github.com/hanzoai/base/plugins/bootnode/auth"
@@ -174,12 +172,12 @@ func (p *plugin) requireUser(e *core.RequestEvent) (*Identity, error) {
 		return &Identity{UserID: e.Auth.Id, Email: e.Auth.GetString("email")}, nil
 	}
 
-	cred, isBearer := bearerToken(e.Request)
+	cred := apis.Credential(e.Request)
 	if cred == "" {
 		return nil, e.UnauthorizedError("Authentication required. Use Authorization: Bearer <token> or X-API-Key.", nil)
 	}
 
-	switch auth.ClassifyCredential(cred, isBearer) {
+	switch auth.ClassifyCredential(cred) {
 	case auth.KeyJWT:
 		u, err := p.iam.ValidateToken(cred)
 		if err != nil {
@@ -214,19 +212,6 @@ func (p *plugin) identityFromIAM(e *core.RequestEvent, u *iam.User, readOnly boo
 		return nil, e.ForbiddenError("organization '"+org+"' is not allowed", nil)
 	}
 	return &Identity{UserID: u.ID, Email: u.Email, Org: org, ReadOnly: readOnly}, nil
-}
-
-// bearerToken extracts a credential from the Authorization (Bearer) or
-// X-API-Key header. The bool reports whether it came from a Bearer header.
-func bearerToken(r *http.Request) (string, bool) {
-	if k := r.Header.Get("X-API-Key"); k != "" {
-		return k, false
-	}
-	authz := r.Header.Get("Authorization")
-	if strings.HasPrefix(authz, "Bearer ") {
-		return strings.TrimPrefix(authz, "Bearer "), true
-	}
-	return "", false
 }
 
 // orgLabels returns the standard CR labels scoping a resource to an org.
