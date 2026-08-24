@@ -14,26 +14,24 @@ import (
 // under /v1/bases by KIND rather than by method — so these predicates ARE the
 // authorization, and this is the import path the estate is told to use.
 //
-// The table states every prefix once, so a new kind added to one predicate and
-// forgotten in another shows up as a row that disagrees with itself.
+// Three prefixes are resolved and the table states each once, so a kind added to
+// one predicate and forgotten in another shows up as a row disagreeing with
+// itself.
 func TestKeyKindsAreClassifiedByPrefix(t *testing.T) {
 	for _, tc := range []struct {
-		token                                          string
-		publishable, secret, apiKey, analytics, widget bool
+		token                       string
+		publishable, secret, apiKey bool
 	}{
-		{"pk-live-abc", true, false, true, false, false},
-		{"sk-live-abc", false, true, true, false, false},
-		{"hk-abc", false, false, true, false, false},
-		{"hi-abc", false, false, false, true, false},
-		{"ha-abc", false, false, false, true, false},
-		{"hz-abc", false, false, false, false, true},
+		{"pk-live-abc", true, false, true},
+		{"sk-live-abc", false, true, true},
+		{"hk-abc", false, false, true},
 		// Not keys at all: a JWT, an empty string, and near-misses.
-		{"eyJhbGciOiJIUzI1NiJ9.e30.sig", false, false, false, false, false},
-		{"", false, false, false, false, false},
-		{"pk_live_abc", false, false, false, false, false},  // underscore, not dash
-		{"PK-LIVE-ABC", false, false, false, false, false},  // prefixes are lower-case
-		{"xpk-live-abc", false, false, false, false, false}, // prefix must lead
-		{"pk-", true, false, true, false, false},            // bare prefix still classifies
+		{"eyJhbGciOiJIUzI1NiJ9.e30.sig", false, false, false},
+		{"", false, false, false},
+		{"pk_live_abc", false, false, false},  // underscore, not dash
+		{"PK-LIVE-ABC", false, false, false},  // prefixes are lower-case
+		{"xpk-live-abc", false, false, false}, // the prefix must lead
+		{"pk-", true, false, true},            // a bare prefix still classifies
 	} {
 		t.Run(tc.token, func(t *testing.T) {
 			if got := iam.IsPublishable(tc.token); got != tc.publishable {
@@ -45,26 +43,23 @@ func TestKeyKindsAreClassifiedByPrefix(t *testing.T) {
 			if got := iam.IsAPIKey(tc.token); got != tc.apiKey {
 				t.Errorf("IsAPIKey(%q) = %v, want %v", tc.token, got, tc.apiKey)
 			}
-			if got := iam.IsAnalytics(tc.token); got != tc.analytics {
-				t.Errorf("IsAnalytics(%q) = %v, want %v", tc.token, got, tc.analytics)
-			}
-			if got := iam.IsWidget(tc.token); got != tc.widget {
-				t.Errorf("IsWidget(%q) = %v, want %v", tc.token, got, tc.widget)
-			}
 		})
 	}
 }
 
-// IsAPIKey is what the key middleware asks before it will resolve a credential
-// at all (plugins/org/plugin.go). It admits hk-, pk- and sk- and NOTHING else —
-// so an analytics or widget key is not an API key here, and a request bearing
-// one is refused rather than resolved. Stated as its own test because the
-// asymmetry reads like an omission and is not: those kinds are classified for a
-// caller to route on, never admitted by this door.
-func TestAnalyticsAndWidgetKeysAreNotAPIKeys(t *testing.T) {
-	for _, token := range []string{"hi-abc", "ha-abc", "hz-abc"} {
+// hz-, hi- and ha- are prefixes IAM mints and no door here resolves, so a caller
+// bearing one reaches exactly what an anonymous caller reaches. That is the whole
+// reason IsWidgetKey and IsAnalyticsKey could be deleted (30c91ac7) — and it now
+// rests entirely on IsAPIKey answering false, with no predicate left naming those
+// kinds. If one ever starts returning true here, a key that was public becomes a
+// credential, silently. This is the guard on that.
+func TestUnresolvedPrefixesAreNotAPIKeys(t *testing.T) {
+	for _, token := range []string{"hz-abc", "hi-abc", "ha-abc"} {
 		if iam.IsAPIKey(token) {
-			t.Fatalf("IsAPIKey(%q) = true — the key middleware would admit it", token)
+			t.Fatalf("IsAPIKey(%q) = true — the key middleware would resolve a prefix no door serves", token)
+		}
+		if iam.IsPublishable(token) || iam.IsSecret(token) {
+			t.Fatalf("%q classified as a publishable or secret key", token)
 		}
 	}
 	for _, token := range []string{"hk-abc", "pk-abc", "sk-abc"} {
@@ -74,41 +69,13 @@ func TestAnalyticsAndWidgetKeysAreNotAPIKeys(t *testing.T) {
 	}
 }
 
-// No token is two kinds at once. It matters for pk- specifically: the middleware
-// refuses a publishable key by kind, and a token that were also something else
-// would offer a second reading to gate on.
+// No token is both publishable and secret. It matters for pk- specifically: the
+// middleware refuses a publishable key by kind, and a token that were also
+// something else would offer a second reading to gate on.
 func TestNoTokenIsTwoKinds(t *testing.T) {
-	for _, token := range []string{"pk-a", "sk-a", "hk-a", "hi-a", "ha-a", "hz-a"} {
-		n := 0
-		for _, is := range []bool{iam.IsPublishable(token), iam.IsSecret(token), iam.IsAnalytics(token), iam.IsWidget(token)} {
-			if is {
-				n++
-			}
-		}
-		if n > 1 {
-			t.Fatalf("%q matched %d kinds, want at most 1", token, n)
-		}
-	}
-}
-
-// hk- is the one kind with no predicate of its own: it is an API key and nothing
-// narrower says so. That is a real hole in the surface rather than a rounding
-// error — a caller routing on kind has no way to name a hosted key, and asking
-// "is it an API key but none of the others" is a definition by subtraction that
-// silently acquires every kind added later.
-func TestHostedKeyIsAnAPIKeyWithNoKindOfItsOwn(t *testing.T) {
-	const hosted = "hk-abc"
-	if !iam.IsAPIKey(hosted) {
-		t.Fatalf("IsAPIKey(%q) = false", hosted)
-	}
-	for name, is := range map[string]bool{
-		"IsPublishable": iam.IsPublishable(hosted),
-		"IsSecret":      iam.IsSecret(hosted),
-		"IsAnalytics":   iam.IsAnalytics(hosted),
-		"IsWidget":      iam.IsWidget(hosted),
-	} {
-		if is {
-			t.Fatalf("%s(%q) = true — hk- has acquired a kind; give it a named predicate", name, hosted)
+	for _, token := range []string{"pk-a", "sk-a", "hk-a", "hz-a", "hi-a", "ha-a"} {
+		if iam.IsPublishable(token) && iam.IsSecret(token) {
+			t.Fatalf("%q is both publishable and secret", token)
 		}
 	}
 }
