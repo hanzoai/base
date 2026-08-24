@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hanzoai/base/tools/osutils"
+
 	"github.com/fatih/color"
 	"github.com/hanzoai/base/tools/cron"
 	"github.com/hanzoai/base/tools/filesystem"
@@ -221,7 +223,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 	//   4. (none) — local goroutine timer mode (dev fallback, no
 	//      durability)
 	zapAddr := os.Getenv("TASKS_ZAP")
-	if os.Getenv("TASKS_EMBED") == "true" && zapAddr == "" {
+	if osutils.Bool("TASKS_EMBED", false) && zapAddr == "" {
 		// Default the socket under THIS app's data dir, not a shared temp dir. A
 		// fixed fleet-wide path is a collision: two Base processes on one host
 		// would fight over one listener and all but the first would come up with

@@ -3,6 +3,8 @@ package bootnode
 import (
 	"os"
 	"strings"
+
+	"github.com/hanzoai/base/tools/osutils"
 )
 
 // Config is the bootnode plugin configuration. It ports the environment-driven
@@ -97,7 +99,7 @@ func (c *Config) isProductionIAM() bool {
 // variables. Used by the default Base wiring; tests construct Config directly.
 func ConfigFromEnv() Config {
 	return Config{
-		Enabled:         os.Getenv("BOOTNODE_ENABLED") == "true",
+		Enabled:         osutils.Bool("BOOTNODE_ENABLED", false),
 		IAMEndpoint:     os.Getenv("IAM_URL"),
 		IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
 		IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
