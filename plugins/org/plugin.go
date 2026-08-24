@@ -334,7 +334,7 @@ func Register(app core.App, config Config) error {
 				// other write stays blocked. Org is derived from the key by the
 				// stampOrgOwnership create hook, never from the request.
 				if method == http.MethodPost {
-					if name := createsRecordIn(re.Request); name != "" {
+					if name := apis.CreatesRecord(re.Request); name != "" {
 						if c, err := re.App.FindCachedCollectionByNameOrId(name); err == nil &&
 							c.CreateRule != nil && *c.CreateRule == "" {
 							return re.Next()
@@ -878,21 +878,4 @@ func stampOrgOwnership(e *core.RecordRequestEvent) error {
 		e.Record.Set("owner", owner) // may be "" for a pure-anon public submit
 	}
 	return e.Next()
-}
-
-// createsRecordIn names the collection a request creates a record in, and "" for
-// a request that creates none.
-//
-// It reads the address the ROUTER matched, the way the rules on /v1/bases do
-// and for the same reason: the router's answer is the one the handler serves,
-// so an exception granted on any other reading is granted at an address that is
-// not the one about to run. The create route is the records group's own POST,
-// wherever the deployment mounts it, and the collection is the segment the
-// router filled — which is also the segment the handler reads.
-func createsRecordIn(r *http.Request) string {
-	if !strings.HasSuffix(patternPath(r.Pattern), "/collections/{collection}/records") {
-		return ""
-	}
-
-	return r.PathValue("collection")
 }
