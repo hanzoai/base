@@ -276,7 +276,7 @@ func Register(app core.App, config Config) error {
 
 				// Set identity context from resolved key
 				re.Set(apis.RequestEventKeySub, user.ID)
-				re.Set("authName", user.Name)
+				re.Set(apis.RequestEventKeyName, user.Name)
 				re.Set("authEmail", user.Email)
 				re.Set("authOwner", org)
 				re.Set(apis.RequestEventKeyOrg, org)

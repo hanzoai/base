@@ -46,6 +46,11 @@ const (
 	// IAM key mints no auth record, so e.Auth answers nothing for one.
 	RequestEventKeySub = "authSub"
 
+	// RequestEventKeyName carries the account's USERNAME, as a string — the
+	// <name> half of the <owner>/<name> IAM files an account under, and never a
+	// display name. Set by whichever door resolved the credential.
+	RequestEventKeyName = "authName"
+
 	// RequestEventKeyOrgAdmin reports, as a bool, whether the credential carries
 	// authority over the org it acts in rather than only over its own subject.
 	// A member's token is not that; an org admin's token and an org's secret key
@@ -464,7 +469,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// were deleted on the way in, so what is here now came from the token.
 	e.Set(RequestEventKeySub, sub)
 	e.Set("authEmail", email)
-	e.Set("authName", name)
+	e.Set(RequestEventKeyName, name)
 	e.Set(RequestEventKeyOrgs, orgsOf(verified))
 	e.Set(RequestEventKeyOrg, org)
 	e.Set(RequestEventKeyOrgAdmin, verified.OrgAdmin(org))

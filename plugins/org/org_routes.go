@@ -31,11 +31,40 @@ func (p *plugin) registerOrgRoutes(r *router.Router[*core.RequestEvent]) {
 	base.POST("/customers/{userId}", p.handleProvisionCustomer)
 }
 
-// caller is the subject the credential names, whichever door resolved it. An
-// IAM key mints no auth record, so e.Auth answers nothing for one; and e.Auth.Id
-// is a record id derived from the subject rather than the subject itself, so it
-// does not compare against an id IAM issued.
+// caller is the person the credential names, spelled the ONE way IAM spells a
+// person: <owner>/<name>, the account's own org and its username. It is the
+// name a customer row is filed under, so one person is one row whichever door
+// they came through.
+//
+// The two doors learn different things about the same account. IAM's key
+// endpoint answers with the account and never its opaque id, so a key can only
+// name a person owner/name. A token carries that id in `sub` — and carries the
+// membership set home org first, and the username in `name`. IAM builds both
+// halves from the same user row (its own natural key is owner/name and its
+// `orgs` claim leads with the account's owner), so owner/name is the one
+// spelling both doors produce.
+//
+// A credential that names no person — a machine token, which carries neither a
+// membership nor a username — is its own subject.
 func caller(e *core.RequestEvent) string {
+	name, _ := e.Get(apis.RequestEventKeyName).(string)
+	orgs, _ := e.Get(apis.RequestEventKeyOrgs).([]string)
+	if name != "" && len(orgs) > 0 && orgs[0] != "" {
+		return orgs[0] + "/" + name
+	}
+
+	return subject(e)
+}
+
+// subject is what the credential itself says its subject is: owner/name from a
+// key, IAM's opaque account id from a token. A row filed before the two doors
+// spelled a person one way is filed under this, so it is the second name the
+// same person is recognised by.
+//
+// An IAM key mints no auth record, so e.Auth answers nothing for one; and
+// e.Auth.Id is a record id derived from the subject rather than the subject
+// itself, so it does not compare against anything IAM issued.
+func subject(e *core.RequestEvent) string {
 	sub, _ := e.Get(apis.RequestEventKeySub).(string)
 	return sub
 }
@@ -48,10 +77,15 @@ func actingOrg(e *core.RequestEvent) string {
 }
 
 // actsForUser reports whether the credential may act for the named user: it is
-// that user, or it carries the org rather than a person — an org admin's token,
-// the org's own secret key, or a platform operator.
+// that person — under either name the credential carries for them — or it
+// carries the org rather than a person: an org admin's token, the org's own
+// secret key, or a platform operator.
+//
+// Both names belong to the one account the credential resolved, so recognising
+// either widens nothing. It is what keeps a person's own row reachable while
+// rows filed under the older of the two names are still about.
 func actsForUser(e *core.RequestEvent, user string) bool {
-	if user != "" && user == caller(e) {
+	if user != "" && (user == caller(e) || user == subject(e)) {
 		return true
 	}
 
