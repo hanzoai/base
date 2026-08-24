@@ -2,7 +2,6 @@ package org
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/hanzoai/base/apis"
@@ -60,50 +59,72 @@ func actsForUser(e *core.RequestEvent, user string) bool {
 	return admin || e.HasSuperuserAuth()
 }
 
-// addressed is what a path under /v1/bases names: the org, and — where the
+// addressed is what an address under /v1/bases names: the org, and — where the
 // address has one — the user. Either may be empty.
 type addressed struct {
 	org  string
 	user string
 }
 
-// address reads a request path as an address under /v1/bases, reporting false
-// for a path that is not one.
+// address reads what the ROUTER matched as an address under /v1/bases,
+// reporting false for a request it matched somewhere else.
 //
-// It reads the ESCAPED path and unescapes each segment itself, which is what
-// the mux does to fill a path parameter. Reading URL.Path instead compares
-// against something already decoded: /v1/bases/beta%2Fx arrives there as
-// /v1/bases/beta/x, which is a different address with a different org in it.
+// The router's answer is the one the handler acts on, so it is the one the rule
+// has to read. http.ServeMux matches by splitting the ESCAPED path on "/" and
+// unescaping each segment, so one address has many spellings and all of them
+// reach the same handler. A rule that compares the escaped string against a
+// literal prefix answers about a different address than the one being served.
+//
+// The router's answer is the pattern it chose and the values it filled, so this
+// takes its segments from the pattern: the value bound where the pattern names
+// a wildcard, the segment itself where the pattern states it — so a route that
+// writes the org into its address is read like one that takes it as a
+// parameter. The handlers below read those same values, which is what leaves
+// rule and handler no way to disagree about who is addressed.
 //
 // A segment names what it names however the address continues past it. Reading
-// the user only where the path STOPS there would recognise the seven shapes
+// the user only where the address STOPS there would recognise the seven shapes
 // this file publishes and no others, and the rules exist precisely because
 // routes are registered here and elsewhere at the same addresses.
-func address(escaped string) (addressed, bool) {
-	if escaped == basesPath {
-		return addressed{}, true
-	}
-
-	rest, ok := strings.CutPrefix(escaped, basesPath+"/")
-	if !ok {
+func address(r *http.Request) (addressed, bool) {
+	matched := patternPath(r.Pattern)
+	if matched != basesPath && !strings.HasPrefix(matched, basesPath+"/") {
 		return addressed{}, false
 	}
 
-	segments := strings.Split(strings.TrimSuffix(rest, "/"), "/")
+	segments := strings.Split(strings.Trim(matched, "/"), "/") // v1, bases, ...
 
-	a := addressed{org: unescape(segments[0])}
-	if len(segments) >= 3 && segments[1] == "customers" {
-		a.user = unescape(segments[2])
+	a := addressed{org: matchedSegment(r, segments, 2)}
+	if len(segments) >= 5 && segments[3] == "customers" {
+		a.user = matchedSegment(r, segments, 4)
 	}
 
 	return a, true
 }
 
-func unescape(segment string) string {
-	if decoded, err := url.PathUnescape(segment); err == nil {
-		return decoded
+// patternPath is the path of a matched pattern. A pattern is written
+// "[METHOD ][HOST]/[PATH]" and so begins at its first slash; a request the
+// router matched against no pattern has none, and reaches nothing here.
+func patternPath(pattern string) string {
+	if i := strings.IndexByte(pattern, '/'); i >= 0 {
+		return pattern[i:]
 	}
-	return segment
+	return ""
+}
+
+// matchedSegment reads one segment of the matched pattern: the value the router
+// filled for a wildcard, the segment itself where the pattern states it.
+func matchedSegment(r *http.Request, segments []string, i int) string {
+	if i >= len(segments) {
+		return ""
+	}
+
+	name, wild := strings.CutPrefix(segments[i], "{")
+	if !wild {
+		return segments[i]
+	}
+
+	return r.PathValue(strings.TrimSuffix(strings.TrimSuffix(name, "}"), "..."))
 }
 
 // publishableReachesNoBase refuses a publishable key everything under
@@ -122,7 +143,7 @@ func unescape(segment string) string {
 // same reason a write is and no future GET can be added to the subtree without
 // inheriting it.
 func publishableReachesNoBase(e *core.RequestEvent) error {
-	if _, ok := address(e.Request.URL.EscapedPath()); !ok {
+	if _, ok := address(e.Request); !ok {
 		return e.Next()
 	}
 
@@ -146,7 +167,7 @@ func publishableReachesNoBase(e *core.RequestEvent) error {
 // same posture the door already takes, where a token carrying no membership is
 // a machine and is refused rather than served from the process's own Base.
 func actsInNamedOrg(e *core.RequestEvent) error {
-	named, ok := address(e.Request.URL.EscapedPath())
+	named, ok := address(e.Request)
 	if !ok || named.org == "" {
 		return e.Next() // /v1/bases itself names no org and answers per membership
 	}
@@ -169,7 +190,7 @@ func actsInNamedOrg(e *core.RequestEvent) error {
 // org and reach every member's row. A platform operator reaches it the way it
 // reaches everything else.
 func namesItsOwnUser(e *core.RequestEvent) error {
-	named, ok := address(e.Request.URL.EscapedPath())
+	named, ok := address(e.Request)
 	if !ok || named.user == "" {
 		return e.Next()
 	}
