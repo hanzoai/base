@@ -23,7 +23,7 @@
 
 ## v0.22.37
 
-- (_Backported from v0.34.1_) - Added missing `:` char to the autocomplete regex ([#7353](https://github.com/base/base/pull/7353)).
+- (_Backported from v0.34.1_) - Added missing `:` char to the autocomplete regex (#7353).
 
 - (_Backported from v0.34.1_) Bumped min Go GitHub action version to 1.25.5 because it comes with some [minor security fixes](https://github.com/golang/go/issues?q=milestone%3AGo1.25.5).
     _The runner action was also updated to `actions/setup-go@v6` since the previous v5 Go source seems [no longer accessible](https://github.com/actions/setup-go/pull/665#issuecomment-3416693714)._
@@ -41,12 +41,12 @@
 
 ## v0.22.34
 
-- (_Backported from v0.26.6_) Allow OIDC `email_verified` to be int or boolean string since some OIDC providers like AWS Cognito has non-standard userinfo response ([#6657](https://github.com/base/base/pull/6657)).
+- (_Backported from v0.26.6_) Allow OIDC `email_verified` to be int or boolean string since some OIDC providers like AWS Cognito has non-standard userinfo response (#6657).
 
 
 ## v0.22.33
 
-- (_Backported from v0.26.3_) Fixed and normalized logs error serialization across common types for more consistent logs error output ([#6631](https://github.com/base/base/issues/6631)).
+- (_Backported from v0.26.3_) Fixed and normalized logs error serialization across common types for more consistent logs error output (#6631).
 
 
 ## v0.22.32
