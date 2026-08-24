@@ -35,10 +35,10 @@ type HttpClient interface {
 //
 // NB! This plugin is considered experimental and its config options may change in the future.
 type Config struct {
-	// Owner specifies the account owner of the repository (default to "base").
+	// Owner specifies the account owner of the repository (default "hanzoai").
 	Owner string
 
-	// Repo specifies the name of the repository (default to "base").
+	// Repo specifies the name of the repository (default "base").
 	Repo string
 
 	// ArchiveExecutable specifies the name of the executable file in the release archive
@@ -69,8 +69,14 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 		config:         config,
 	}
 
+	// github.com/hanzoai/base, which is where this code lives. It defaulted to
+	// owner "base" — github.com/base/base, a repository this project does not
+	// own and which exists — so `base update` on a stock binary asked a stranger
+	// for a release and overwrote the running executable with the answer. The
+	// fork's rebrand rewrote "pocketbase" to "base" mechanically and turned a
+	// correct default into that one. Pinned by TestDefaultsPointAtThisProject.
 	if p.config.Owner == "" {
-		p.config.Owner = "base"
+		p.config.Owner = "hanzoai"
 	}
 
 	if p.config.Repo == "" {
@@ -256,15 +262,20 @@ func (p *plugin) update(withBackup bool) error {
 	return nil
 }
 
+// releaseURL is the one place the update endpoint is spelled. It is a function
+// rather than a line inside the fetch so a test can ask what a stock binary
+// addresses without performing the request.
+func releaseURL(owner, repo string) string {
+	return fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
+}
+
 func fetchLatestRelease(
 	ctx context.Context,
 	client HttpClient,
 	owner string,
 	repo string,
 ) (*release, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", releaseURL(owner, repo), nil)
 	if err != nil {
 		return nil, err
 	}
