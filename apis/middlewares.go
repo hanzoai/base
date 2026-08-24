@@ -321,7 +321,7 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 				return e.Next()
 			}
 
-			token := getAuthTokenFromRequest(e)
+			token := Credential(e.Request)
 			if token == "" {
 				return e.Next()
 			}
@@ -664,27 +664,6 @@ func isLowerAlphanumeric(s string) bool {
 		}
 	}
 	return true
-}
-
-func getAuthTokenFromRequest(e *core.RequestEvent) string {
-	token := e.Request.Header.Get("Authorization")
-
-	// Fall back to X-Authorization (alias when Authorization is consumed by a proxy/CDN).
-	if token == "" {
-		token = e.Request.Header.Get("X-Authorization")
-	}
-
-	// Fall back to legacy X-Auth-Token header.
-	if token == "" {
-		token = e.Request.Header.Get("X-Auth-Token")
-	}
-
-	// Strip optional "Bearer " prefix for compatibility with standard HTTP clients.
-	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
-		return token[7:]
-	}
-
-	return token
 }
 
 // wwwRedirect performs www->non-www redirect(s) if the request host

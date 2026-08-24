@@ -2,7 +2,9 @@ package org
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hanzoai/base/core"
@@ -164,6 +166,109 @@ func TestOnlyAPublishableKeyIsHeldToTheList(t *testing.T) {
 	} {
 		if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha", c.token, nil); code == http.StatusForbidden {
 			t.Errorf("%s was refused a Base it acts in: %s", c.what, body)
+		}
+	}
+}
+
+// spelling is one credential and how a caller wrote it.
+type spelling struct {
+	how     string
+	headers map[string]string
+	query   string
+}
+
+// spellings is one key written every way this process accepts a credential.
+//
+// The spelling is the caller's choice, so what a credential reaches cannot
+// depend on it. Reading only the canonical one left the other eleven to be read
+// by the doors — and, past a proxy that forwards headers and query verbatim, by
+// whatever answers upstream.
+func spellings(key string) []spelling {
+	return []spelling{
+		{"Bearer", map[string]string{"Authorization": "Bearer " + key}, ""},
+		{"a lowercase scheme", map[string]string{"Authorization": "bearer " + key}, ""},
+		{"an uppercase scheme", map[string]string{"Authorization": "BEARER " + key}, ""},
+		{"two spaces", map[string]string{"Authorization": "Bearer  " + key}, ""},
+		{"a tab", map[string]string{"Authorization": "Bearer\t" + key}, ""},
+		{"bare", map[string]string{"Authorization": key}, ""},
+		{"the alias header", map[string]string{"X-Authorization": "Bearer " + key}, ""},
+		{"the alias header bare", map[string]string{"X-Authorization": key}, ""},
+		{"the legacy header", map[string]string{"X-Auth-Token": key}, ""},
+		{"the machine header", map[string]string{"X-API-Key": key}, ""},
+		{"the query", nil, "?key=" + key},
+		{"the query after a semicolon", nil, "?a=1;key=" + key},
+	}
+}
+
+// TestNoSpellingOfAPublishableKeyReachesAnUpstream pins the rule against the
+// two mounts where it is the only thing standing: /v1/iam and /v1/idv forward
+// headers and query to their issuer verbatim, with the doors that resolve a
+// credential deliberately unbound, so a key the rule fails to recognise is a key
+// the issuer authenticates.
+//
+// It measures the BYTES the upstream received, not the status that came back. A
+// status can be a refusal for some other reason; only the upstream's own record
+// says whether a key printed in a web page was handed on.
+func TestNoSpellingOfAPublishableKeyReachesAnUpstream(t *testing.T) {
+	var mu sync.Mutex
+	var handed []string
+
+	idv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		for _, h := range []string{"Authorization", "X-Authorization", "X-Auth-Token", "X-API-Key"} {
+			if v := r.Header.Get(h); v != "" {
+				handed = append(handed, h+": "+v)
+			}
+		}
+		if r.URL.RawQuery != "" {
+			handed = append(handed, "?"+r.URL.RawQuery)
+		}
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"upstream":"answered"}`))
+	}))
+	t.Cleanup(idv.Close)
+	t.Setenv("IDV_ENDPOINT", idv.URL)
+
+	_, _, mux := keyed(t, "alpha")
+
+	// The IAM mount forwards to the same server keyed stands up for key
+	// resolution, and that server answers every path — so a 200 carrying its
+	// envelope is the issuer having answered a key printed in a web page.
+	for _, s := range spellings("pk-in-the-page") {
+		for _, path := range []string{"/v1/iam/oauth/userinfo", "/v1/idv/verify"} {
+			code, body := call(t, mux, http.MethodGet, path+s.query, "", s.headers)
+			if code != http.StatusForbidden {
+				t.Errorf("GET %s spelled %s answered %d %s, want 403", path, s.how, code, body)
+			}
+			if strings.Contains(body, "upstream") || strings.Contains(body, `"status":"ok"`) {
+				t.Errorf("GET %s spelled %s was answered by the upstream: %s", path, s.how, body)
+			}
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(handed) != 0 {
+		t.Fatalf("a key printed in a web page was handed to the upstream: %q", handed)
+	}
+}
+
+// TestEverySpellingOfAWorkingCredentialStillWorks is the other half. One reader
+// is only right if it reads MORE spellings, not fewer: a secret key and a
+// member's token authenticate in every one of them.
+func TestEverySpellingOfAWorkingCredentialStillWorks(t *testing.T) {
+	_, iam, mux := keyed(t, "alpha")
+
+	const id = "9f3c21b8-7e4d-4a02-9c15-6b0f8d2e1a77"
+	for _, c := range []struct{ what, token string }{
+		{"a secret key", "sk-service"},
+		{"a member's token", iam.signed(t, "member", id, "keyuser", "alpha")},
+	} {
+		for _, s := range spellings(c.token) {
+			code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha"+s.query, "", s.headers)
+			if code == http.StatusForbidden || code == http.StatusUnauthorized {
+				t.Errorf("%s spelled %s was refused its own org: %d %s", c.what, s.how, code, body)
+			}
 		}
 	}
 }

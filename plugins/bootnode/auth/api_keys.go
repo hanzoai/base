@@ -38,10 +38,20 @@ const BootnodeKeyPrefix = "bn_"
 const keyPrefixLen = 12
 
 // ClassifyCredential determines the [KeyType] of a presented credential
-// without any network call. isBearer indicates the credential arrived via an
-// Authorization: Bearer header (vs an X-API-Key header).
-func ClassifyCredential(cred string, isBearer bool) KeyType {
+// without any network call.
+//
+// It reads the credential and nothing about where it arrived. Which header
+// carried it is [apis.Credential]'s business and is the same answer either way,
+// so classifying by it meant one credential was a JWT under one header name and
+// unknown under another.
+//
+// A credential matching no prefix here is one IAM is asked about: identity is
+// IAM's to state, and a shape this package does not recognise is not a shape it
+// should be refusing on.
+func ClassifyCredential(cred string) KeyType {
 	switch {
+	case cred == "":
+		return KeyUnknown
 	case strings.HasPrefix(cred, BootnodeKeyPrefix):
 		return KeyBootnode
 	case strings.HasPrefix(cred, "pk-"):
@@ -50,10 +60,8 @@ func ClassifyCredential(cred string, isBearer bool) KeyType {
 		return KeyIAMSecret
 	case strings.HasPrefix(cred, "hk-"):
 		return KeyIAMService
-	case isBearer || strings.Count(cred, ".") == 2:
-		return KeyJWT
 	default:
-		return KeyUnknown
+		return KeyJWT
 	}
 }
 
