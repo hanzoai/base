@@ -103,7 +103,12 @@ func actsForOrg(e *core.RequestEvent) bool {
 // addressed is what an address under /v1/bases names: the org, whether the
 // address names the org's own credentials, and — where the address has one —
 // the user.
+//
+// root is the collection itself, /v1/bases, the ONE address under this prefix
+// that legitimately names no org: it answers the membership question. Anywhere
+// else, naming no org is a fact about the address and not a permission.
 type addressed struct {
+	root  bool
 	org   string
 	creds bool
 	user  string
@@ -133,6 +138,9 @@ func address(r *http.Request) (addressed, bool) {
 	matched := patternPath(r.Pattern)
 	if matched != basesPath && !strings.HasPrefix(matched, basesPath+"/") {
 		return addressed{}, false
+	}
+	if matched == basesPath {
+		return addressed{root: true}, true
 	}
 
 	segments := strings.Split(strings.Trim(matched, "/"), "/") // v1, bases, ...
@@ -212,13 +220,22 @@ func publishableReachesNoBase(e *core.RequestEvent) error {
 // A credential that resolved no org at all reaches nothing here. That is the
 // same posture the door already takes, where a token carrying no membership is
 // a machine and is refused rather than served from the process's own Base.
+//
+// An address under this prefix that BINDS no org is refused too, and the two
+// refusals are the same one: a request whose address names no org and whose
+// credential resolves none compares "" against "" and matches. Only the
+// collection itself may name no org, and it says so by being that exact
+// address. Everything else under the prefix carries an org somewhere in it —
+// /v1/bases/ as a subtree pattern binds it into a later segment, where a rule
+// reading position 2 cannot see it — so an address that binds none is one this
+// rule cannot answer about, and what it cannot answer about it refuses.
 func actsInNamedOrg(e *core.RequestEvent) error {
 	named, ok := address(e.Request)
-	if !ok || named.org == "" {
+	if !ok || named.root {
 		return e.Next() // /v1/bases itself names no org and answers per membership
 	}
 
-	if named.org != actingOrg(e) {
+	if named.org == "" || named.org != actingOrg(e) {
 		return e.ForbiddenError("The credential does not act in the requested organization.", nil)
 	}
 
