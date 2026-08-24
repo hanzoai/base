@@ -42,7 +42,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	baseRouter.Bind(securityHeaders())
 	baseRouter.Bind(BodyLimit(DefaultMaxBodySize))
 
-	prefix := apiPrefix()
+	prefix := Prefix()
 	app.Logger().Info("base: API mount prefix", "prefix", prefix)
 
 	apiGroup := baseRouter.Group(prefix)
@@ -78,14 +78,14 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	return baseRouter, nil
 }
 
-// apiPrefix is where this app mounts its API — one mount prefix per app, the
+// Prefix is where this app mounts its API — one mount prefix per app, the
 // only knob. Default `/v1`. Multi-app deployments set BASE_API_PREFIX=/v1/<app>
 // so the gateway can route to the right service. Hanzo IAM is a sibling at
 // `/v1/iam`, mounted by the platform plugin regardless of this prefix.
 //
 // It reads the environment on every call rather than remembering an answer,
 // because a remembered one is set in one process and empty in the next.
-func apiPrefix() string {
+func Prefix() string {
 	prefix := strings.TrimRight(os.Getenv("BASE_API_PREFIX"), "/")
 	if prefix == "" {
 		prefix = "/v1"

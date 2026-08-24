@@ -34,7 +34,7 @@ const recordsPath = "/collections/{collection}/records"
 // and this answer is read by things that GRANT that route something, so it has
 // to name the route and not a family of routes shaped like it.
 func CreatesRecord(r *http.Request) string {
-	if r.Pattern != http.MethodPost+" "+apiPrefix()+recordsPath {
+	if r.Pattern != http.MethodPost+" "+Prefix()+recordsPath {
 		return ""
 	}
 

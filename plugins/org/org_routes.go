@@ -182,33 +182,6 @@ func matchedSegment(r *http.Request, segments []string, i int) string {
 	return r.PathValue(strings.TrimSuffix(strings.TrimSuffix(name, "}"), "..."))
 }
 
-// publishableReachesNoBase refuses a publishable key everything under
-// /v1/bases.
-//
-// A pk- key is the one you paste into a web page. It travels in ?key=, so
-// reaching these routes with it needs no Authorization header and no secret at
-// all — the page source is the credential. The only thing that stood between it
-// and an org's provider secrets was a check that publishable keys may not
-// WRITE, and every read here is a GET: the page's own key returned the
-// platform's live Stripe key and every member's billing identity. Read-only was
-// the wrong reading of publishable. Publishable means public, and nothing under
-// this prefix is.
-//
-// It is refused by kind rather than by method, so a read is refused for the
-// same reason a write is and no future GET can be added to the subtree without
-// inheriting it.
-func publishableReachesNoBase(e *core.RequestEvent) error {
-	if _, ok := address(e.Request); !ok {
-		return e.Next()
-	}
-
-	if kind, _ := e.Get(keyKind).(string); kind == keyPublishable {
-		return e.ForbiddenError("A publishable key is public and reaches no Base.", nil)
-	}
-
-	return e.Next()
-}
-
 // actsInNamedOrg refuses a request naming an org other than the one its
 // credential acts in.
 //
