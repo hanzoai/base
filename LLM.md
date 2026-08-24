@@ -704,10 +704,16 @@ Fallback: `$BASE_ENV` -> default `local`.
 ### Config File
 
 `~/.config/base/config.json` (respects `$XDG_CONFIG_HOME`). Holds the default
-env, the default org and the token path — nothing else. A service URL is
-computed, not stored: `EnvURLs(env, service, localPort)` over
-`Env.DomainSuffix()`, which is the one way the CLI names a host. Unknown keys
-in an existing file are dropped on the next write.
+env, the default org and the token path — nothing else. Unknown keys in an
+existing file are dropped on the next write.
+
+`EnvURLs(env, service, localPort)` over `Env.DomainSuffix()` was described here
+as "the one way the CLI names a host". It names none: nothing calls it outside
+its own test. And it could not name a real one if it did — `DomainSuffix` is
+hard-coded to `example.com` / `test.example.com` / `dev.example.com` with no env,
+config or flag behind it, so every remote URL it builds points at a domain nobody
+owns. Having no caller is the only reason that has never surfaced. Give it a real
+source before giving it a caller.
 
 ### Cluster (HA)
 
@@ -717,10 +723,20 @@ Consensus: `--consensus lux` (default) or `--consensus pubsub`.
 
 ### Operator (K8s CRDs)
 
-Wraps kubectl against `hanzo.ai/v1alpha1` CRDs. Context map per env:
-- devnet: `gke_<project>-devnet_us-central1_dev`
-- testnet: `gke_<project>-testnet_us-central1_test`
-- mainnet: `gke_<project>-mainnet_us-central1_main`
+Wraps kubectl against `hanzo.ai/v1alpha1` CRDs, passing `--context` from
+`Env.K8sContext()` at eleven call sites across operator, cluster and status.
+
+**What it actually returns is `gke_mainnet`, `gke_testnet`, `gke_devnet`** — a
+bare literal per env, not the `gke_<project>-<env>_<region>_<suffix>` map this
+section used to print. Neither shape is a context this estate has: Hanzo runs on
+DOKS, so `kubectl --context gke_mainnet` finds nothing and every remote CLI
+command fails at the first call. It fails loudly, which is the one good thing to
+say about it. Local (`--dev`) is unaffected — `K8sContext()` returns "" there and
+`statuscmd` keys on the empty string to skip the cluster entirely.
+
+Pinned by `cmd/cli/network_flags_test.go` as it stands, so replacing the literals
+with the real contexts is a deliberate edit in both places rather than a
+discovery someone makes during an incident.
 
 ## FHE Position
 
