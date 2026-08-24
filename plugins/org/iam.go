@@ -270,16 +270,15 @@ type IAMKey struct {
 	State       string `json:"state"`
 }
 
-// Hanzo key prefix standard (always hyphen, never underscore):
+// The key prefixes this process resolves (always hyphen, never underscore):
 //
-//   pk-  publishable key  (frontend-safe, read-only API access)
-//   sk-  secret key       (backend-only, full API access)
-//   hk-  hanzo key        (IAM user API key, legacy)
-//   hi-  hanzo insights   (analytics event ingestion)
-//   ha-  hanzo analytics  (lightweight web analytics)
-//   hz-  hanzo widget     (restricted chat/embed key)
+//   pk-  publishable key  (printed in a web page)
+//   sk-  secret key       (the org's own server)
+//   hk-  hanzo key        (a person's IAM key)
 //
-// All managed by IAM. One key store. One prefix convention.
+// IAM mints them all and holds them in one store. A prefix a door here does not
+// resolve reaches exactly what an anonymous caller reaches, so classifying one
+// is a question with no consumer and no answer.
 
 // IsPublishableKey returns true if the token has a publishable key prefix.
 func IsPublishableKey(token string) bool {
@@ -296,17 +295,6 @@ func IsAPIKey(token string) bool {
 	return strings.HasPrefix(token, "hk-") ||
 		strings.HasPrefix(token, "pk-") ||
 		strings.HasPrefix(token, "sk-")
-}
-
-// IsAnalyticsKey returns true if the token is an insights or analytics key.
-func IsAnalyticsKey(token string) bool {
-	return strings.HasPrefix(token, "hi-") ||
-		strings.HasPrefix(token, "ha-")
-}
-
-// IsWidgetKey returns true if the token is a widget embed key.
-func IsWidgetKey(token string) bool {
-	return strings.HasPrefix(token, "hz-")
 }
 
 // ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
