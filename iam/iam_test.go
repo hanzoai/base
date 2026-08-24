@@ -67,37 +67,38 @@ func writeErr(w http.ResponseWriter, msg string) {
 // LookupByAttribute
 // ──────────────────────────────────────────────────────────────────────
 
+// writePage writes the user collection's page: the records themselves, under no
+// envelope.
+func writePage(w http.ResponseWriter, users ...map[string]any) {
+	if users == nil {
+		users = []map[string]any{}
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"users": users, "total": len(users)})
+}
+
 func TestLookupByAttribute_Hit(t *testing.T) {
 	f := newFakeIAM(t)
-	// Phone normalization probes multiple candidate formats: the canonical
-	// `+16125551234`, the `+`-stripped `16125551234`, and the country-
-	// code-stripped `6125551234`. Accept any of the three on the first
-	// probe — the SDK's normalization order is its own internal choice
-	// and the test should not be load-bearing on that order.
-	validProbes := map[string]bool{
-		"+16125551234": true,
-		"16125551234":  true,
-		"6125551234":   true,
-	}
-	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("field"); got != "phone" {
-			t.Errorf("field: got %q want phone", got)
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		id, secret, ok := r.BasicAuth()
+		if !ok || id != "svc" || secret != "shh" {
+			t.Errorf("credential did not arrive as Basic: id=%q ok=%v", id, ok)
 		}
-		if got := r.URL.Query().Get("value"); !validProbes[got] {
-			t.Errorf("value: got %q want one of {+16125551234, 16125551234, 6125551234}", got)
+		if got := r.URL.Query().Get("email"); got != "alice@x.com" {
+			t.Errorf("email: got %q want alice@x.com", got)
 		}
 		if got := r.URL.Query().Get("owner"); got != "hanzo" {
 			t.Errorf("owner: got %q want hanzo", got)
 		}
-		writeOK(w, []map[string]any{
-			{"id": "u-1", "name": "alice", "email": "alice@x.com", "owner": "hanzo"},
-		})
+		if got := r.URL.Query().Get("limit"); got != "10" {
+			t.Errorf("limit: got %q want 10", got)
+		}
+		writePage(w, map[string]any{"id": "u-1", "name": "alice", "email": "alice@x.com", "owner": "hanzo"})
 	})
 
 	c := iam.NewClient(f.server.URL)
 	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
-	out, err := c.LookupByAttribute(context.Background(), "phone", "+16125551234", "", 10)
+	out, err := c.LookupByAttribute(context.Background(), "email", "alice@x.com", "", 10)
 	if err != nil {
 		t.Fatalf("LookupByAttribute: %v", err)
 	}
@@ -108,8 +109,8 @@ func TestLookupByAttribute_Hit(t *testing.T) {
 
 func TestLookupByAttribute_Miss(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
-		writeOK(w, []map[string]any{})
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		writePage(w)
 	})
 
 	c := iam.NewClient(f.server.URL)
@@ -124,34 +125,29 @@ func TestLookupByAttribute_Miss(t *testing.T) {
 	}
 }
 
-func TestLookupByAttribute_PhoneNormalization(t *testing.T) {
-	// Verify the three-shape probe for phone: +16125551234 → 16125551234 → 6125551234.
-	// The user actually exists under the raw US-national form ("6125551234"),
-	// so the first two probes miss and the third hits.
+// An attribute the collection cannot narrow on is refused BEFORE the request. A
+// filter IAM does not offer is one it ignores, so sending it would answer with
+// the org's first page and every one of those rows would read as a match.
+func TestLookupByAttribute_RefusesUnfilterableAttribute(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Query().Get("value") {
-		case "6125551234":
-			writeOK(w, []map[string]any{
-				{"id": "u-7", "name": "bob", "email": "bob@x.com", "owner": "hanzo"},
-			})
-		default:
-			writeOK(w, []map[string]any{})
-		}
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		writePage(w, map[string]any{"id": "u-9", "name": "somebody", "email": "else@x.com", "owner": "hanzo"})
 	})
 
 	c := iam.NewClient(f.server.URL)
 	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
-	out, err := c.LookupByAttribute(context.Background(), "phone", "+16125551234", "", 10)
-	if err != nil {
-		t.Fatalf("LookupByAttribute: %v", err)
+	for _, attr := range []string{"phone", "name", ""} {
+		out, err := c.LookupByAttribute(context.Background(), attr, "+16125551234", "", 10)
+		if err == nil {
+			t.Fatalf("attr %q: want refusal, got %+v", attr, out)
+		}
+		if out != nil {
+			t.Fatalf("attr %q: refusal must yield no users, got %+v", attr, out)
+		}
 	}
-	if len(out) != 1 || out[0].ID != "u-7" {
-		t.Fatalf("expected normalization to recover u-7, got %+v", out)
-	}
-	if got := f.callCount("/v1/iam/get-users"); got != 3 {
-		t.Fatalf("expected 3 probes (raw, no-plus, no-US), got %d", got)
+	if got := f.callCount("/v1/iam/users"); got != 0 {
+		t.Fatalf("an unfilterable attribute reached IAM %d times", got)
 	}
 }
 
@@ -163,18 +159,22 @@ func TestLookupByAttribute_RequiresAdminCreds(t *testing.T) {
 	}
 }
 
-func TestLookupByAttribute_IAMErrorPropagates(t *testing.T) {
+func TestLookupByAttribute_IAMRefusalPropagates(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/v1/iam/get-users", func(w http.ResponseWriter, r *http.Request) {
-		writeErr(w, "field not supported")
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"title":"forbidden: this credential is scoped to organization other"}`))
 	})
 
 	c := iam.NewClient(f.server.URL)
 	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
-	_, err := c.LookupByAttribute(context.Background(), "bogus", "x", "", 10)
-	if err == nil || !strings.Contains(err.Error(), "field not supported") {
-		t.Fatalf("want IAM-side error propagation, got %v", err)
+	out, err := c.LookupByAttribute(context.Background(), "email", "x@y.com", "", 10)
+	if err == nil || !strings.Contains(err.Error(), "403") {
+		t.Fatalf("want the refusal to propagate, got %+v / %v", out, err)
+	}
+	if out != nil {
+		t.Fatalf("a refusal must yield no users, got %+v", out)
 	}
 }
 
@@ -184,27 +184,36 @@ func TestLookupByAttribute_IAMErrorPropagates(t *testing.T) {
 
 func TestEnsureUser_Create(t *testing.T) {
 	f := newFakeIAM(t)
-	var addUserCalls, getUserCalls int64
-	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&addUserCalls, 1)
+	var reads, writes int64
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			atomic.AddInt64(&reads, 1)
+			writePage(w)
+			return
+		}
+		atomic.AddInt64(&writes, 1)
+		if id, secret, ok := r.BasicAuth(); !ok || id != "svc" || secret != "shh" {
+			t.Errorf("credential did not arrive as Basic: id=%q ok=%v", id, ok)
+		}
 		body, _ := io.ReadAll(r.Body)
-		var payload map[string]any
-		_ = json.Unmarshal(body, &payload)
-		if payload["email"] != "new@x.com" {
-			t.Errorf("email: got %v want new@x.com", payload["email"])
+		var payload struct {
+			User map[string]any `json:"user"`
 		}
-		if payload["owner"] != "hanzo" {
-			t.Errorf("owner: got %v want hanzo", payload["owner"])
+		if err := json.Unmarshal(body, &payload); err != nil {
+			t.Fatalf("decode create body: %v", err)
 		}
-		writeOK(w, "Affected")
-	})
-	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&getUserCalls, 1)
-		writeOK(w, map[string]any{
-			"id":    "new-id",
-			"name":  "new",
-			"email": "new@x.com",
-			"owner": "hanzo",
+		// The profile rides under "user"; a flat body would decode to nothing.
+		if payload.User == nil {
+			t.Fatalf("create body carried no user object: %s", body)
+		}
+		if payload.User["email"] != "new@x.com" {
+			t.Errorf("email: got %v want new@x.com", payload.User["email"])
+		}
+		if payload.User["owner"] != "hanzo" {
+			t.Errorf("owner: got %v want hanzo", payload.User["owner"])
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "new-id", "name": "new", "email": "new@x.com", "owner": "hanzo",
 		})
 	})
 
@@ -223,34 +232,28 @@ func TestEnsureUser_Create(t *testing.T) {
 	if user.ID != "new-id" {
 		t.Errorf("user.ID: got %q want new-id", user.ID)
 	}
-	if atomic.LoadInt64(&addUserCalls) != 1 {
-		t.Errorf("add-user calls: got %d want 1", addUserCalls)
-	}
-	if atomic.LoadInt64(&getUserCalls) != 1 {
-		t.Errorf("get-user calls: got %d want 1", getUserCalls)
+	if atomic.LoadInt64(&reads) != 1 || atomic.LoadInt64(&writes) != 1 {
+		t.Errorf("reads=%d writes=%d, want 1 and 1", reads, writes)
 	}
 }
 
-func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
-	// IAM returns HTTP 200 with status:"error" + "X already exists"
-	// when the user is already present. EnsureUser must treat this as
-	// idempotent-replay and resolve the user via GET /v1/iam/get-user.
+// The address is read FIRST, so an account that is already there is returned
+// without a write. IAM's create refuses a duplicate username and admits a
+// duplicate address, so creating first would file a second row nothing can
+// resolve by address again.
+func TestEnsureUser_ExistingIsReturnedWithoutWriting(t *testing.T) {
 	f := newFakeIAM(t)
-	var addUserCalls int64
-	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt64(&addUserCalls, 1)
-		writeErr(w, "user:Email already exists")
-	})
-	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
+	var writes int64
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			atomic.AddInt64(&writes, 1)
+			t.Errorf("EnsureUser wrote for an address already present")
+			return
+		}
 		if got := r.URL.Query().Get("email"); got != "dup@x.com" {
 			t.Errorf("email: got %q want dup@x.com", got)
 		}
-		writeOK(w, map[string]any{
-			"id":    "existing-id",
-			"name":  "dup",
-			"email": "dup@x.com",
-			"owner": "hanzo",
-		})
+		writePage(w, map[string]any{"id": "existing-id", "name": "dup", "email": "dup@x.com", "owner": "hanzo"})
 	})
 
 	c := iam.NewClient(f.server.URL)
@@ -258,28 +261,32 @@ func TestEnsureUser_Idempotent_AlreadyExists(t *testing.T) {
 
 	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "dup@x.com", Name: "dup"})
 	if err != nil {
-		t.Fatalf("EnsureUser on duplicate: %v", err)
+		t.Fatalf("EnsureUser on existing: %v", err)
 	}
 	if user.ID != "existing-id" {
 		t.Errorf("user.ID: got %q want existing-id", user.ID)
 	}
+	if atomic.LoadInt64(&writes) != 0 {
+		t.Errorf("writes: got %d want 0", writes)
+	}
 }
 
-func TestEnsureUser_Idempotent_HTTP409(t *testing.T) {
-	// Some IAM versions / proxies may return HTTP 409 directly. EnsureUser
-	// handles both signals.
+// The username was taken between the read and the write — the racing provision
+// that lost. Both agree on the address, so it resolves by that.
+func TestEnsureUser_RaceLosesOnNameAndResolvesByAddress(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte(`{"status":"error","msg":"already exists"}`))
-	})
-	f.setHandler("/v1/iam/get-user", func(w http.ResponseWriter, r *http.Request) {
-		writeOK(w, map[string]any{
-			"id":    "existing-id",
-			"name":  "dup",
-			"email": "dup@x.com",
-			"owner": "hanzo",
-		})
+	var reads int64
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusConflict)
+			_, _ = w.Write([]byte(`{"title":"user hanzo/dup already exists"}`))
+			return
+		}
+		if atomic.AddInt64(&reads, 1) == 1 {
+			writePage(w) // the read that lost the race saw nothing
+			return
+		}
+		writePage(w, map[string]any{"id": "existing-id", "name": "dup", "email": "dup@x.com", "owner": "hanzo"})
 	})
 
 	c := iam.NewClient(f.server.URL)
@@ -294,20 +301,106 @@ func TestEnsureUser_Idempotent_HTTP409(t *testing.T) {
 	}
 }
 
-func TestEnsureUser_PropagatesNonExistsError(t *testing.T) {
-	// Errors that are NOT "already exists" must propagate to the caller —
-	// not get silently swallowed by the idempotent-replay path.
+// An address naming two accounts names none: refuse rather than pick one, and
+// write nothing.
+func TestEnsureUser_RefusesAmbiguousAddress(t *testing.T) {
 	f := newFakeIAM(t)
-	f.setHandler("/v1/iam/add-user", func(w http.ResponseWriter, r *http.Request) {
-		writeErr(w, "organization not found")
+	var writes int64
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			atomic.AddInt64(&writes, 1)
+			return
+		}
+		writePage(w,
+			map[string]any{"id": "u-1", "name": "a", "email": "two@x.com", "owner": "hanzo"},
+			map[string]any{"id": "u-2", "name": "b", "email": "two@x.com", "owner": "hanzo"},
+		)
 	})
 
 	c := iam.NewClient(f.server.URL)
 	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 
-	_, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "x@y.com"})
+	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "two@x.com"})
+	if err == nil {
+		t.Fatalf("want refusal on an ambiguous address, got %+v", user)
+	}
+	if user != nil {
+		t.Fatalf("a refusal must yield no user, got %+v", user)
+	}
+	if atomic.LoadInt64(&writes) != 0 {
+		t.Errorf("writes: got %d want 0", writes)
+	}
+}
+
+func TestEnsureUser_PropagatesCreateRefusal(t *testing.T) {
+	f := newFakeIAM(t)
+	f.setHandler("/v1/iam/users", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			writePage(w)
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"title":"organization not found"}`))
+	})
+
+	c := iam.NewClient(f.server.URL)
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
+
+	user, err := c.EnsureUser(context.Background(), iam.EnsureUserSpec{Email: "x@y.com"})
 	if err == nil || !strings.Contains(err.Error(), "organization not found") {
-		t.Fatalf("want non-exists error to propagate, got %v", err)
+		t.Fatalf("want the refusal to propagate, got %+v / %v", user, err)
+	}
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// ResolveAPIKey
+// ──────────────────────────────────────────────────────────────────────
+
+// A key resolves to the account the key endpoint names, and to nothing when it
+// does not resolve: a refusal must never become a default principal.
+func TestResolveAPIKey_ResolvesAndRefuses(t *testing.T) {
+	f := newFakeIAM(t)
+	f.setHandler("/v1/iam/keys/principal", func(w http.ResponseWriter, r *http.Request) {
+		if id, secret, ok := r.BasicAuth(); !ok || id != "svc" || secret != "shh" {
+			t.Errorf("credential did not arrive as Basic: id=%q ok=%v", id, ok)
+		}
+		if r.URL.Query().Get("accessKey") != "sk-good" {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"status": "error", "msg": "the entity does not exist", "code": "not-found",
+			})
+			return
+		}
+		writeOK(w, map[string]any{
+			"owner": "hanzo", "name": "svc", "email": "svc@hanzo.ai", "isAdmin": false,
+		})
+	})
+
+	c := iam.NewClient(f.server.URL)
+	c.SetAdminCreds(iam.AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
+
+	user, err := c.ResolveAPIKey("sk-good")
+	if err != nil {
+		t.Fatalf("ResolveAPIKey: %v", err)
+	}
+	if user.ID == "" {
+		t.Fatalf("a resolved key must carry a subject, got %+v", user)
+	}
+	if user.ID != "hanzo/svc" || len(user.OrgIDs) != 1 || user.OrgIDs[0] != "hanzo" {
+		t.Fatalf("resolved %+v", user)
+	}
+
+	if bad, err := c.ResolveAPIKey("sk-bad"); err == nil {
+		t.Fatalf("an unresolvable key must refuse, got %+v", bad)
+	}
+}
+
+// With no credential configured the resolver refuses rather than asking IAM
+// anonymously and reading whatever comes back.
+func TestResolveAPIKey_RequiresAdminCreds(t *testing.T) {
+	c := iam.NewClient("http://unused.invalid")
+	if user, err := c.ResolveAPIKey("sk-x"); err == nil {
+		t.Fatalf("want refusal without credentials, got %+v", user)
 	}
 }
 

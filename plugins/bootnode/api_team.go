@@ -80,9 +80,12 @@ func (p *plugin) handleInviteMember(e *core.RequestEvent) error {
 		return e.BadRequestError("member with this email already exists", nil)
 	}
 
-	// Does the email already resolve to an IAM user in this org?
+	// Does the email already resolve to an IAM user in this org? Ask for two, so
+	// an address held by two accounts is VISIBLE: seating the invitee on whichever
+	// row sorted first is how somebody joins a team under a colleague's identity.
+	// An ambiguous address stays pending and goes through the invite instead.
 	var iamUserID, iamName string
-	if users, lookupErr := p.iam.LookupByAttribute(e.Request.Context(), "email", body.Email, id.Org, 1); lookupErr == nil && len(users) > 0 {
+	if users, lookupErr := p.iam.LookupByAttribute(e.Request.Context(), "email", body.Email, id.Org, 2); lookupErr == nil && len(users) == 1 {
 		iamUserID = users[0].ID
 		iamName = users[0].Name
 	}

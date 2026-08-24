@@ -4,7 +4,7 @@
 // every address it listens on, and the address SCHEME names the transport: a
 // bare host:port is ZAP, "http://" is HTTP. IAM's deployment listens on both —
 // `iam serve --zap :9653 --http http://:8000` — so /v1/iam/oauth/userinfo,
-// /v1/iam/get-user and the JWKS answer identically on either wire.
+// /v1/iam/users and the JWKS answer identically on either wire.
 //
 // So this is not a second client, a second protocol, or a second set of paths.
 // It is the same request, addressed the same way, carried over the transport the

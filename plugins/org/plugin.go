@@ -159,10 +159,21 @@ func Register(app core.App, config Config) error {
 		return err
 	}
 
+	// The service's OWN IAM application credentials, installed where the client is
+	// built. Every server-to-server read presents them — resolving a key to its
+	// holder, reading a user by address — so a caller cannot reach IAM without one
+	// and read whatever an anonymous request happens to answer with.
+	iamClient := NewIAMClient(readAddress(config))
+	iamClient.SetAdminCreds(AdminCreds{
+		ClientID:     config.IAMClientID,
+		ClientSecret: config.IAMClientSecret,
+		Owner:        config.IAMOrg,
+	})
+
 	p := &plugin{
 		app:        app,
 		config:     config,
-		iam:        NewIAMClient(readAddress(config)),
+		iam:        iamClient,
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
 		orgDB:      NewOrgDB(app, config.principalKey()),
