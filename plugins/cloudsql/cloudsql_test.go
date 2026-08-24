@@ -343,3 +343,28 @@ func TestMetaProxyOpensOneDatabase(t *testing.T) {
 		t.Errorf("postgres-meta was reached for an org with no database: %v", seen)
 	}
 }
+
+// TestACreatedDatabaseRequiresTLS pins that a handed-out connection string never
+// turns TLS off. ConnectionString decides what an unstated mode means, and the
+// create path stating one of its own is how it came to say disable.
+func TestACreatedDatabaseRequiresTLS(t *testing.T) {
+	iam, mux, _, _ := stand(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/cloud-sql/databases",
+		strings.NewReader(`{"databaseName":"gamma"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+iam.token(t, "gamma/g", "gamma"))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	body := rec.Body.String()
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("gamma could not create its database: %d %s", rec.Code, body)
+	}
+	if strings.Contains(body, "sslmode=disable") {
+		t.Errorf("a created database was handed back with TLS off: %s", body)
+	}
+	if !strings.Contains(body, "sslmode=require") {
+		t.Errorf("a created database's connection string did not require TLS: %s", body)
+	}
+}
