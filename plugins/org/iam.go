@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -309,8 +310,8 @@ func IsWidgetKey(token string) bool {
 }
 
 // ResolveAPIKey resolves an IAM API key (hk-/pk-/sk-) to user + org context.
-// Uses IAM's GET /v1/iam/get-user?accessKey= endpoint. Results are cached for
-// tokenCacheTTL; concurrent resolves of the same key are coalesced via
+// Uses IAM's GET /v1/iam/keys/principal?accessKey= endpoint. Results are cached
+// for tokenCacheTTL; concurrent resolves of the same key are coalesced via
 // singleflight.
 func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
 	if user, ok := c.keys.Get(accessKey); ok {
@@ -336,12 +337,18 @@ func (c *IAMClient) ResolveAPIKey(accessKey string) (*IAMUser, error) {
 }
 
 func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
-	u := c.baseURL + "/v1/iam/get-user?accessKey=" + url.QueryEscape(accessKey)
+	creds := c.adminCreds()
+	if creds.ClientID == "" || creds.ClientSecret == "" {
+		return nil, fmt.Errorf("iam: ResolveAPIKey: admin credentials not configured (call SetAdminCreds)")
+	}
+	u := c.baseURL + "/v1/iam/keys/principal?accessKey=" + url.QueryEscape(accessKey)
 
 	req, err := http.NewRequest("GET", u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("iam: create key request: %w", err)
 	}
+	req.SetBasicAuth(creds.ClientID, creds.ClientSecret)
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -351,43 +358,51 @@ func (c *IAMClient) fetchUserByKey(accessKey string) (*IAMUser, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return nil, fmt.Errorf("iam: get-user returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("iam: keys/principal returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result struct {
-		Data struct {
+	var envelope struct {
+		Status string `json:"status"`
+		Msg    string `json:"msg"`
+		Data   *struct {
 			Owner string `json:"owner"`
 			Name  string `json:"name"`
 			Email string `json:"email"`
-			ID    string `json:"id"`
 		} `json:"data"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("iam: decode key user: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("iam: decode key principal: %w", err)
 	}
-
-	if result.Data.Name == "" {
+	if envelope.Status != "ok" || envelope.Data == nil {
+		return nil, fmt.Errorf("iam: key did not resolve: %s", envelope.Msg)
+	}
+	if envelope.Data.Owner == "" || envelope.Data.Name == "" {
 		return nil, fmt.Errorf("iam: key resolved to empty user")
 	}
 
+	// The key endpoint answers with the account, never its opaque id: what it
+	// discloses is deliberately the narrowest projection a resolver needs. So the
+	// subject is the account's own canonical spelling, owner/name, which is unique
+	// across tenants where a bare username is unique only inside one.
 	return &IAMUser{
-		ID:     result.Data.ID,
-		Name:   result.Data.Name,
-		Email:  result.Data.Email,
-		OrgIDs: []string{result.Data.Owner},
+		ID:     envelope.Data.Owner + "/" + envelope.Data.Name,
+		Name:   envelope.Data.Name,
+		Email:  envelope.Data.Email,
+		OrgIDs: []string{envelope.Data.Owner},
 	}, nil
 }
 
 // ── Server-to-Server User Operations ────────────────────────────────────
 //
-// These methods authenticate using clientId + clientSecret (IAM application
-// credentials) and bypass session auth. They're for service-to-service flows
-// where a downstream service needs to look up or provision IAM users
-// (onboarding, KYC reconciliation, deduplication).
+// These methods present the calling service's OWN IAM application credentials
+// as client_secret_basic, and carry no session. They are for the flows where a
+// service looks up or provisions IAM users (onboarding, KYC reconciliation,
+// deduplication).
 //
-// The clientId/clientSecret used here are the calling *service*'s own IAM
-// application credentials. They authorize reads against the configured org.
-// They do NOT grant superuser scope.
+// What those credentials reach is the application's capability allowlist and the
+// tenant it serves — never platform scope, and never another tenant's rows. IAM
+// refuses an owner the credential is not scoped to rather than answering with
+// its own, so a lookup either reads the org it named or fails.
 
 // AdminCreds holds the service's IAM application credentials. Pass these to
 // the client via SetAdminCreds before invoking server-to-server methods.
@@ -415,41 +430,6 @@ type EnsureUserSpec struct {
 	Type        string // IAM user type, e.g. "normal-user"
 }
 
-// normalizePhoneCandidates returns the set of phone shapes IAM might have
-// stored. IAM inconsistently persists phones — some rows include the
-// leading "+", some are raw digits, US numbers sometimes omit the +1 country
-// code. We probe all three shapes to catch either persistence path.
-func normalizePhoneCandidates(phone string) []string {
-	if phone == "" {
-		return nil
-	}
-	out := []string{phone}
-	if strings.HasPrefix(phone, "+") {
-		stripped := strings.TrimPrefix(phone, "+")
-		if stripped != "" {
-			out = append(out, stripped)
-		}
-		// US: drop +1 country code to match a raw 10-digit national number.
-		if strings.HasPrefix(stripped, "1") {
-			noUS := strings.TrimPrefix(stripped, "1")
-			if noUS != "" {
-				out = append(out, noUS)
-			}
-		}
-	}
-	// Deduplicate while preserving order.
-	seen := make(map[string]struct{}, len(out))
-	deduped := out[:0]
-	for _, v := range out {
-		if _, ok := seen[v]; ok {
-			continue
-		}
-		seen[v] = struct{}{}
-		deduped = append(deduped, v)
-	}
-	return deduped
-}
-
 // adminCreds returns a snapshot of the configured admin credentials.
 func (c *IAMClient) adminCreds() AdminCreds {
 	c.mu.RLock()
@@ -458,19 +438,19 @@ func (c *IAMClient) adminCreds() AdminCreds {
 }
 
 // LookupByAttribute performs a server-to-server lookup of users matching
-// attr=value within org. attr is an IAM user field name ("phone", "email",
-// "name", etc.). org defaults to the client's admin Owner if empty.
+// attr=value within org. org defaults to the client's admin Owner if empty.
 // maxResults caps the page size; values <= 0 default to 10.
 //
-// For attr=="phone", LookupByAttribute probes multiple phone normalizations
-// (raw, with leading "+", US +1 stripped) since IAM stores phones in
-// inconsistent shapes depending on the signup path.
+// IAM's user collection narrows on ONE attribute, the email address, so "email"
+// is the only attr this answers. Any other name is refused rather than sent: a
+// filter IAM does not offer is a filter it ignores, the reply is then the org's
+// first page, and a caller reading that as a match binds the wrong person.
 //
 // Returns ([], nil) when no user matches — never an error for empty results.
 // Errors are returned only for transport / decoding / IAM-side error responses.
 func (c *IAMClient) LookupByAttribute(ctx context.Context, attr, value, org string, maxResults int) ([]IAMUser, error) {
-	if attr == "" {
-		return nil, fmt.Errorf("iam: LookupByAttribute: attr is required")
+	if attr != "email" {
+		return nil, fmt.Errorf("iam: LookupByAttribute: no %q filter; the user collection narrows on email", attr)
 	}
 	if value == "" {
 		return nil, fmt.Errorf("iam: LookupByAttribute: value is required")
@@ -489,88 +469,79 @@ func (c *IAMClient) LookupByAttribute(ctx context.Context, attr, value, org stri
 		maxResults = 10
 	}
 
-	// Build candidate values. Phone gets multiple normalizations; everything
-	// else uses the value verbatim.
-	candidates := []string{value}
-	if attr == "phone" {
-		candidates = normalizePhoneCandidates(value)
+	users, err := c.listUsers(ctx, org, value, maxResults)
+	if err != nil {
+		return nil, fmt.Errorf("iam: LookupByAttribute: %w", err)
+	}
+	return users, nil
+}
+
+// listUsers reads the page of users in owner carrying email. It is the ONE place
+// this client addresses the user collection, so a lookup and a provision cannot
+// come to disagree about where that collection is or what it answers with.
+//
+// A page is the record list itself — no envelope — and an owner that holds no
+// match is an empty list, not an error.
+func (c *IAMClient) listUsers(ctx context.Context, owner, email string, limit int) ([]IAMUser, error) {
+	creds := c.adminCreds()
+	q := url.Values{}
+	q.Set("owner", owner)
+	q.Set("email", email)
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
 	}
 
-	var matches []IAMUser
-	seenIDs := make(map[string]struct{})
-	for _, candidate := range candidates {
-		if candidate == "" {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/v1/iam/users?"+q.Encode(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.SetBasicAuth(creds.ClientID, creds.ClientSecret)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("users returned %d: %s", resp.StatusCode, truncate(string(body), 256))
+	}
+
+	var page struct {
+		Users []struct {
+			ID    string `json:"id"`
+			Name  string `json:"name"`
+			Email string `json:"email"`
+			Owner string `json:"owner"`
+		} `json:"users"`
+	}
+	if err := json.Unmarshal(body, &page); err != nil {
+		return nil, fmt.Errorf("decode: %w", err)
+	}
+
+	out := make([]IAMUser, 0, len(page.Users))
+	for _, u := range page.Users {
+		if u.ID == "" {
 			continue
 		}
-		q := url.Values{}
-		q.Set("owner", org)
-		q.Set("clientId", creds.ClientID)
-		q.Set("clientSecret", creds.ClientSecret)
-		q.Set("pageSize", fmt.Sprintf("%d", maxResults))
-		q.Set("p", "1")
-		q.Set("field", attr)
-		q.Set("value", candidate)
-
-		req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/v1/iam/get-users?"+q.Encode(), nil)
-		if err != nil {
-			return nil, fmt.Errorf("iam: LookupByAttribute build request: %w", err)
-		}
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("iam: LookupByAttribute request: %w", err)
-		}
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-		resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("iam: LookupByAttribute returned %d: %s", resp.StatusCode, truncate(string(body), 256))
-		}
-		var envelope struct {
-			Status string `json:"status"`
-			Msg    string `json:"msg"`
-			Data   []struct {
-				ID    string `json:"id"`
-				Name  string `json:"name"`
-				Email string `json:"email"`
-				Owner string `json:"owner"`
-			} `json:"data"`
-		}
-		if err := json.Unmarshal(body, &envelope); err != nil {
-			return nil, fmt.Errorf("iam: LookupByAttribute decode: %w", err)
-		}
-		if envelope.Status == "error" {
-			return nil, fmt.Errorf("iam: LookupByAttribute: %s", envelope.Msg)
-		}
-		for _, u := range envelope.Data {
-			if u.ID == "" {
-				continue
-			}
-			if _, ok := seenIDs[u.ID]; ok {
-				continue
-			}
-			seenIDs[u.ID] = struct{}{}
-			matches = append(matches, IAMUser{
-				ID:     u.ID,
-				Name:   u.Name,
-				Email:  u.Email,
-				OrgIDs: []string{u.Owner},
-			})
-			if len(matches) >= maxResults {
-				return matches, nil
-			}
-		}
+		out = append(out, IAMUser{ID: u.ID, Name: u.Name, Email: u.Email, OrgIDs: []string{u.Owner}})
 	}
-	return matches, nil
+	return out, nil
 }
 
 // EnsureUser idempotently provisions an IAM user matching spec. If the user
 // already exists (matched by email within spec.Owner), the existing user is
 // returned without modification. Otherwise the user is created via
-// POST /v1/iam/add-user and the new user is fetched and returned.
+// POST /v1/iam/users and the created record is returned.
 //
-// EnsureUser treats both HTTP 409 and IAM's status:"error" + "already exists"
-// envelope as the idempotent-replay path — IAM responds with HTTP 200 in
-// either case depending on version, and both shapes mean "this user is
-// already there, fetch it".
+// The ADDRESS decides, so the read comes first. IAM's create refuses a duplicate
+// username and admits a duplicate address, and a second row under one address is
+// a row no lookup by address will resolve again — it makes both unreachable.
+// Creating first and treating the refusal as "already there" would be that write.
 //
 // spec.Email is required (used as the dedup key). spec.Owner defaults to the
 // client's admin Owner if empty.
@@ -597,33 +568,41 @@ func (c *IAMClient) EnsureUser(ctx context.Context, spec EnsureUserSpec) (*IAMUs
 		}
 	}
 
-	payload := map[string]any{
-		"owner":        owner,
-		"name":         name,
-		"email":        spec.Email,
-		"displayName":  spec.DisplayName,
-		"phone":        spec.Phone,
-		"type":         spec.Type,
-		"organization": owner,
+	existing, err := c.listUsers(ctx, owner, spec.Email, 2)
+	if err != nil {
+		return nil, fmt.Errorf("iam: EnsureUser: %w", err)
 	}
-	body, err := json.Marshal(payload)
+	if len(existing) > 1 {
+		return nil, fmt.Errorf("iam: EnsureUser: email=%s names %d users in owner=%s", spec.Email, len(existing), owner)
+	}
+	if len(existing) == 1 {
+		return &existing[0], nil
+	}
+
+	// The profile rides under "user": the create body carries the record beside
+	// the write-only fields that never land on it, so a flat body reads as a user
+	// with nothing in it.
+	body, err := json.Marshal(map[string]any{
+		"user": map[string]any{
+			"owner":       owner,
+			"name":        name,
+			"email":       spec.Email,
+			"displayName": spec.DisplayName,
+			"phone":       spec.Phone,
+			"type":        spec.Type,
+		},
+	})
 	if err != nil {
 		return nil, fmt.Errorf("iam: EnsureUser marshal: %w", err)
 	}
 
-	q := url.Values{}
-	q.Set("clientId", creds.ClientID)
-	q.Set("clientSecret", creds.ClientSecret)
-	// IAM's add-user uses `id` (owner/name) for routing; include both for
-	// safety against handlers that read either shape.
-	q.Set("id", owner+"/"+name)
-
-	req, err := http.NewRequestWithContext(ctx, "POST",
-		c.baseURL+"/v1/iam/add-user?"+q.Encode(), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/v1/iam/users", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("iam: EnsureUser build request: %w", err)
 	}
+	req.SetBasicAuth(creds.ClientID, creds.ClientSecret)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -632,98 +611,55 @@ func (c *IAMClient) EnsureUser(ctx context.Context, spec EnsureUserSpec) (*IAMUs
 	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	resp.Body.Close()
 
-	// HTTP 409 → already exists, fetch and return.
+	// The username was taken between the read above and this write — the racing
+	// provision that lost. Both agree on the address, so resolve by it.
 	if resp.StatusCode == http.StatusConflict {
 		return c.fetchUserByEmail(ctx, owner, spec.Email)
 	}
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, fmt.Errorf("iam: EnsureUser returned %d: %s",
 			resp.StatusCode, truncate(string(respBody), 256))
 	}
 
-	// HTTP 200 — could be success (status:ok) or IAM-style error envelope.
-	var envelope struct {
-		Status string `json:"status"`
-		Msg    string `json:"msg"`
-		Data   any    `json:"data"`
+	var created struct {
+		ID    string `json:"id"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
+		Owner string `json:"owner"`
 	}
-	if err := json.Unmarshal(respBody, &envelope); err != nil {
+	if err := json.Unmarshal(respBody, &created); err != nil {
 		return nil, fmt.Errorf("iam: EnsureUser decode: %w", err)
 	}
-	if envelope.Status == "error" {
-		// IAM's idempotent-replay signal: "X already exists". Could be
-		// username, email, or phone — any of them means the user is in IAM
-		// already and we should resolve it by email.
-		if isAlreadyExistsMsg(envelope.Msg) {
-			return c.fetchUserByEmail(ctx, owner, spec.Email)
-		}
-		return nil, fmt.Errorf("iam: EnsureUser: %s", envelope.Msg)
-	}
-	// Success — fetch the freshly-created user to get its IAM-assigned ID.
-	return c.fetchUserByEmail(ctx, owner, spec.Email)
-}
-
-// fetchUserByEmail does a server-to-server lookup of a user by email within
-// the given org. Used by EnsureUser to resolve both new and already-existing
-// users to a canonical *IAMUser.
-func (c *IAMClient) fetchUserByEmail(ctx context.Context, owner, email string) (*IAMUser, error) {
-	creds := c.adminCreds()
-	q := url.Values{}
-	q.Set("owner", owner)
-	q.Set("email", email)
-	q.Set("clientId", creds.ClientID)
-	q.Set("clientSecret", creds.ClientSecret)
-
-	req, err := http.NewRequestWithContext(ctx, "GET",
-		c.baseURL+"/v1/iam/get-user?"+q.Encode(), nil)
-	if err != nil {
-		return nil, fmt.Errorf("iam: fetchUserByEmail build request: %w", err)
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("iam: fetchUserByEmail request: %w", err)
-	}
-	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("iam: fetchUserByEmail returned %d: %s",
-			resp.StatusCode, truncate(string(body), 256))
-	}
-	var envelope struct {
-		Status string `json:"status"`
-		Msg    string `json:"msg"`
-		Data   struct {
-			ID    string `json:"id"`
-			Name  string `json:"name"`
-			Email string `json:"email"`
-			Owner string `json:"owner"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, fmt.Errorf("iam: fetchUserByEmail decode: %w", err)
-	}
-	if envelope.Status == "error" {
-		return nil, fmt.Errorf("iam: fetchUserByEmail: %s", envelope.Msg)
-	}
-	if envelope.Data.ID == "" {
-		return nil, fmt.Errorf("iam: fetchUserByEmail: no user found for email=%s in owner=%s", email, owner)
+	if created.ID == "" {
+		return nil, fmt.Errorf("iam: EnsureUser: created user carries no id")
 	}
 	return &IAMUser{
-		ID:     envelope.Data.ID,
-		Name:   envelope.Data.Name,
-		Email:  envelope.Data.Email,
-		OrgIDs: []string{envelope.Data.Owner},
+		ID:     created.ID,
+		Name:   created.Name,
+		Email:  created.Email,
+		OrgIDs: []string{created.Owner},
 	}, nil
 }
 
-// isAlreadyExistsMsg recognizes IAM's various "X already exists" error messages
-// emitted by add-user when the username/email/phone collides.
-func isAlreadyExistsMsg(msg string) bool {
-	if msg == "" {
-		return false
+// fetchUserByEmail resolves the ONE user carrying email within owner. Used by
+// EnsureUser to resolve a user a racing provision created first.
+//
+// An address naming two accounts names none: two rows refuse rather than hand
+// back the first, because choosing between them is how somebody ends up acting
+// under a colleague's identity.
+func (c *IAMClient) fetchUserByEmail(ctx context.Context, owner, email string) (*IAMUser, error) {
+	users, err := c.listUsers(ctx, owner, email, 2)
+	if err != nil {
+		return nil, fmt.Errorf("iam: fetchUserByEmail: %w", err)
 	}
-	low := strings.ToLower(msg)
-	return strings.Contains(low, "already exists")
+	switch len(users) {
+	case 0:
+		return nil, fmt.Errorf("iam: fetchUserByEmail: no user found for email=%s in owner=%s", email, owner)
+	case 1:
+		return &users[0], nil
+	default:
+		return nil, fmt.Errorf("iam: fetchUserByEmail: email=%s names %d users in owner=%s", email, len(users), owner)
+	}
 }
 
 // truncate clips s to at most n runes, appending "…" if truncated. Used for

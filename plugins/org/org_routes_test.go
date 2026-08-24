@@ -184,11 +184,12 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 	// The half of IAM a key resolves against, beside the JWKS one.
 	keys := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"id":"u_key","name":"keyuser","email":"k@example.test","owner":"alpha"}}`))
+		_, _ = w.Write([]byte(`{"status":"ok","data":{"name":"keyuser","email":"k@example.test","owner":"alpha"}}`))
 	}))
 	defer keys.Close()
 
-	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1",
+		IAMClientID: "svc", IAMClientSecret: "shh"}); err != nil {
 		t.Fatal(err)
 	}
 	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
@@ -237,11 +238,12 @@ func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.Ap
 	iam := newIssuer(t)
 	keys := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":{"id":"u_key","name":"keyuser","email":"k@example.test","owner":"` + owner + `"}}`))
+		_, _ = w.Write([]byte(`{"status":"ok","data":{"name":"keyuser","email":"k@example.test","owner":"` + owner + `"}}`))
 	}))
 	t.Cleanup(keys.Close)
 
-	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1",
+		IAMClientID: "svc", IAMClientSecret: "shh"}); err != nil {
 		t.Fatal(err)
 	}
 	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
@@ -509,7 +511,7 @@ func TestTheAuditLogIsTheOperatorsAndCarriesNoSecret(t *testing.T) {
 	if auth, _ := row.Data["auth"].(string); auth != "key" {
 		t.Errorf("a keyed request was attributed to %q", auth)
 	}
-	if id, _ := row.Data["authId"].(string); id != "u_key" {
+	if id, _ := row.Data["authId"].(string); id != "alpha/keyuser" {
 		t.Errorf("a keyed request named the subject %q", id)
 	}
 }
