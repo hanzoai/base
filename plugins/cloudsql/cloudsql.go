@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -35,6 +36,15 @@ import (
 
 // Config defines the configuration for the Cloud SQL plugin.
 type Config struct {
+	// Enabled decides whether the plugin registers at all. A zero-value Config
+	// is disabled and callers opt in, the way bootnode and calendar do.
+	//
+	// Every address this plugin publishes hands out, or acts on, the string
+	// that opens a database — and that string carries the PostgreSQL password
+	// the plugin is configured with. So the routes exist where a deployment
+	// configured Cloud SQL, and nowhere else.
+	Enabled bool
+
 	// MetaURL is the URL of the postgres-meta service.
 	MetaURL string
 
@@ -57,6 +67,17 @@ type Config struct {
 	ProxyPort int
 }
 
+// ConfigFromEnv reads CLOUD_SQL_ENABLED and the Cloud SQL upstream settings.
+func ConfigFromEnv() Config {
+	return Config{
+		Enabled:       os.Getenv("CLOUD_SQL_ENABLED") == "true",
+		MetaURL:       os.Getenv("CLOUD_SQL_META_URL"),
+		ComputeHost:   os.Getenv("CLOUD_SQL_COMPUTE_HOST"),
+		DefaultPGUser: os.Getenv("CLOUD_SQL_PG_USER"),
+		DefaultPGPass: os.Getenv("CLOUD_SQL_PG_PASS"),
+	}
+}
+
 // MustRegister registers the Cloud SQL plugin and panics on failure.
 func MustRegister(app core.App, config Config) {
 	if err := Register(app, config); err != nil {
@@ -64,8 +85,13 @@ func MustRegister(app core.App, config Config) {
 	}
 }
 
-// Register registers the Cloud SQL plugin to the provided app instance.
+// Register registers the Cloud SQL plugin to the provided app instance. A
+// Config that is not Enabled registers nothing, so /v1/cloud-sql and /v1/meta
+// are addresses the process does not answer at.
 func Register(app core.App, config Config) error {
+	if !config.Enabled {
+		return nil
+	}
 	if config.MetaURL == "" {
 		config.MetaURL = "http://base-meta.hanzo.svc:8080"
 	}

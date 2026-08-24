@@ -125,6 +125,7 @@ func stand(t *testing.T) (*iam, http.Handler, *upstream, map[string]string) {
 
 	meta := newUpstream(t)
 	if err := Register(app, Config{
+		Enabled:       true,
 		MetaURL:       meta.url,
 		ComputeHost:   "cloud-sql.test",
 		DefaultPGUser: "hanzo",
@@ -341,6 +342,44 @@ func TestMetaProxyOpensOneDatabase(t *testing.T) {
 	}
 	if seen := meta.connections(); len(seen) != 1 {
 		t.Errorf("postgres-meta was reached for an org with no database: %v", seen)
+	}
+}
+
+// TestADisabledPluginPublishesNothing pins the gate. Every address here hands
+// out or acts on the string that opens a database, so a deployment that has not
+// configured Cloud SQL should not be answering at them at all — the routes do
+// not exist rather than existing and refusing.
+func TestADisabledPluginPublishesNothing(t *testing.T) {
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(app.Cleanup)
+
+	if err := Register(app, Config{MetaURL: newUpstream(t).url, DefaultPGPass: adminPassword}); err != nil {
+		t.Fatal(err)
+	}
+
+	router, err := apis.NewRouter(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := new(core.ServeEvent)
+	e.App = app
+	e.Router = router
+	if err := app.OnServe().Trigger(e, func(*core.ServeEvent) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	mux, err := e.Router.BuildMux()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, r := range routes {
+		path := strings.Replace(r.path, "%s", "any", 1)
+		if code, body := call(t, mux, r.method, path, ""); code != http.StatusNotFound {
+			t.Errorf("%s %s answered %d %s with the plugin unconfigured, want 404", r.method, path, code, body)
+		}
 	}
 }
 

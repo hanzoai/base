@@ -157,13 +157,9 @@ func main() {
 	// Mounts under /v1/calendar. Opt-in via CALENDAR_ENABLED=true.
 	calendar.MustRegister(app, calendar.ConfigFromEnv())
 
-	// Hanzo Cloud SQL — serverless PostgreSQL (per-base database provisioning)
-	cloudsql.MustRegister(app, cloudsql.Config{
-		MetaURL:       os.Getenv("CLOUD_SQL_META_URL"),
-		ComputeHost:   os.Getenv("CLOUD_SQL_COMPUTE_HOST"),
-		DefaultPGUser: os.Getenv("CLOUD_SQL_PG_USER"),
-		DefaultPGPass: os.Getenv("CLOUD_SQL_PG_PASS"),
-	})
+	// Hanzo Cloud SQL — serverless PostgreSQL (per-base database provisioning).
+	// Mounts /v1/cloud-sql and /v1/meta. Opt-in via CLOUD_SQL_ENABLED=true.
+	cloudsql.MustRegister(app, cloudsql.ConfigFromEnv())
 
 	// static route to serves files from the provided public dir
 	// (if publicDir exists and the route path is not already defined)
