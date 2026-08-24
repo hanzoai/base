@@ -431,6 +431,41 @@ func TestAMemberReachesOnlyItsOwnCustomerRow(t *testing.T) {
 	}
 }
 
+// TestADisplayNameNamesNobody pins which claim a person's address is composed
+// from.
+//
+// caller() spells a person <owner>/<name>, the way IAM files one, and a customer
+// row is addressed by that spelling. The <name> half is the account's USERNAME.
+// A display name is free-form text the account holder writes, and base validates
+// tokens against whichever identity provider a deployment points it at — so a
+// name composed from one names whatever row its holder typed.
+//
+// A token that carries no username composes no address at all, which is the
+// right answer: it names nobody, so it reaches nobody's row but its own subject.
+func TestADisplayNameNamesNobody(t *testing.T) {
+	app, iam, mux, _ := twoOrgs(t)
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A member of alpha carrying no username, whose display name is the
+	// username half of another member's address.
+	ann := iam.display(t, "member", "alpha/ann", "ceo", "alpha")
+
+	for _, method := range []string{http.MethodGet, http.MethodPost} {
+		code, body := call(t, mux, method, "/v1/bases/alpha/customers/alpha%2Fceo", ann, nil)
+		if code != http.StatusForbidden {
+			t.Errorf("%s a colleague's row on a display name answered %d %s, want 403", method, code, body)
+		}
+	}
+
+	// The same account still reaches its own row, under the subject its token
+	// does carry.
+	if code, body := call(t, mux, http.MethodPost, "/v1/bases/alpha/customers/alpha%2Fann", ann, nil); code == http.StatusForbidden {
+		t.Errorf("an account was refused its own row: %s", body)
+	}
+}
+
 // TestTheRuleFollowsTheAddressAndNotTheGroup pins that what defends
 // /v1/bases/{org} is the address and not the subtree it happened to be
 // registered under.
