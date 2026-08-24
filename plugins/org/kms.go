@@ -162,19 +162,45 @@ func NewKMSClient(endpoint string) (*KMSClient, error) {
 // configured reports whether this deployment has a KMS to talk to.
 func (c *KMSClient) configured() bool { return c != nil && (c.addr != "" || c.mdns) }
 
+// ErrName is returned when a name cannot be composed into a KMS coordinate.
+var ErrName = errors.New("kms: a name must be one path segment")
+
+// segment reports whether s is ONE path segment: something present, carrying no
+// separator, and naming a folder rather than the way out of one.
+func segment(s string) bool {
+	return s != "" && s != "." && s != ".." && !strings.ContainsAny(s, `/\`)
+}
+
 // ref maps (org, "provider/key") onto the (path, name) coordinate the KMS store
 // keys on. The org leads the path because that segment IS the base boundary.
-func ref(orgId, secretPath string) (path, name string) {
-	name = strings.Trim(strings.TrimSpace(secretPath), "/")
-	dir := ""
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		dir, name = name[:i], name[i+1:]
+//
+// That boundary is this string and nothing else: the store keys on the whole
+// path, so which org a record belongs to is read out of the path's second
+// segment. Which means the org has to BE one segment. With a separator in it,
+// "acme/x" with "stripe/api_key" composes what "acme" with "x/stripe/api_key"
+// composes, and two orgs key on one record; IAM admits a separator in an org
+// name, so this is the composition that has to refuse one.
+//
+// The rest of the path is checked for the same reason from the other end: a
+// segment that names the way out of a folder walks the coordinate somewhere the
+// org does not reach.
+//
+// A name this cannot compose composes nothing, rather than something near it.
+func ref(orgId, secretPath string) (path, name string, err error) {
+	segments := strings.Split(strings.Trim(strings.TrimSpace(secretPath), "/"), "/")
+	if !segment(orgId) {
+		return "", "", fmt.Errorf("%w: organization %q", ErrName, orgId)
 	}
-	path = "orgs/" + orgId
-	if dir != "" {
-		path += "/" + dir
+	for _, s := range segments {
+		if !segment(s) {
+			return "", "", fmt.Errorf("%w: %q in %q", ErrName, s, secretPath)
+		}
 	}
-	return path, name
+
+	name = segments[len(segments)-1]
+	path = strings.Join(append([]string{"orgs", orgId}, segments[:len(segments)-1]...), "/")
+
+	return path, name, nil
 }
 
 // conn returns the live KMS connection, dialling on first use and after a drop.
@@ -250,7 +276,10 @@ func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 		return entry.value, nil
 	}
 
-	path, name := ref(orgId, secretPath)
+	path, name, err := ref(orgId, secretPath)
+	if err != nil {
+		return "", err
+	}
 	var val string
 	if err := c.call(func(ctx context.Context, cli secrets) error {
 		v, err := cli.GetAt(ctx, path, name, c.env)
@@ -272,7 +301,10 @@ func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 
 // SetSecret creates or updates a secret.
 func (c *KMSClient) SetSecret(orgId, secretPath, value string) error {
-	path, name := ref(orgId, secretPath)
+	path, name, err := ref(orgId, secretPath)
+	if err != nil {
+		return err
+	}
 	if err := c.call(func(ctx context.Context, cli secrets) error {
 		return cli.PutAt(ctx, path, name, c.env, value)
 	}); err != nil {
@@ -284,7 +316,10 @@ func (c *KMSClient) SetSecret(orgId, secretPath, value string) error {
 
 // DeleteSecret removes a secret.
 func (c *KMSClient) DeleteSecret(orgId, secretPath string) error {
-	path, name := ref(orgId, secretPath)
+	path, name, err := ref(orgId, secretPath)
+	if err != nil {
+		return err
+	}
 	if err := c.call(func(ctx context.Context, cli secrets) error {
 		return cli.DeleteAt(ctx, path, name, c.env)
 	}); err != nil {

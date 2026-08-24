@@ -77,11 +77,51 @@ func TestKMSRefFoldsOrgIntoPath(t *testing.T) {
 		{"acme", "/leading/slash", "orgs/acme/leading", "slash"},
 	}
 	for _, c := range cases {
-		path, name := ref(c.org, c.secret)
+		path, name, err := ref(c.org, c.secret)
+		if err != nil {
+			t.Errorf("ref(%q,%q) refused: %v", c.org, c.secret, err)
+			continue
+		}
 		if path != c.wantPath || name != c.wantName {
 			t.Errorf("ref(%q,%q) = (%q,%q), want (%q,%q)",
 				c.org, c.secret, path, name, c.wantPath, c.wantName)
 		}
+	}
+}
+
+// TestKMSRefComposesOneCoordinateOrNone pins that the org boundary is a path
+// segment and can only be read as one.
+//
+// The store keys on the whole path, so which org owns a record is the path's
+// second segment. An org name carrying a separator makes that reading
+// ambiguous: "acme/x" with "stripe/api_key" composes exactly what "acme" with
+// "x/stripe/api_key" composes, and IAM admits a separator in an org name. A
+// segment that names the way OUT of a folder does the same from the other end.
+func TestKMSRefComposesOneCoordinateOrNone(t *testing.T) {
+	for _, c := range []struct{ org, secret string }{
+		{"acme/x", "stripe/api_key"},
+		{"acme", "../globex/stripe/api_key"},
+		{"acme", "stripe/../../globex/api_key"},
+		{"..", "stripe/api_key"},
+		{"", "stripe/api_key"},
+		{"acme", ""},
+		{"acme", "stripe//api_key"},
+		{`acme\x`, "stripe/api_key"},
+	} {
+		path, name, err := ref(c.org, c.secret)
+		if !errors.Is(err, ErrName) {
+			t.Errorf("ref(%q,%q) composed (%q,%q), want a refusal", c.org, c.secret, path, name)
+		}
+	}
+
+	// The one coordinate two spellings used to share now has a single owner:
+	// the org that IS one segment, and it is the only one that composes at all.
+	mine, name, err := ref("acme", "x/stripe/api_key")
+	if err != nil {
+		t.Fatalf("ref refused an org that is one segment: %v", err)
+	}
+	if _, _, err := ref("acme/x", "stripe/api_key"); !errors.Is(err, ErrName) {
+		t.Errorf("an org carrying a separator composed %q/%q", mine, name)
 	}
 }
 
