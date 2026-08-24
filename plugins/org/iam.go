@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/hashicorp/golang-lru/v2/expirable"
 	"golang.org/x/sync/singleflight"
@@ -652,9 +653,23 @@ func (c *IAMClient) fetchUserByEmail(ctx context.Context, owner, email string) (
 
 // truncate clips s to at most n runes, appending "…" if truncated. Used for
 // safe inclusion of IAM error bodies in returned error messages.
+//
+// It counts RUNES because the input is a response body from another service and
+// the output is read by a person. Clipping by byte cut a multi-byte rune in half
+// — truncate("🔑🔑🔑🔑", 2) returned "\xf0\x9f…" — so an IAM failure carrying any
+// non-ASCII arrived as invalid UTF-8 and the error meant to explain it needed
+// explaining. A body that is not valid UTF-8 to begin with still clips on a
+// boundary: range over a string steps rune starts, counting each bad byte as one.
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	if utf8.RuneCountInString(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	count := 0
+	for idx := range s {
+		if count == n {
+			return s[:idx] + "…"
+		}
+		count++
+	}
+	return s
 }
