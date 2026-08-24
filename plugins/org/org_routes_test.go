@@ -332,6 +332,13 @@ func TestAPublishableKeyReachesNoBase(t *testing.T) {
 		}
 	}
 
+	// The collection root too, which names no org and so has no wildcard in its
+	// address. What a publishable key reaches is a property of the prefix and
+	// not of any one segment in it.
+	if code, body := call(t, mux, http.MethodGet, basesPath, "pk-in-the-page", nil); code != http.StatusForbidden {
+		t.Errorf("the collection root answered a publishable key: %d %s", code, body)
+	}
+
 	// And it is refused by address rather than by being a pk- key at all: the
 	// same key still reaches what is not a Base.
 	if code, body := call(t, mux, http.MethodGet, "/v1/health", "pk-in-the-page", nil); code == http.StatusForbidden {
@@ -513,5 +520,122 @@ func TestTheAuditLogIsTheOperatorsAndCarriesNoSecret(t *testing.T) {
 	}
 	if id, _ := row.Data["authId"].(string); id != "alpha/keyuser" {
 		t.Errorf("a keyed request named the subject %q", id)
+	}
+}
+
+// TestTheRuleReadsTheAddressTheRouterMatched pins the rule and the handler to
+// ONE reading of the path.
+//
+// http.ServeMux matches by splitting the escaped path on "/" and unescaping
+// each segment, so every spelling below reaches the same handler with the same
+// orgId. A rule that compares the escaped string against a literal prefix reads
+// a different address than the router did, and the handler that runs is the
+// router's — so the rule reads what the router matched: the pattern it chose
+// and the values it filled.
+func TestTheRuleReadsTheAddressTheRouterMatched(t *testing.T) {
+	app, iam, mux, _ := twoOrgs(t)
+	seedOrgConfig(t, app, "alpha", "alpha-kms-project")
+	seedOrgConfig(t, app, "beta", "beta-kms-project")
+
+	alpha := iam.token(t, "alpha/ann", "alpha")
+	ann := iam.member(t, "alpha/ann", "alpha")
+
+	// Every spelling of an address that routes to beta's config or beta's
+	// provider credentials, and what each must answer.
+	for _, c := range []struct{ name, path, token string }{
+		{"an encoded segment, uncredentialed", "/v1/%62ases/beta/config", ""},
+		{"an encoded prefix, uncredentialed", "/%76%31/%62%61%73%65%73/beta/config", ""},
+		{"an encoded segment, credentialed elsewhere", "/v1/%62ases/beta/config", alpha},
+		{"credentials by an encoded segment", "/v1/%62ases/beta/creds/stripe", ""},
+		{"credentials spelled plainly", "/v1/bases/beta/creds/stripe", ""},
+		{"the config spelled plainly", "/v1/bases/beta/config", ""},
+	} {
+		code, body := call(t, mux, http.MethodGet, c.path, c.token, nil)
+		if code != http.StatusForbidden {
+			t.Errorf("%s: GET %s answered %d %s, want 403", c.name, c.path, code, body)
+		}
+		if strings.Contains(body, "beta-kms-project") {
+			t.Errorf("%s: GET %s handed over beta's config: %s", c.name, c.path, body)
+		}
+	}
+
+	// A path that climbs reaches no org but its own. The router canonicalises
+	// one spelling before it matches and matches nothing at all on the other,
+	// so neither becomes a read of beta.
+	for _, path := range []string{
+		"/v1/bases/alpha/../beta/config",
+		"/v1/bases/alpha/%2e%2e/beta/config",
+	} {
+		code, body := call(t, mux, http.MethodGet, path, alpha, nil)
+		if code == http.StatusOK || strings.Contains(body, "beta-kms-project") {
+			t.Errorf("GET %s reached beta: %d %s", path, code, body)
+		}
+	}
+
+	// The member rule holds through an encoded address too: a user segment
+	// names a person however the prefix in front of it is spelled.
+	if code, body := call(t, mux, http.MethodGet,
+		"/v1/%62ases/alpha/customers/alpha%2Fceo", ann, nil); code != http.StatusForbidden {
+		t.Errorf("a member read another member's row through an encoded address: %d %s", code, body)
+	}
+
+	// And the org it does act in still answers, spelled either way.
+	for _, path := range []string{"/v1/bases/alpha/config", "/v1/%62ases/alpha/config"} {
+		code, body := call(t, mux, http.MethodGet, path, alpha, nil)
+		if code != http.StatusOK {
+			t.Errorf("GET %s refused alpha its own config: %d %s", path, code, body)
+		}
+		if !strings.Contains(body, "alpha-kms-project") {
+			t.Errorf("GET %s did not answer alpha its own config: %s", path, body)
+		}
+	}
+}
+
+// publicForm puts a collection anyone may create in into one org's Base, the
+// way a contact form or a signup list is declared.
+func publicForm(t *testing.T, dataDir, collection string) {
+	t.Helper()
+
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: dataDir})
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	defer app.ResetBootstrapState()
+
+	open := ""
+	c := core.NewBaseCollection(collection)
+	c.CreateRule = &open
+	c.Fields.Add(&core.TextField{Name: "email"})
+	if err := app.Save(c); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestAPublishableKeyWritesOnlyAtTheCreateRoute pins the one write a publishable
+// key is allowed, and the address that allows it.
+//
+// The exception is the public submit path — a collection whose createRule
+// admits anyone — and what makes a request that path is the route the router
+// matched. A string that merely appears somewhere in a URL is not an address,
+// and granting the exception on one hands the key whatever the router did
+// match.
+func TestAPublishableKeyWritesOnlyAtTheCreateRoute(t *testing.T) {
+	app, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
+		// A POST at an address that is not the create route, registered the way
+		// an extension does it.
+		e.Router.POST("/v1/notes/{note}", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"wrote": re.Request.PathValue("note")})
+		})
+	})
+	publicForm(t, NewOrgDB(app, "").OrgDir("alpha"), "signups")
+
+	if code, body := call(t, mux, http.MethodPost, "/v1/collections/signups/records",
+		"pk-in-the-page", nil); code == http.StatusForbidden {
+		t.Errorf("a publishable key was refused the public submit path: %d %s", code, body)
+	}
+
+	if code, body := call(t, mux, http.MethodPost, "/v1/notes/..%2Fcollections%2Fsignups%2Frecords",
+		"pk-in-the-page", nil); code != http.StatusForbidden {
+		t.Errorf("a publishable key wrote at a route that is not the create route: %d %s", code, body)
 	}
 }
