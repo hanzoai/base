@@ -23,7 +23,7 @@ CHANGELOG_8_15.html
 LICENSE.html
 
 # SDK build artifacts
-node_modules/
+node_modules
 dist/
 !ui-react/dist/
 !ui-react/dist/**
