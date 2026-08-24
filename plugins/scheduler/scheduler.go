@@ -412,7 +412,12 @@ func (p *plugin) markFailed(record *core.Record, errMsg string) {
 	}
 }
 
-// scheduleRetry reschedules a failed function for retry with exponential backoff.
+// scheduleRetry reschedules a failed function, pushing it out by RetryDelay for
+// each attempt already spent — 5s, 10s, 15s against the default base. That is
+// ARITHMETIC growth, not the exponential this line used to claim; with
+// RetryCount defaulting to 3 the two barely differ, which is why the wrong word
+// survived. Pinned by TestBackoffGrowsByAFixedStepPerRetry, so changing the
+// schedule is a deliberate edit to both.
 func (p *plugin) scheduleRetry(record *core.Record, retryCount int, origErr error) {
 	delay := p.config.RetryDelay * time.Duration(retryCount)
 	nextRun, _ := types.ParseDateTime(time.Now().UTC().Add(delay))
