@@ -552,7 +552,8 @@ Two thin shims remain in gojavm with `TODO(zip/runtime)` markers (tracked
 on zap-proto/zip PR #9): ctx-aware Eval, and multi-file bundling transpile.
 The HTTP layer stays on base's `tools/router` (Base-native,
 `http.Handler` via `BuildMux`); cloud mounts it under `/v1/base/*` via
-`zip.AdaptNetHTTP` (see `cloud/mounts/base/mount.go`). A native-fiber
+`zip.AdaptNetHTTP` (see `apps/base/base.go` in hanzoai/cloud, which embeds this
+module as a library and runs the same engine in-process). A native-fiber
 rewrite of the router is a later, separate step.
 
 ## Vault SDK (plugins/vault/)
