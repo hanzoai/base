@@ -395,6 +395,41 @@ func TestASecretKeyReachesItsOrgCredentials(t *testing.T) {
 	}
 }
 
+// TestAProviderNamesOneSegment pins the shape of what an address hands the KMS
+// path composer.
+//
+// The KMS store keys on a path and the org is one segment of it, so which org
+// owns a record is read out of that segment. A provider carrying a separator
+// composes a coordinate instead of naming a folder — which is a spelling of a
+// path only its writer chose — so it names no provider and stores nothing.
+func TestAProviderNamesOneSegment(t *testing.T) {
+	_, iam, mux, _ := twoOrgs(t)
+	boss := iam.token(t, "alpha/boss", "alpha")
+
+	for _, provider := range []string{"x%2Fstripe", "..%2Fbeta%2Fstripe"} {
+		path := "/v1/bases/alpha/creds/" + provider
+
+		req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{"api_key":"alpha-key"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+boss)
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("POST %s answered %d %s, want 400", path, rec.Code, rec.Body.String())
+		}
+
+		if code, body := call(t, mux, http.MethodGet, path, boss, nil); code == http.StatusOK {
+			t.Errorf("GET %s answered %d %s", path, code, body)
+		}
+	}
+
+	// A provider that names one segment reaches KMS, which is where the answer
+	// comes from — this deployment has none, so it is a dial and not a refusal.
+	if code, body := call(t, mux, http.MethodPost, "/v1/bases/alpha/creds/stripe", boss, nil); code == http.StatusBadRequest {
+		t.Errorf("a provider naming one segment was refused: %s", body)
+	}
+}
+
 // TestAMemberReachesOnlyItsOwnCustomerRow pins the second half of the customer
 // route, which compared orgs and said nothing whatever about users.
 //
