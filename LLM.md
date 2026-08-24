@@ -142,14 +142,14 @@ schema, settings, backups and logs are process-wide. A token with no membership
 at all is a machine and is refused rather than handed that Base; a machine that
 needs a Base uses an IAM key, which carries a real membership.
 
-**The rule belongs to the ADDRESS, not to the subtree.** Three sentences govern
-everything under `/v1/bases`, and all three are bound on the ROUTER and read the
-path (`actsInNamedOrg`, `publishableReachesNoBase`, `namesItsOwnUser`):
+**The rule belongs to the ADDRESS, not to the subtree.** Two sentences govern
+everything under `/v1/bases` (`actsInNamedOrg`, `namesItsOwnUser`), bound on the
+ROUTER beside the one that governs every address
+(`publishableReachesOnlyPublic`), all reading the path:
 
 - the org a path names is the org the request acts in, which `loadAuthToken` or
   the key middleware already resolved from the verified credential into
   `apis.RequestEventKeyOrg`;
-- a publishable key reaches none of it, refused by KIND and never by method;
 - the user a path names is the caller, unless the credential carries the org
   rather than a person — an org admin's token, the org's own `sk-` key, or a
   platform operator.
@@ -170,12 +170,22 @@ collection and no local `checkOrgAccess`: a second answer to "who is in this
 org" is one that can disagree with the credential the request arrived on, and
 the one it arrived on wins.
 
-**Publishable means public, not read-only.** A `pk-` key is the one that ships
-inside a web page and travels in `?key=`, so reaching a route with it needs no
-Authorization header at all. It is refused across `/v1/bases` by KIND and never
-by method — every read there is a GET, so a method check alone settles nothing.
-The method floor stays (a `pk-` key writes nothing anywhere) and what it may
-READ is settled per address.
+**Publishable means public, and the list of what is public is finite.** A `pk-`
+key is the one that ships inside a web page and travels in `?key=`, so reaching
+a route with it needs no Authorization header at all. `plugins/org/publishable.go`
+states the whole rule in one place: `public` is every address such a key reaches
+— the record list and view, the same rows on the `/v1/rest` wire, a public
+collection's create, a record's files, and liveness — and everything else is
+refused. Naming what is public is a list that can be read; naming what is
+private is a list that is never finished, which is how a rule scoped to
+`/v1/bases` left a page's key reaching a database's connection string.
+
+The rule reads the CREDENTIAL off the request rather than what a door published
+about it, because `/v1/iam` unbinds the doors that resolve a key, and what a
+credential reaches has to be answerable where nothing resolved it. It is bound
+anonymously, so no group can `Unbind` it. Addresses are compared as WHOLE
+patterns — method and `apis.Prefix()` included — the way `apis.CreatesRecord`
+names the one route it grants.
 
 **A provider name is not a key to the pod environment.** `provider` is a path
 segment the caller writes, so `OrgService.GetCreds` reads KMS or nothing. There
@@ -532,8 +542,8 @@ The server is a relay/index/cache layer, not the owner of truth.
 | scheduler | plugins/scheduler/ | Deferred and time-based execution with exactly-once semantics and retries. A function scheduled inside a hook runs only after that hook's transaction commits |
 | tasks | plugins/tasks/ | Durable task queue — a claimed task runs through `ExecuteFunc` and reports output or error |
 | waitlist | plugins/waitlist/ | Waitlist with referral attribution: `/v1/waitlist/*`, refCode per entry, points awarded per event and deduped by key, rank computed from points. Embedded by cloud's `apps/base/base.go` |
-| cloudsql | plugins/cloudsql/ | Per-base database management against a managed SQL instance |
-| calendar | plugins/calendar/ | Cal-compatible booking shapes, so a public booking page renders against Base |
+| cloudsql | plugins/cloudsql/ | Per-base database management against a managed SQL instance. Every address it publishes hands out or acts on the connection string that opens a database, so it is opt-in via CLOUD_SQL_ENABLED=true and `/v1/cloud-sql` + `/v1/meta` do not exist without it. Branch provisioning is unwritten |
+| calendar | plugins/calendar/ | Cal-compatible booking shapes, so a public booking page renders against Base. Opt-in via CALENDAR_ENABLED=true |
 | ghupdate | plugins/ghupdate/ | Replaces the running Base executable with the latest GitHub release |
 | migratecmd | plugins/migratecmd/ | Migration authoring commands |
 | extbench | plugins/extbench/ | One workload run across every extension runtime, for comparison |

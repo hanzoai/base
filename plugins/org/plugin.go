@@ -40,15 +40,6 @@ import (
 // which must not be authenticated by Base can say which door it is closing.
 const apiKeyAuthId = "platformAPIKeyAuth"
 
-// keyKind carries which tier of IAM key authenticated a request, and the two
-// tiers it can hold. A pk- key ships inside a web page and is public knowledge;
-// an sk- or hk- key is the org's own server credential.
-const (
-	keyKind        = "authKeyType"
-	keyPublishable = "publishable"
-	keySecret      = "secret"
-)
-
 // Config defines the configuration for the platform plugin.
 type Config struct {
 	// IAMEndpoint is the base URL for Hanzo IAM (default: "https://hanzo.id").
@@ -227,17 +218,7 @@ func Register(app core.App, config Config) error {
 					return re.Next()
 				}
 
-				// Extract Bearer token
-				auth := re.Request.Header.Get("Authorization")
-				token := ""
-				if len(auth) > 7 && auth[:7] == "Bearer " {
-					token = auth[7:]
-				}
-				// Also check query param (for /v1/config?key=pk-xxx)
-				if token == "" {
-					token = re.Request.URL.Query().Get("key")
-				}
-
+				token := credential(re.Request)
 				if token == "" || !IsAPIKey(token) {
 					return re.Next()
 				}
@@ -284,17 +265,12 @@ func Register(app core.App, config Config) error {
 				re.Request.Header.Set("X-Org-Id", org)
 				re.Request.Header.Set("X-User-Email", user.Email)
 
-				// Which tier of key this is. It decides what the key may reach,
-				// so it is stated once here, where the key was read.
-				//
 				// A secret key belongs to the org's own server rather than to
 				// any one person, so it acts for the org: it reaches every
 				// member's row the way an org admin's token does. A publishable
-				// key acts for nobody — it is in a web page.
-				if IsPublishableKey(token) {
-					re.Set(keyKind, keyPublishable)
-				} else {
-					re.Set(keyKind, keySecret)
+				// key acts for nobody — it is in a web page — and what it
+				// reaches is publishableReachesOnlyPublic's answer.
+				if !IsPublishableKey(token) {
 					re.Set(apis.RequestEventKeyOrgAdmin, true)
 				}
 
@@ -302,57 +278,9 @@ func Register(app core.App, config Config) error {
 			},
 		})
 
-		// A publishable key writes nothing, anywhere:
-		//   pk- → GET, plus a create in a collection that is open to anyone
-		//   sk- → all methods (create orders, manage accounts, admin)
-		//   hk- → all methods (IAM service key, legacy compat)
-		//   JWT → all methods (user session via IAM OIDC)
-		//
-		// This is a floor and not the whole rule, because a method says nothing
-		// about what an answer contains. What a pk- key may READ is settled per
-		// address — see publishableReachesNoBase, which refuses it every org
-		// secret and every billing identity on the strength of what the key IS.
-		//
-		// Priority +3: runs after identity headers are set, before route handlers.
-		e.Router.Bind(&hook.Handler[*core.RequestEvent]{
-			Id:       "platformKeyTypeEnforcement",
-			Priority: apis.DefaultLoadAuthTokenMiddlewarePriority + 3,
-			Func: func(re *core.RequestEvent) error {
-				kind, _ := re.Get(keyKind).(string)
-				if kind != keyPublishable {
-					return re.Next() // JWT, sk-, hk-, or unauthenticated — no restriction
-				}
-
-				method := re.Request.Method
-				if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-					return re.Next() // reads allowed
-				}
-
-				// Exception: a publishable key MAY create in a PUBLIC-FORM
-				// collection (createRule == "" ⇒ anonymous create allowed) — the
-				// public submit path (contact forms, signups, waitlists). Every
-				// other write stays blocked. Org is derived from the key by the
-				// stampOrgOwnership create hook, never from the request.
-				if method == http.MethodPost {
-					if name := apis.CreatesRecord(re.Request); name != "" {
-						if c, err := re.App.FindCachedCollectionByNameOrId(name); err == nil &&
-							c.CreateRule != nil && *c.CreateRule == "" {
-							return re.Next()
-						}
-					}
-				}
-
-				// pk- key trying to write — block it
-				return re.JSON(http.StatusForbidden, map[string]any{
-					"error":   "publishable keys are read-only",
-					"message": "Use a secret key (sk-) or JWT for write operations.",
-					"code":    "key_read_only",
-				})
-			},
-		})
-
-		// What every address under /v1/bases requires of the credential that
-		// reaches it, bound on the ROUTER and reading the path.
+		// What a credential is required to be to reach an address: the first
+		// rule holds everywhere, the three after it under /v1/bases. All four
+		// are bound on the ROUTER and read the path.
 		//
 		// Not bound on the group that declares those routes. A group states its
 		// middleware down the GROUP tree and not down the URL, so a route
@@ -367,8 +295,10 @@ func Register(app core.App, config Config) error {
 		// Anonymous by construction: an anonymous middleware has no id and
 		// Unbind removes nothing that has no id, so no group beneath this one
 		// can drop the tenant boundary the way /v1/iam legitimately drops the
-		// doors that resolve a credential.
-		e.Router.BindFunc(publishableReachesNoBase, actsInNamedOrg, secretsBelongToTheOrg, namesItsOwnUser)
+		// doors that resolve a credential. That subtree is why the publishable
+		// rule reads the request for its credential rather than what those
+		// doors published about it.
+		e.Router.BindFunc(publishableReachesOnlyPublic, actsInNamedOrg, secretsBelongToTheOrg, namesItsOwnUser)
 
 		p.registerRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
