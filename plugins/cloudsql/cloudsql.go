@@ -139,6 +139,10 @@ type OrgDatabase struct {
 }
 
 // ConnectionString returns a PostgreSQL connection string.
+//
+// A database that states no mode gets require, and this is the one place that
+// decides it. A mode written beside this one can disagree with it, so nothing
+// writes a mode a deployment did not choose.
 func (t *OrgDatabase) ConnectionString() string {
 	sslMode := t.SSLMode
 	if sslMode == "" {
@@ -341,7 +345,6 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 	record.Set("port", p.config.ComputePort)
 	record.Set("pgUser", p.config.DefaultPGUser)
 	record.Set("pgPassword", p.config.DefaultPGPass)
-	record.Set("sslMode", "disable")
 	record.Set("status", "ready")
 
 	if err := p.app.Save(record); err != nil {
@@ -355,7 +358,6 @@ func (p *plugin) handleCreateDatabase(e *core.RequestEvent) error {
 		Port:         p.config.ComputePort,
 		User:         p.config.DefaultPGUser,
 		Password:     p.config.DefaultPGPass,
-		SSLMode:      "disable",
 	}
 	p.orgDB.Set(org, tdb)
 
