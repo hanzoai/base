@@ -577,10 +577,11 @@ rewrite of the router is a later, separate step.
 
 ## Vault SDK (plugins/vault/)
 
-5 primitives, 18 tests:
+5 primitives, 54 test functions
+(`grep -hcE '^func Test' plugins/vault/*_test.go | paste -sd+ - | bc`):
 
 1. **Identity** — `OpenUser(userID)` -> resolve DID, derive DEK, bind device
-2. **Key Access** — DEK/KEK hierarchy: Master KEK -> Org KEK -> User DEK
+2. **Key Access** — one derivation from the master, bound to org+user+subsystem
 3. **Local DB** — `Put(key, value)`, `Get(key)`, `Delete(key)` -> encrypted SQLite
 4. **Sync** — `Sync()`, `Merge(ops)` -> CRDT over ZAP (encrypted ops)
 5. **Anchor** — `Anchor()` -> merkle root to chain, audit receipt
@@ -588,11 +589,27 @@ rewrite of the router is a later, separate step.
 Key hierarchy:
 ```
 Cloud HSM / K-Chain ML-KEM
-  +-- Master KEK (never on disk)
-        +-- Org KEK = HMAC-SHA256(master, "vault:org:" + orgID)
-              +-- User DEK = HMAC-SHA256(orgKEK, "vault:user:" + userID)
-                    +-- AES-256-GCM per entry (random nonce)
+  +-- Master key, 32 bytes (never on disk)
+        +-- User DEK = cek.DeriveKey(master, org/{orgID}/{userID}, "vault")
+              +-- AES-256-GCM per entry (random nonce)
 ```
+
+`cek.DeriveKey` (github.com/hanzoai/cek, pinned v0.2.3) is
+`HKDF-SHA256(master, salt=nil, info=<prefix> + org/{orgID}/{userID} + "/vault")`.
+It is ONE step and a pure function of its inputs: the same namespace and
+subsystem always give the same key, so a shard reopens after a restart with
+nothing persisted beside it, and two databases never share a key because the
+subsystem is part of the binding.
+
+There is NO intermediate Org KEK. This diagram used to show one — a two-level
+HMAC-SHA256 chain under `"vault:org:"` and `"vault:user:"` labels — and none of
+that is in the tree: `deriveOrgKEK` and `deriveUserDEK` are gone, and the only
+surviving `vault:org:` string is an unrelated ACL wildcard in policy.go. It
+matters which it is. A reader planning key rotation or reasoning about blast
+radius would look for an org-level key to roll, and there is nothing there to
+roll; the org is a segment of the derivation path, so per-org isolation holds
+while per-org rotation is a different operation entirely. Authoritative source
+is the package comment at plugins/vault/plugin.go:11, beside the code.
 
 ## What Goes On-Chain (Lux)
 
@@ -636,7 +653,7 @@ Cloud HSM / K-Chain ML-KEM
 ```bash
 go build ./...
 go test ./...
-go test ./plugins/vault/  # 18 tests
+go test ./plugins/vault/  # the vault plugin alone
 go test ./cmd/cli/        # 39 tests (network flags, cluster, operator, config, etc.)
 go test ./cmd/            # integration tests (collection, record, login, superuser)
 ```
