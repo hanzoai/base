@@ -20,12 +20,33 @@ import (
 	"github.com/hanzoai/dbx"
 )
 
+// recordsPath is where the records API hangs the routes for one collection,
+// under whatever prefix this deployment mounts the API at.
+const recordsPath = "/collections/{collection}/records"
+
+// CreatesRecord names the collection a request creates a record in, and "" for
+// a request that creates none.
+//
+// It answers about the route the ROUTER chose, and by that route's WHOLE
+// pattern: the method, this deployment's mount prefix, and the address the
+// records group registers its create at. A pattern that merely ends the same
+// way is a different route — an extension registers whatever path it likes —
+// and this answer is read by things that GRANT that route something, so it has
+// to name the route and not a family of routes shaped like it.
+func CreatesRecord(r *http.Request) string {
+	if r.Pattern != http.MethodPost+" "+apiPrefix()+recordsPath {
+		return ""
+	}
+
+	return r.PathValue("collection")
+}
+
 // bindRecordCrudApi registers the record crud api endpoints and
 // the corresponding handlers.
 //
 // note: the rate limiter is "inlined" because some of the crud actions are also used in the batch APIs
 func bindRecordCrudApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
-	subGroup := rg.Group("/collections/{collection}/records").Unbind(DefaultRateLimitMiddlewareId)
+	subGroup := rg.Group(recordsPath).Unbind(DefaultRateLimitMiddlewareId)
 	subGroup.GET("", recordsList)
 	subGroup.GET("/{id}", recordView)
 	subGroup.POST("", recordCreate(true, nil)).Bind(dynamicCollectionBodyLimit(""))

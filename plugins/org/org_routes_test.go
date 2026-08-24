@@ -805,13 +805,19 @@ func publicForm(t *testing.T, dataDir, collection string) {
 // admits anyone — and what makes a request that path is the route the router
 // matched. A string that merely appears somewhere in a URL is not an address,
 // and granting the exception on one hands the key whatever the router did
-// match.
+// match. Neither is a pattern that merely ENDS the same way: an extension
+// registers whatever path it likes, and a grant keyed on how a pattern ends is
+// a grant every one of them inherits.
 func TestAPublishableKeyWritesOnlyAtTheCreateRoute(t *testing.T) {
 	app, _, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
 		// A POST at an address that is not the create route, registered the way
 		// an extension does it.
 		e.Router.POST("/v1/notes/{note}", func(re *core.RequestEvent) error {
 			return re.JSON(http.StatusOK, map[string]string{"wrote": re.Request.PathValue("note")})
+		})
+		// And one whose PATTERN ends exactly the way the create route's does.
+		e.Router.POST("/v1/ext/collections/{collection}/records", func(re *core.RequestEvent) error {
+			return re.JSON(http.StatusOK, map[string]string{"wrote": re.Request.PathValue("collection")})
 		})
 	})
 	publicForm(t, NewOrgDB(app, "").OrgDir("alpha"), "signups")
@@ -824,6 +830,11 @@ func TestAPublishableKeyWritesOnlyAtTheCreateRoute(t *testing.T) {
 	if code, body := call(t, mux, http.MethodPost, "/v1/notes/..%2Fcollections%2Fsignups%2Frecords",
 		"pk-in-the-page", nil); code != http.StatusForbidden {
 		t.Errorf("a publishable key wrote at a route that is not the create route: %d %s", code, body)
+	}
+
+	if code, body := call(t, mux, http.MethodPost, "/v1/ext/collections/signups/records",
+		"pk-in-the-page", nil); code != http.StatusForbidden {
+		t.Errorf("a publishable key wrote at a route that only ENDS like the create route: %d %s", code, body)
 	}
 }
 
