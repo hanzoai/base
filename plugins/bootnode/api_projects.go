@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/bootnode/auth"
 	"github.com/hanzoai/base/plugins/bootnode/models"
@@ -211,8 +212,8 @@ func (p *plugin) handleDeleteAPIKey(e *core.RequestEvent) error {
 // user (whose first project is used). This is the Go equivalent of the
 // Python deps.py get_project_from_key. Returns a 404 when no project is found.
 func (p *plugin) requireProject(e *core.RequestEvent) (*core.Record, error) {
-	cred, _ := bearerToken(e.Request)
-	if auth.ClassifyCredential(cred, false) == auth.KeyBootnode {
+	cred := apis.Credential(e.Request)
+	if auth.ClassifyCredential(cred) == auth.KeyBootnode {
 		hash := auth.HashKey(cred, p.config.APIKeySalt)
 		key, err := p.app.FindFirstRecordByData(models.APIKeys, "keyHash", hash)
 		if err != nil {

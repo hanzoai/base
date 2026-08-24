@@ -48,23 +48,25 @@ func TestClientIDForRedirect(t *testing.T) {
 	}
 }
 
+// TestClassifyCredential pins that the answer is the credential's, not the
+// header's. The same token classified two ways depending on which header
+// carried it, so one caller's JWT was another caller's unsupported credential.
 func TestClassifyCredential(t *testing.T) {
 	cases := []struct {
-		cred     string
-		isBearer bool
-		want     KeyType
+		cred string
+		want KeyType
 	}{
-		{"bn_abc123", false, KeyBootnode},
-		{"pk-abc", false, KeyIAMPublishable},
-		{"sk-abc", false, KeyIAMSecret},
-		{"hk-abc", false, KeyIAMService},
-		{"aaa.bbb.ccc", false, KeyJWT},
-		{"opaque", true, KeyJWT}, // bearer header => treat as JWT
-		{"opaque", false, KeyUnknown},
+		{"bn_abc123", KeyBootnode},
+		{"pk-abc", KeyIAMPublishable},
+		{"sk-abc", KeyIAMSecret},
+		{"hk-abc", KeyIAMService},
+		{"aaa.bbb.ccc", KeyJWT},
+		{"opaque", KeyJWT}, // a shape this package does not know is IAM's to judge
+		{"", KeyUnknown},
 	}
 	for _, c := range cases {
-		if got := ClassifyCredential(c.cred, c.isBearer); got != c.want {
-			t.Errorf("ClassifyCredential(%q, %v) = %d, want %d", c.cred, c.isBearer, got, c.want)
+		if got := ClassifyCredential(c.cred); got != c.want {
+			t.Errorf("ClassifyCredential(%q) = %d, want %d", c.cred, got, c.want)
 		}
 	}
 }
