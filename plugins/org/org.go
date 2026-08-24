@@ -103,7 +103,10 @@ func (s *OrgService) GetConfig(orgId string) map[string]any {
 // where the KMSSecret CRDs put the platform's own secrets. A tenant asked for
 // its own credentials and got the operator's. The read is KMS or nothing.
 func (s *OrgService) GetCreds(orgId, provider string) map[string]string {
-	if orgId == "" || provider == "" {
+	// A provider names ONE folder under the org, and it arrives as one segment
+	// of an address. A caller that writes a separator into it is naming a
+	// coordinate rather than a provider, and there is no provider by that name.
+	if orgId == "" || !segment(provider) {
 		return nil
 	}
 
@@ -158,8 +161,19 @@ func (s *OrgService) fetchCredsFromKMS(orgId, provider string) map[string]string
 
 // SetCreds stores credentials in KMS for an org+provider.
 func (s *OrgService) SetCreds(orgId, provider string, creds map[string]string) error {
-	if orgId == "" || provider == "" {
-		return fmt.Errorf("org: orgId and provider are required")
+	if orgId == "" {
+		return fmt.Errorf("org: orgId is required")
+	}
+	// The provider and each key name one folder and one secret in it, so each
+	// is one segment. A separator in either names a coordinate of the caller's
+	// choosing instead.
+	if !segment(provider) {
+		return fmt.Errorf("%w: provider %q", ErrName, provider)
+	}
+	for key := range creds {
+		if !segment(key) {
+			return fmt.Errorf("%w: %q", ErrName, key)
+		}
 	}
 	if !s.kms.configured() {
 		return fmt.Errorf("org: KMS not configured")

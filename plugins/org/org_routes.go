@@ -1,6 +1,7 @@
 package org
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -318,6 +319,9 @@ func (p *plugin) handleSetOrgCreds(e *core.RequestEvent) error {
 	}
 
 	err := p.org.SetCreds(e.Request.PathValue("orgId"), e.Request.PathValue("provider"), body)
+	if errors.Is(err, ErrName) {
+		return e.BadRequestError("A provider and a key each name one segment.", err)
+	}
 	if err != nil {
 		return e.InternalServerError("failed to set credentials", err)
 	}
