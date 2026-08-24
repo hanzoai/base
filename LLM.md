@@ -525,9 +525,28 @@ The server is a relay/index/cache layer, not the owner of truth.
 | org | plugins/org/ | Per-org Bases: orgs read from IAM, per-org encrypted SQLite, and per-org secrets from KMS over native ZAP (github.com/luxfi/kms) |
 | bootnode | plugins/bootnode/ | Blockchain dev platform (Go port of Python bootnode): /v1 multi-network OAuth, bn_ project keys, teams, network/node/key provisioning via bootno.de/v1 CRDs (dependency-free kube REST client, no client-go). Reuses iam + platform per-org SQLite isolation. Opt-in via BOOTNODE_ENABLED=true |
 | commerce | plugins/commerce/ | Typed client for Hanzo Commerce HTTP API (Square billing). Client interface; bootnode depends on it, never the reverse |
-| functions | plugins/functions/ | OpenFaaS gateway proxy — needs Kubernetes. Deploys a container IMAGE by reference; stores no code, binds no hooks. NOT event workers, whatever this table said before. |
 | jsvm | plugins/jsvm/ | JS hook host (.base.js hook files) — still goja-native |
 | gojavm | plugins/gojavm/ | `runtime: goja` extensions — delegates to zip's JSRuntime |
+| ha | plugins/ha/ | Writer/replica HA. Quasar is leaderless, so SQLite's single writer is settled by pinning: the lowest-sorted alive NodeID holds the write lock and every replica 307s a mutating request to it |
+| replicate | plugins/replicate/ | SQLite WAL replication to object storage. One import, no config file, no sidecar — `REPLICATE_S3_ENDPOINT` is the whole contract |
+| scheduler | plugins/scheduler/ | Deferred and time-based execution with exactly-once semantics and retries. A function scheduled inside a hook runs only after that hook's transaction commits |
+| tasks | plugins/tasks/ | Durable task queue — a claimed task runs through `ExecuteFunc` and reports output or error |
+| waitlist | plugins/waitlist/ | Waitlist with referral attribution: `/v1/waitlist/*`, refCode per entry, points awarded per event and deduped by key, rank computed from points. Embedded by cloud's `apps/base/base.go` |
+| cloudsql | plugins/cloudsql/ | Per-base database management against a managed SQL instance |
+| calendar | plugins/calendar/ | Cal-compatible booking shapes, so a public booking page renders against Base |
+| ghupdate | plugins/ghupdate/ | Replaces the running Base executable with the latest GitHub release |
+| migratecmd | plugins/migratecmd/ | Migration authoring commands |
+| extbench | plugins/extbench/ | One workload run across every extension runtime, for comparison |
+
+`functions` is NOT a plugin. `plugins/functions/` — an OpenFaaS gateway proxy
+that needed Kubernetes — was deleted at c5cd8399 (2026-08-13). A function is a
+record in `_functions` served by `apis/functions.go`, in-process through
+`extruntime`; see "Functions — a record that reads as whoever invoked it" above,
+which is where the behaviour is described.
+
+`extruntime` is the polyglot SPI and `pyvm`/`v8vm`/`wasmvm`/`starkvm` are
+implementations of it — covered in the runtime section immediately below rather
+than repeated here.
 
 ## JS Runtime — ONE engine, via zip
 
