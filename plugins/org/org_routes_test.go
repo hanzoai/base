@@ -2,6 +2,7 @@ package org
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -224,9 +225,10 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 	}
 }
 
-// keyed stands up the half of IAM a key resolves against, so a test can issue
-// one. Every key it answers for belongs to owner.
-func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.App, http.Handler) {
+// keyed stands up both halves of IAM: the one a key resolves against, and the
+// issuer a token is verified against. Every key it answers for belongs to owner,
+// under the username keyuser.
+func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.App, *issuer, http.Handler) {
 	t.Helper()
 
 	app, err := tests.NewTestApp()
@@ -255,7 +257,7 @@ func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.Ap
 		}
 	}
 
-	return app, serve(t, app, extra...)
+	return app, iam, serve(t, app, extra...)
 }
 
 // seedOrgConfig puts a real config row in, so a read that is admitted has
@@ -291,7 +293,7 @@ func seedOrgConfig(t *testing.T, app core.App, org, secret string) {
 // printed in a customer's HTML returned that org's provider secrets and every
 // member's billing identity. Read-only was the wrong reading of publishable.
 func TestAPublishableKeyReachesNoBase(t *testing.T) {
-	app, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
+	app, _, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
 		// An address this file does not publish, registered the way an
 		// extension does it. What a publishable key reaches is a property of
 		// the prefix, so it holds for whatever route sits under it.
@@ -493,7 +495,7 @@ func requestLog(t *testing.T, app core.App) *core.Log {
 // And it names who acted. A key mints no auth record, so every keyed action was
 // attributed to nobody at all.
 func TestTheAuditLogIsTheOperatorsAndCarriesNoSecret(t *testing.T) {
-	app, mux := keyed(t, "alpha")
+	app, _, mux := keyed(t, "alpha")
 
 	s := app.Settings()
 	s.Logs.MaxDays = 5
@@ -620,7 +622,7 @@ func publicForm(t *testing.T, dataDir, collection string) {
 // and granting the exception on one hands the key whatever the router did
 // match.
 func TestAPublishableKeyWritesOnlyAtTheCreateRoute(t *testing.T) {
-	app, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
+	app, _, mux := keyed(t, "alpha", func(e *core.ServeEvent) {
 		// A POST at an address that is not the create route, registered the way
 		// an extension does it.
 		e.Router.POST("/v1/notes/{note}", func(re *core.RequestEvent) error {
@@ -638,4 +640,65 @@ func TestAPublishableKeyWritesOnlyAtTheCreateRoute(t *testing.T) {
 		"pk-in-the-page", nil); code != http.StatusForbidden {
 		t.Errorf("a publishable key wrote at a route that is not the create route: %d %s", code, body)
 	}
+}
+
+// TestOneAccountIsOneCustomer pins the name a person is filed under.
+//
+// IAM's key endpoint answers with the account and never its opaque id, so a key
+// can only name a person <owner>/<name>; a token carries the id in `sub` and
+// the two halves of that name in `orgs` and `name`. Filed under whichever
+// arrived, one human holds two customer rows in one org — two customer ids, two
+// broker accounts, two vaults — and the KYC record bound through one door
+// answers nobody at the other. So the name IAM files an account under is the
+// name this package files a customer under, and both doors produce it.
+func TestOneAccountIsOneCustomer(t *testing.T) {
+	app, iam, mux := keyed(t, "alpha")
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+
+	// A token for the account the keys resolve to: IAM's opaque id in `sub`,
+	// the username in `name`, home org first.
+	const id = "9f3c21b8-7e4d-4a02-9c15-6b0f8d2e1a77"
+	self := iam.signed(t, "member", id, "keyuser", "alpha")
+
+	// The key opens the row. A secret key is the org's own, so it acts for the
+	// org and may open one for any member.
+	code, opened := call(t, mux, http.MethodPost, "/v1/bases/alpha/customers/alpha%2Fkeyuser", "sk-service", nil)
+	if code != http.StatusCreated {
+		t.Fatalf("a key could not open a customer row: %d %s", code, opened)
+	}
+
+	// The token reaches that same row rather than opening a second one.
+	code, read := call(t, mux, http.MethodPost, "/v1/bases/alpha/customers/alpha%2Fkeyuser", self, nil)
+	if code == http.StatusForbidden {
+		t.Fatalf("a token was refused the row its own key opened: %s", read)
+	}
+	if !sameCustomer(opened, read) {
+		t.Errorf("one account holds two customer rows:\n key:   %s\n token: %s", opened, read)
+	}
+
+	// And it is recognised by the id its own token carries, which is the name a
+	// row opened before the two doors agreed is filed under.
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/"+id, self, nil); code == http.StatusForbidden {
+		t.Errorf("a token was refused the name it carries for itself: %s", body)
+	}
+
+	// A colleague is still a colleague.
+	bob := iam.signed(t, "member", "3c7a0d51-2f88-4e63-b1aa-5d904c7e6b12", "bob", "alpha")
+	if code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/customers/alpha%2Fkeyuser", bob, nil); code != http.StatusForbidden {
+		t.Errorf("a member read another member's row: %d %s", code, body)
+	}
+}
+
+// sameCustomer reports whether two customer answers name one row.
+func sameCustomer(a, b string) bool {
+	id := func(body string) string {
+		var c struct {
+			CustomerID string `json:"customer_id"`
+		}
+		_ = json.Unmarshal([]byte(body), &c)
+		return c.CustomerID
+	}
+	return id(a) != "" && id(a) == id(b)
 }

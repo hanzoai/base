@@ -71,7 +71,20 @@ func (i *issuer) member(t *testing.T, sub string, orgs ...string) string {
 	return i.as(t, "member", sub, orgs...)
 }
 
+// as signs for a subject spelled the way IAM spells an account, <owner>/<name>,
+// so the username is the half after the slash.
 func (i *issuer) as(t *testing.T, role, sub string, orgs ...string) string {
+	t.Helper()
+
+	_, name, _ := strings.Cut(sub, "/")
+
+	return i.signed(t, role, sub, name, orgs...)
+}
+
+// signed is the one place a token is built. IAM puts the account's stable id in
+// `sub` and its USERNAME in `name` — two claims, because the id it issues an
+// account is not the name it files that account under.
+func (i *issuer) signed(t *testing.T, role, sub, name string, orgs ...string) string {
 	t.Helper()
 
 	memberships := make([]any, 0, len(orgs))
@@ -81,6 +94,7 @@ func (i *issuer) as(t *testing.T, role, sub string, orgs ...string) string {
 
 	claims := jwt.MapClaims{
 		"sub":   sub,
+		"name":  name,
 		"email": sub + "@example.test",
 		"owner": "hanzo", // the org of the APP the token was minted through
 		"orgs":  memberships,
