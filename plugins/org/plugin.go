@@ -368,7 +368,7 @@ func Register(app core.App, config Config) error {
 		// Unbind removes nothing that has no id, so no group beneath this one
 		// can drop the tenant boundary the way /v1/iam legitimately drops the
 		// doors that resolve a credential.
-		e.Router.BindFunc(publishableReachesNoBase, actsInNamedOrg, namesItsOwnUser)
+		e.Router.BindFunc(publishableReachesNoBase, actsInNamedOrg, secretsBelongToTheOrg, namesItsOwnUser)
 
 		p.registerRoutes(e.Router)
 		p.registerOrgRoutes(e.Router)
