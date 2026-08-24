@@ -26,6 +26,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/hanzoai/base/tools/osutils"
 )
 
 const (
@@ -92,7 +94,7 @@ func New(defaultNamespace string) *Client {
 	if api := os.Getenv("KUBE_APISERVER"); api != "" {
 		c.apiServer = strings.TrimRight(api, "/")
 		c.token = os.Getenv("KUBE_TOKEN")
-		if os.Getenv("KUBE_INSECURE_SKIP_TLS_VERIFY") == "true" {
+		if osutils.Bool("KUBE_INSECURE_SKIP_TLS_VERIFY", false) {
 			c.http.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} //nolint:gosec // opt-in dev only
 		}
 		c.available = true

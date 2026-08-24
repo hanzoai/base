@@ -10,8 +10,9 @@
 package calendar
 
 import (
-	"os"
 	"time"
+
+	"github.com/hanzoai/base/tools/osutils"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
@@ -25,7 +26,7 @@ type Config struct {
 
 // ConfigFromEnv reads CALENDAR_ENABLED.
 func ConfigFromEnv() Config {
-	return Config{Enabled: os.Getenv("CALENDAR_ENABLED") == "true"}
+	return Config{Enabled: osutils.Bool("CALENDAR_ENABLED", false)}
 }
 
 type plugin struct {
