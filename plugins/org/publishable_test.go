@@ -3,6 +3,7 @@ package org
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -273,58 +274,166 @@ func TestEverySpellingOfAWorkingCredentialStillWorks(t *testing.T) {
 	}
 }
 
-// TestAProxyForwardsTheQueryItJudged pins the rule at the two mounts that
-// forward a query whole: the value this side read is the value the upstream
-// gets, and a second `key` never leaves the process.
-//
-// It measures what ARRIVED upstream. A request presenting `key` twice is judged
-// here by the first and read by a last-occurrence server by the second, so the
-// status this side returns says nothing about which credential was delivered.
-func TestAProxyForwardsTheQueryItJudged(t *testing.T) {
-	var mu sync.Mutex
-	var seen []string
+// recorder is an upstream that remembers every credential channel it was handed
+// and the query it arrived with. What a proxy FORWARDS is what the far side
+// authenticates on, so the measurement is the bytes that got there.
+func recorder(t *testing.T) (*httptest.Server, func() []string, func() string) {
+	t.Helper()
 
-	idv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var mu sync.Mutex
+	var handed []string
+	var last string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
-		seen = append(seen, r.URL.RawQuery)
+		for _, h := range []string{"Authorization", "X-Authorization", "X-Auth-Token", "X-API-Key"} {
+			for _, v := range r.Header.Values(h) {
+				handed = append(handed, h+": "+v)
+			}
+		}
+		last = r.URL.RawQuery
 		mu.Unlock()
 		_, _ = w.Write([]byte(`{"upstream":"answered"}`))
 	}))
-	t.Cleanup(idv.Close)
+	t.Cleanup(srv.Close)
+
+	all := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]string(nil), handed...)
+	}
+	query := func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		return last
+	}
+
+	return srv, all, query
+}
+
+// channels is a publishable key hidden behind a decoy in every channel a
+// credential can arrive on.
+//
+// The decoy is what makes each of these work: `nonsense` is a bare token by any
+// reading, so a rule that judges only the credential a door would resolve judges
+// the decoy, finds it harmless, and forwards the key beside it.
+func channels(key string) []spelling {
+	return []spelling{
+		{"a repeat Authorization value", nil, ""}, // filled in below
+		{"a decoy over X-API-Key", map[string]string{"Authorization": "nonsense", "X-API-Key": key}, ""},
+		{"a decoy over X-Auth-Token", map[string]string{"Authorization": "nonsense", "X-Auth-Token": key}, ""},
+		{"a decoy over X-Authorization", map[string]string{"Authorization": "nonsense", "X-Authorization": "Bearer " + key}, ""},
+		{"a scheme we do not read over X-API-Key", map[string]string{"Authorization": "Basic dXNlcjpwYXNz", "X-API-Key": key}, ""},
+		{"a decoy over the query", map[string]string{"Authorization": "nonsense"}, "?key=" + key},
+		{"a decoy query parameter", nil, "?key=nonsense&key=" + key},
+		{"a decoy query parameter after a semicolon", nil, "?key=nonsense;key=" + key},
+		{"a decoy query parameter under an escaped name", nil, "?key=nonsense&k%65y=" + key},
+		{"X-Auth-Token alone", map[string]string{"X-Auth-Token": key}, ""},
+		{"X-API-Key alone", map[string]string{"X-API-Key": key}, ""},
+	}
+}
+
+// TestAPublishableKeyIsRefusedInEveryChannel pins the whole class. A key printed
+// in a web page is refused wherever it sits, because the proxies forward every
+// channel and only one of them was ever judged.
+func TestAPublishableKeyIsRefusedInEveryChannel(t *testing.T) {
+	idv, handed, _ := recorder(t)
 	t.Setenv("IDV_ENDPOINT", idv.URL)
 
 	_, _, mux := keyed(t, "alpha")
 
-	last := func() string {
-		mu.Lock()
-		defer mu.Unlock()
-		if len(seen) == 0 {
-			return "<the upstream was never reached>"
+	for _, c := range channels("pk-in-the-page") {
+		for _, path := range []string{"/v1/iam/oauth/userinfo", "/v1/idv/verify"} {
+			req := httptest.NewRequest(http.MethodGet, path+c.query, nil)
+			for k, v := range c.headers {
+				req.Header.Set(k, v)
+			}
+			if c.how == "a repeat Authorization value" {
+				req.Header.Set("Authorization", "nonsense")
+				req.Header.Add("Authorization", "Bearer pk-in-the-page")
+			}
+
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusForbidden {
+				t.Errorf("GET %s with %s answered %d %s, want 403", path, c.how, rec.Code, rec.Body.String())
+			}
+			if strings.Contains(rec.Body.String(), "upstream") || strings.Contains(rec.Body.String(), `"status":"ok"`) {
+				t.Errorf("GET %s with %s was answered by the upstream: %s", path, c.how, rec.Body.String())
+			}
 		}
-		return seen[len(seen)-1]
 	}
 
+	for _, got := range handed() {
+		if strings.Contains(got, "pk-") {
+			t.Errorf("a key printed in a web page was handed to the upstream: %q", got)
+		}
+	}
+}
+
+// TestAnUpstreamsOwnCredentialIsUntouched is the half that makes the rule usable.
+// Nothing is dropped and no other credential is disturbed — the IDV service
+// authenticates its own callers on a key of its own format, and that key is not
+// a pk-, so it reaches the service exactly as it was sent.
+func TestAnUpstreamsOwnCredentialIsUntouched(t *testing.T) {
+	idv, handed, query := recorder(t)
+	t.Setenv("IDV_ENDPOINT", idv.URL)
+
+	_, _, mux := keyed(t, "alpha")
+
+	for _, c := range []struct {
+		what    string
+		headers map[string]string
+		want    string
+	}{
+		{"the vendor's own key", map[string]string{"X-API-Key": "idv_live_7f3c"}, "X-API-Key: idv_live_7f3c"},
+		{"a webhook signature beside it", map[string]string{
+			"X-API-Key": "idv_live_7f3c", "X-Auth-Token": "sig_9a1b"}, "X-Auth-Token: sig_9a1b"},
+		{"a scheme we do not read", map[string]string{"Authorization": "Basic dXNlcjpwYXNz"}, "Authorization: Basic dXNlcjpwYXNz"},
+	} {
+		code, body := call(t, mux, http.MethodGet, "/v1/idv/verify", "", c.headers)
+		if code != http.StatusOK {
+			t.Errorf("%s answered %d %s, want 200", c.what, code, body)
+		}
+		if !slices.Contains(handed(), c.want) {
+			t.Errorf("%s did not reach the service: upstream got %q", c.what, handed())
+		}
+	}
+
+	// And a legitimate single `key` travels unchanged.
+	if code, body := call(t, mux, http.MethodGet, "/v1/idv/verify?key=idv_live_7f3c&a=1", "", nil); code != http.StatusOK {
+		t.Errorf("a vendor key in the query answered %d %s, want 200", code, body)
+	}
+	if got := query(); got != "key=idv_live_7f3c&a=1" {
+		t.Errorf("the upstream received %q, want it unchanged", got)
+	}
+}
+
+// TestAProxyForwardsTheQueryItJudged pins the forward side, which holds for
+// every credential and not only a publishable one: a request presenting `key`
+// twice is read here by the first and by a last-occurrence server upstream by
+// the second, so only the one that was read goes on.
+func TestAProxyForwardsTheQueryItJudged(t *testing.T) {
+	idv, _, query := recorder(t)
+	t.Setenv("IDV_ENDPOINT", idv.URL)
+
+	_, _, mux := keyed(t, "alpha")
+
 	for _, c := range []struct{ how, query, want string }{
-		{"a publishable key behind a decoy", "?key=nonsense&key=pk-in-the-page", "key=nonsense"},
-		{"behind a semicolon", "?key=nonsense;key=pk-in-the-page", "key=nonsense"},
-		{"under an escaped name", "?key=nonsense&k%65y=pk-in-the-page", "key=nonsense"},
-		{"behind a secret key", "?key=sk-service&key=pk-in-the-page", "key=sk-service"},
+		{"a decoy in front", "?key=nonsense&key=sk-service", "key=nonsense"},
+		{"a decoy after a semicolon", "?key=nonsense;key=sk-service", "key=nonsense"},
+		{"a decoy under an escaped name", "?key=nonsense&k%65y=sk-service", "key=nonsense"},
+		{"two secret keys", "?key=sk-service&key=sk-other", "key=sk-service"},
+		{"the rest of the query kept", "?a=1&key=sk-service&b=2&key=sk-other", "a=1&key=sk-service&b=2"},
 		{"one key, untouched", "?key=sk-service&a=1", "key=sk-service&a=1"},
 		{"no key, untouched", "?a=1;b=2", "a=1;b=2"},
 	} {
 		if code, body := call(t, mux, http.MethodGet, "/v1/idv/verify"+c.query, "", nil); code != http.StatusOK {
 			t.Fatalf("%s answered %d %s, want 200", c.how, code, body)
 		}
-		if got := last(); got != c.want {
+		if got := query(); got != c.want {
 			t.Errorf("%s: the upstream received %q, want %q", c.how, got, c.want)
-		}
-	}
-
-	mu.Lock()
-	defer mu.Unlock()
-	for _, got := range seen {
-		if strings.Contains(got, "pk-") {
-			t.Errorf("a key printed in a web page was forwarded: %q", got)
 		}
 	}
 }

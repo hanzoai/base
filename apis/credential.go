@@ -33,6 +33,10 @@ var credentialHeaders = [...]string{
 // A publishable key travels in the query — that is what makes the page source
 // the credential — so the query spelling is read here too, and the headers win
 // where a request carries both.
+//
+// This is the credential a DOOR resolves, and it is the wrong question for a
+// refusal. A request may present several; use [Credentials] to decide what one
+// may reach.
 func Credential(r *http.Request) string {
 	for _, name := range credentialHeaders {
 		// Every value, not the first. A header may repeat, and a repeat is
@@ -132,6 +136,18 @@ func keyAt(ps []param) int {
 	return -1
 }
 
+// value is what the parameter carries, unescaped.
+func (p param) value() string {
+	_, value, _ := strings.Cut(p.raw, "=")
+
+	value, err := url.QueryUnescape(value)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
+}
+
 // queryKey is the credential a raw query presents.
 func queryKey(raw string) string {
 	ps := params(raw)
@@ -141,13 +157,43 @@ func queryKey(raw string) string {
 		return ""
 	}
 
-	_, value, _ := strings.Cut(ps[i].raw, "=")
-	value, err := url.QueryUnescape(value)
-	if err != nil {
-		return ""
+	return ps[i].value()
+}
+
+// Credentials is every credential a request presents, in the order the channels
+// are read: each value of each header in [credentialHeaders], then each `key`
+// parameter.
+//
+// There are two questions about a request and they have different answers.
+// WHICH credential does a door resolve — [Credential], the first one. WHAT does
+// this request present — all of them, here.
+//
+// A refusal has to ask this one, because a proxy forwards every channel. Reading
+// only the first let a decoy in the read channel hide a key printed in a web
+// page in another: a bare `nonsense` in Authorization is a token by any reading,
+// so nothing was judged publishable while `X-API-Key: pk-`, a repeat
+// `Authorization` value, or a second `key` parameter travelled on to the issuer.
+func Credentials(r *http.Request) []string {
+	var out []string
+
+	for _, name := range credentialHeaders {
+		for _, value := range r.Header.Values(name) {
+			if token := bearer(value); token != "" {
+				out = append(out, token)
+			}
+		}
 	}
 
-	return strings.TrimSpace(value)
+	for _, p := range params(r.URL.RawQuery) {
+		if p.name != "key" {
+			continue
+		}
+		if value := p.value(); value != "" {
+			out = append(out, value)
+		}
+	}
+
+	return out
 }
 
 // Query is the query a request may be forwarded with: its own, with every `key`

@@ -2,6 +2,7 @@ package org
 
 import (
 	"net/http"
+	"slices"
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
@@ -26,20 +27,24 @@ func publishableReachesOnlyPublic(e *core.RequestEvent) error {
 	return e.Next()
 }
 
-// publishable reports whether the credential a request carries is a key printed
-// in a web page.
+// publishable reports whether a request presents a key printed in a web page —
+// in ANY channel it could have arrived on, not only the one a door resolves.
 //
 // It reads the request rather than what a door resolved from it. The doors do
 // not run at every address — /v1/iam unbinds them so the proxy hands IAM the
 // caller's own credential — and what a credential reaches has to be answerable
 // where nothing resolved it.
 //
-// It reads it through [apis.Credential], which is the same reader the doors use.
-// A rule and a door that read a credential differently disagree about what
-// arrived, and the rule's half of that disagreement is a key travelling on to an
-// upstream in a spelling the rule never saw.
+// Every channel, because the proxies forward every channel. Asking only which
+// credential a door would resolve is a question a decoy walks past: a bare
+// `nonsense` in Authorization is a token by any reading, so it was judged, found
+// harmless and admitted, while the pk- beside it under X-API-Key — or in a
+// second Authorization value, or a second `key` parameter — went on to the
+// issuer. Nothing is dropped here and no other credential is disturbed; a
+// request presenting a publishable key is simply held to what a publishable key
+// reaches.
 func publishable(r *http.Request) bool {
-	return IsPublishableKey(apis.Credential(r))
+	return slices.ContainsFunc(apis.Credentials(r), IsPublishableKey)
 }
 
 // public reports whether the address a request reached is one a publishable key
