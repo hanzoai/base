@@ -121,6 +121,7 @@ func (r *Router[T]) loadMux(mux *http.ServeMux, group *RouterGroup[T], parents [
 
 			// add current route middlewares
 			pattern += v.Path
+			v.pattern = pattern
 			for _, h := range v.Middlewares {
 				if _, ok := v.excludedMiddlewares[h.Id]; !ok {
 					routeHook.Bind(h)

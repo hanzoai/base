@@ -5,10 +5,25 @@ import "github.com/hanzoai/base/tools/hook"
 type Route[T hook.Resolver] struct {
 	excludedMiddlewares map[string]struct{}
 
+	// pattern is the whole address the route was mounted at, assembled by
+	// [Router.BuildMux] from the method, the group prefixes and the path.
+	pattern string
+
 	Action      func(e T) error
 	Method      string
 	Path        string
 	Middlewares []*hook.Handler[T]
+}
+
+// Pattern is the whole address the route answers at: its method, every group
+// prefix above it and its own path, which is also what the mux reports in
+// [net/http.Request.Pattern]. It is empty until the mux is built, because a
+// route knows its path but not the groups it was registered under.
+//
+// A route's own address is otherwise only knowable by reassembling it from the
+// group tree, and two assemblies of one address drift.
+func (route *Route[T]) Pattern() string {
+	return route.pattern
 }
 
 // BindFunc registers one or multiple middleware functions to the current route.
