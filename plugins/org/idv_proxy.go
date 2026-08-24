@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/router"
 )
@@ -113,8 +114,10 @@ func (p *plugin) handleIDVProxy(e *core.RequestEvent) error {
 		upstreamPath = "/v1/idv/"
 	}
 	upstreamURL := endpoint + upstreamPath
-	if e.Request.URL.RawQuery != "" {
-		upstreamURL += "?" + e.Request.URL.RawQuery
+	// The query the credential was judged on, the same boundary the IAM proxy
+	// states: a `key` this side did not read is a `key` that does not travel.
+	if q := apis.Query(e.Request); q != "" {
+		upstreamURL += "?" + q
 	}
 
 	req, err := http.NewRequestWithContext(e.Request.Context(), e.Request.Method, upstreamURL, e.Request.Body)
