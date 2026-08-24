@@ -819,6 +819,73 @@ func mintIAMToken(t testing.TB, claims jwt.MapClaims) (token, jwksURL string) {
 	return signed, ts.URL
 }
 
+// TestTheUsernameIsNotADisplayName pins which claim the account's USERNAME is
+// read from.
+//
+// The username is the <name> half of the <owner>/<name> IAM files a person
+// under, and a per-org API composes an address out of it. A display name is
+// free-form text the account holder writes, so a username taken from one names
+// whatever its holder typed — and base validates against whichever identity
+// provider a deployment points at, so the claim it insists on has to be one an
+// account is FILED under.
+func TestTheUsernameIsNotADisplayName(t *testing.T) {
+	t.Parallel()
+
+	member := []any{map[string]any{"org": "acme", "role": "member"}}
+
+	scenarios := []struct {
+		name   string
+		claims jwt.MapClaims
+		want   string
+	}{
+		{
+			name: "the name claim, which is where Hanzo IAM puts the username",
+			claims: jwt.MapClaims{
+				"sub": "acme/ann", "owner": "acme", "name": "ann", "orgs": member,
+			},
+			want: `"name":"ann"`,
+		},
+		{
+			name: "preferred_username, where the name claim holds a display name",
+			claims: jwt.MapClaims{
+				"sub": "acme/ann", "owner": "acme",
+				"preferred_username": "ann", "name": "Ann Example", "orgs": member,
+			},
+			want: `"name":"ann"`,
+		},
+		{
+			name: "a display name and no username at all",
+			claims: jwt.MapClaims{
+				"sub": "acme/ann", "owner": "acme", "displayName": "ceo", "orgs": member,
+			},
+			want: `"name":""`,
+		},
+	}
+
+	for _, s := range scenarios {
+		token, jwksURL := mintIAMToken(t, s.claims)
+
+		scenario := tests.ApiScenario{
+			Name:            s.name,
+			Method:          http.MethodGet,
+			URL:             "/username",
+			Headers:         map[string]string{"Authorization": "Bearer " + token},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{s.want},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+				app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+				e.Router.GET("/username", func(re *core.RequestEvent) error {
+					name, _ := re.Get(apis.RequestEventKeyName).(string)
+					return re.JSON(http.StatusOK, map[string]string{"name": name})
+				})
+			},
+		}
+
+		scenario.Test(t)
+	}
+}
+
 func TestIAMSuperuserMirror(t *testing.T) {
 	t.Parallel()
 

@@ -81,28 +81,52 @@ func (i *issuer) as(t *testing.T, role, sub string, orgs ...string) string {
 	return i.signed(t, role, sub, name, orgs...)
 }
 
-// signed is the one place a token is built. IAM puts the account's stable id in
-// `sub` and its USERNAME in `name` — two claims, because the id it issues an
-// account is not the name it files that account under.
+// signed is the one place a token with a USERNAME is built. IAM puts the
+// account's stable id in `sub` and its username in `name` — two claims, because
+// the id it issues an account is not the name it files that account under.
 func (i *issuer) signed(t *testing.T, role, sub, name string, orgs ...string) string {
 	t.Helper()
 
+	p := payload(role, sub, orgs...)
+	p["name"] = name
+
+	return i.sign(t, p)
+}
+
+// display signs for an account whose token carries no username at all, only the
+// free-form text a UI shows.
+func (i *issuer) display(t *testing.T, role, sub, displayName string, orgs ...string) string {
+	t.Helper()
+
+	p := payload(role, sub, orgs...)
+	p["displayName"] = displayName
+
+	return i.sign(t, p)
+}
+
+// payload is what IAM signs about a person, apart from the names: a subject,
+// and the membership set with the role it holds in each.
+func payload(role, sub string, orgs ...string) jwt.MapClaims {
 	memberships := make([]any, 0, len(orgs))
 	for _, o := range orgs {
 		memberships = append(memberships, map[string]any{"org": o, "role": role})
 	}
 
-	claims := jwt.MapClaims{
+	return jwt.MapClaims{
 		"sub":   sub,
-		"name":  name,
 		"email": sub + "@example.test",
 		"owner": "hanzo", // the org of the APP the token was minted through
 		"orgs":  memberships,
 		"iat":   time.Now().Unix(),
 		"exp":   time.Now().Add(time.Hour).Unix(),
 	}
+}
 
-	jt := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+// sign puts the issuer's signature on a claim set.
+func (i *issuer) sign(t *testing.T, p jwt.MapClaims) string {
+	t.Helper()
+
+	jt := jwt.NewWithClaims(jwt.SigningMethodRS256, p)
 	jt.Header["kid"] = "iam-test"
 
 	signed, err := jt.SignedString(i.key)

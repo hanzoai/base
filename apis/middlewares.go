@@ -421,10 +421,26 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	}
 
 	email, _ := raw["email"].(string)
-	name, _ := raw["name"].(string)
-	displayName, _ := raw["displayName"].(string)
-	if name == "" {
-		name = displayName
+
+	// The account's USERNAME — the <name> half of the <owner>/<name> IAM files
+	// a person under, and the half an address under a per-org API is composed
+	// from. `preferred_username` is the claim that carries it; `name` carries it
+	// too where the issuer is Hanzo IAM.
+	//
+	// A DISPLAY NAME is not a username. It is free-form text the account holder
+	// writes, and this token was validated against whichever identity provider
+	// the deployment points at, so a username composed from one names whatever
+	// its holder typed. An account whose token carries no username has none, and
+	// a name that names nobody is the right answer for it.
+	username, _ := raw["preferred_username"].(string)
+	if username == "" {
+		username, _ = raw["name"].(string)
+	}
+
+	// What a UI shows. It reaches the mirrored record and nothing that decides.
+	display, _ := raw["name"].(string)
+	if display == "" {
+		display, _ = raw["displayName"].(string)
 	}
 
 	verified := decode(raw)
@@ -469,7 +485,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	// were deleted on the way in, so what is here now came from the token.
 	e.Set(RequestEventKeySub, sub)
 	e.Set("authEmail", email)
-	e.Set(RequestEventKeyName, name)
+	e.Set(RequestEventKeyName, username)
 	e.Set(RequestEventKeyOrgs, orgsOf(verified))
 	e.Set(RequestEventKeyOrg, org)
 	e.Set(RequestEventKeyOrgAdmin, verified.OrgAdmin(org))
@@ -501,8 +517,8 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	record := core.NewRecord(collection)
 	record.Id = subToRecordID(sub)
 	record.Set("email", email)
-	if name != "" {
-		record.Set("name", name)
+	if display != "" {
+		record.Set("name", display)
 	}
 	if collection.Fields.GetByName("org_id") != nil {
 		record.Set("org_id", org)
