@@ -48,13 +48,16 @@ import (
 // read a row, which is the one disagreement that matters.
 func bindRestApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	sub := rg.Group("/rest")
-	sub.GET("/{collection}", restList)
+
+	// The same rows through this wire, decided on the same listRule by the same
+	// handler. One credential, one answer, whichever wire asked.
+	Public(sub.GET("/{collection}", restList))
 	// A count query is a HEAD: a REST client's .select('*', {count, head: true})
 	// issues one and reads the total out of Content-Range, because the rows are
 	// exactly what it does not want. Without this the count path 404s while every
 	// other read works, which reads as "counting is broken" rather than "that
 	// verb is unrouted".
-	sub.HEAD("/{collection}", restList)
+	Public(sub.HEAD("/{collection}", restList))
 	sub.POST("/{collection}", restCreate)
 	sub.PATCH("/{collection}", restUpdate)
 	sub.DELETE("/{collection}", restDelete)

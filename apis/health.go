@@ -11,12 +11,14 @@ import (
 // BindHealthzRoute registers health check endpoints.
 // /healthz at root (platform standard) and /health under the API group.
 func BindHealthzRoute(rg *router.Router[*core.RequestEvent]) {
-	rg.GET("/healthz", healthCheck)
+	// Liveness answers a request carrying no credential at all, so a
+	// credential widens nothing here and is not grounds for a refusal.
+	Public(rg.GET("/healthz", healthCheck))
 }
 
 // bindHealthApi registers /v1/health.
 func bindHealthApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
-	rg.GET("/health", healthCheck)
+	Public(rg.GET("/health", healthCheck))
 }
 
 // healthCheck returns a 200 OK response if the server is healthy.

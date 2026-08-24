@@ -41,7 +41,9 @@ func bindFileApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 
 	sub := rg.Group("/files")
 	sub.POST("/token", api.fileToken).Bind(RequireAuth())
-	sub.GET("/{collection}/{recordId}/{filename}", api.download).Bind(collectionPathRateLimit("", "file"))
+	// The files those rows name. A field marked Protected re-reads viewRule
+	// below; every other file is reached by knowing its address.
+	Public(sub.GET("/{collection}/{recordId}/{filename}", api.download).Bind(collectionPathRateLimit("", "file")))
 }
 
 type fileApi struct {
