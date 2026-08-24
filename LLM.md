@@ -870,9 +870,25 @@ One knob for where the app's data plane lives. Default `/v1`. For
 multi-app deployments where a gateway routes by path, set
 `BASE_API_PREFIX=/v1/<app>` (e.g. `/v1/base`, `/v1/team`).
 
-The SPA client must match: `VITE_API_PREFIX` (in `gui/apps/admin-*/vite.config.ts`
-`define` block) is the client-side counterpart. Both are configured at
-deploy together.
+**The admin SPA does NOT follow it.** `ui-react/src/lib/api.ts` writes `/v1`
+into all 33 of its call sites, and there is no client-side prefix anywhere — the
+SPA reads `VITE_IAM_URL`, `VITE_IAM_CLIENT_ID` and `import.meta.env.BASE_URL`,
+and nothing else. This paragraph used to claim a `VITE_API_PREFIX` in a `define`
+block under `gui/apps/admin-*/vite.config.ts`; neither the variable nor that path
+exists, and the SPA has been built in this repo since `scripts/sync-admin-ui.sh`
+was removed.
+
+So `BASE_ENABLE_ADMIN_UI=1` together with a non-default `BASE_API_PREFIX` is a
+combination that does not work, and it fails the quiet way: the admin's calls
+land outside the data plane, where a catch-all answers 200 with HTML rather than
+404 — the same silent shape this file warns about for IAM. Serve the admin at the
+default `/v1`, or serve it from a Base that is not prefixed.
+
+Nothing in production hits this today: cloud pins `BASE_API_PREFIX=/v1/base`
+(`apps/base/base.go`) and does not set `BASE_ENABLE_ADMIN_UI`, so the admin is not
+served there at all. The fix is one constant in `api.ts` applied at the single
+`request()` chokepoint, with `/v1/iam/*` left alone because IAM is a fixed sibling
+whatever the prefix is.
 
 **IAM is always a fixed sibling at `/v1/iam`** regardless of
 `BASE_API_PREFIX`. In production a gateway typically routes `/v1/iam/*`
