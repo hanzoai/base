@@ -272,3 +272,59 @@ func TestEverySpellingOfAWorkingCredentialStillWorks(t *testing.T) {
 		}
 	}
 }
+
+// TestAProxyForwardsTheQueryItJudged pins the rule at the two mounts that
+// forward a query whole: the value this side read is the value the upstream
+// gets, and a second `key` never leaves the process.
+//
+// It measures what ARRIVED upstream. A request presenting `key` twice is judged
+// here by the first and read by a last-occurrence server by the second, so the
+// status this side returns says nothing about which credential was delivered.
+func TestAProxyForwardsTheQueryItJudged(t *testing.T) {
+	var mu sync.Mutex
+	var seen []string
+
+	idv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		seen = append(seen, r.URL.RawQuery)
+		mu.Unlock()
+		_, _ = w.Write([]byte(`{"upstream":"answered"}`))
+	}))
+	t.Cleanup(idv.Close)
+	t.Setenv("IDV_ENDPOINT", idv.URL)
+
+	_, _, mux := keyed(t, "alpha")
+
+	last := func() string {
+		mu.Lock()
+		defer mu.Unlock()
+		if len(seen) == 0 {
+			return "<the upstream was never reached>"
+		}
+		return seen[len(seen)-1]
+	}
+
+	for _, c := range []struct{ how, query, want string }{
+		{"a publishable key behind a decoy", "?key=nonsense&key=pk-in-the-page", "key=nonsense"},
+		{"behind a semicolon", "?key=nonsense;key=pk-in-the-page", "key=nonsense"},
+		{"under an escaped name", "?key=nonsense&k%65y=pk-in-the-page", "key=nonsense"},
+		{"behind a secret key", "?key=sk-service&key=pk-in-the-page", "key=sk-service"},
+		{"one key, untouched", "?key=sk-service&a=1", "key=sk-service&a=1"},
+		{"no key, untouched", "?a=1;b=2", "a=1;b=2"},
+	} {
+		if code, body := call(t, mux, http.MethodGet, "/v1/idv/verify"+c.query, "", nil); code != http.StatusOK {
+			t.Fatalf("%s answered %d %s, want 200", c.how, code, body)
+		}
+		if got := last(); got != c.want {
+			t.Errorf("%s: the upstream received %q, want %q", c.how, got, c.want)
+		}
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	for _, got := range seen {
+		if strings.Contains(got, "pk-") {
+			t.Errorf("a key printed in a web page was forwarded: %q", got)
+		}
+	}
+}
