@@ -47,8 +47,16 @@ func CreatesRecord(r *http.Request) string {
 // note: the rate limiter is "inlined" because some of the crud actions are also used in the batch APIs
 func bindRecordCrudApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
 	subGroup := rg.Group(recordsPath).Unbind(DefaultRateLimitMiddlewareId)
-	subGroup.GET("", recordsList)
-	subGroup.GET("/{id}", recordView)
+
+	// The rows a page renders. listRule and viewRule say which rows, and a
+	// collection stating no rule is reachable by a superuser alone — so a key
+	// printed in a page selects the Base to ask and the collection decides
+	// what comes back.
+	Public(
+		subGroup.GET("", recordsList),
+		subGroup.GET("/{id}", recordView),
+	)
+
 	subGroup.POST("", recordCreate(true, nil)).Bind(dynamicCollectionBodyLimit(""))
 	subGroup.PATCH("/{id}", recordUpdate(true, nil)).Bind(dynamicCollectionBodyLimit(""))
 	subGroup.DELETE("/{id}", recordDelete(true, nil))

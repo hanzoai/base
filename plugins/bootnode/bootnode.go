@@ -103,44 +103,67 @@ type plugin struct {
 
 // registerRoutes mounts every bootnode endpoint. One group, /v1, matching the
 // Python api_prefix. No extraneous /api/ segment.
+//
+// The reads are declared public, which is what a pk- key was issued for: it is
+// printed in a page, it carries the page's own org, and every read here answers
+// within that org — the chain catalogue, the project's networks, nodes and key
+// status, its team, the key's own identity. None hands back key material or a
+// credential: a key's material exists only in KMS, the listing shows a prefix,
+// and the handler that mints one is a POST. Every write refuses a publishable
+// key outright, beside the write.
+//
+// The declaration sits here because these are bootnode's routes. It used to sit
+// in the rule that reads it, which meant a list of one package's addresses kept
+// in another, and a dozen of these reads answered 403 the moment that list fell
+// behind.
 func (p *plugin) registerRoutes(r *router.Router[*core.RequestEvent]) {
 	g := r.Group("/v1")
 
 	// auth/
 	g.POST("/auth/oauth/callback", p.handleOAuthCallback)
-	g.GET("/auth/me", p.handleMe)
 	g.POST("/auth/projects", p.handleCreateProject)
-	g.GET("/auth/projects/{id}", p.handleGetProject)
 	g.POST("/auth/keys", p.handleCreateAPIKey)
-	g.GET("/auth/keys", p.handleListAPIKeys)
 	g.DELETE("/auth/keys/{id}", p.handleDeleteAPIKey)
+	apis.Public(
+		g.GET("/auth/me", p.handleMe),
+		g.GET("/auth/projects/{id}", p.handleGetProject),
+		g.GET("/auth/keys", p.handleListAPIKeys),
+	)
 
 	// team/
-	g.GET("/team", p.handleListTeam)
 	g.POST("/team", p.handleInviteMember)
 	g.PATCH("/team/{id}", p.handleUpdateMember)
 	g.DELETE("/team/{id}", p.handleRemoveMember)
+	apis.Public(g.GET("/team", p.handleListTeam))
 
 	// chains/
-	g.GET("/chains", p.handleListChains)
-	g.GET("/chains/{chain}", p.handleGetChain)
+	apis.Public(
+		g.GET("/chains", p.handleListChains),
+		g.GET("/chains/{chain}", p.handleGetChain),
+	)
 
 	// networks/  (bootno.de/v1 Network CRs)
 	g.POST("/networks", p.handleCreateNetwork)
-	g.GET("/networks", p.handleListNetworks)
-	g.GET("/networks/{id}", p.handleGetNetwork)
 	g.DELETE("/networks/{id}", p.handleDeleteNetwork)
+	apis.Public(
+		g.GET("/networks", p.handleListNetworks),
+		g.GET("/networks/{id}", p.handleGetNetwork),
+	)
 
 	// nodes/  (bootno.de/v1 NodeFleet CRs)
 	g.POST("/nodes", p.handleCreateNodeFleet)
-	g.GET("/nodes", p.handleListNodeFleets)
-	g.GET("/nodes/{id}", p.handleGetNodeFleet)
 	g.DELETE("/nodes/{id}", p.handleDeleteNodeFleet)
+	apis.Public(
+		g.GET("/nodes", p.handleListNodeFleets),
+		g.GET("/nodes/{id}", p.handleGetNodeFleet),
+	)
 
 	// keys/  (bootno.de/v1 KMSSecret CRs — no plaintext storage)
 	g.POST("/keys", p.handleCreateKMSKey)
-	g.GET("/keys/status", p.handleKeyStatus)
-	g.GET("/keys/{name}", p.handleGetKMSKey)
+	apis.Public(
+		g.GET("/keys/status", p.handleKeyStatus),
+		g.GET("/keys/{name}", p.handleGetKMSKey),
+	)
 }
 
 // Identity is the resolved caller context for a request: who they are (IAM
@@ -159,11 +182,16 @@ type Identity struct {
 // identify a project (see requireProject). Returns a 401 on failure.
 func (p *plugin) requireUser(e *core.RequestEvent) (*Identity, error) {
 	// Identity headers set by the platform plugin / gateway take precedence.
+	// They say WHO, and the credential still says WHAT KIND: the plugin that
+	// writes them writes the same headers for every IAM key it resolved, so
+	// reading only them made a key printed in a web page a caller with a
+	// person's privileges and left the read-only refusals below unreachable.
 	if uid := e.Request.Header.Get("X-User-Id"); uid != "" {
 		return &Identity{
-			UserID: uid,
-			Email:  e.Request.Header.Get("X-User-Email"),
-			Org:    e.Request.Header.Get("X-Org-Id"),
+			UserID:   uid,
+			Email:    e.Request.Header.Get("X-User-Email"),
+			Org:      e.Request.Header.Get("X-Org-Id"),
+			ReadOnly: auth.ClassifyCredential(apis.Credential(e.Request)) == auth.KeyIAMPublishable,
 		}, nil
 	}
 
