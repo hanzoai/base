@@ -152,10 +152,23 @@ func (p *plugin) creditReferrer(txApp core.App, waitlistID string, joiner *core.
 		return err
 	}
 
-	referrer.Set("referralCount", referrer.GetFloat("referralCount")+1)
+	// The count and the points are two facts, so each is written by whoever owns
+	// it. This used to set referralCount and leave the save to award(), which
+	// skips it for a zero-point award — so under POINTS_REFERRAL=0 the increment
+	// was discarded while the joiner's referredBy above was written, and the two
+	// sides of one referral disagreed. award's own answer still gates it: a
+	// referral already credited (same dedupKey) reports false and is not counted
+	// twice.
 	meta := map[string]any{"who": maskEmail(referrer.GetString("email")), "invited": maskEmail(joinerEmail)}
-	if _, err := p.award(txApp, referrer, "referral", "referral:"+joinerEmail, p.config.Points.Referral, meta); err != nil {
+	credited, err := p.award(txApp, referrer, "referral", "referral:"+joinerEmail, p.config.Points.Referral, meta)
+	if err != nil {
 		return err
+	}
+	if credited {
+		referrer.Set("referralCount", referrer.GetFloat("referralCount")+1)
+		if err := txApp.Save(referrer); err != nil {
+			return err
+		}
 	}
 
 	// Conversion: did this referrer previously invite the joiner's email?
