@@ -170,22 +170,37 @@ collection and no local `checkOrgAccess`: a second answer to "who is in this
 org" is one that can disagree with the credential the request arrived on, and
 the one it arrived on wins.
 
-**Publishable means public, and the list of what is public is finite.** A `pk-`
+**Publishable means public, and a route says for itself whether it is.** A `pk-`
 key is the one that ships inside a web page and travels in `?key=`, so reaching
-a route with it needs no Authorization header at all. `plugins/org/publishable.go`
-states the whole rule in one place: `public` is every address such a key reaches
-— the record list and view, the same rows on the `/v1/rest` wire, a public
-collection's create, a record's files, and liveness — and everything else is
-refused. Naming what is public is a list that can be read; naming what is
-private is a list that is never finished, which is how a rule scoped to
-`/v1/bases` left a page's key reaching a database's connection string.
+a route with it needs no Authorization header at all.
+`plugins/org/publishable.go` states the rule — refuse such a key every address
+that is not public — and holds no addresses of its own. Each product declares
+its own: `apis.Public(g.GET(...))` beside the registration, which Base uses for
+the record list and view, the same rows on the `/v1/rest` wire, a record's files
+and liveness, and bootnode uses for its twelve reads. A list of one package's
+addresses kept in another goes stale the moment that package mounts a route, and
+it goes stale silently. The rule keeps one address of its own, the public
+submit path, because whether it is public is the collection's `createRule` and
+not the route's.
+
+Addresses are compared as WHOLE patterns — method and the mount prefix included
+— which the mux records on the route as it mounts it (`router.Route.Pattern`), so
+a route that merely ends the same way is a different route.
 
 The rule reads the CREDENTIAL off the request rather than what a door published
 about it, because `/v1/iam` unbinds the doors that resolve a key, and what a
 credential reaches has to be answerable where nothing resolved it. It is bound
-anonymously, so no group can `Unbind` it. Addresses are compared as WHOLE
-patterns — method and `apis.Prefix()` included — the way `apis.CreatesRecord`
-names the one route it grants.
+anonymously, so no group can `Unbind` it.
+
+**One reader answers what credential a request carries.** `apis.Credential` is
+it: the `Bearer` scheme matched without regard to case and separated by spaces or
+tabs, a bare token, every value of `Authorization`, `X-Authorization`,
+`X-Auth-Token` and `X-API-Key` in that order, then `?key=` split on `;` as well
+as `&`. A value naming any other scheme presents no token. A rule that decides
+what a credential may REACH and a door that RESOLVES it agree only if they read
+the same bytes — three readers accepting different subsets meant a key one
+refused was a key another handed to an upstream, and `/v1/iam` and `/v1/idv`
+forward headers and query verbatim.
 
 **A provider name is not a key to the pod environment.** `provider` is a path
 segment the caller writes, so `OrgService.GetCreds` reads KMS or nothing. There
