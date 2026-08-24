@@ -84,7 +84,10 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 
 		upstream := *upstreamBase
 		upstream.Path = upstreamFor(upstreamBase.Path, e.Request.URL.Path)
-		upstream.RawQuery = e.Request.URL.RawQuery
+		// The query the credential was judged on. A request presenting `key`
+		// twice is one this side reads by the first and the issuer may read by
+		// the last, so only the one that was read goes on.
+		upstream.RawQuery = apis.Query(e.Request)
 
 		req, err := http.NewRequestWithContext(
 			e.Request.Context(), e.Request.Method, upstream.String(), e.Request.Body)

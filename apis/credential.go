@@ -75,31 +75,114 @@ func bearer(value string) string {
 	return strings.TrimSpace(value[i:])
 }
 
-// queryKey is the `key` parameter of a raw query string.
-//
-// It splits on `;` as well as `&` and unescapes both halves. Go stopped
-// treating `;` as a separator, so `?a=1;key=pk-` carries no key by Go's reading
-// while a server that still splits on it reads one — and this answer decides
-// what gets FORWARDED, so it has to see every parameter the far side might.
-func queryKey(raw string) string {
-	for raw != "" {
-		part := raw
+// param is one parameter of a raw query: the separator that preceded it (0 for
+// the first), the name it unescapes to, and the bytes exactly as they arrived.
+type param struct {
+	sep  byte
+	name string
+	raw  string
+}
+
+// params splits a raw query on `;` as well as `&`. Go stopped treating `;` as a
+// separator, so `?a=1;key=pk-` carries no key by Go's reading while a server
+// that still splits on it reads one — and these answers decide what is
+// forwarded, so they have to see every parameter the far side might.
+func params(raw string) []param {
+	if raw == "" {
+		return nil
+	}
+
+	var out []param
+	sep := byte(0)
+
+	for {
+		part, next := raw, byte(0)
 		if i := strings.IndexAny(raw, "&;"); i >= 0 {
-			part, raw = raw[:i], raw[i+1:]
+			part, next, raw = raw[:i], raw[i], raw[i+1:]
 		} else {
 			raw = ""
 		}
 
-		name, value, _ := strings.Cut(part, "=")
-		if name, err := url.QueryUnescape(name); err != nil || name != "key" {
-			continue
+		name, _, _ := strings.Cut(part, "=")
+		if unescaped, err := url.QueryUnescape(name); err == nil {
+			name = unescaped
 		}
-		if value, err := url.QueryUnescape(value); err == nil {
-			if value = strings.TrimSpace(value); value != "" {
-				return value
-			}
+		out = append(out, param{sep: sep, name: name, raw: part})
+
+		if next == 0 {
+			return out
+		}
+		sep = next
+	}
+}
+
+// keyAt is where a query presents its credential: the index of the FIRST
+// parameter named `key`, and -1 for a query presenting none.
+//
+// One definition, read by the answer about what ARRIVED and by the answer about
+// what is FORWARDED. Two definitions is how a request comes to be judged on one
+// value and read upstream on another.
+func keyAt(ps []param) int {
+	for i, p := range ps {
+		if p.name == "key" {
+			return i
 		}
 	}
 
-	return ""
+	return -1
+}
+
+// queryKey is the credential a raw query presents.
+func queryKey(raw string) string {
+	ps := params(raw)
+
+	i := keyAt(ps)
+	if i < 0 {
+		return ""
+	}
+
+	_, value, _ := strings.Cut(ps[i].raw, "=")
+	value, err := url.QueryUnescape(value)
+	if err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(value)
+}
+
+// Query is the query a request may be forwarded with: its own, with every `key`
+// parameter after the first removed.
+//
+// A proxy forwards a query whole, so a request presenting `key` twice is judged
+// here on one value and read upstream on the other — whichever a server that
+// takes the last occurrence would take. `?key=nonsense&key=pk-` was judged on
+// nonsense, passed as carrying no publishable key, and handed the issuer the
+// publishable key. What was judged is what is forwarded.
+//
+// Everything else arrives as it came, separators included: whether `a=1;b=2` is
+// two parameters or none is the far side's reading to make, and rewriting it
+// here would answer that question on its behalf.
+func Query(r *http.Request) string {
+	raw := r.URL.RawQuery
+
+	ps := params(raw)
+	first := keyAt(ps)
+	if first < 0 {
+		return raw
+	}
+
+	var b strings.Builder
+	wrote := false
+	for i, p := range ps {
+		if p.name == "key" && i != first {
+			continue
+		}
+		if wrote && p.sep != 0 {
+			b.WriteByte(p.sep)
+		}
+		b.WriteString(p.raw)
+		wrote = true
+	}
+
+	return b.String()
 }

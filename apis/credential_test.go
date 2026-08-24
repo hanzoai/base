@@ -71,3 +71,43 @@ func TestCredentialReadsPastAnUnreadableValue(t *testing.T) {
 		t.Errorf("Credential = %q, want %q", got, "tok")
 	}
 }
+
+// TestQueryForwardsTheCredentialItWasJudgedOn pins that the query a proxy may
+// forward presents the same credential this side read, and only that one.
+//
+// A query presenting `key` twice is judged here by the first and read by a
+// last-occurrence server by the second, so `?key=nonsense&key=pk-` passed as
+// carrying no publishable key and handed one on.
+func TestQueryForwardsTheCredentialItWasJudgedOn(t *testing.T) {
+	for _, c := range []struct{ how, query, want, judged string }{
+		{"one key", "?key=pk-x", "key=pk-x", "pk-x"},
+		{"a decoy in front", "?key=nonsense&key=pk-x", "key=nonsense", "nonsense"},
+		{"a decoy after a semicolon", "?key=nonsense;key=pk-x", "key=nonsense", "nonsense"},
+		{"a decoy under an escaped name", "?key=nonsense&k%65y=pk-x", "key=nonsense", "nonsense"},
+		{"an escaped name first", "?k%65y=pk-x&key=nonsense", "k%65y=pk-x", "pk-x"},
+		{"a stronger key in front", "?key=sk-y&key=pk-x", "key=sk-y", "sk-y"},
+		{"three of them", "?key=a&key=b&key=c", "key=a", "a"},
+		{"the rest of the query kept", "?a=1&key=nonsense&b=2&key=pk-x", "a=1&key=nonsense&b=2", "nonsense"},
+		{"no key at all", "?a=1&b=2", "a=1&b=2", ""},
+		{"semicolons left alone", "?a=1;b=2", "a=1;b=2", ""},
+		{"a leading separator kept", "?&key=pk-x", "&key=pk-x", "pk-x"},
+		{"a trailing separator kept", "?key=pk-x&", "key=pk-x&", "pk-x"},
+		{"nothing at all", "", "", ""},
+	} {
+		r := httptest.NewRequest(http.MethodGet, "/anywhere"+c.query, nil)
+
+		if got := Query(r); got != c.want {
+			t.Errorf("%s: Query = %q, want %q", c.how, got, c.want)
+		}
+		if got := Credential(r); got != c.judged {
+			t.Errorf("%s: Credential = %q, want %q", c.how, got, c.judged)
+		}
+
+		// The forwarded query presents the credential that was judged. Read it
+		// back the way the far side would: one reader, both ends.
+		forwarded := httptest.NewRequest(http.MethodGet, "/anywhere?"+Query(r), nil)
+		if got := Credential(forwarded); got != c.judged {
+			t.Errorf("%s: the forwarded query presents %q, judged on %q", c.how, got, c.judged)
+		}
+	}
+}
