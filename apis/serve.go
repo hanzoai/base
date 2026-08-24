@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hanzoai/base/tools/osutils"
+
 	"github.com/fatih/color"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
@@ -109,7 +111,7 @@ func Serve(app core.App, config ServeConfig) error {
 	//
 	// Admin UI: disabled by default. Set BASE_ENABLE_ADMIN_UI=1 to serve the
 	// dashboard. Production services are headless APIs — no UI surface exposed.
-	if os.Getenv("BASE_ENABLE_ADMIN_UI") != "1" {
+	if !osutils.Bool("BASE_ENABLE_ADMIN_UI", false) {
 		baseRouter.GET("/{path...}", func(e *core.RequestEvent) error {
 			// Two different questions land here and they want different answers.
 			// A browser navigating to the dashboard is asking about the admin,

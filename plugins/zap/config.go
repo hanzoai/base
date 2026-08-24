@@ -8,6 +8,8 @@ package zap
 import (
 	"fmt"
 	"os"
+
+	"github.com/hanzoai/base/tools/osutils"
 )
 
 // Config for the ZAP transport plugin.
@@ -41,6 +43,6 @@ func DefaultConfig() Config {
 		Port:        port,
 		ServiceType: "_hanzo-base._tcp",
 		NodeID:      nodeID,
-		Enabled:     os.Getenv("ZAP_DISABLED") != "true",
+		Enabled:     !osutils.Bool("ZAP_DISABLED", false),
 	}
 }
