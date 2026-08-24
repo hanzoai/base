@@ -57,9 +57,3 @@ func IsSecret(token string) bool { return org.IsSecretKey(token) }
 
 // IsAPIKey reports whether token is any IAM API key (pk-/sk-/hk-).
 func IsAPIKey(token string) bool { return org.IsAPIKey(token) }
-
-// IsAnalytics reports whether token is an insights (hi-) or analytics (ha-) key.
-func IsAnalytics(token string) bool { return org.IsAnalyticsKey(token) }
-
-// IsWidget reports whether token is a widget embed key (hz-).
-func IsWidget(token string) bool { return org.IsWidgetKey(token) }

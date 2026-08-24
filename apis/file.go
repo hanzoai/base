@@ -105,7 +105,9 @@ func (api *fileApi) download(e *core.RequestEvent) error {
 		return e.NotFoundError("", nil)
 	}
 
-	// check whether the request is authorized to view the protected file
+	// A field marked Protected re-reads viewRule here, against a file token
+	// rather than the caller's own credential. A field not so marked is reached
+	// by knowing the address, which is what a file URL in a page is.
 	if fileField.Protected {
 		originalRequestInfo, err := e.RequestInfo()
 		if err != nil {
