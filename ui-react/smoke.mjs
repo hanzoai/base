@@ -26,10 +26,15 @@ const { chromium } = await import(process.env.PLAYWRIGHT ?? 'playwright')
 
 const root = new URL('./dist/', import.meta.url).pathname
 const css = fs.readFileSync(new URL('./src/index.css', import.meta.url), 'utf8')
-// The tokens this sheet leans on. `--gap`/`--cols` are its own locals, set on
-// the element, so they are not expected on :root.
+// The tokens this sheet leans on, checked against :root. LOCALS are excluded:
+// a property the sheet reads but an element supplies is not a :root token, and
+// asserting it there reports a design that works as a design that is broken.
+//   --gap, --cols  set on the element by the grid rules
+//   --mark         set inline by __root.tsx and login.tsx, which is the point —
+//                  the mark takes its url from the page rendering it
+const LOCALS = new Set(['--gap', '--cols', '--mark'])
 const tokens = [...new Set([...css.matchAll(/var\((--[a-z0-9-]+)/g)].map((m) => m[1]))]
-  .filter((t) => t !== '--gap' && t !== '--cols')
+  .filter((t) => !LOCALS.has(t))
 
 // Read the width the confirm dialog asks for out of the route that asks for it,
 // so this check cannot drift from the source it is checking.
@@ -62,6 +67,16 @@ function stub(url) {
   if (url === '/v1/realtime/token') return { token: 'a-stream-grant' }
   if (url === '/v1/files/token') return { token: 'a-file-grant' }
   if (url === '/v1/bases') return [{ org: 'acme', exists: true, bytes: 40960 }]
+  // /settings/data reads this. Unstubbed, the route crashed on
+  // data.collections.filter and the error boundary swallowed it, so the recovery
+  // section below timed out waiting for a textarea that never rendered — the
+  // failure mode this file exists to catch, arriving through the file itself.
+  if (url === '/v1/database') return {
+    engine: 'sqlite', local: true,
+    data: { path: '/data/data.db', size: 40960 },
+    aux: { path: '/data/aux.db', size: 8192 },
+    collections: [{ id: 'c1', name: 'posts', records: 1 }, { id: 'c2', name: 'unreadable', records: null }],
+  }
   if (url === '/v1/settings') {
     return {
       meta: { appName: 'Base', appURL: 'http://localhost:8090', senderName: 'Support', senderAddress: 'support@example.com' },
