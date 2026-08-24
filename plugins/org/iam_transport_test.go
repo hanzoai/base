@@ -28,13 +28,14 @@ func serveIAM(t *testing.T) (addr string, seen *string) {
 			"orgIds": []string{"hanzo"},
 		})
 	})
-	app.Get("/v1/iam/get-user", func(c *zip.Ctx) error {
+	app.Get("/v1/iam/keys/principal", func(c *zip.Ctx) error {
 		if c.Query("accessKey") != "sk-probe" {
-			return c.JSON(404, map[string]string{"status": "error"})
+			return c.JSON(400, map[string]string{"status": "error", "msg": "the entity does not exist"})
 		}
 		return c.JSON(200, map[string]any{
-			"data": map[string]string{
-				"id": "u-2", "name": "svc", "email": "svc@hanzo.ai", "owner": "hanzo",
+			"status": "ok",
+			"data": map[string]any{
+				"name": "svc", "email": "svc@hanzo.ai", "owner": "hanzo", "isAdmin": false,
 			},
 		})
 	})
@@ -80,11 +81,12 @@ func TestIAMClientOverZAP(t *testing.T) {
 		t.Fatalf("authorization did not cross the wire: %q", *seen)
 	}
 
+	c.SetAdminCreds(AdminCreds{ClientID: "svc", ClientSecret: "shh", Owner: "hanzo"})
 	key, err := c.ResolveAPIKey("sk-probe")
 	if err != nil {
 		t.Fatalf("ResolveAPIKey over zap: %v", err)
 	}
-	if key.ID != "u-2" || len(key.OrgIDs) != 1 || key.OrgIDs[0] != "hanzo" {
+	if key.ID != "hanzo/svc" || len(key.OrgIDs) != 1 || key.OrgIDs[0] != "hanzo" {
 		t.Fatalf("decoded %+v", key)
 	}
 }
