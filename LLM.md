@@ -1197,7 +1197,7 @@ Both are obsolete: `hanzogui` is now **`@hanzo/gui`**, `hanzogui-loader` is
 - **Overlays are components.** Dialog and DropdownMenu come from `@hanzo/ui`,
   because they carry a11y, focus management and placement that CSS cannot.
 - **Everything else is CSS.** `src/index.css` imports `@hanzo/design/styles.css`
-  for tokens and the self-hosted Geist/Geist Mono faces, then defines ~30 class
+  for tokens and the self-hosted Zen/Zen Mono faces, then defines ~30 class
   names for the things this admin has (`.shell`, `.panel`, `.btn`, `.field`,
   `.table`, `.chip`). It replaced ~220 utility classes pasted across 30 files and
   four duplicated style constants. Nothing invents a colour, size or radius —
