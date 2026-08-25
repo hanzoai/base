@@ -170,9 +170,16 @@ func (validator *collectionValidator) checkUniqueName(value any) error {
 		return validation.NewError("validation_collection_name_exists", "Collection name must be unique (case insensitive).")
 	}
 
-	// ensure that the collection name doesn't collide with the id of any collection
+	// ensure that the collection name doesn't collide with the id of ANOTHER
+	// collection. A collection may hold its own name as its id — NewBaseCollection
+	// takes the id as an optional argument and nothing forbids the two matching —
+	// and this lookup finds that collection itself, so without excluding it such a
+	// collection passed creation and could never be updated again. Every later
+	// schema change died on restart with the error below, which describes a
+	// collision with itself.
 	dummyCollection := &Collection{}
-	if validator.app.ModelQuery(dummyCollection).Model(v, dummyCollection) == nil {
+	if validator.app.ModelQuery(dummyCollection).Model(v, dummyCollection) == nil &&
+		dummyCollection.Id != validator.original.Id {
 		return validation.NewError("validation_collection_name_id_duplicate", "The name must not match an existing collection id.")
 	}
 
