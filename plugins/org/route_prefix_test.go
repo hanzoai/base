@@ -23,6 +23,13 @@ var banned = []struct {
 	// the standard bans the path segment, not the api.* subdomain.
 	{regexp.MustCompile(`(^|[^.\w])/api/`), "Hanzo services answer under /v1/<service>/, never /api/"},
 
+	// The same segment reached through an ABSOLUTE URL at one of our own hosts.
+	// The rule above cannot see it: a word character precedes the segment there,
+	// so `https://hanzo.id/api/login/...` reads exactly like the third-party URLs
+	// the exclusion exists to permit. Our hosts are the ones the standard binds,
+	// so they are named.
+	{regexp.MustCompile(`hanzo\.(ai|id|bot|network)\S*/api/`), "our own hosts answer under /v1/<service>/, never /api/"},
+
 	// /v1/platform belongs to the PaaS at platform.hanzo.ai. Base published its
 	// own resource there once, and "where are my Bases?" had no answer a person
 	// could act on: two products wore one name. A Base is Base's noun — /v1/bases.
@@ -30,10 +37,12 @@ var banned = []struct {
 }
 
 // TestNoBannedRouteLiterals guards the ONE package in this repo that calls
-// OUT to Hanzo services. Base's own record store legitimately serves `/api/*`
-// (the native surface every Base client speaks), so the ban cannot be repo-wide
-// — but no route here may address a Hanzo service that way: IAM answers only
-// under /v1/iam, and the edge refuses the old prefix outright.
+// OUT to Hanzo services. Two rules do the work, because one cannot: a bare
+// path is caught by requiring a non-word character before the segment, which
+// deliberately lets a third-party absolute URL like gitlab.com/api/v4 through
+// — those are the only `/api/` this repo legitimately holds — and our own
+// hosts are named outright, since to the first rule they read the same way.
+// IAM answers only under /v1/iam, and the edge refuses the old prefix outright.
 //
 // It inspects STRING LITERALS via go/ast, not lines of text: only a literal can
 // BE a route. Prose that names the prefix — a comment recording which dead
