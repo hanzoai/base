@@ -33,7 +33,7 @@ require (
 	github.com/luxfi/keys v1.4.1
 	github.com/luxfi/kms v1.11.7
 	github.com/luxfi/log v1.5.0
-	github.com/luxfi/zap v1.2.7
+	github.com/luxfi/zap v1.2.9
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/tetratelabs/wazero v1.11.0
@@ -157,7 +157,7 @@ require (
 	github.com/luxfi/ids v1.3.2 // indirect
 	github.com/luxfi/math v1.5.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
-	github.com/luxfi/mdns v0.1.1 // indirect
+	github.com/luxfi/mdns v0.2.1 // indirect
 	github.com/luxfi/metric v1.10.0
 	github.com/luxfi/mock v0.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect

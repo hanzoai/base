@@ -93,7 +93,14 @@ func (p *plugin) start(httpHandler http.Handler) {
 	p.bridgeForward(httpHandler)
 
 	if err := p.node.Start(); err != nil {
-		p.logger.Error("failed to start ZAP node", "error", err)
+		// What is lost here is the inbound surface — the gateway's route to
+		// /v1/base/* on this instance. Nothing in this process goes OUT
+		// through this node: the KMS bridge and every other client dial
+		// their own. HTTP still serves, so this is a degradation and not a
+		// reason to take the process down with it.
+		p.logger.Error("ZAP transport unavailable; this instance serves HTTP only and the gateway cannot route to it over ZAP",
+			"port", p.config.Port, "error", err)
+		p.node = nil // never hold a node that is not running
 		return
 	}
 
