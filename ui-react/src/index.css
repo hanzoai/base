@@ -1,9 +1,9 @@
 /*
  * Base Admin — the whole visual layer, in one sheet.
  *
- * Tokens, the type faces (Geist Sans + Geist Mono, self-hosted inside the
- * package, so this page makes no third-party request — the sheet this replaces
- * pulled Geist Mono from jsdelivr on every load) and the element defaults all
+ * Tokens, the type faces (Zen + Zen Mono, self-hosted inside the package, so
+ * this page makes no third-party request — the sheet this replaces pulled the
+ * mono face from jsdelivr on every load) and the element defaults all
  * come from `@hanzo/design`. Nothing below invents a colour, a size or a radius:
  * every value is a token, so a brand fork retunes the admin for free.
  *
