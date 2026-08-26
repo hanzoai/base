@@ -131,3 +131,44 @@ func TestIAMProxyIsNotBaseToAuthenticate(t *testing.T) {
 		}
 	}
 }
+
+// A reverse proxy hands a redirect back; it must not take one itself.
+//
+// /v1/iam/oauth/authorize answers 302 to the redirect_uri, and that redirect IS
+// the code flow — the browser has to receive it. Go's default client follows up
+// to ten, so this process fetched the app's own callback URL instead and the
+// caller got 500 "iam unreachable" whenever that URL was not reachable from the
+// server, which is the normal case for a location meant for a browser. Sign-in
+// could not complete through the proxy at all.
+func TestIAMProxyHandsBackARedirectRatherThanFollowingIt(t *testing.T) {
+	var followed bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/followed" {
+			followed = true
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("the proxy chased the redirect"))
+			return
+		}
+		http.Redirect(w, r, "/followed?code=abc&state=xyz", http.StatusFound)
+	}))
+	defer upstream.Close()
+
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	if err := Register(app, Config{IAMEndpoint: upstream.URL}); err != nil {
+		t.Fatal(err)
+	}
+	mux := serve(t, app)
+
+	code, body := call(t, mux, http.MethodGet, "/v1/iam/oauth/authorize?redirect_uri=http://app/callback", "", nil)
+	if followed {
+		t.Fatal("the proxy fetched the redirect target itself; the browser never sees the location")
+	}
+	if code != http.StatusFound {
+		t.Fatalf("status = %d, want 302 — the redirect must reach the caller, body: %s", code, body)
+	}
+}
