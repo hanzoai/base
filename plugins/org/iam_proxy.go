@@ -63,9 +63,21 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		return
 	}
 
-	// Streaming-friendly client: no global timeout; the request's
+	// A reverse proxy HANDS BACK a redirect; it does not take one.
+	//
+	// Go's default client follows up to ten, and /v1/iam/oauth/authorize answers
+	// 302 to the redirect_uri — the whole mechanism of the code flow. Followed
+	// here, the browser never receives it, this process fetches the app's own
+	// callback URL instead, and sign-in cannot complete: the caller saw 500
+	// "iam unreachable" whenever that URL was not reachable FROM THE SERVER,
+	// which is the normal case for a redirect meant for a browser.
+	//
+	// It also stops the upstream naming a URL this process will then fetch.
+	//
+	// Streaming-friendly otherwise: no global timeout, since the request's
 	// context cancellation handles abandonment.
-	client := &http.Client{Timeout: 0}
+	noFollow := func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	client := &http.Client{Timeout: 0, CheckRedirect: noFollow}
 
 	handler := func(e *core.RequestEvent) error {
 		// The path passes through UNCHANGED: /v1/iam/x → ${IAMEndpoint}/v1/iam/x.
@@ -119,7 +131,7 @@ func (p *plugin) registerIAMProxy(r *router.Router[*core.RequestEvent]) {
 		// SSE / streaming heuristic: use a long-lived client.
 		c := client
 		if !isLikelyStreaming(e.Request.URL.Path) {
-			c = &http.Client{Timeout: 30 * time.Second}
+			c = &http.Client{Timeout: 30 * time.Second, CheckRedirect: noFollow}
 		}
 		resp, err := c.Do(req)
 		if err != nil {
