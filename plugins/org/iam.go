@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,59 +80,111 @@ func ValidateIAMToken(token string, config Config) (*IAMUser, error) {
 	return &user, nil
 }
 
-// ExchangeOAuth2Token exchanges an authorization code for tokens using the
-// IAM OAuth2 token endpoint.
-func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, refreshToken string, err error) {
-	// Minting addresses the BRAND, so this one stays on the brand's public
-	// origin and does not take the in-cluster wire.
-	//
-	// IAM resolves the issuer per brand from the request Host (internal/oidc:
-	// resolveIssuer(c.Host())) because a relying party that discovered through
-	// lux.id pins `iss` to lux.id and rejects a hanzo.id-issued token. The ZAP
-	// request frame carries no Host — zap-proto/http encodes method, target,
-	// proto, headers and body, and Host is skipped from the headers as
-	// frame-owned without a frame slot to own it — so a token minted over that
-	// wire would carry the default brand's issuer whatever host was asked for.
-	// Reads are unaffected: nothing below reads `iss`.
+// ExchangePassword signs a user in against IAM with their own credential and
+// returns IAM's tokens. It is the ONE way a service that owns a login form gets
+// a token Base will accept: Base verifies every bearer against IAM's JWKS, so a
+// token the service mints itself authenticates nothing.
+//
+// It is a CONFIDENTIAL-client grant and IAM enforces that — a client with no
+// registered secret is refused, because otherwise the endpoint would take a
+// username and password from anyone holding a public client id. Call it from a
+// server that holds config.IAMClientSecret, never from a browser.
+//
+// org names the tenant to resolve the username in; empty lets IAM use the
+// client's own organization.
+//
+// Prefer the PKCE code flow for a human at a browser (HIP-0111). This exists for
+// the case where a service already presents a login form — a sandbox demo, a
+// first-run console — and the alternative is not PKCE but a local password
+// store, which is the thing that must not exist.
+func ExchangePassword(username, password, org string, config Config) (accessToken, refreshToken string, err error) {
+	endpoint, err := brandOrigin(config)
+	if err != nil {
+		return "", "", err
+	}
+	if username == "" || password == "" {
+		return "", "", errors.New("iam: username and password are required")
+	}
+
+	data := url.Values{
+		"grant_type":    {"password"},
+		"username":      {username},
+		"password":      {password},
+		"client_id":     {config.IAMClientID},
+		"client_secret": {config.IAMClientSecret},
+	}
+	if org != "" {
+		data.Set("organization", org)
+	}
+
+	return postToken(endpoint, data)
+}
+
+// brandOrigin is the public origin a token must be minted through, with the
+// reason it cannot be the in-cluster address.
+//
+// IAM resolves the issuer per brand from the request Host (internal/oidc:
+// resolveIssuer(c.Host())) because a relying party that discovered through
+// lux.id pins `iss` to lux.id and rejects a hanzo.id-issued token. The ZAP
+// request frame carries no Host — zap-proto/http encodes method, target, proto,
+// headers and body, and Host is skipped from the headers as frame-owned without
+// a frame slot to own it — so a token minted over that wire would carry the
+// default brand's issuer whatever host was asked for. Reads are unaffected:
+// nothing that reads a token reads `iss` from here.
+func brandOrigin(config Config) (string, error) {
 	endpoint := strings.TrimRight(strings.TrimSpace(config.IAMEndpoint), "/")
 	if endpoint == "" {
 		endpoint = "https://hanzo.id"
 	}
 	if low := strings.ToLower(endpoint); !strings.HasPrefix(low, "http://") && !strings.HasPrefix(low, "https://") {
-		return "", "", fmt.Errorf("iam: token exchange needs the brand's public origin, "+
+		return "", fmt.Errorf("iam: minting a token needs the brand's public origin, "+
 			"not the in-cluster address %q: the issuer is derived from the request host, "+
 			"so a token minted through the cluster address carries the wrong brand", config.IAMEndpoint)
 	}
+	return endpoint, nil
+}
+
+// postToken performs the token request and reads the pair back. One place, so
+// every grant reports a failure the same way and none of them leaks the form.
+func postToken(endpoint string, data url.Values) (accessToken, refreshToken string, err error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-
-	data := url.Values{
-		"grant_type":    {"authorization_code"},
-		"code":          {code},
-		"redirect_uri":  {redirectURI},
-		"client_id":     {config.IAMClientID},
-		"client_secret": {config.IAMClientSecret},
-	}
-
 	resp, err := client.PostForm(endpoint+"/v1/iam/oauth/token", data)
 	if err != nil {
-		return "", "", fmt.Errorf("iam: token exchange request failed: %w", err)
+		return "", "", fmt.Errorf("iam: token request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return "", "", fmt.Errorf("iam: token exchange returned %d: %s", resp.StatusCode, string(body))
+		return "", "", fmt.Errorf("iam: token endpoint returned %d: %s", resp.StatusCode, string(body))
 	}
-
 	var result struct {
 		AccessToken  string `json:"access_token"`
 		RefreshToken string `json:"refresh_token"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", "", fmt.Errorf("iam: decode token response: %w", err)
+		return "", "", fmt.Errorf("iam: could not read the token response: %w", err)
 	}
-
+	if result.AccessToken == "" {
+		return "", "", errors.New("iam: token response carried no access_token")
+	}
 	return result.AccessToken, result.RefreshToken, nil
+}
+
+// ExchangeOAuth2Token exchanges an authorization code for tokens using the
+// IAM OAuth2 token endpoint.
+func ExchangeOAuth2Token(code, redirectURI string, config Config) (accessToken, refreshToken string, err error) {
+	endpoint, err := brandOrigin(config)
+	if err != nil {
+		return "", "", err
+	}
+	return postToken(endpoint, url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {redirectURI},
+		"client_id":     {config.IAMClientID},
+		"client_secret": {config.IAMClientSecret},
+	})
 }
 
 // --------------------------------------------------------------------------
