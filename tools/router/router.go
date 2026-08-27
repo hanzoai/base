@@ -59,45 +59,63 @@ func NewRouter[T hook.Resolver](eventFactory EventFactoryFunc[T]) *Router[T] {
 
 // BuildMux constructs a new mux [http.Handler] instance from the current router configurations.
 func (r *Router[T]) BuildMux() (http.Handler, error) {
-	// Note that some of the default std Go handlers like the [http.NotFoundHandler]
-	// cannot be currently extended and requires defining a custom "catch-all" route
-	// so that the group middlewares could be executed.
-	//
-	// https://github.com/golang/go/issues/65648
-	if !r.HasRoute("", "/") {
-		r.Route("", "/", func(e T) error {
-			return NewNotFoundError("", nil)
-		})
-	}
+	r.bindCatchAll()
 
 	mux := http.NewServeMux()
 
-	if err := r.loadMux(mux, r.RouterGroup, nil); err != nil {
+	err := r.walk(r.RouterGroup, nil, func(method, path string, serve http.HandlerFunc) error {
+		pattern := path
+		if method != "" {
+			pattern = method + " " + pattern
+		}
+		mux.HandleFunc(pattern, serve)
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
 
 	return mux, nil
 }
 
-func (r *Router[T]) loadMux(mux *http.ServeMux, group *RouterGroup[T], parents []*RouterGroup[T]) error {
+// bindCatchAll registers the fallback route every build depends on.
+//
+// Note that some of the default std Go handlers like the [http.NotFoundHandler]
+// cannot be currently extended and requires defining a custom "catch-all" route
+// so that the group middlewares could be executed.
+//
+// https://github.com/golang/go/issues/65648
+func (r *Router[T]) bindCatchAll() {
+	if r.HasRoute("", "/") {
+		return
+	}
+
+	r.Route("", "/", func(e T) error {
+		return NewNotFoundError("", nil)
+	})
+}
+
+// walk visits every route in the tree in registration order, handing the visitor
+// the method and path its pattern is composed from and the handler that answers
+// it — the route's hook chain over the event factory.
+//
+// It is the one reading of the router configuration, so [Router.BuildMux] and
+// [Router.BuildApp] differ in what they register and never in what they read.
+func (r *Router[T]) walk(group *RouterGroup[T], parents []*RouterGroup[T], visit func(method, path string, serve http.HandlerFunc) error) error {
 	for _, child := range group.children {
 		switch v := child.(type) {
 		case *RouterGroup[T]:
-			if err := r.loadMux(mux, v, append(parents, group)); err != nil {
+			if err := r.walk(v, append(parents, group), visit); err != nil {
 				return err
 			}
 		case *Route[T]:
 			routeHook := &hook.Hook[T]{}
 
-			var pattern string
-
-			if v.Method != "" {
-				pattern = v.Method + " "
-			}
+			var path string
 
 			// add parent groups middlewares
 			for _, p := range parents {
-				pattern += p.Prefix
+				path += p.Prefix
 				for _, h := range p.Middlewares {
 					if _, ok := p.excludedMiddlewares[h.Id]; !ok {
 						if _, ok = group.excludedMiddlewares[h.Id]; !ok {
@@ -110,7 +128,7 @@ func (r *Router[T]) loadMux(mux *http.ServeMux, group *RouterGroup[T], parents [
 			}
 
 			// add current groups middlewares
-			pattern += group.Prefix
+			path += group.Prefix
 			for _, h := range group.Middlewares {
 				if _, ok := group.excludedMiddlewares[h.Id]; !ok {
 					if _, ok = v.excludedMiddlewares[h.Id]; !ok {
@@ -120,15 +138,21 @@ func (r *Router[T]) loadMux(mux *http.ServeMux, group *RouterGroup[T], parents [
 			}
 
 			// add current route middlewares
-			pattern += v.Path
-			v.pattern = pattern
+			path += v.Path
+			// The route records the pattern it is registered under, which is the
+			// path with its method in front — the one spelling both builders
+			// compose, kept here so the route carries it whichever one ran.
+			v.pattern = path
+			if v.Method != "" {
+				v.pattern = v.Method + " " + path
+			}
 			for _, h := range v.Middlewares {
 				if _, ok := v.excludedMiddlewares[h.Id]; !ok {
 					routeHook.Bind(h)
 				}
 			}
 
-			mux.HandleFunc(pattern, func(resp http.ResponseWriter, req *http.Request) {
+			err := visit(v.Method, path, func(resp http.ResponseWriter, req *http.Request) {
 				// wrap the response to add write and status tracking
 				resp = &ResponseWriter{ResponseWriter: resp}
 
@@ -150,6 +174,9 @@ func (r *Router[T]) loadMux(mux *http.ServeMux, group *RouterGroup[T], parents [
 					cleanupFunc()
 				}
 			})
+			if err != nil {
+				return err
+			}
 		default:
 			return errors.New("invalid Group item type")
 		}
