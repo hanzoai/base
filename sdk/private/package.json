@@ -1,7 +1,7 @@
 {
   "name": "@hanzo/private",
   "version": "0.1.0",
-  "description": "Per-user encrypted blob store — Base SQLite, EVM contract, or IPFS. Same API.",
+  "description": "Per-user encrypted blob store \u2014 Base SQLite, EVM contract, or IPFS. Same API.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -16,10 +16,10 @@
     "test": "vitest run"
   },
   "peerDependencies": {
-    "viem": "^2.0.0"
+    "viem": ">=2"
   },
   "devDependencies": {
-    "typescript": "^5.9.0",
-    "vitest": "^1.0.0"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.11"
   }
 }
