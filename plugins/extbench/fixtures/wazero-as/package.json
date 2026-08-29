@@ -8,6 +8,6 @@
     "asbuild:debug": "asc src/assembly/index.ts --target debug --outFile validate.debug.wasm --exportRuntime --runtime minimal --use abort="
   },
   "devDependencies": {
-    "assemblyscript": "0.27.37"
+    "assemblyscript": "^0.28.20"
   }
 }
