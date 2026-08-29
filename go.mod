@@ -22,7 +22,7 @@ require (
 	github.com/hanzoai/namespace v1.2.0
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.52.9
-	github.com/hanzoai/tygoja v0.0.2
+	hanzo.ai/tygoja v0.0.3
 	github.com/hanzos3/go v1.0.1
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.2
