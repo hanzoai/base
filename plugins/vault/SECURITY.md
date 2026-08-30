@@ -70,7 +70,7 @@ vault.MustRegister(app, vault.Config{
     DataDir:     "/data/vaults",      // per-user .db files here
     OrgID:       "my-org",
     MasterKey:   masterKeyFromHSM,    // 32 bytes, NEVER on disk
-    ChainRPC:    "http://node:9650/v1/bc/I",  // I-Chain for anchoring
+    ChainRPC:    "http://node:9650/v1/chain/I",  // I-Chain for anchoring
     SyncEnabled: true,
     ZAPPort:     9999,
 })
