@@ -23,12 +23,12 @@ require (
 	github.com/hanzoai/pubsub-go v1.0.0
 	github.com/hanzoai/tasks v1.52.9
 	github.com/hanzoai/tygoja v0.0.2
-	github.com/hanzos3/go v1.0.1
+	github.com/hanzos3/go v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/luxfi/age v1.6.0
 	github.com/luxfi/cache v1.3.1
-	github.com/luxfi/consensus v1.36.3
+	github.com/luxfi/consensus v1.36.81
 	github.com/luxfi/fhe v1.8.2
 	github.com/luxfi/keys v1.4.1
 	github.com/luxfi/kms v1.11.7
@@ -82,11 +82,11 @@ require (
 	github.com/luxfi/accel v1.2.4 // indirect
 	github.com/luxfi/address v1.1.1 // indirect
 	github.com/luxfi/constants v1.6.2 // indirect
-	github.com/luxfi/container v0.2.1 // indirect
+	github.com/luxfi/container v0.2.2 // indirect
 	github.com/luxfi/corona v0.10.4 // indirect
 	github.com/luxfi/dkg v0.3.5 // indirect
 	github.com/luxfi/formatting v1.1.1 // indirect
-	github.com/luxfi/geth v1.20.1 // indirect
+	github.com/luxfi/geth v1.20.2 // indirect
 	github.com/luxfi/go-bip32 v1.1.0 // indirect
 	github.com/luxfi/go-bip39 v1.2.0 // indirect
 	github.com/luxfi/lattice/v7 v7.1.4 // indirect
@@ -99,7 +99,7 @@ require (
 	github.com/luxfi/sampler v1.1.0 // indirect
 	github.com/luxfi/threshold v1.12.3 // indirect
 	github.com/luxfi/tls v1.1.1 // indirect
-	github.com/luxfi/vm v1.3.2 // indirect
+	github.com/luxfi/vm v1.3.12 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
