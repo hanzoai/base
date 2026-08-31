@@ -19,7 +19,7 @@
 //	    DataDir:    "/data/vaults",
 //	    MasterKey:  masterKeyBytes, // from HSM or K-Chain
 //	    OrgID:      "my-org",
-//	    ChainRPC:   "http://localhost:9650/v1/bc/I", // optional anchoring
+//	    ChainRPC:   "http://localhost:9650/v1/chain/I", // optional anchoring
 //	    SyncEnabled: true,
 //	})
 //
