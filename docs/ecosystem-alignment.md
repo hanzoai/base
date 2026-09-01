@@ -232,7 +232,6 @@ CONFLICT: Server renamed, SDK not.
 
 Server was updated. SDK was not.
 
-#### E2. Inter-Service Events
 
 | Repo | Transport | Source |
 |------|-----------|--------|
