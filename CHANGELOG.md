@@ -122,7 +122,7 @@ The changelog below follows Keep a Changelog.
    `app.Logger() logger.Logger` (interface) — or call `app.SlogLogger()` for the
    `*slog.Logger` escape hatch.
 
-**Companion:** `hanzoai/team-go` is the canonical reference implementation of the
+**Companion:** `hanzoai/team` is the canonical reference implementation of the
 single-Go-binary-on-`@hanzo/base` pattern on the new IAM-native runtime.
 
 ### Compatibility
