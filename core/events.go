@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hanzoai/base/tools/auth"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/mailer"
 	"github.com/hanzoai/base/tools/router"
@@ -494,9 +493,7 @@ type RecordAuthWithOAuth2RequestEvent struct {
 	baseCollectionEventData
 
 	ProviderName   string
-	ProviderClient auth.Provider
 	Record         *Record
-	OAuth2User     *auth.AuthUser
 	CreateData     map[string]any
 	IsNewRecord    bool
 }
