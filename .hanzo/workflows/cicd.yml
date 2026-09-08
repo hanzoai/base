@@ -8,7 +8,7 @@ name: CI/CD
 #
 #   * github.com has ZERO self-hosted runners for this org
 #     (/orgs/hanzoai/actions/runners -> total_count 0), so a job asking for
-#     `hanzo-build-linux-amd64` there is never claimed. An unclaimable job does
+#     `linux-amd64` there is never claimed. An unclaimable job does
 #     not fail — it waits out the 24h timeout while the next push queues behind
 #     it. Silence, not an error.
 #   * The `git-runner` StatefulSet registers against the GIT.HANZO.AI only
