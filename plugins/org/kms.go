@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -34,9 +35,10 @@ import (
 )
 
 const (
-	// defaultKMSEndpoint is the in-cluster KMS ZAP service, the same default
-	// github.com/luxfi/kms itself ships.
-	defaultKMSEndpoint = "zap.kms.svc.cluster.local:9999"
+	// masterKeyPath is where a Base reads the key its per-principal DEKs derive
+	// from, beneath its own org. One coordinate, so a deployment that can read
+	// it has encryption and one that cannot does not.
+	masterKeyPath = "base/MASTER_KEY_B64"
 
 	secretCacheTTL = 1 * time.Minute
 	callTimeout    = 10 * time.Second
@@ -109,6 +111,11 @@ func serviceIdentity() (*keys.ServiceIdentity, error) {
 type KMSClient struct {
 	addr string // host:port; empty with mdns set means discovery
 	mdns bool
+	// http is the base URL when this deployment's KMS answers over HTTP —
+	// "https://kms.hanzo.ai". Set instead of addr, never beside it.
+	http string
+	id   string // IAM client id, presented to the HTTP door
+	sec  string // IAM client secret
 	env  string
 
 	mu    sync.RWMutex
@@ -131,11 +138,13 @@ type secretCacheEntry struct {
 // ErrKMSNotConfigured and the caller falls back to the environment. An http(s)
 // endpoint is a misconfiguration and is rejected here, where an operator sees
 // it, rather than degrading every read into the env fallback at runtime.
-func NewKMSClient(endpoint string) (*KMSClient, error) {
+func NewKMSClient(endpoint, clientID, clientSecret string) (*KMSClient, error) {
 	ep := strings.TrimSpace(endpoint)
 	c := &KMSClient{
 		cache: make(map[string]*secretCacheEntry),
 		env:   envOr("KMS_ENV", "prod"),
+		id:    strings.TrimSpace(clientID),
+		sec:   strings.TrimSpace(clientSecret),
 	}
 	if ep == "" {
 		return c, nil
@@ -145,22 +154,27 @@ func NewKMSClient(endpoint string) (*KMSClient, error) {
 	case strings.HasPrefix(low, mdnsScheme):
 		c.mdns = true
 	case strings.HasPrefix(low, "http://"), strings.HasPrefix(low, "https://"):
-		return nil, fmt.Errorf(
-			"kms: %q is an HTTP endpoint — Base speaks native ZAP to KMS; "+
-				"set the KMS endpoint to zap://host:9999 (or host:9999)", endpoint)
+		c.http = strings.TrimSuffix(ep, "/")
+		if c.id == "" || c.sec == "" {
+			return nil, fmt.Errorf(
+				"kms: %q is the HTTP door and it authenticates an IAM application — "+
+					"set IAM_CLIENT_ID and IAM_CLIENT_SECRET", endpoint)
+		}
 	case strings.HasPrefix(low, zapScheme):
 		c.addr = strings.TrimSuffix(ep[len(zapScheme):], "/")
 	default:
 		c.addr = strings.TrimSuffix(ep, "/")
 	}
-	if c.addr == "" && !c.mdns {
+	if c.addr == "" && c.http == "" && !c.mdns {
 		return nil, fmt.Errorf("kms: %q has no host:port", endpoint)
 	}
 	return c, nil
 }
 
 // configured reports whether this deployment has a KMS to talk to.
-func (c *KMSClient) configured() bool { return c != nil && (c.addr != "" || c.mdns) }
+func (c *KMSClient) configured() bool {
+	return c != nil && (c.addr != "" || c.http != "" || c.mdns)
+}
 
 // ErrName is returned when a name cannot be composed into a KMS coordinate.
 var ErrName = errors.New("kms: a name must be one path segment")
@@ -210,6 +224,10 @@ func (c *KMSClient) conn(ctx context.Context) (secrets, error) {
 	if c.cli != nil {
 		return c.cli, nil
 	}
+	if c.http != "" {
+		c.cli = &httpSecrets{base: c.http, id: c.id, sec: c.sec, hc: &http.Client{Timeout: callTimeout}}
+		return c.cli, nil
+	}
 	cli, err := dialKMS(ctx, c.addr)
 	if err != nil {
 		return nil, fmt.Errorf("kms: dial %s: %w", c.target(), err)
@@ -219,8 +237,11 @@ func (c *KMSClient) conn(ctx context.Context) (secrets, error) {
 }
 
 func (c *KMSClient) target() string {
-	if c.mdns {
+	switch {
+	case c.mdns:
 		return "_kms._tcp (mDNS)"
+	case c.http != "":
+		return c.http
 	}
 	return c.addr
 }

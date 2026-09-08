@@ -193,7 +193,7 @@ func TestHeaderOrgID(t *testing.T) {
 
 func mustKMS(t *testing.T, endpoint string) *KMSClient {
 	t.Helper()
-	c, err := NewKMSClient(endpoint)
+	c, err := NewKMSClient(endpoint, "hanzo-base", "test-secret")
 	if err != nil {
 		t.Fatalf("NewKMSClient(%q): %v", endpoint, err)
 	}
