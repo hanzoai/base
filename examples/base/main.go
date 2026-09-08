@@ -136,14 +136,16 @@ func main() {
 	// can set either without config drift (one way to configure Base's
 	// upstreams, two accepted spellings). Mirrors the resolution in
 	// plugins/org/kms_helpers.go.
+	//
+	// The master key per-principal DEKs derive from is NOT here: it is read
+	// from KMS under this org, so no deployment carries it in its environment.
 	if iamEndpoint := envAny("IAM_ENDPOINT", "IAM_URL"); iamEndpoint != "" {
 		org.MustRegister(app, org.Config{
-			IAMEndpoint:            iamEndpoint,
-			IAMAddress:             envAny("IAM_ADDRESS"),
-			KMSEndpoint:            envAny("KMS_ENDPOINT", "KMS_URL"),
-			IAMClientID:            os.Getenv("IAM_CLIENT_ID"),
-			IAMClientSecret:        os.Getenv("IAM_CLIENT_SECRET"),
-			PrincipalEncryptionKey: os.Getenv("PRINCIPAL_ENCRYPTION_KEY"),
+			IAMEndpoint:     iamEndpoint,
+			IAMAddress:      envAny("IAM_ADDRESS"),
+			KMSEndpoint:     envAny("KMS_ENDPOINT", "KMS_URL"),
+			IAMClientID:     os.Getenv("IAM_CLIENT_ID"),
+			IAMClientSecret: os.Getenv("IAM_CLIENT_SECRET"),
 		})
 	}
 

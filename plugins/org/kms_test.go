@@ -220,7 +220,7 @@ func TestKMSInvalidateCacheIsPerOrg(t *testing.T) {
 }
 
 func TestKMSNotConfigured(t *testing.T) {
-	c, err := NewKMSClient("")
+	c, err := NewKMSClient("", "", "")
 	if err != nil {
 		t.Fatalf("NewKMSClient(\"\"): %v", err)
 	}
@@ -235,13 +235,34 @@ func TestKMSNotConfigured(t *testing.T) {
 	}
 }
 
-// An http(s) endpoint is a misconfiguration, not a fallback: base speaks native
-// ZAP to KMS and nothing else. It must fail at construction, where an operator
-// sees it, rather than degrade every secret read into the env fallback.
-func TestKMSRejectsHTTPEndpoint(t *testing.T) {
+// An http(s) endpoint is the door KMS serves, and it authenticates an IAM
+// application. Accepted with a credential; refused at construction without one,
+// where an operator sees it, rather than failing every read at the first fetch.
+func TestKMSHTTPEndpointNeedsCredential(t *testing.T) {
 	for _, ep := range []string{"https://kms.hanzo.ai", "http://kms.hanzo.svc.cluster.local:8443"} {
-		if _, err := NewKMSClient(ep); err == nil {
-			t.Errorf("NewKMSClient(%q) accepted an HTTP endpoint", ep)
+		c, err := NewKMSClient(ep, "hanzo-base", "s3cr3t")
+		if err != nil {
+			t.Errorf("NewKMSClient(%q) with a credential: %v", ep, err)
+		} else if !c.configured() {
+			t.Errorf("NewKMSClient(%q): not configured", ep)
+		}
+		if _, err := NewKMSClient(ep, "", ""); err == nil {
+			t.Errorf("NewKMSClient(%q) accepted the HTTP door with no credential", ep)
+		}
+	}
+}
+
+// The org segment ref() composes is the base boundary on the ZAP side; over
+// HTTP the org comes from the credential, so it is dropped rather than sent
+// twice. A secret directly under the org root keeps its bare name.
+func TestHTTPCoordinateDropsTheOrgSegment(t *testing.T) {
+	for _, c := range []struct{ path, name, want string }{
+		{"orgs/hanzo/base", "MASTER_KEY_B64", "base/MASTER_KEY_B64"},
+		{"orgs/hanzo/integrations/cloudflare", "OAUTH_CLIENT_ID", "integrations/cloudflare/OAUTH_CLIENT_ID"},
+		{"orgs/hanzo", "TOKEN", "TOKEN"},
+	} {
+		if got := coordinate(c.path, c.name); got != c.want {
+			t.Errorf("coordinate(%q, %q) = %q, want %q", c.path, c.name, got, c.want)
 		}
 	}
 }

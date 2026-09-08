@@ -24,6 +24,7 @@
 package org
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -82,15 +83,6 @@ type Config struct {
 	// ComplianceAPIKey is the API key for the compliance service.
 	ComplianceAPIKey string
 
-	// PrincipalEncryptionKey is the master key per-principal keys are derived
-	// from, by github.com/hanzoai/cek — see OrgDB.OrgDEK and OrgDB.UserDEK for
-	// the namespace each one uses. It must be 32 bytes, which is what a master
-	// key from KMS is. If empty, encryption is disabled (dev mode).
-	PrincipalEncryptionKey string
-
-	// Deprecated: use PrincipalEncryptionKey.
-	OrgEncryptionKey string
-
 	// OrgStorageEndpoint is the S3-compatible storage endpoint for per-org
 	// object storage (e.g., "s3.hanzo.space" or "s3.hanzo.ai").
 	// Each org and user gets isolated prefixes with SSE-C encryption.
@@ -103,20 +95,6 @@ type Config struct {
 	// DefaultTemplates defines collection schemas cloned per org on creation.
 	// If nil, no default org collections are created.
 	DefaultTemplates []CollectionTemplate
-}
-
-// principalKey is the master key per-principal DEKs are derived from.
-//
-// PrincipalEncryptionKey is the field the binary sets and OrgEncryptionKey is
-// its deprecated spelling. Reading only the deprecated one meant the key the
-// shipped binary supplies never arrived, masterKey stayed empty, and OrgDEK
-// refused — so per-org encryption could not be turned on even by a deployment
-// that had provided the key.
-func (c Config) principalKey() string {
-	if c.PrincipalEncryptionKey != "" {
-		return c.PrincipalEncryptionKey
-	}
-	return c.OrgEncryptionKey
 }
 
 // MustRegister registers the platform plugin to the provided app instance
@@ -141,13 +119,31 @@ func Register(app core.App, config Config) error {
 				"Hanzo IAM instance (e.g. https://hanzo.id) or an in-process " +
 				"iam.Embed() served by the fused daemon")
 	}
-	if config.KMSEndpoint == "" {
-		config.KMSEndpoint = defaultKMSEndpoint
-	}
-
-	kmsClient, err := NewKMSClient(config.KMSEndpoint)
+	kmsClient, err := NewKMSClient(config.KMSEndpoint, config.IAMClientID, config.IAMClientSecret)
 	if err != nil {
 		return err
+	}
+
+	// The master key per-principal DEKs derive from, read from KMS.
+	//
+	// It used to arrive as PRINCIPAL_ENCRYPTION_KEY, which meant a 32-byte key
+	// travelled through the environment and sat in a Secret beside the pod — a
+	// second way to hold the one thing KMS exists to hold. There is one way
+	// now: whoever can read this coordinate can turn per-principal encryption
+	// on, and nobody else, and no deployment carries the key at rest.
+	//
+	// Absent is not fatal. A Base with no KMS, or one whose org has no key
+	// stored, runs with encryption off exactly as it did with the variable
+	// unset — which is what `make dev` wants and what every unconfigured
+	// deployment already did.
+	masterKey := ""
+	if config.IAMOrg != "" {
+		if k, err := kmsClient.GetSecret(config.IAMOrg, masterKeyPath); err == nil {
+			masterKey = k
+		} else if !errors.Is(err, ErrKMSNotConfigured) {
+			app.Logger().Warn("per-principal encryption is off: master key unreadable",
+				"coordinate", masterKeyPath, "error", err)
+		}
 	}
 
 	// The service's OWN IAM application credentials, installed where the client is
@@ -167,7 +163,7 @@ func Register(app core.App, config Config) error {
 		iam:        iamClient,
 		compliance: NewComplianceClient(config.ComplianceEndpoint, config.ComplianceAPIKey),
 		org:        &OrgService{app: app, kms: kmsClient, config: config},
-		orgDB:      NewOrgDB(app, config.principalKey()),
+		orgDB:      NewOrgDB(app, masterKey),
 		jwksURL:    strings.TrimRight(config.IAMEndpoint, "/") + "/v1/iam/.well-known/jwks",
 	}
 	p.bases = newBases(p)
