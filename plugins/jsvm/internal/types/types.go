@@ -13,7 +13,7 @@ import (
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/tools/list"
-	"github.com/hanzoai/tygoja"
+	"hanzo.ai/tygoja"
 )
 
 const heading = `

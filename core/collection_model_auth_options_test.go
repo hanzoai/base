@@ -1,7 +1,6 @@
 package core_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
-	"github.com/hanzoai/base/tools/auth"
 	"github.com/hanzoai/base/tools/types"
 )
 
@@ -590,152 +588,6 @@ func TestOAuth2ProviderConfigValidate(t *testing.T) {
 			result := s.config.Validate()
 
 			tests.TestValidationErrors(t, result, s.expectedErrors)
-		})
-	}
-}
-
-func TestOAuth2ProviderConfigInitProvider(t *testing.T) {
-	scenarios := []struct {
-		name           string
-		config         core.OAuth2ProviderConfig
-		expectedConfig core.OAuth2ProviderConfig
-		expectedError  bool
-	}{
-		{
-			"empty config",
-			core.OAuth2ProviderConfig{},
-			core.OAuth2ProviderConfig{},
-			true,
-		},
-		{
-			"missing provider",
-			core.OAuth2ProviderConfig{
-				Name:         "missing",
-				ClientId:     "test_ClientId",
-				ClientSecret: "test_ClientSecret",
-				AuthURL:      "test_AuthURL",
-				TokenURL:     "test_TokenURL",
-				UserInfoURL:  "test_UserInfoURL",
-				DisplayName:  "test_DisplayName",
-				PKCE:         types.Pointer(true),
-			},
-			core.OAuth2ProviderConfig{
-				Name:         "missing",
-				ClientId:     "test_ClientId",
-				ClientSecret: "test_ClientSecret",
-				AuthURL:      "test_AuthURL",
-				TokenURL:     "test_TokenURL",
-				UserInfoURL:  "test_UserInfoURL",
-				DisplayName:  "test_DisplayName",
-				PKCE:         types.Pointer(true),
-			},
-			true,
-		},
-		{
-			"existing provider minimal",
-			core.OAuth2ProviderConfig{
-				Name: "gitlab",
-			},
-			core.OAuth2ProviderConfig{
-				Name:         "gitlab",
-				ClientId:     "",
-				ClientSecret: "",
-				AuthURL:      "https://gitlab.com/oauth/authorize",
-				TokenURL:     "https://gitlab.com/oauth/token",
-				UserInfoURL:  "https://gitlab.com/api/v4/user",
-				DisplayName:  "GitLab",
-				PKCE:         types.Pointer(true),
-			},
-			false,
-		},
-		{
-			"existing provider with all fields",
-			core.OAuth2ProviderConfig{
-				Name:         "gitlab",
-				ClientId:     "test_ClientId",
-				ClientSecret: "test_ClientSecret",
-				AuthURL:      "test_AuthURL",
-				TokenURL:     "test_TokenURL",
-				UserInfoURL:  "test_UserInfoURL",
-				DisplayName:  "test_DisplayName",
-				PKCE:         types.Pointer(true),
-				Extra:        map[string]any{"a": 1},
-			},
-			core.OAuth2ProviderConfig{
-				Name:         "gitlab",
-				ClientId:     "test_ClientId",
-				ClientSecret: "test_ClientSecret",
-				AuthURL:      "test_AuthURL",
-				TokenURL:     "test_TokenURL",
-				UserInfoURL:  "test_UserInfoURL",
-				DisplayName:  "test_DisplayName",
-				PKCE:         types.Pointer(true),
-				Extra:        map[string]any{"a": 1},
-			},
-			false,
-		},
-	}
-
-	for _, s := range scenarios {
-		t.Run(s.name, func(t *testing.T) {
-			provider, err := s.config.InitProvider()
-
-			hasErr := err != nil
-			if hasErr != s.expectedError {
-				t.Fatalf("Expected hasErr %v, got %v", s.expectedError, hasErr)
-			}
-
-			if hasErr {
-				if provider != nil {
-					t.Fatalf("Expected nil provider, got %v", provider)
-				}
-				return
-			}
-
-			factory, ok := auth.Providers[s.expectedConfig.Name]
-			if !ok {
-				t.Fatalf("Missing factory for provider %q", s.expectedConfig.Name)
-			}
-
-			expectedType := fmt.Sprintf("%T", factory())
-			providerType := fmt.Sprintf("%T", provider)
-			if expectedType != providerType {
-				t.Fatalf("Expected provider instanceof %q, got %q", expectedType, providerType)
-			}
-
-			if provider.ClientId() != s.expectedConfig.ClientId {
-				t.Fatalf("Expected ClientId %q, got %q", s.expectedConfig.ClientId, provider.ClientId())
-			}
-
-			if provider.ClientSecret() != s.expectedConfig.ClientSecret {
-				t.Fatalf("Expected ClientSecret %q, got %q", s.expectedConfig.ClientSecret, provider.ClientSecret())
-			}
-
-			if provider.AuthURL() != s.expectedConfig.AuthURL {
-				t.Fatalf("Expected AuthURL %q, got %q", s.expectedConfig.AuthURL, provider.AuthURL())
-			}
-
-			if provider.UserInfoURL() != s.expectedConfig.UserInfoURL {
-				t.Fatalf("Expected UserInfoURL %q, got %q", s.expectedConfig.UserInfoURL, provider.UserInfoURL())
-			}
-
-			if provider.TokenURL() != s.expectedConfig.TokenURL {
-				t.Fatalf("Expected TokenURL %q, got %q", s.expectedConfig.TokenURL, provider.TokenURL())
-			}
-
-			if provider.DisplayName() != s.expectedConfig.DisplayName {
-				t.Fatalf("Expected DisplayName %q, got %q", s.expectedConfig.DisplayName, provider.DisplayName())
-			}
-
-			if provider.PKCE() != *s.expectedConfig.PKCE {
-				t.Fatalf("Expected PKCE %v, got %v", *s.expectedConfig.PKCE, provider.PKCE())
-			}
-
-			rawMeta, _ := json.Marshal(provider.Extra())
-			expectedMeta, _ := json.Marshal(s.expectedConfig.Extra)
-			if !bytes.Equal(rawMeta, expectedMeta) {
-				t.Fatalf("Expected PKCE %v, got %v", *s.expectedConfig.PKCE, provider.PKCE())
-			}
 		})
 	}
 }

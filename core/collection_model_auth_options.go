@@ -7,7 +7,6 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/go-ozzo/ozzo-validation/v4/is"
-	"github.com/hanzoai/base/tools/auth"
 	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/types"
 	"github.com/spf13/cast"
@@ -300,7 +299,7 @@ type OAuth2ProviderConfig struct {
 // Validate makes OAuth2ProviderConfig validatable by implementing [validation.Validatable] interface.
 func (c OAuth2ProviderConfig) Validate() error {
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.Name, validation.Required, validation.By(checkProviderName)),
+		validation.Field(&c.Name, validation.Required),
 		validation.Field(&c.ClientId, validation.Required),
 		validation.Field(&c.ClientSecret, validation.Required),
 		validation.Field(&c.AuthURL, is.URL),
@@ -309,58 +308,3 @@ func (c OAuth2ProviderConfig) Validate() error {
 	)
 }
 
-func checkProviderName(value any) error {
-	name, _ := value.(string)
-	if name == "" {
-		return nil // nothing to check
-	}
-
-	if _, err := auth.NewProviderByName(name); err != nil {
-		return validation.NewError("validation_missing_provider", "Invalid or missing provider with name {{.name}}.").
-			SetParams(map[string]any{"name": name})
-	}
-
-	return nil
-}
-
-// InitProvider returns a new auth.Provider instance loaded with the current OAuth2ProviderConfig options.
-func (c OAuth2ProviderConfig) InitProvider() (auth.Provider, error) {
-	provider, err := auth.NewProviderByName(c.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	if c.ClientId != "" {
-		provider.SetClientId(c.ClientId)
-	}
-
-	if c.ClientSecret != "" {
-		provider.SetClientSecret(c.ClientSecret)
-	}
-
-	if c.AuthURL != "" {
-		provider.SetAuthURL(c.AuthURL)
-	}
-
-	if c.UserInfoURL != "" {
-		provider.SetUserInfoURL(c.UserInfoURL)
-	}
-
-	if c.TokenURL != "" {
-		provider.SetTokenURL(c.TokenURL)
-	}
-
-	if c.DisplayName != "" {
-		provider.SetDisplayName(c.DisplayName)
-	}
-
-	if c.PKCE != nil {
-		provider.SetPKCE(*c.PKCE)
-	}
-
-	if c.Extra != nil {
-		provider.SetExtra(c.Extra)
-	}
-
-	return provider, nil
-}
