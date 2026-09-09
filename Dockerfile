@@ -6,7 +6,7 @@
 # binary at compile time (ui-react/embed.go uses //go:embed all:dist).
 # The committed ui-react/dist is the source of truth for CI builds —
 # rebuild it locally with `pnpm --dir ui-react build` before tagging.
-FROM public.ecr.aws/docker/library/golang:1.26.5-alpine AS builder
+FROM public.ecr.aws/docker/library/golang:1.26.8-alpine AS builder
 RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /build
 # Every module in this graph is public, so the download is the proxy verified
