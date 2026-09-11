@@ -48,7 +48,8 @@ type Config struct {
 	// /-/base/members endpoint by the Gateway; main HTTP comes from core.
 	ListenHTTP string
 
-	// ListenP2P is the Quasar peer-to-peer port.
+	// ListenP2P is the host:port the Quasar peer listener binds. The host is
+	// honoured: ":9999" is every interface, "127.0.0.1:9999" loopback only.
 	ListenP2P string
 }
 
@@ -165,6 +166,9 @@ func (c Config) validate() error {
 	}
 	if strings.TrimSpace(c.NodeID) == "" {
 		return fmt.Errorf("BASE_NODE_ID or $HOSTNAME must be set when BASE_NETWORK=quasar")
+	}
+	if _, err := listenPort(c.ListenP2P); err != nil {
+		return fmt.Errorf("BASE_LISTEN_P2P=%q: must be the host:port the peer listener binds: %w", c.ListenP2P, err)
 	}
 	return nil
 }
