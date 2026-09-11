@@ -35,6 +35,7 @@ import (
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/router"
+	"github.com/hanzoai/sqlite"
 )
 
 // apiKeyAuthId names the middleware that resolves an IAM key, so that a route
@@ -70,7 +71,8 @@ type Config struct {
 	// IAMClientSecret is the OAuth2 client secret for IAM authentication.
 	IAMClientSecret string
 
-	// IAMOrg is the IAM organization identifier (optional, used by auth proxy).
+	// IAMOrg is the IAM org this Base belongs to. The master key is read from
+	// KMS beneath it, so it is required when KMSEndpoint is set.
 	IAMOrg string
 
 	// IAMApp is the IAM application identifier (optional, used by auth proxy).
@@ -124,26 +126,21 @@ func Register(app core.App, config Config) error {
 		return err
 	}
 
-	// The master key per-principal DEKs derive from, read from KMS.
-	//
-	// It used to arrive as PRINCIPAL_ENCRYPTION_KEY, which meant a 32-byte key
-	// travelled through the environment and sat in a Secret beside the pod — a
-	// second way to hold the one thing KMS exists to hold. There is one way
-	// now: whoever can read this coordinate can turn per-principal encryption
-	// on, and nobody else, and no deployment carries the key at rest.
-	//
-	// Absent is not fatal. A Base with no KMS, or one whose org has no key
-	// stored, runs with encryption off exactly as it did with the variable
-	// unset — which is what `make dev` wants and what every unconfigured
-	// deployment already did.
-	masterKey := ""
-	if config.IAMOrg != "" {
-		if k, err := kmsClient.GetSecret(config.IAMOrg, masterKeyPath); err == nil {
-			masterKey = k
-		} else if !errors.Is(err, ErrKMSNotConfigured) {
-			app.Logger().Warn("per-principal encryption is off: master key unreadable",
-				"coordinate", masterKeyPath, "error", err)
-		}
+	// The master key per-principal DEKs derive from, read from KMS beneath
+	// IAMOrg. Without one, which is what `make dev` runs, org Bases are not
+	// encrypted and the log says so. With one, SQLite has to encrypt pages as it
+	// writes them, which only a linked SQLCipher codec does.
+	masterKey, err := kmsClient.masterKey(config.IAMOrg)
+	if err != nil {
+		return err
+	}
+	if masterKey != "" && !sqlite.CodecLinked() {
+		return errors.New("platform: a master key is configured and this build has no SQLCipher codec " +
+			"linked; the pure-Go codec gives each handle a private copy of a file, which a Base cannot " +
+			"run on — build with SQLCipher (github.com/hanzoai/sqlite)")
+	}
+	if masterKey == "" {
+		app.Logger().Warn("org Bases are not encrypted: no master key", "coordinate", masterKeyPath)
 	}
 
 	// The service's OWN IAM application credentials, installed where the client is

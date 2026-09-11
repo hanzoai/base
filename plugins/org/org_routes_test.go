@@ -26,12 +26,10 @@ func twoOrgs(t *testing.T) (core.App, *issuer, http.Handler, *OrgDB) {
 	t.Cleanup(app.Cleanup)
 
 	iam := newIssuer(t)
-	// A KMS address that refuses at once. The credential routes reach KMS on
-	// the path where they are ALLOWED to, and the default address is a cluster
-	// name that resolves nowhere here, so every such call would sit out a dial
-	// timeout — twenty seconds per read, to prove a refusal that never got near
-	// a secret.
-	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+	// A KMS that stores nothing and answers at once. The credential routes reach
+	// KMS on the path where they are ALLOWED to, and find nothing there.
+	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: kmsHolding(t, ""),
+		IAMClientID: "svc", IAMClientSecret: "shh", IAMOrg: "hanzo"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -189,8 +187,8 @@ func TestAKeyActsInItsOwnOrg(t *testing.T) {
 	}))
 	defer keys.Close()
 
-	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1",
-		IAMClientID: "svc", IAMClientSecret: "shh"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: kmsHolding(t, ""),
+		IAMClientID: "svc", IAMClientSecret: "shh", IAMOrg: "hanzo"}); err != nil {
 		t.Fatal(err)
 	}
 	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
@@ -244,8 +242,8 @@ func keyed(t *testing.T, owner string, extra ...func(*core.ServeEvent)) (core.Ap
 	}))
 	t.Cleanup(keys.Close)
 
-	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1",
-		IAMClientID: "svc", IAMClientSecret: "shh"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: keys.URL, KMSEndpoint: kmsHolding(t, ""),
+		IAMClientID: "svc", IAMClientSecret: "shh", IAMOrg: "hanzo"}); err != nil {
 		t.Fatal(err)
 	}
 	app.Store().Set("jwksURL", iam.url+"/v1/iam/.well-known/jwks")
@@ -519,7 +517,8 @@ func TestTheRuleFollowsTheAddressAndNotTheGroup(t *testing.T) {
 	t.Cleanup(app.Cleanup)
 
 	iam := newIssuer(t)
-	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: kmsHolding(t, ""),
+		IAMClientID: "svc", IAMClientSecret: "shh", IAMOrg: "hanzo"}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -583,7 +582,8 @@ func TestASubtreeRouteBindsNoOrgAndIsRefused(t *testing.T) {
 	t.Cleanup(app.Cleanup)
 
 	iam := newIssuer(t)
-	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: "127.0.0.1:1"}); err != nil {
+	if err := Register(app, Config{IAMEndpoint: iam.url, KMSEndpoint: kmsHolding(t, ""),
+		IAMClientID: "svc", IAMClientSecret: "shh", IAMOrg: "hanzo"}); err != nil {
 		t.Fatal(err)
 	}
 
