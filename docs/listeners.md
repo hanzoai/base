@@ -87,16 +87,21 @@ With no peers it opens nothing.
 ## Embedded Tasks
 
 `TASKS_EMBED=true` runs the Tasks engine inside Base and listens for it at
-`TASKS_EMBED_ADDRESS`, by default `<data dir>/tasks.sock`. A path is a unix
-socket; anything else is `host:port`. When the engine fails to start, Base logs
-nothing and runs scheduled jobs on timers inside the process. Rule out these
-causes:
+`TASKS_EMBED_ADDRESS`, by default `<data dir>/tasks.sock`. An address that starts
+with `/`, `./`, `../` or `@` is a unix socket; anything else is `host:port`. When
+the engine cannot listen, Base logs nothing and runs scheduled jobs on timers
+inside the process. That happens when:
 
-- A relative data directory, such as the default `base_/data`. The socket path
-  then starts with neither `/` nor `./`, is read as a TCP address, and cannot
-  bind. Give an absolute `--dir` or `TASKS_EMBED_ADDRESS`.
-- No RAM-backed directory for the engine's encrypted store: `/dev/shm` on
-  Linux, or on macOS a `tmpfs` mount named by `HANZO_SQLITE_RAMFS_DIR`.
+- the address is a relative path without `./`. The default is one whenever the
+  data directory is relative, as the default `base_/data` is, and it is then
+  read as `host:port`;
+- the socket's directory does not exist yet. Base starts the engine before it
+  creates the data directory, so the default address fails on the first start
+  with a new data directory;
+- the path is too long for a unix socket. Keep it well under 100 bytes.
+
+A short absolute `TASKS_EMBED_ADDRESS` in a directory that already exists avoids
+each of these.
 
 ## KMS
 
