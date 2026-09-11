@@ -4,12 +4,22 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 )
 
 func TestRecordAuthRefresh(t *testing.T) {
 	t.Parallel()
+
+	iamToken, jwksURL := mintIAMToken(t, jwt.MapClaims{
+		"sub": "hanzo/z", "owner": "hanzo", "email": "z@hanzo.ai",
+		"orgs": []any{
+			map[string]any{"org": "hanzo", "role": "admin"},
+			map[string]any{"org": "admin", "role": "admin"},
+		},
+	})
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -30,6 +40,40 @@ func TestRecordAuthRefresh(t *testing.T) {
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "superuser token a Base signed",
+			Method: http.MethodPost,
+			URL:    "/v1/collections/_superusers/auth-refresh",
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio",
+			},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "superuser token from IAM",
+			Method: http.MethodPost,
+			URL:    "/v1/collections/_superusers/auth-refresh",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + iamToken,
+			},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+				app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"token":"` + iamToken + `"`,
+				`"collectionName":"_superusers"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                          0,
+				"OnRecordAuthRefreshRequest": 1,
+				"OnRecordAuthRequest":        1,
+				"OnRecordEnrich":             1,
+			},
 		},
 		{
 			Name:   "auth record + not an auth collection",

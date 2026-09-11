@@ -12,6 +12,12 @@ func recordAuthRefresh(e *core.RequestEvent) error {
 		return e.NotFoundError("Missing auth record context.", nil)
 	}
 
+	// IAM issues and renews superuser tokens, and a token from IAM names its
+	// subject. A superuser token that names none was signed by a Base.
+	if sub, _ := e.Get(RequestEventKeySub).(string); sub == "" && record.IsSuperuser() {
+		return e.ForbiddenError("Superuser tokens are issued and renewed by IAM.", nil)
+	}
+
 	event := new(core.RecordAuthRefreshRequestEvent)
 	event.RequestEvent = e
 	event.Collection = record.Collection()
