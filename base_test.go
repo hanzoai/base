@@ -131,7 +131,7 @@ func TestNewWithConfigAndFlags(t *testing.T) {
 }
 
 // The ZAP transport's address and mDNS switch come from --zap and --no-mdns
-// laid over BASE_ZAP_ADDR, and this is where the flag wins or loses.
+// laid over ZAP_ADDR, and this is where the flag wins or loses.
 func TestZapFlags(t *testing.T) {
 	// copy os.Args
 	originalArgs := make([]string, len(os.Args))
@@ -151,13 +151,13 @@ func TestZapFlags(t *testing.T) {
 		{"nothing set", "", []string{"serve"}, "", false},
 		{"flags after --http", "", []string{"serve", "--http", "127.0.0.1:18090", "--zap", "127.0.0.1:19652", "--no-mdns"}, "127.0.0.1:19652", true},
 		{"flag with =", "", []string{"serve", "--zap=[::1]:19652"}, "[::1]:19652", false},
-		{"BASE_ZAP_ADDR alone", "127.0.0.1:29652", []string{"serve"}, "127.0.0.1:29652", false},
-		{"--zap beats BASE_ZAP_ADDR", "0.0.0.0:29652", []string{"serve", "--zap", "127.0.0.1:19652"}, "127.0.0.1:19652", false},
+		{"ZAP_ADDR alone", "127.0.0.1:29652", []string{"serve"}, "127.0.0.1:29652", false},
+		{"--zap beats ZAP_ADDR", "0.0.0.0:29652", []string{"serve", "--zap", "127.0.0.1:19652"}, "127.0.0.1:19652", false},
 	}
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			t.Setenv("BASE_ZAP_ADDR", s.env)
+			t.Setenv("ZAP_ADDR", s.env)
 			os.Args = append(originalArgs[:1:1], s.args...)
 
 			config := New().zapConfig()

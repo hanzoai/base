@@ -12,7 +12,7 @@ import (
 func TestNodeConfig(t *testing.T) {
 	scenarios := []struct {
 		name     string
-		address  string // Config.Address: --zap, else BASE_ZAP_ADDR
+		address  string // Config.Address: --zap, else ZAP_ADDR
 		noMDNS   bool
 		httpAddr string
 		wantAddr string

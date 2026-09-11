@@ -18,7 +18,7 @@ type Config struct {
 	Port int
 
 	// Address is the host:port to listen on, overriding Port (default
-	// BASE_ZAP_ADDR). Empty means the HTTP server's host on Port, so a Base
+	// ZAP_ADDR). Empty means the HTTP server's host on Port, so a Base
 	// serving HTTP on loopback serves ZAP on loopback too. ":9999" is every
 	// interface, which is only what an operator gets by writing it.
 	Address string
@@ -52,7 +52,7 @@ func DefaultConfig() Config {
 
 	return Config{
 		Port:        port,
-		Address:     os.Getenv("BASE_ZAP_ADDR"),
+		Address:     os.Getenv("ZAP_ADDR"),
 		ServiceType: "_hanzo-base._tcp",
 		NodeID:      nodeID,
 		Enabled:     !osutils.Bool("ZAP_DISABLED", false),

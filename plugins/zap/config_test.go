@@ -9,7 +9,7 @@ func TestDefaultConfig(t *testing.T) {
 	t.Run("defaults when nothing is set", func(t *testing.T) {
 		t.Setenv("ZAP_PORT", "")
 		t.Setenv("ZAP_DISABLED", "")
-		t.Setenv("BASE_ZAP_ADDR", "")
+		t.Setenv("ZAP_ADDR", "")
 		c := DefaultConfig()
 		if c.Port != 9999 {
 			t.Fatalf("Port = %d, want 9999", c.Port)
@@ -38,8 +38,8 @@ func TestDefaultConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("BASE_ZAP_ADDR is honoured", func(t *testing.T) {
-		t.Setenv("BASE_ZAP_ADDR", "127.0.0.1:19652")
+	t.Run("ZAP_ADDR is honoured", func(t *testing.T) {
+		t.Setenv("ZAP_ADDR", "127.0.0.1:19652")
 		if got := DefaultConfig().Address; got != "127.0.0.1:19652" {
 			t.Fatalf("Address = %q, want 127.0.0.1:19652", got)
 		}

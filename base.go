@@ -166,7 +166,7 @@ func NewWithConfig(config Config) *Base {
 	// Register ZAP transport plugin natively. ZAP is the binary,
 	// zero-copy wire protocol shared with Lux/Hanzo HFT services.
 	// Set ZAP_DISABLED=true to skip; set ZAP_PORT to override port.
-	// It listens on the HTTP host unless --zap or BASE_ZAP_ADDR names
+	// It listens on the HTTP host unless --zap or ZAP_ADDR names
 	// an address, and --no-mdns keeps it out of LAN discovery.
 	zap.MustRegisterWithConfig(base, base.zapConfig())
 
@@ -264,7 +264,7 @@ func (base *Base) eagerParseFlags(config *Config) error {
 		&base.zapAddrFlag,
 		"zap",
 		"",
-		"the address for the ZAP transport to listen on, eg. 127.0.0.1:9999 (\":9999\" is every interface)\n(default $BASE_ZAP_ADDR, otherwise the --http host on $ZAP_PORT or 9999)",
+		"the address for the ZAP transport to listen on, eg. 127.0.0.1:9999 (\":9999\" is every interface)\n(default $ZAP_ADDR, otherwise the --http host on $ZAP_PORT or 9999)",
 	)
 
 	base.RootCmd.PersistentFlags().BoolVar(
