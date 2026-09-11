@@ -281,7 +281,7 @@ process's Base, which is what an anonymous caller reads anyway.
 The admin does its half in `ui-react/src/lib/api.ts`: mint, open, and reopen with
 a fresh grant when the stream drops, because the browser's own retry replays one
 that is spent. The handshake event is `CONNECT` on both sides — the client
-listened for `PB_CONNECT`, so no `clientId` ever arrived and no subscription was
+listened for an older name, so no `clientId` ever arrived and no subscription was
 ever submitted, and both halves had to be right before anything reached a page.
 
 ### The process answers what is asked of the process

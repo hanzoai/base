@@ -635,7 +635,6 @@ and the minor performance boost that you may get when used on large records is n
 ## v0.25.8
 
 - Added a default leeway of 5 minutes for the Apple/OIDC `id_token` timestamp claims check to account for clock-skew (#6529).
-    It can be further customized if needed with the `PB_ID_TOKEN_LEEWAY` env variable (_the value must be in seconds, e.g. "PB_ID_TOKEN_LEEWAY=60" for 1 minute_).
 
 
 ## v0.25.7

@@ -1,5 +1,5 @@
 // Field-type helpers shared by the record grid and the detail panel. Maps
-// Base/PocketBase field types to an editor kind and provides display
+// Base field types to an editor kind and provides display
 // formatting + value coercion so cell rendering stays orthogonal to the grid.
 import type { CollectionField } from '~/lib/base';
 
