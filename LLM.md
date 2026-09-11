@@ -69,8 +69,15 @@ JWKS and mirrors it into an unsaved record: `_superusers` when
 `authz.Claims.Sudo()` holds (membership of IAM's `admin` org), otherwise
 `users`. Never read authority from the `owner` claim, which IAM sets to the org
 of the application a token was minted through. With `plugins/org` registered,
-only IAM tokens count. Without it, tokens Base signed earlier still verify and
-`auth-refresh` renews them, but nothing issues a first one.
+only IAM tokens count. Without it, a `users` token Base signed earlier still
+verifies, but nothing issues a first one. Superuser tokens Base signed stopped
+verifying at `1789100100_rotate_superuser_tokens.go`, and `auth-refresh` renews
+no superuser token IAM did not issue.
+
+**An org Base under a master key is never plaintext.** `plugins/org` reads the
+key from KMS beneath `IAMOrg` in `Register`, refuses to start when it cannot
+tell whether one exists or SQLCipher is not linked, and its keyed connector
+refuses a plaintext file.
 
 **The org is the token's.** `orgOf` takes it from the token's memberships.
 `X-Org-Id` only selects among them; anything else is `403`, never `404`, since a
@@ -145,8 +152,7 @@ is `BASE_FRAME_ANCESTORS` (default `'self'`). It signs in with IAM PKCE
 
 - `apis/installer.go` tells a Base without IAM to run `superuser upsert`, a command that no longer exists.
 - `--publicDir` and `--indexFallback` do nothing: `apis.Serve` registers `GET /{path...}` before the binary's static route checks for one.
-- A fresh Base's `users.createRule` is `""`, so anonymous callers can create rows.
-- `examples/base` sets no `IAMOrg`, so `plugins/org` never reads the master key and org Bases open unencrypted.
+- An encrypted org Base needs SQLCipher linked (`CGO_ENABLED=1`, `-tags libsqlite3` and the flags in hanzoai/sqlite's README). The image builds `CGO_ENABLED=0`, whose pure-Go codec gives each handle a private copy of a file, so a Base with a master key refuses to start there.
 - `TASKS_EMBED` fails and `NewBaseApp` drops the error when the default socket path is relative (`zap.Network` reads `base_/data/tasks.sock` as a TCP address) and on a data directory's first start (the engine binds before the directory exists).
 - The start banner prints `/v1/` and a Dashboard address whatever `BASE_API_PREFIX` and `BASE_ENABLE_ADMIN_UI` say.
 - No GitHub release after `v0.36.7-hanzo.1` carries binaries, so `base update` fails, and `ghcr.io/hanzoai/base` has no image for `v1.5.92` to `v1.5.96`.

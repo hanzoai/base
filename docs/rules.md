@@ -101,9 +101,8 @@ against collections whose rules admit anonymous callers. Define the collections
 in [migrations](hooks.md#migrations), because `/v1/collections` needs a
 superuser.
 
-Tokens Base signed itself still count, though, and `auth-refresh` renews them.
-A superuser token left from an older version is one; [versions.md](versions.md)
-shows how to revoke it.
+A `users` token Base signed before sign-in moved to IAM still counts. A
+superuser token does not; [versions.md](versions.md) says why.
 
 Such a Base prints this when it starts:
 
@@ -114,11 +113,13 @@ Such a Base prints this when it starts:
 
 That command was removed. Superusers come from IAM.
 
-## Close the open users collection
+## Who can add users rows
 
-A new Base has a `users` collection whose `createRule` is `""`, so anyone can
-add rows to it. Nobody can sign in as those rows, but it is still a public
-write. Close it with a migration:
+The `users` collection's `createRule` is `null`, so only superusers add rows.
+Before `v1.5.98` a new Base set it to `""`, which let anyone add them. The
+upgrade sets `null` where all five `users` rules are still the ones Base
+created, and leaves any other rule set alone. To close one that kept `""`, run
+a migration:
 
 ```js
 migrate((app) => {

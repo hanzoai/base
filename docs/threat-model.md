@@ -37,10 +37,10 @@ a different authority and grants none of it.
 
 **The platform database is not encrypted by the driver.** `DefaultDBConnect`
 opens `data.db` with pragmas only — no key. Per-org shards open under a per-org
-DEK derived from a master key, SQLCipher under cgo and a pure-Go codec envelope
-otherwise, but only when the org plugin has read that key from KMS, which it
-does only when it is given an `IAMOrg`. The `base` binary gives it none, so its
-org shards open unencrypted as well. **Put the data directory on an encrypted
+DEK derived from a master key the org plugin reads from KMS beneath
+`IAM_ORGANIZATION`, and only on a build with SQLCipher linked. The `base` image
+links none: with a key stored it refuses to start, and without one its org shards
+open unencrypted as well. **Put the data directory on an encrypted
 volume.** Anyone who can read a file can read that Base with any SQLite client.
 
 **Settings are plaintext JSON unless you set the encryption env.** SMTP
