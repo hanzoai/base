@@ -19,7 +19,6 @@ import (
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/org"
 	"github.com/hanzoai/base/plugins/waitlist"
-	"github.com/hanzoai/base/plugins/zap"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
 )
@@ -108,8 +107,9 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
-	// ZAP binary protocol transport (port 9999)
-	zap.MustRegister(app)
+	// The ZAP transport is registered by base.New, which reads --zap and
+	// --no-mdns. Registering it again here would replace that registration
+	// with one that ignores them.
 
 	// Waitlist — POST /v1/waitlist/join etc. (the "Join waitlist" CTA on
 	// coming-soon products; console2 proxies to it via WAITLIST_URL). Turnstile

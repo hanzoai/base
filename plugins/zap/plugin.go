@@ -36,7 +36,15 @@ func MustRegisterWithConfig(app core.App, config Config) {
 			// Router.BuildMux and assigns e.Server.Handler, so the
 			// fully-wrapped HTTP handler (all middleware + routes) is now
 			// populated and can be bridged onto the ZAP node.
-			p.start(e.Server.Handler)
+			//
+			// The node listens where that handler is served from, so it
+			// needs the HTTP address too: the listener a hook supplied if
+			// there is one, else the address the server was given.
+			httpAddr := e.Server.Addr
+			if e.Listener != nil {
+				httpAddr = e.Listener.Addr().String()
+			}
+			p.start(e.Server.Handler, httpAddr)
 			return nil
 		},
 	})
@@ -80,15 +88,22 @@ type plugin struct {
 // credential in a second place, on a second transport, in this package — which
 // is authentication, and there is one of those in the estate. So they are gone
 // rather than mended. The transport keeps its speed and stops being a door.
-func (p *plugin) start(httpHandler http.Handler) {
+//
+// httpAddr is where that same handler is served over HTTP. The node listens on
+// its host unless the config names an address; nodeConfig decides.
+func (p *plugin) start(httpHandler http.Handler, httpAddr string) {
 	p.logger = luxlog.New("component", "zap")
-	p.logger.Info("starting ZAP transport", "port", p.config.Port, "nodeID", p.config.NodeID)
 
-	p.node = zaplib.NewNode(zaplib.NodeConfig{
-		NodeID:      p.config.NodeID,
-		Port:        p.config.Port,
-		ServiceType: p.config.ServiceType,
-	})
+	nodeCfg, err := nodeConfig(p.config, httpAddr)
+	if err != nil {
+		// Not binding is the safe failure: any address guessed here could be
+		// wider than the one that was asked for.
+		p.logger.Error("ZAP transport not started; this instance serves HTTP only", "error", err)
+		return
+	}
+	p.logger.Info("starting ZAP transport", "addr", nodeCfg.Address, "mdns", !nodeCfg.NoDiscovery, "nodeID", nodeCfg.NodeID)
+
+	p.node = zaplib.NewNode(nodeCfg)
 
 	p.bridgeForward(httpHandler)
 
@@ -99,12 +114,12 @@ func (p *plugin) start(httpHandler http.Handler) {
 		// their own. HTTP still serves, so this is a degradation and not a
 		// reason to take the process down with it.
 		p.logger.Error("ZAP transport unavailable; this instance serves HTTP only and the gateway cannot route to it over ZAP",
-			"port", p.config.Port, "error", err)
+			"addr", nodeCfg.Address, "error", err)
 		p.node = nil // never hold a node that is not running
 		return
 	}
 
-	p.logger.Info("ZAP transport listening", "port", p.config.Port, "discovery", p.config.ServiceType)
+	p.logger.Info("ZAP transport listening", "addr", nodeCfg.Address, "mdns", !nodeCfg.NoDiscovery)
 }
 
 func (p *plugin) stop() {

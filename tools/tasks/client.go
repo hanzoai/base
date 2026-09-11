@@ -359,7 +359,7 @@ func (c *Client) connectZAP() error {
 		c.zapNode = zap.NewNode(zap.NodeConfig{
 			NodeID:      "tasks-sdk",
 			ServiceType: "_tasks-sdk._tcp",
-			Port:        0, // ephemeral
+			Address:     "127.0.0.1:0", // dials out only; nothing needs to reach it
 			NoDiscovery: true,
 		})
 		if err := c.zapNode.Start(); err != nil {

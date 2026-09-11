@@ -2,15 +2,23 @@ package zap
 
 import "testing"
 
-// DefaultConfig is the operator's whole interface to this transport: a port and
-// an off-switch. Both are read from the environment, so both are pinned here.
+// DefaultConfig is the operator's whole interface to this transport: a port, an
+// address and an off-switch. All three are read from the environment, so all
+// three are pinned here.
 func TestDefaultConfig(t *testing.T) {
 	t.Run("defaults when nothing is set", func(t *testing.T) {
 		t.Setenv("ZAP_PORT", "")
 		t.Setenv("ZAP_DISABLED", "")
+		t.Setenv("ZAP_ADDR", "")
 		c := DefaultConfig()
 		if c.Port != 9999 {
 			t.Fatalf("Port = %d, want 9999", c.Port)
+		}
+		if c.Address != "" {
+			t.Fatalf("Address = %q, want empty — the node follows the HTTP host unless told", c.Address)
+		}
+		if c.NoMDNS {
+			t.Fatal("NoMDNS = true — mDNS is off only on loopback or when switched off")
 		}
 		if c.ServiceType != "_hanzo-base._tcp" {
 			t.Fatalf("ServiceType = %q", c.ServiceType)
@@ -27,6 +35,13 @@ func TestDefaultConfig(t *testing.T) {
 		t.Setenv("ZAP_PORT", "4242")
 		if got := DefaultConfig().Port; got != 4242 {
 			t.Fatalf("Port = %d, want 4242", got)
+		}
+	})
+
+	t.Run("ZAP_ADDR is honoured", func(t *testing.T) {
+		t.Setenv("ZAP_ADDR", "127.0.0.1:19652")
+		if got := DefaultConfig().Address; got != "127.0.0.1:19652" {
+			t.Fatalf("Address = %q, want 127.0.0.1:19652", got)
 		}
 	})
 
