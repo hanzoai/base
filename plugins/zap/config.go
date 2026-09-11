@@ -17,6 +17,17 @@ type Config struct {
 	// Port to listen on for ZAP connections (default 9999).
 	Port int
 
+	// Address is the host:port to listen on, overriding Port (default
+	// ZAP_ADDR). Empty means the HTTP server's host on Port, so a Base
+	// serving HTTP on loopback serves ZAP on loopback too. ":9999" is every
+	// interface, which is only what an operator gets by writing it.
+	Address string
+
+	// NoMDNS stops the node advertising itself on the LAN and dialling the
+	// peers it finds there. A node on a loopback address never runs mDNS:
+	// no peer that learned of it could reach it.
+	NoMDNS bool
+
 	// ServiceType for mDNS discovery (default "_hanzo-base._tcp").
 	ServiceType string
 
@@ -41,6 +52,7 @@ func DefaultConfig() Config {
 
 	return Config{
 		Port:        port,
+		Address:     os.Getenv("ZAP_ADDR"),
 		ServiceType: "_hanzo-base._tcp",
 		NodeID:      nodeID,
 		Enabled:     !osutils.Bool("ZAP_DISABLED", false),
