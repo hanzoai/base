@@ -38,6 +38,7 @@ type Base struct {
 	queryTimeout      int
 	hideStartBanner   bool
 	zapAddrFlag       string
+	mdnsFlag          bool
 	noMDNSFlag        bool
 
 	// RootCmd is the main console command
@@ -167,7 +168,7 @@ func NewWithConfig(config Config) *Base {
 	// zero-copy wire protocol shared with Lux/Hanzo HFT services.
 	// Set ZAP_DISABLED=true to skip; set ZAP_PORT to override port.
 	// It listens on the HTTP host unless --zap or ZAP_ADDR names
-	// an address, and --no-mdns keeps it out of LAN discovery.
+	// an address, and runs mDNS only when --mdns or ZAP_MDNS asks.
 	zap.MustRegisterWithConfig(base, base.zapConfig())
 
 	return base
@@ -268,21 +269,31 @@ func (base *Base) eagerParseFlags(config *Config) error {
 	)
 
 	base.RootCmd.PersistentFlags().BoolVar(
+		&base.mdnsFlag,
+		"mdns",
+		false,
+		"advertise the ZAP transport over mDNS and dial the LAN peers it finds\n(default $ZAP_MDNS, otherwise off; never while ZAP listens on loopback)",
+	)
+
+	base.RootCmd.PersistentFlags().BoolVar(
 		&base.noMDNSFlag,
 		"no-mdns",
 		false,
-		"don't advertise the ZAP transport over mDNS or dial the peers it finds\n(mDNS never runs while ZAP listens on loopback)",
+		"keep mDNS off even when --mdns or $ZAP_MDNS asks for it",
 	)
 
 	return base.RootCmd.ParseFlags(os.Args[1:])
 }
 
-// zapConfig is the ZAP transport config the environment gives, with the --zap
-// and --no-mdns flags laid over it.
+// zapConfig is the ZAP transport config the environment gives, with the --zap,
+// --mdns and --no-mdns flags laid over it.
 func (base *Base) zapConfig() zap.Config {
 	config := zap.DefaultConfig()
 	if base.zapAddrFlag != "" {
 		config.Address = base.zapAddrFlag
+	}
+	if base.mdnsFlag {
+		config.MDNS = true
 	}
 	if base.noMDNSFlag {
 		config.NoMDNS = true

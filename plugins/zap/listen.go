@@ -48,7 +48,10 @@ func nodeConfig(cfg Config, httpAddr string) (zaplib.NodeConfig, error) {
 	}
 
 	nc.Port = port // what mDNS advertises, so it must be the port bound
-	nc.NoDiscovery = cfg.NoMDNS || isLoopback(host)
+
+	// mDNS announces the node to the LAN and dials whatever answers, so it runs
+	// only when asked for, and never where no peer could reach the node.
+	nc.NoDiscovery = !cfg.MDNS || cfg.NoMDNS || isLoopback(host)
 
 	return nc, nil
 }

@@ -23,9 +23,16 @@ type Config struct {
 	// interface, which is only what an operator gets by writing it.
 	Address string
 
-	// NoMDNS stops the node advertising itself on the LAN and dialling the
-	// peers it finds there. A node on a loopback address never runs mDNS:
-	// no peer that learned of it could reach it.
+	// MDNS turns on mDNS: the node advertises itself on the LAN and dials the
+	// peers it finds there (default ZAP_MDNS, else off). Hanzo nodes reach each
+	// other through explicit peers, so discovery runs only for an operator who
+	// asks for it, and never on a loopback address, where no peer that learned
+	// of the node could reach it.
+	MDNS bool
+
+	// NoMDNS keeps mDNS off even when MDNS asks for it. It predates MDNS, from
+	// when discovery was on by default, and stays so that configs written for
+	// v1.5.93 keep meaning what they say.
 	NoMDNS bool
 
 	// ServiceType for mDNS discovery (default "_hanzo-base._tcp").
@@ -53,6 +60,7 @@ func DefaultConfig() Config {
 	return Config{
 		Port:        port,
 		Address:     os.Getenv("ZAP_ADDR"),
+		MDNS:        osutils.Bool("ZAP_MDNS", false),
 		ServiceType: "_hanzo-base._tcp",
 		NodeID:      nodeID,
 		Enabled:     !osutils.Bool("ZAP_DISABLED", false),

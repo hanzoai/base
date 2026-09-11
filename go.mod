@@ -21,7 +21,7 @@ require (
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/namespace v1.2.0
 	github.com/hanzoai/pubsub-go v1.0.0
-	github.com/hanzoai/tasks v1.52.9
+	github.com/hanzoai/tasks v1.53.2
 	github.com/hanzos3/go v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.9.2
@@ -170,7 +170,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/zap-proto/http v0.3.5
-	github.com/zap-proto/zip v1.36.8
+	github.com/zap-proto/zip v1.36.9
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.37.0 // indirect
