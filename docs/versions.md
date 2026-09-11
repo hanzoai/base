@@ -65,20 +65,12 @@ tables. People sign in at Hanzo IAM and send its access token, and superusers
 are the members of IAM's `admin` org. Set `IAM_ENDPOINT`; [rules.md](rules.md)
 covers the rest.
 
-**Tokens from before the upgrade.** Until `IAM_ENDPOINT` is set, Base still
-accepts tokens it signed itself. A superuser token from the old version keeps
-superuser access, and `POST /v1/collections/_superusers/auth-refresh` trades it
-for a fresh one, so it never has to expire. Setting `IAM_ENDPOINT` ends that:
-the same token then gets `401`. Without IAM, rotate the signing secrets, using
-that token one last time:
-
-```sh
-curl -X POST http://127.0.0.1:8090/v1/collections/_superusers/rotate \
-  -H "Authorization: $OLD_TOKEN"
-```
-
-Every `_superusers` token signed before the rotation, `$OLD_TOKEN` included,
-then gets `401`. Rotate `users` the same way if it held accounts.
+**Tokens from before the upgrade.** On its first start, `v1.5.98` or later
+replaces the secrets superuser tokens are signed with, so a superuser token from
+an older version, `v0.36.7-hanzo.1` included, gets `401`. `auth-refresh` renews
+no superuser token that IAM did not issue. A `users` token Base signed keeps
+working until `IAM_ENDPOINT` is set, which makes Base ignore every token IAM did
+not sign.
 
 **Ids in rules.** Rules carry over as written, but `@request.auth.id` now comes
 from the IAM token (see [rules.md](rules.md#where-identity-comes-from)). A rule

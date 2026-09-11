@@ -109,12 +109,21 @@ The binary registers `plugins/org` when `IAM_ENDPOINT` or `IAM_URL` is set.
 | `IAM_ENDPOINT` (or `IAM_URL`) | none | IAM origin. Turns on IAM sign-in and a Base per org. |
 | `IAM_ADDRESS` | none | Where Base reaches the IAM service to check tokens and keys, when that is not `IAM_ENDPOINT`. A bare `host:port` is ZAP. |
 | `IAM_CLIENT_ID`, `IAM_CLIENT_SECRET` | none | The IAM application Base presents when it calls IAM itself, and to KMS over HTTPS. |
-| `KMS_ENDPOINT` (or `KMS_URL`) | none | Secrets store: `host:port`, `zap://host:port`, `https://...`, or `zap+mdns://_kms._tcp` to discover it. Contacted on first use. |
+| `IAM_ORGANIZATION` | none | The IAM org Base belongs to. Required with `KMS_ENDPOINT`: the master key is read beneath it. |
+| `KMS_ENDPOINT` (or `KMS_URL`) | none | Secrets store: `host:port`, `zap://host:port`, `https://...`, or `zap+mdns://_kms._tcp` to discover it. Base reads its master key from it when it starts. |
 | `LUX_MNEMONIC` (or `MNEMONIC`) | none | Seed of the identity Base signs KMS requests with. Required for KMS over ZAP. |
 | `KMS_ENV` | `prod` | Environment of the secrets Base reads. |
 | `KMS_SERVICE_PATH` | `hanzo/base` | Derivation path of that identity. |
 | `KMS_NODE_ID` | `hanzo-base` | Node name the KMS client presents. |
 | `IDV_ENDPOINT` | none | Upstream for `/v1/idv/*`. Unset, `/v1/idv/status` answers `{"enabled":false}` and the rest `503`. |
+
+The master key is `base/MASTER_KEY_B64` beneath `IAM_ORGANIZATION`: 32 bytes,
+base64-encoded. Each org Base is encrypted under a key derived from it, and an
+org Base that is already a plaintext file is refused. With no key stored, org
+Bases are not encrypted, and Base logs that when it starts. Base does not start
+when KMS cannot be read, when the key is not 32 bytes, or when a key is stored
+and SQLCipher is not linked. The image is built with `CGO_ENABLED=0`, which
+links none.
 
 ### Replication
 
