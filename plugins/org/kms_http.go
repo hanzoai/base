@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/luxfi/kms/pkg/zapclient"
 )
 
 // The door KMS actually serves.
@@ -126,6 +128,9 @@ func (h *httpSecrets) GetAt(ctx context.Context, path, name, env string) (string
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", fmt.Errorf("kms get %s: %w", coordinate(path, name), zapclient.ErrNotFound)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("kms get %s: %s", coordinate(path, name), resp.Status)
 	}

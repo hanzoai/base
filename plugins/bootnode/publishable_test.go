@@ -41,7 +41,7 @@ func oneProcess(t *testing.T) http.Handler {
 	}))
 	t.Cleanup(keys.Close)
 
-	if err := org.Register(app, org.Config{IAMEndpoint: keys.URL, KMSEndpoint: "127.0.0.1:1",
+	if err := org.Register(app, org.Config{IAMEndpoint: keys.URL,
 		IAMClientID: "svc", IAMClientSecret: "shh"}); err != nil {
 		t.Fatal(err)
 	}

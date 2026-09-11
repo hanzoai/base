@@ -1,8 +1,13 @@
 package org
 
 import (
+	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
 	"sync"
 
 	"github.com/hanzoai/authz"
@@ -26,6 +31,7 @@ import (
 // plaintext exactly as it did before. A master key of the wrong length is an
 // error rather than a silent downgrade, because a key that quietly becomes no
 // key is how data ends up in the clear while the deployment believes otherwise.
+// For the same reason a file that is already plaintext is refused under a key.
 func encryptedConnect(orgDB *OrgDB, org string) (core.DBConnectFunc, error) {
 	dek, err := orgDB.OrgDEK(org)
 	if err != nil {
@@ -46,6 +52,9 @@ func encryptedConnect(orgDB *OrgDB, org string) (core.DBConnectFunc, error) {
 		if err := core.VerifySQLiteMathFunctions(); err != nil {
 			return nil, err
 		}
+		if err := refusePlaintext(dbPath); err != nil {
+			return nil, err
+		}
 
 		db, err := sqlite.OpenDB(dbPath, key)
 		if err != nil {
@@ -54,6 +63,30 @@ func encryptedConnect(orgDB *OrgDB, org string) (core.DBConnectFunc, error) {
 
 		return dbx.NewFromDB(db, "sqlite"), nil
 	}, nil
+}
+
+// sqliteHeader is how every unencrypted SQLite file starts. An encrypted file
+// starts with its random salt.
+var sqliteHeader = []byte("SQLite format 3\x00")
+
+// refusePlaintext refuses a file that is already an unencrypted SQLite
+// database. A missing or empty file is created encrypted.
+func refusePlaintext(path string) error {
+	f, err := os.Open(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	head := make([]byte, len(sqliteHeader))
+	if _, err := io.ReadFull(f, head); err == nil && bytes.Equal(head, sqliteHeader) {
+		return fmt.Errorf("platform: %s is an unencrypted SQLite file and a master key is configured", path)
+	}
+
+	return nil
 }
 
 // bases maps an org to the Base that serves it: {DataDir}/orgs/{org}, opened the

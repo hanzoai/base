@@ -21,6 +21,7 @@ package org
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -29,6 +30,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/hanzoai/cek"
 	"github.com/luxfi/keys"
 	"github.com/luxfi/kms/pkg/envelope"
 	"github.com/luxfi/kms/pkg/zapclient"
@@ -36,8 +38,7 @@ import (
 
 const (
 	// masterKeyPath is where a Base reads the key its per-principal DEKs derive
-	// from, beneath its own org. One coordinate, so a deployment that can read
-	// it has encryption and one that cannot does not.
+	// from, beneath its own org: 32 bytes, base64-encoded.
 	masterKeyPath = "base/MASTER_KEY_B64"
 
 	secretCacheTTL = 1 * time.Minute
@@ -318,6 +319,36 @@ func (c *KMSClient) GetSecret(orgId, secretPath string) (string, error) {
 	c.mu.Unlock()
 
 	return val, nil
+}
+
+// masterKey reads the master key beneath org. With no KMS, or no key stored
+// there, there is no key. Anything else that stops the read is an error: a Base
+// that cannot tell whether it has a key must not write an org's data in the
+// clear.
+func (c *KMSClient) masterKey(org string) (string, error) {
+	if !c.configured() {
+		return "", nil
+	}
+	if org == "" {
+		return "", errors.New("platform: KMS is configured and no IAM org is set, so the master key " +
+			"cannot be read — set IAM_ORGANIZATION")
+	}
+
+	v, err := c.GetSecret(org, masterKeyPath)
+	if errors.Is(err, zapclient.ErrNotFound) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("platform: read the master key at %s: %w", masterKeyPath, err)
+	}
+
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(v))
+	if err != nil || len(key) != cek.KeyLen {
+		return "", fmt.Errorf("platform: the master key at %s must be %d bytes, base64-encoded",
+			masterKeyPath, cek.KeyLen)
+	}
+
+	return string(key), nil
 }
 
 // SetSecret creates or updates a secret.
