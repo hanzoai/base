@@ -77,13 +77,20 @@ func statusReply(status uint32) (*zap.Message, error) {
 // finished dialling has a peer.
 func listening(t *testing.T) map[int]string {
 	t.Helper()
-	fds, err := os.ReadDir("/dev/fd")
+	// Names only: os.ReadDir stats each entry, and on macOS a descriptor in
+	// /dev/fd can refuse fstatat, which fails the listing outright.
+	dir, err := os.Open("/dev/fd")
+	if err != nil {
+		t.Fatalf("list descriptors: %v", err)
+	}
+	names, err := dir.Readdirnames(-1)
+	dir.Close()
 	if err != nil {
 		t.Fatalf("list descriptors: %v", err)
 	}
 	out := make(map[int]string)
-	for _, e := range fds {
-		fd, err := strconv.Atoi(e.Name())
+	for _, name := range names {
+		fd, err := strconv.Atoi(name)
 		if err != nil {
 			continue
 		}
