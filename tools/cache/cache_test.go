@@ -104,16 +104,20 @@ func TestTTL_Expiration(t *testing.T) {
 }
 
 func TestTTL_PutResetsExpiry(t *testing.T) {
-	c := NewTTL[string, int](100, 50*time.Millisecond)
+	// The entry must outlive its first expiry and not its second, so both
+	// sleeps carry 200ms of slack: 700ms elapsed against a 500ms life, and
+	// 300ms since the re-put. A sleep overrunning by a frame decided this
+	// when the margins were 20ms.
+	c := NewTTL[string, int](100, 500*time.Millisecond)
 
 	c.Put("a", 1)
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(400 * time.Millisecond)
 
 	// Re-put before expiry to reset TTL.
 	c.Put("a", 2)
-	time.Sleep(30 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 
-	// 60ms total, but TTL was reset at 30ms, so 30ms since last Put.
+	// 700ms total, but TTL was reset at 400ms, so 300ms since last Put.
 	if v, ok := c.Get("a"); !ok || v != 2 {
 		t.Fatalf("Get(a) = %d, %v; want 2, true (TTL should have been reset)", v, ok)
 	}

@@ -63,8 +63,12 @@ func TestBaseBindsSleep(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The floor is what sleep promises. The ceiling is loose on purpose: it
+	// is here to catch an argument read as seconds rather than milliseconds,
+	// and a tight one measures how busy the machine is instead — 150ms was
+	// reached by a loaded box that slept correctly.
 	lasted := time.Since(start).Milliseconds()
-	if lasted < 100 || lasted > 150 {
+	if lasted < 100 || lasted > 1000 {
 		t.Fatalf("Expected to sleep for ~100ms, got %d", lasted)
 	}
 }
