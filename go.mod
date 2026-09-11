@@ -43,7 +43,7 @@ require (
 	golang.org/x/net v0.59.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/sync v0.23.0
-	hanzo.ai/tygoja v0.0.3
+	hanzo.ai/tygoja v0.1.1
 	rogchap.com/v8go v0.9.0
 )
 
