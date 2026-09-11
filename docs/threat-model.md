@@ -9,10 +9,12 @@ with the thing you do about it.
 
 ## The boundary
 
-**Identity comes from Hanzo IAM and from nowhere else.** Base hosts no login,
-stores no password and issues no token. A request is whoever IAM's signed token
-says it is, verified against IAM's JWKS. `IAM_ENDPOINT` is required; a Base with
-no IAM refuses to boot rather than falling back to something weaker.
+**Identity comes from Hanzo IAM and from nowhere else.** Base hosts no login and
+stores no password. A request is whoever IAM's signed token says it is, verified
+against IAM's JWKS. `IAM_ENDPOINT` turns that on. Without it, the `base` binary
+serves one Base in which every HTTP caller is anonymous, except one holding a
+token Base signed itself, such as a superuser token left from an older version.
+**Rotate those after an upgrade**; [versions.md](versions.md) shows how.
 
 **A tenant is a file.** The org on a verified token selects
 `{DataDir}/orgs/{org}/data.db`, and every read and write in `/v1` lands there.
@@ -34,11 +36,12 @@ a different authority and grants none of it.
 ## At rest
 
 **The platform database is not encrypted by the driver.** `DefaultDBConnect`
-opens `data.db` with pragmas only — no key. Per-org shards are different: they
-open under a per-org DEK derived from the master key, SQLCipher under cgo and a
-pure-Go codec envelope otherwise. **Put the data directory on an encrypted
-volume.** Anyone who can read the file can read the platform Base with any
-SQLite client.
+opens `data.db` with pragmas only — no key. Per-org shards open under a per-org
+DEK derived from a master key, SQLCipher under cgo and a pure-Go codec envelope
+otherwise, but only when the org plugin has read that key from KMS, which it
+does only when it is given an `IAMOrg`. The `base` binary gives it none, so its
+org shards open unencrypted as well. **Put the data directory on an encrypted
+volume.** Anyone who can read a file can read that Base with any SQLite client.
 
 **Settings are plaintext JSON unless you set the encryption env.** SMTP
 passwords, S3 secrets and OAuth2 client secrets live in `_params`. With

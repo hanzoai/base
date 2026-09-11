@@ -2,16 +2,21 @@
 
 ## Reporting a vulnerability
 
-Email security@hanzo.ai with details. Encrypt with our PGP key (fingerprint TBD).
+Email security@hanzo.ai with details.
 
 We respond within 48 hours. Critical issues receive same-day acknowledgment.
 
 ## Scope
 
-This policy covers code in this repository. For the broader Hanzo platform threat model, see [hanzoai/HIPs](https://github.com/hanzoai/HIPs).
+This policy covers code in this repository. What Base defends on its own, and
+what it leaves to a deployment, is in [docs/threat-model.md](docs/threat-model.md).
 
-## Sandbox boundary
+## Isolation
 
-`base` enforces tenant isolation at the storage layer: each org gets its own per-tenant data file (`data/{orgSlug}.db`) with a per-org HKDF-derived DEK from KMS, and the WAL is shipped to age-encrypted object storage via `hanzoai/replicate`. User-supplied per-record validators, computed fields, and access rules execute exclusively inside the HIP-0105 in-process runtimes (goja, wazero, pyvm, starkvm) — never in the host Go process directly.
+With `IAM_ENDPOINT` set, each org's data is its own SQLite file,
+`<data dir>/orgs/<org>/data.db`, so a query in one org cannot read another's
+rows. The `base` binary opens those files unencrypted: encryption needs a master
+key from KMS, which the org plugin reads only when it is given an `IAMOrg`.
 
-For runtime sandbox guarantees, see HIP-0105 (in-process extension runtimes).
+JavaScript hooks run inside the Base process with its full authority. They are
+not sandboxed.

@@ -1,82 +1,49 @@
-# Contributing to Base
+# Contributing
 
-Thanks for taking the time to improve Base!
+Base is one Go module. `examples/base` is the binary, and everything else is
+packages it imports.
 
-This document describes how to prepare a PR for a change in the main repository.
+## Go
 
-- [Prerequisites](#prerequisites)
-- [Making changes in the Go code](#making-changes-in-the-go-code)
-- [Making changes in the Admin UI](#making-changes-in-the-admin-ui)
+You need the Go version in `go.mod` (1.26.8) or newer.
 
-## Prerequisites
-
-- Go 1.25+ (for making changes in the Go code)
-- Node 18+ (for making changes in the Admin UI)
-
-If you haven't already, you can fork the main repository and clone your fork so that you can work locally:
-
-```
-git clone https://github.com/your_username/base.git
+```sh
+cd examples/base
+go run . serve --http 127.0.0.1:8090
 ```
 
-> [!IMPORTANT]
-> It is recommended to create a new branch from master for each of your bugfixes and features.
-> This is required if you are planning to submit multiple PRs in order to keep the changes separate for review until they eventually get merged.
+Check your change the way CI does, with the settings the published binary is
+built with:
 
-## Making changes in the Go code
+```sh
+GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2 go vet ./...
+GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2 go test -count=1 ./...
+golangci-lint run -c ./golangci.yml ./...
+```
 
-Base is distributed as a Go package, which means that in order to run the project you'll have to create a Go `main` program that imports the package.
+On macOS two tests fail for want of RAM-backed storage: `TestTasksEmbed` in
+`core` and `TestOrgBaseIsEncryptedAtRest` in `plugins/org`. The encrypted SQLite
+codec will only decrypt into RAM, which is `/dev/shm` on Linux, or on macOS a
+`tmpfs` mount named by `HANZO_SQLITE_RAMFS_DIR`.
 
-The repository already includes such program, located in `examples/base`, that is also used for the prebuilt executables.
+## Admin UI
 
-So, let's assume that you already done some changes in the Base Go code and you want now to run them:
+The admin is a React app in `ui-react/`, built with pnpm. Its build output,
+`ui-react/dist`, is committed and embedded in the binary, so building Go needs
+no Node toolchain.
 
-1. Navigate to `examples/base`
-2. Run `go run main.go serve`
+```sh
+pnpm --dir ui-react install
+pnpm --dir ui-react dev      # http://localhost:3000, sends /v1 to localhost:8090
+pnpm --dir ui-react build
+pnpm --dir ui-react smoke    # loads the built admin in Playwright and checks what renders
+```
 
-This will start a web server on `http://localhost:8090` with the embedded prebuilt Admin UI from `ui/dist`. And that's it!
+Commit a rebuilt `dist/` with any change under `ui-react/src`, and build it on
+Linux: a macOS build of the same source emits a different, larger bundle, and
+the next Linux build undoes it.
 
-**Before making a PR to the main repository, it is a good idea to:**
+## Pull requests
 
-- Add unit/integration tests for your changes (we are using the standard `testing` go package).
-  To run the tests, you could execute (while in the root project directory):
-
-  ```sh
-  go test ./...
-
-  # or using the Makefile
-  make test
-  ```
-
-- Run the linter - **golangci** ([see how to install](https://golangci-lint.run/usage/install/#local-installation)):
-
-  ```sh
-  golangci-lint run -c ./golangci.yml ./...
-
-  # or using the Makefile
-  make lint
-  ```
-
-## Making changes in the Admin UI
-
-Base Admin UI is a single-page application (SPA) built with Svelte and Vite.
-
-To start the Admin UI:
-
-1. Navigate to the `ui` project directory
-2. Run `npm install` to install the node dependencies
-3. Start vite's dev server
-   ```sh
-   npm run dev
-   ```
-
-You could open the browser and access the running Admin UI at `http://localhost:3000`.
-
-Since the Admin UI is just a client-side application, you need to have the Base backend server also running in the background (either manually running the `examples/base/main.go` or download a prebuilt executable).
-
-> [!NOTE]
-> By default, the Admin UI is expecting the backend server to be started at `http://localhost:8090`, but you could change that by creating a new `ui/.env.development.local` file with `HZ_BACKEND_URL = YOUR_ADDRESS` variable inside it.
-
-Every change you make in the Admin UI should be automatically reflected in the browser at `http://localhost:3000` without reloading the page.
-
-Once you are done with your changes, you have to build the Admin UI with `npm run build`, so that it can be embedded in the go package. And that's it - you can make your PR to the main Base repository.
+Open an issue before a large change. Keep a pull request to one change, with
+its tests, and update `docs/` when behaviour a reader relies on changes.

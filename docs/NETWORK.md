@@ -1,6 +1,6 @@
 # Base Network
 
-Seamless, PQ-native, consensus-replicated HA for every Base app.
+PQ-native, consensus-replicated HA for every Base app.
 One mechanism. One env flag. Replica count `N ∈ {1,2,3,…}` works
 identically on a laptop (`docker compose`) and on k8s (via
 `~/work/hanzo/operator`). No FUSE, no LiteFS, no Consul.
@@ -8,7 +8,7 @@ identically on a laptop (`docker compose`) and on k8s (via
 Durability and replication come from `luxfi/consensus/protocol/quasar`
 — the same DAG consensus that runs Lux validators — applied to SQLite
 WAL frames, one DAG per shard. Archive tier is optional cold storage
-on `~/work/hanzo/storage` (`hanzoai/s3`) or GCS for PITR.
+in S3 (`s3://`) for PITR.
 
 ## Problem
 
@@ -159,12 +159,8 @@ per-shard WAL segments to object storage. Layout:
 of PQ-signed, quasar-finalized frames. Replay any prefix ⇒ SQLite at
 that `txseq`. PITR for free.
 
-Backend is pluggable via `github.com/hanzoai/s3` client surface:
-
-- S3 (`s3://…`) — the S3 API, served by `hanzoai/s3`.
-- GCS (`gs://…`) — native client, used for production in GCP-hosted
-  clusters.
-- off — archive disabled; durability = quasar DAG only.
+The backend is S3 (`s3://bucket/prefix`), served by `hanzoai/s3` or AWS.
+`off` disables the archive, leaving the quasar DAG as the only durability.
 
 ### Env surface (one shape, every Base app)
 
@@ -175,11 +171,12 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 | `BASE_REPLICATION`          | `1` \| `2` \| `3` \| …                      | ≤ `BASE_PEERS` count. |
 | `BASE_PEERS`                | CSV of `host:port` DNS                      | operator-emitted in k8s; explicit in compose. |
 | `BASE_NODE_ROLE`            | `validator` (default) \| `archive`          |  |
-| `BASE_ARCHIVE`              | `gs://…` \| `s3://…` \| `off` (default)     |  |
-| `BASE_LISTEN_HTTP`          | `:8090` default                             | Base HTTP. |
+| `BASE_ARCHIVE`              | `s3://bucket/prefix` \| `off` (default)     |  |
+| `BASE_LISTEN_HTTP`          | `:8090` default                             | Read, but opens nothing; `serve --http` sets the HTTP address. |
 | `BASE_LISTEN_P2P`           | `host:port`, `:9999` default                | quasar p2p listener. The host is honoured: `:9999` is every interface, `127.0.0.1:9999` loopback only. |
-| `BASE_SHARD_BACKLOG_MAX`    | bytes (64 MiB default)                      | R6 per-shard archive backlog cap; drop-oldest beyond. |
-| `BASE_SHARD_BACKLOG_SEGMENTS` | integer (100 000 default)                 | R6 segment-count cap; first-to-hit with MAX drops. |
+
+The R6 backlog caps are constants in `network/archive.go`: 64 MiB and 100,000
+segments per shard. No variable changes them.
 
 **The peer transport presents no certificate.**
 
@@ -452,23 +449,23 @@ never diverges. Same code path as prod.
 
 ## Acceptance tests
 
-1. **Single-node**: `N=1`, `archive=off` → behaves exactly like
-   today. No regression in `core/base_test.go`.
-2. **Docker compose N=3**: write 1000 rows, kill `base-b`, read all
-   1000 from `base-a` and `base-c`. Bring `base-b` back, verify it
-   catches up (txseq matches). No row loss, no duplication.
-3. **Archive PITR**: write 1000 rows, record txseq, write 100 more.
-   Restore to the first txseq from GCS archive; DB has exactly 1000.
-4. **k8s operator**: apply a Base-backed CR with
-   `network.replication: 3`. Verify: headless svc, 3 pods with
-   BASE_PEERS env, HPA, PDB minAvailable=2, archive sidecar when
-   `archive != off`.
-5. **Autoscale**: drive `base_hot_shards` > `hotShardsTarget` via
-   synthetic load; verify KEDA scales Deployment up, new pod joins
-   the network, existing shards rebalance.
-6. **Gateway**: two users in different shards produce writes on
-   different owner pods; both succeed; read-your-writes respected
-   via `txseq` cookie.
+- **Single-node**: `N=1`, `archive=off` → behaves exactly like
+  today. No regression in `core/base_test.go`.
+- **Docker compose N=3**: write 1000 rows, kill `base-b`, read all
+  1000 from `base-a` and `base-c`. Bring `base-b` back, verify it
+  catches up (txseq matches). No row loss, no duplication.
+- **Archive PITR**: write 1000 rows, record txseq, write 100 more.
+  Restore to the first txseq from the S3 archive; DB has exactly 1000.
+- **k8s operator**: apply a Base-backed CR with
+  `network.replication: 3`. Verify: headless svc, 3 pods with
+  BASE_PEERS env, HPA, PDB minAvailable=2, archive sidecar when
+  `archive != off`.
+- **Autoscale**: drive `base_hot_shards` > `hotShardsTarget` via
+  synthetic load; verify KEDA scales Deployment up, new pod joins
+  the network, existing shards rebalance.
+- **Gateway**: two users in different shards produce writes on
+  different owner pods; both succeed; read-your-writes respected
+  via `txseq` cookie.
 
 ## Non-goals
 
