@@ -3,13 +3,14 @@ package zap
 import "testing"
 
 // DefaultConfig is the operator's whole interface to this transport: a port, an
-// address and an off-switch. All three are read from the environment, so all
-// three are pinned here.
+// address, an mDNS switch and an off-switch. All four are read from the
+// environment, so all four are pinned here.
 func TestDefaultConfig(t *testing.T) {
 	t.Run("defaults when nothing is set", func(t *testing.T) {
 		t.Setenv("ZAP_PORT", "")
 		t.Setenv("ZAP_DISABLED", "")
 		t.Setenv("ZAP_ADDR", "")
+		t.Setenv("ZAP_MDNS", "")
 		c := DefaultConfig()
 		if c.Port != 9999 {
 			t.Fatalf("Port = %d, want 9999", c.Port)
@@ -17,8 +18,8 @@ func TestDefaultConfig(t *testing.T) {
 		if c.Address != "" {
 			t.Fatalf("Address = %q, want empty — the node follows the HTTP host unless told", c.Address)
 		}
-		if c.NoMDNS {
-			t.Fatal("NoMDNS = true — mDNS is off only on loopback or when switched off")
+		if c.MDNS || c.NoMDNS {
+			t.Fatalf("MDNS = %v, NoMDNS = %v — with nothing set, discovery is simply off", c.MDNS, c.NoMDNS)
 		}
 		if c.ServiceType != "_hanzo-base._tcp" {
 			t.Fatalf("ServiceType = %q", c.ServiceType)
@@ -44,6 +45,24 @@ func TestDefaultConfig(t *testing.T) {
 			t.Fatalf("Address = %q, want 127.0.0.1:19652", got)
 		}
 	})
+
+	// mDNS is opt-in, and asking takes every spelling of true.
+	for _, raw := range []string{"true", "TRUE", "1", "t"} {
+		t.Run("ZAP_MDNS="+raw+" turns mDNS on", func(t *testing.T) {
+			t.Setenv("ZAP_MDNS", raw)
+			if !DefaultConfig().MDNS {
+				t.Fatalf("ZAP_MDNS=%q left mDNS off", raw)
+			}
+		})
+	}
+	for _, raw := range []string{"false", "0", "", "nonsense"} {
+		t.Run("ZAP_MDNS="+raw+" leaves it off", func(t *testing.T) {
+			t.Setenv("ZAP_MDNS", raw)
+			if DefaultConfig().MDNS {
+				t.Fatalf("ZAP_MDNS=%q turned mDNS on", raw)
+			}
+		})
+	}
 
 	t.Run("an unreadable ZAP_PORT keeps the default", func(t *testing.T) {
 		t.Setenv("ZAP_PORT", "not-a-port")

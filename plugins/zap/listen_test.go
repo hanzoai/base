@@ -13,33 +13,39 @@ func TestNodeConfig(t *testing.T) {
 	scenarios := []struct {
 		name     string
 		address  string // Config.Address: --zap, else ZAP_ADDR
-		noMDNS   bool
+		mdns     bool   // Config.MDNS: --mdns, else ZAP_MDNS
+		noMDNS   bool   // Config.NoMDNS: --no-mdns
 		httpAddr string
 		wantAddr string
 		wantMDNS bool
 	}{
-		// With no address given, the node takes the HTTP host.
-		{"loopback HTTP keeps ZAP on loopback", "", false, "127.0.0.1:8090", "127.0.0.1:9999", false},
-		{"IPv6 loopback HTTP", "", false, "[::1]:8090", "[::1]:9999", false},
-		{"localhost HTTP", "", false, "localhost:8090", "localhost:9999", false},
-		{"wildcard HTTP keeps the wildcard", "", false, "0.0.0.0:8090", "0.0.0.0:9999", true},
-		{"empty-host HTTP is every interface", "", false, ":8090", ":9999", true},
-		{"LAN HTTP", "", false, "192.168.1.5:8090", "192.168.1.5:9999", true},
-		{"unreadable HTTP address falls back to loopback", "", false, "", "127.0.0.1:9999", false},
+		// With no address given, the node takes the HTTP host. mDNS is off
+		// unless asked for, wherever the node listens.
+		{"loopback HTTP keeps ZAP on loopback", "", false, false, "127.0.0.1:8090", "127.0.0.1:9999", false},
+		{"IPv6 loopback HTTP", "", false, false, "[::1]:8090", "[::1]:9999", false},
+		{"localhost HTTP", "", false, false, "localhost:8090", "localhost:9999", false},
+		{"wildcard HTTP keeps the wildcard, without mDNS", "", false, false, "0.0.0.0:8090", "0.0.0.0:9999", false},
+		{"empty-host HTTP is every interface, without mDNS", "", false, false, ":8090", ":9999", false},
+		{"LAN HTTP, without mDNS", "", false, false, "192.168.1.5:8090", "192.168.1.5:9999", false},
+		{"unreadable HTTP address falls back to loopback", "", false, false, "", "127.0.0.1:9999", false},
 
 		// An address given wins over the HTTP host, in both directions.
-		{"address narrower than HTTP", "127.0.0.1:19652", false, "0.0.0.0:8090", "127.0.0.1:19652", false},
-		{"an explicit wildcard is honoured", ":19652", false, "127.0.0.1:8090", ":19652", true},
-		{"address is trimmed", " 127.0.0.1:19652 ", false, "0.0.0.0:8090", "127.0.0.1:19652", false},
+		{"address narrower than HTTP", "127.0.0.1:19652", false, false, "0.0.0.0:8090", "127.0.0.1:19652", false},
+		{"an explicit wildcard is honoured", ":19652", false, false, "127.0.0.1:8090", ":19652", false},
+		{"address is trimmed", " 127.0.0.1:19652 ", false, false, "0.0.0.0:8090", "127.0.0.1:19652", false},
 
-		// --no-mdns turns mDNS off wherever the node listens.
-		{"no-mdns on an explicit wildcard", ":19652", true, "127.0.0.1:8090", ":19652", false},
-		{"no-mdns on a derived wildcard", "", true, "0.0.0.0:8090", "0.0.0.0:9999", false},
+		// --mdns turns discovery on only where a peer could reach the node, and
+		// --no-mdns beats it.
+		{"mdns on a wildcard", "", true, false, "0.0.0.0:8090", "0.0.0.0:9999", true},
+		{"mdns on a LAN address", "192.168.1.5:19652", true, false, "127.0.0.1:8090", "192.168.1.5:19652", true},
+		{"mdns never on loopback", "", true, false, "127.0.0.1:8090", "127.0.0.1:9999", false},
+		{"no-mdns beats mdns", ":19652", true, true, "127.0.0.1:8090", ":19652", false},
+		{"no-mdns alone on a wildcard", "", false, true, "0.0.0.0:8090", "0.0.0.0:9999", false},
 	}
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			nc, err := nodeConfig(Config{Port: 9999, Address: s.address, NoMDNS: s.noMDNS, NodeID: "n"}, s.httpAddr)
+			nc, err := nodeConfig(Config{Port: 9999, Address: s.address, MDNS: s.mdns, NoMDNS: s.noMDNS, NodeID: "n"}, s.httpAddr)
 			if err != nil {
 				t.Fatalf("nodeConfig: %v", err)
 			}
@@ -57,7 +63,7 @@ func TestNodeConfig(t *testing.T) {
 	}
 
 	t.Run("a unix socket is never advertised", func(t *testing.T) {
-		nc, err := nodeConfig(Config{Port: 9999, Address: "/tmp/base.zap.sock"}, "0.0.0.0:8090")
+		nc, err := nodeConfig(Config{Port: 9999, Address: "/tmp/base.zap.sock", MDNS: true}, "0.0.0.0:8090")
 		if err != nil {
 			t.Fatalf("nodeConfig: %v", err)
 		}
