@@ -137,7 +137,6 @@ func createUsersCollection(txApp core.App) error {
 	ownerRule := "id = @request.auth.id"
 	users.ListRule = types.Pointer(ownerRule)
 	users.ViewRule = types.Pointer(ownerRule)
-	users.CreateRule = types.Pointer("")
 	users.UpdateRule = types.Pointer(ownerRule)
 	users.DeleteRule = types.Pointer(ownerRule)
 
