@@ -38,7 +38,8 @@
   },
   "pnpm": {
     "overrides": {
-      "@hanzo/ui": "8.27.7"
+      "@hanzo/ui": "8.27.7",
+      "metro>image-size": "-"
     }
   }
 }
