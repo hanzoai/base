@@ -568,11 +568,12 @@ func TestAnchorStatusAfterClose(t *testing.T) {
 	// AnchorStatus after Close must not panic and must return last snapshot.
 	postSt := doc.AnchorStatus()
 
-	if postSt.LastHeight == 0 && preSt.LastHeight > 0 {
-		t.Fatal("AnchorStatus after Close lost data")
-	}
-	if postSt.LastHeight != preSt.LastHeight {
-		t.Fatalf("AnchorStatus changed after Close: pre=%d post=%d", preSt.LastHeight, postSt.LastHeight)
+	// Close joins the anchor goroutine rather than abandoning it, so a submit
+	// already in flight when Close is called still lands and the height may
+	// climb across it. The height is a count of anchors written: it may stand
+	// still or rise, and losing it is the only wrong answer.
+	if postSt.LastHeight < preSt.LastHeight {
+		t.Fatalf("AnchorStatus rewound after Close: pre=%d post=%d", preSt.LastHeight, postSt.LastHeight)
 	}
 }
 

@@ -223,6 +223,11 @@ type OAuth2KnownFields struct {
 	AvatarURL string `form:"avatarURL" json:"avatarURL"`
 }
 
+// OAuth2ProviderIAM names the one provider Base has. Auth is Hanzo IAM
+// (HIP-0111), so a provider config naming anything else describes a login
+// route that does not exist and that no collection can ever offer.
+const OAuth2ProviderIAM = "iam"
+
 type OAuth2Config struct {
 	Providers []OAuth2ProviderConfig `form:"providers" json:"providers"`
 
@@ -299,12 +304,24 @@ type OAuth2ProviderConfig struct {
 // Validate makes OAuth2ProviderConfig validatable by implementing [validation.Validatable] interface.
 func (c OAuth2ProviderConfig) Validate() error {
 	return validation.ValidateStruct(&c,
-		validation.Field(&c.Name, validation.Required),
+		validation.Field(&c.Name, validation.Required, validation.By(checkProviderName)),
 		validation.Field(&c.ClientId, validation.Required),
 		validation.Field(&c.ClientSecret, validation.Required),
 		validation.Field(&c.AuthURL, is.URL),
 		validation.Field(&c.TokenURL, is.URL),
 		validation.Field(&c.UserInfoURL, is.URL),
 	)
+}
+
+// checkProviderName refuses a name no provider answers to. Required runs
+// first, so an empty name is reported once as missing rather than twice.
+func checkProviderName(value any) error {
+	name, _ := value.(string)
+	if name == OAuth2ProviderIAM {
+		return nil
+	}
+
+	return validation.NewError("validation_unknown_provider", "The only auth provider is {{.iam}}.").
+		SetParams(map[string]any{"iam": OAuth2ProviderIAM})
 }
 

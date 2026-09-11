@@ -434,26 +434,20 @@ func TestOAuth2ConfigGetProviderConfig(t *testing.T) {
 	}{
 		{
 			"zero value",
-			"gitlab",
-			core.OAuth2Config{},
-			false,
-		},
-		{
-			"empty config with valid provider",
-			"gitlab",
+			core.OAuth2ProviderIAM,
 			core.OAuth2Config{},
 			false,
 		},
 		{
 			"non-empty config with missing provider",
-			"gitlab",
-			core.OAuth2Config{Providers: []core.OAuth2ProviderConfig{{Name: "google"}, {Name: "github"}}},
+			"missing",
+			core.OAuth2Config{Providers: []core.OAuth2ProviderConfig{{Name: core.OAuth2ProviderIAM}}},
 			false,
 		},
 		{
 			"config with existing provider",
-			"github",
-			core.OAuth2Config{Providers: []core.OAuth2ProviderConfig{{Name: "google"}, {Name: "github"}}},
+			core.OAuth2ProviderIAM,
+			core.OAuth2Config{Providers: []core.OAuth2ProviderConfig{{Name: core.OAuth2ProviderIAM}}},
 			true,
 		},
 	}
@@ -505,23 +499,22 @@ func TestOAuth2ConfigValidate(t *testing.T) {
 		{
 			"known provider with invalid data",
 			core.OAuth2Config{Enabled: true, Providers: []core.OAuth2ProviderConfig{
-				{Name: "gitlab", ClientId: "abc", TokenURL: "!invalid!"},
+				{Name: core.OAuth2ProviderIAM, ClientId: "abc", TokenURL: "!invalid!"},
 			}},
 			[]string{"providers"},
 		},
 		{
 			"known provider with valid data",
 			core.OAuth2Config{Enabled: true, Providers: []core.OAuth2ProviderConfig{
-				{Name: "gitlab", ClientId: "abc", ClientSecret: "456", TokenURL: "https://example.com"},
+				{Name: core.OAuth2ProviderIAM, ClientId: "abc", ClientSecret: "456", TokenURL: "https://example.com"},
 			}},
 			[]string{},
 		},
 		{
 			"known provider with valid data (duplicated)",
 			core.OAuth2Config{Enabled: true, Providers: []core.OAuth2ProviderConfig{
-				{Name: "gitlab", ClientId: "abc1", ClientSecret: "1", TokenURL: "https://example1.com"},
-				{Name: "google", ClientId: "abc2", ClientSecret: "2", TokenURL: "https://example2.com"},
-				{Name: "gitlab", ClientId: "abc3", ClientSecret: "3", TokenURL: "https://example3.com"},
+				{Name: core.OAuth2ProviderIAM, ClientId: "abc1", ClientSecret: "1", TokenURL: "https://example1.com"},
+				{Name: core.OAuth2ProviderIAM, ClientId: "abc2", ClientSecret: "2", TokenURL: "https://example2.com"},
 			}},
 			[]string{"providers"},
 		},
@@ -549,7 +542,7 @@ func TestOAuth2ProviderConfigValidate(t *testing.T) {
 		},
 		{
 			"minimum valid data",
-			core.OAuth2ProviderConfig{Name: "gitlab", ClientId: "abc", ClientSecret: "456"},
+			core.OAuth2ProviderConfig{Name: core.OAuth2ProviderIAM, ClientId: "abc", ClientSecret: "456"},
 			[]string{},
 		},
 		{
@@ -560,7 +553,7 @@ func TestOAuth2ProviderConfigValidate(t *testing.T) {
 		{
 			"invalid urls",
 			core.OAuth2ProviderConfig{
-				Name:         "gitlab",
+				Name:         core.OAuth2ProviderIAM,
 				ClientId:     "abc",
 				ClientSecret: "456",
 				AuthURL:      "!invalid!",
@@ -572,7 +565,7 @@ func TestOAuth2ProviderConfigValidate(t *testing.T) {
 		{
 			"valid urls",
 			core.OAuth2ProviderConfig{
-				Name:         "gitlab",
+				Name:         core.OAuth2ProviderIAM,
 				ClientId:     "abc",
 				ClientSecret: "456",
 				AuthURL:      "https://example.com/a",

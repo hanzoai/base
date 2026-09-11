@@ -287,7 +287,7 @@ func init() {
 			collection.Indexes = types.JSONArray[string]{"create index test on new_name (id)"}
 			collection.ManageRule = types.Pointer("1 != 2")
 			//  should be ignored
-			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: "gitlab", ClientId: "abc", ClientSecret: "123"}}
+			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: core.OAuth2ProviderIAM, ClientId: "abc", ClientSecret: "123"}}
 			testSecret := strings.Repeat("a", 30)
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
@@ -995,7 +995,7 @@ func init() {
 			collection.OAuth2.Enabled = true
 			collection.FileToken.Duration = 10
 			//  should be ignored
-			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: "gitlab", ClientId: "abc", ClientSecret: "123"}}
+			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: core.OAuth2ProviderIAM, ClientId: "abc", ClientSecret: "123"}}
 			testSecret := strings.Repeat("b", 30)
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
@@ -1085,7 +1085,7 @@ func TestAutomigrateCollectionNoChanges(t *testing.T) {
 			app.Bootstrap()
 
 			//  should be ignored
-			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: "gitlab", ClientId: "abc", ClientSecret: "123"}}
+			collection.OAuth2.Providers = []core.OAuth2ProviderConfig{{Name: core.OAuth2ProviderIAM, ClientId: "abc", ClientSecret: "123"}}
 			testSecret := strings.Repeat("b", 30)
 			collection.AuthToken.Secret = testSecret
 			collection.FileToken.Secret = testSecret
