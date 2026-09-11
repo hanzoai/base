@@ -30,7 +30,7 @@ require (
 	github.com/luxfi/consensus v1.36.81
 	github.com/luxfi/fhe v1.8.2
 	github.com/luxfi/keys v1.4.1
-	github.com/luxfi/kms v1.11.7
+	github.com/luxfi/kms v1.12.26
 	github.com/luxfi/log v1.5.0
 	github.com/luxfi/zap v1.2.9
 	github.com/spf13/cast v1.10.0
@@ -153,7 +153,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/luxfi/crypto v1.20.2 // indirect
+	github.com/luxfi/crypto v1.20.5 // indirect
 	github.com/luxfi/ids v1.3.2 // indirect
 	github.com/luxfi/math v1.5.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
