@@ -42,4 +42,11 @@ concurrency:
 jobs:
   cicd:
     uses: hanzoai/ci/.github/workflows/build.yml@v2
+    # The two platforms hanzo.yml declares, and the only mode that can deliver
+    # them. A run is one runner and a runner is one machine, so buildx builds the
+    # architecture it is and refuses the other rather than emulating it. The door
+    # builds each half on a node of its own architecture and publishes the index
+    # over them; the gate still runs here, before anything is delegated.
+    with:
+      mode: delegate
     secrets: inherit
