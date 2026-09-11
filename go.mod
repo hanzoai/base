@@ -5,12 +5,12 @@ go 1.26.8
 require (
 	github.com/disintegration/imaging v1.6.2
 	github.com/domodwyer/mailyak/v3 v3.6.2
-	github.com/dop251/goja v0.0.0-20260627200808-0b76000cabdb
+	github.com/dop251/goja v0.0.0-20260906210903-70ad66ec7ce4
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
-	github.com/evanw/esbuild v0.28.1
+	github.com/evanw/esbuild v0.28.2
 	github.com/fatih/color v1.19.0
-	github.com/fsnotify/fsnotify v1.9.0
-	github.com/gabriel-vasile/mimetype v1.4.13
+	github.com/fsnotify/fsnotify v1.10.1
+	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/ganigeorgiev/fexpr v0.5.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -24,7 +24,7 @@ require (
 	github.com/hanzoai/tasks v1.53.2
 	github.com/hanzos3/go v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/luxfi/age v1.6.0
 	github.com/luxfi/cache v1.3.1
 	github.com/luxfi/consensus v1.36.81
@@ -35,9 +35,9 @@ require (
 	github.com/luxfi/zap v1.2.9
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
-	github.com/tetratelabs/wazero v1.11.0
-	github.com/valyala/fasthttp v1.72.0
-	go.starlark.net v0.0.0-20260326113308-fadfc96def35
+	github.com/tetratelabs/wazero v1.12.0
+	github.com/valyala/fasthttp v1.74.0
+	go.starlark.net v0.0.0-20260908191801-89a6a09411d5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
 	golang.org/x/net v0.59.0
@@ -52,12 +52,11 @@ require (
 	cloud.google.com/go/storage v1.59.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/ALTree/bigfloat v0.2.0 // indirect
-	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
 	github.com/cloudflare/circl v1.6.3 // indirect
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
-	github.com/dlclark/regexp2/v2 v2.2.1 // indirect
+	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
@@ -75,7 +74,7 @@ require (
 	github.com/hanzos3/md5-simd v1.1.3 // indirect
 	github.com/holiman/uint256 v1.3.2 // indirect
 	github.com/jalaali/go-jalaali v0.0.0-20210801064154-80525e88d958 // indirect
-	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/lmittmann/tint v1.1.3 // indirect
@@ -103,6 +102,7 @@ require (
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
+	github.com/molecule-man/go-brrr v1.0.1 // indirect
 	github.com/montanaflynn/stats v0.9.0 // indirect
 	github.com/nats-io/nats.go v1.50.0 // indirect
 	github.com/nats-io/nkeys v0.4.15 // indirect
