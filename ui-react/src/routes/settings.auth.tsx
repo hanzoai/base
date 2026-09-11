@@ -15,12 +15,11 @@ interface ProviderForm {
     displayName: string;
 }
 
-const knownProviders = [
-    'google', 'github', 'apple', 'discord', 'microsoft', 'facebook',
-    'gitlab', 'twitter', 'spotify', 'twitch', 'strava', 'kakao',
-    'livechat', 'gitee', 'gitea', 'bitbucket', 'patreon', 'mailcow',
-    'vk', 'yandex', 'oidc', 'oidc2', 'oidc3',
-] as const;
+// The one provider Base serves. Every other name is refused by
+// OAuth2ProviderConfig.Validate, so offering twenty-three buttons meant
+// twenty-two that answer 400 -- and, before that check existed, twenty-two that
+// saved clean and authenticated nobody.
+const knownProviders = ['iam'] as const;
 
 function AuthSettings() {
     const qc = useQueryClient();
