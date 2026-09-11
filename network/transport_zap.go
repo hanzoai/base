@@ -28,8 +28,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -80,17 +78,16 @@ type zapTransport struct {
 // NOT bind the listener — Start does. Construction is cheap so the base
 // node can embed the transport before the base app has finished booting.
 func newZapTransport(cfg Config) *zapTransport {
-	port := portFromListen(cfg.ListenP2P)
-
 	logger := luxlog.New("component", "base-network", "transport", "zap", "nodeID", cfg.NodeID)
 
 	// luxfi/zap uses mDNS by default for peer discovery; K8s pods don't
 	// get link-local multicast so we disable it and rely on the explicit
-	// BASE_PEERS list below.
+	// BASE_PEERS list below. The node binds BASE_LISTEN_P2P as given, host
+	// included; an address that does not parse fails Start.
 	node := zap.NewNode(zap.NodeConfig{
 		NodeID:      cfg.NodeID,
 		ServiceType: zapServiceType,
-		Port:        port,
+		Address:     strings.TrimSpace(cfg.ListenP2P),
 		NoDiscovery: true,
 	})
 
@@ -262,22 +259,6 @@ func (z *zapTransport) reconnectLoop() {
 			}
 		}
 	}
-}
-
-// portFromListen parses ":9999" or "0.0.0.0:9999" → 9999. Falls back to
-// 9999 on any parse error; validate() already guarantees ListenP2P is a
-// well-formed host:port.
-func portFromListen(listen string) int {
-	listen = strings.TrimSpace(listen)
-	_, p, err := net.SplitHostPort(listen)
-	if err != nil {
-		return 9999
-	}
-	port, err := strconv.Atoi(p)
-	if err != nil || port <= 0 || port > 65535 {
-		return 9999
-	}
-	return port
 }
 
 // buildZapEnvelopeMessage wraps the raw frame bytes in a ZAP message with

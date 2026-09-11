@@ -37,6 +37,8 @@ type Base struct {
 	encryptionEnvFlag string
 	queryTimeout      int
 	hideStartBanner   bool
+	zapAddrFlag       string
+	noMDNSFlag        bool
 
 	// RootCmd is the main console command
 	RootCmd *cobra.Command
@@ -164,7 +166,9 @@ func NewWithConfig(config Config) *Base {
 	// Register ZAP transport plugin natively. ZAP is the binary,
 	// zero-copy wire protocol shared with Lux/Hanzo HFT services.
 	// Set ZAP_DISABLED=true to skip; set ZAP_PORT to override port.
-	zap.MustRegister(base)
+	// It listens on the HTTP host unless --zap or ZAP_ADDR names
+	// an address, and --no-mdns keeps it out of LAN discovery.
+	zap.MustRegisterWithConfig(base, base.zapConfig())
 
 	return base
 }
@@ -256,7 +260,34 @@ func (base *Base) eagerParseFlags(config *Config) error {
 		"the default SELECT queries timeout in seconds",
 	)
 
+	base.RootCmd.PersistentFlags().StringVar(
+		&base.zapAddrFlag,
+		"zap",
+		"",
+		"the address for the ZAP transport to listen on, eg. 127.0.0.1:9999 (\":9999\" is every interface)\n(default $ZAP_ADDR, otherwise the --http host on $ZAP_PORT or 9999)",
+	)
+
+	base.RootCmd.PersistentFlags().BoolVar(
+		&base.noMDNSFlag,
+		"no-mdns",
+		false,
+		"don't advertise the ZAP transport over mDNS or dial the peers it finds\n(mDNS never runs while ZAP listens on loopback)",
+	)
+
 	return base.RootCmd.ParseFlags(os.Args[1:])
+}
+
+// zapConfig is the ZAP transport config the environment gives, with the --zap
+// and --no-mdns flags laid over it.
+func (base *Base) zapConfig() zap.Config {
+	config := zap.DefaultConfig()
+	if base.zapAddrFlag != "" {
+		config.Address = base.zapAddrFlag
+	}
+	if base.noMDNSFlag {
+		config.NoMDNS = true
+	}
+	return config
 }
 
 // skipBootstrap eagerly checks if the app should skip the bootstrap process:
