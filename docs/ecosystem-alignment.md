@@ -230,6 +230,7 @@ Consistent.
 | Base server (Go) | `CONNECT` | base/apis/realtime.go:83 |
 | Base JS SDK | `CONNECT` | base/sdk/base-js/src/core/realtime.ts:163 |
 
+#### E2. Inter-Service Events
 
 | Repo | Transport | Source |
 |------|-----------|--------|
