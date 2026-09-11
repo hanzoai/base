@@ -103,6 +103,40 @@ func TestFromEnvQuasarValid(t *testing.T) {
 	}
 }
 
+// BASE_LISTEN_P2P is the address the peer listener binds, host and all, so one
+// that names no port is refused rather than bound somewhere else.
+func TestFromEnvListenP2P(t *testing.T) {
+	for _, s := range []struct {
+		value string
+		ok    bool
+	}{
+		{":9999", true},
+		{"127.0.0.1:9999", true},
+		{"[::1]:9999", true},
+		{"localhost:9999", true},
+		{":0", true},
+		{"9999", false},
+		{"localhost", false},
+		{"127.0.0.1:", false},
+		{"127.0.0.1:p2p", false},
+		{":65536", false},
+	} {
+		t.Run(s.value, func(t *testing.T) {
+			t.Setenv("BASE_NETWORK", "quasar")
+			t.Setenv("BASE_SHARD_KEY", "user_id")
+			t.Setenv("HOSTNAME", "a")
+			t.Setenv("BASE_LISTEN_P2P", s.value)
+			_, err := ConfigFromEnv()
+			if s.ok && err != nil {
+				t.Fatalf("refused: %v", err)
+			}
+			if !s.ok && err == nil {
+				t.Fatal("accepted an address with no port")
+			}
+		})
+	}
+}
+
 func TestInstallWALHookRejectsBadConn(t *testing.T) {
 	cfg := Config{
 		Enabled:     true,

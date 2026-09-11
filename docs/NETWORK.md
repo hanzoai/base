@@ -177,7 +177,7 @@ Backend is pluggable via `github.com/hanzoai/s3` client surface:
 | `BASE_NODE_ROLE`            | `validator` (default) \| `archive`          |  |
 | `BASE_ARCHIVE`              | `gs://…` \| `s3://…` \| `off` (default)     |  |
 | `BASE_LISTEN_HTTP`          | `:8090` default                             | Base HTTP. |
-| `BASE_LISTEN_P2P`           | `:9999` default                             | quasar p2p port. |
+| `BASE_LISTEN_P2P`           | `host:port`, `:9999` default                | quasar p2p listener. The host is honoured: `:9999` is every interface, `127.0.0.1:9999` loopback only. |
 | `BASE_SHARD_BACKLOG_MAX`    | bytes (64 MiB default)                      | R6 per-shard archive backlog cap; drop-oldest beyond. |
 | `BASE_SHARD_BACKLOG_SEGMENTS` | integer (100 000 default)                 | R6 segment-count cap; first-to-hit with MAX drops. |
 
