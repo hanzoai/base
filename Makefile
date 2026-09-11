@@ -5,7 +5,7 @@ build: ui
 	go build -o base ./examples/base/main.go
 
 dev:
-	go run ./examples/base/main.go serve --http=127.0.0.1:8090 --dir=./pb_data
+	go run ./examples/base/main.go serve --http=127.0.0.1:8090 --dir=./base_/data
 
 lint:
 	golangci-lint run -c ./golangci.yml ./...

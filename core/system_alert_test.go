@@ -10,7 +10,7 @@ import (
 func TestSendSystemAlert(t *testing.T) {
 	t.Parallel()
 
-	testDataDir, err := os.MkdirTemp("", "sendSystemAlert_pb_data")
+	testDataDir, err := os.MkdirTemp("", "sendSystemAlert_data")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestSendSystemAlert(t *testing.T) {
 func TestSendSystemAlertToAllSuperusers(t *testing.T) {
 	t.Parallel()
 
-	testDataDir, err := os.MkdirTemp("", "sendSystemAlertToAllSuperusers_pb_data")
+	testDataDir, err := os.MkdirTemp("", "sendSystemAlertToAllSuperusers_data")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -72,9 +72,9 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 	// github.com/hanzoai/base, which is where this code lives. It defaulted to
 	// owner "base" — github.com/base/base, a repository this project does not
 	// own and which exists — so `base update` on a stock binary asked a stranger
-	// for a release and overwrote the running executable with the answer. The
-	// fork's rebrand rewrote "pocketbase" to "base" mechanically and turned a
-	// correct default into that one. Pinned by TestDefaultsPointAtThisProject.
+	// for a release and overwrote the running executable with the answer. A
+	// mechanical rename to "base" had turned a correct default into that one.
+	// Pinned by TestDefaultsPointAtThisProject.
 	if p.config.Owner == "" {
 		p.config.Owner = "hanzoai"
 	}

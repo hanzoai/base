@@ -41,5 +41,4 @@ QWEN.md
 /base_/
 # legacy data dirs (pre base_/ namespace) — never resurrect
 /hz_data/
-/pb_data/
 .claude/

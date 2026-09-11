@@ -17,10 +17,9 @@ import (
 // they are not a fallback nobody reaches.
 //
 // They pointed at owner "base" until now: github.com/base/base, a repository
-// this project does not own and which exists. The fork's rebrand rewrote
-// "pocketbase" to "base" everywhere and turned a correct default into that one,
-// which is exactly why this is pinned rather than left to be read correctly the
-// next time someone runs a rename across the tree.
+// this project does not own and which exists. A mechanical rename across the
+// tree had turned a correct default into that one, which is exactly why this is
+// pinned rather than left to be read correctly the next time someone runs one.
 func TestDefaultsPointAtThisProject(t *testing.T) {
 	app, err := tests.NewTestApp()
 	if err != nil {

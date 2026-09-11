@@ -223,14 +223,12 @@ concerns (audit, analytics, inter-service events).
 
 #### E1. SSE Event Naming
 
-CONFLICT: Server renamed, SDK not.
+Consistent.
 
 | Component | Event Name | Source |
 |-----------|-----------|--------|
-| Base server (Go) | `HZ_CONNECT` | base/apis/realtime.go:83 |
-| Base JS SDK | `PB_CONNECT` | base/sdk/base-js/src/core/realtime.ts:163 |
-
-Server was updated. SDK was not.
+| Base server (Go) | `CONNECT` | base/apis/realtime.go:83 |
+| Base JS SDK | `CONNECT` | base/sdk/base-js/src/core/realtime.ts:163 |
 
 
 | Repo | Transport | Source |
@@ -269,7 +267,7 @@ Ecosystem standard: Hanzo IAM exclusively (Commerce, Gateway both use it).
 2. **Auth header**: `Authorization: Bearer` (consistent)
 3. **Admin UI**: Disabled by default via `BASE_ENABLE_ADMIN_UI` (correct)
 4. **Health endpoint**: `/healthz` (correct)
-5. **SSE server event**: `HZ_CONNECT` (renamed from PB_CONNECT)
+5. **SSE server event**: `CONNECT`, the same name in the server and the JS SDK
 6. **Error format**: Base's `{status, message, data}` is more informative than Commerce's
 7. **Pagination**: Base's `{items, page, perPage, totalItems, totalPages}` is the best
 8. **Storage model**: Base's SQL-per-collection is superior to ORM's JSON blobs
@@ -282,8 +280,7 @@ Ecosystem standard: Hanzo IAM exclusively (Commerce, Gateway both use it).
 4. **No multi-tenancy**: Commerce has per-org DBs, Base has nothing
 5. **No encryption**: hanzoai/sqlite has CEK, Base does not integrate it
 6. **Auth**: Base has its own auth system alongside IAM
-7. **JS SDK**: Still references `PB_CONNECT`
-8. **No inter-service events**: Commerce has NATS publisher, Base does not
+7. **No inter-service events**: Commerce has NATS publisher, Base does not
 
 ### What Base Does Better
 
@@ -357,12 +354,9 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 ### Phase 5: SDK + Cleanup
 
 **Changes:**
-- Fix JS SDK: `PB_CONNECT` to `HZ_CONNECT`
-- Search-replace remaining `PB_`, `pb_`, `base`, `Base` references
 - Add NATS publisher for inter-service events (like Commerce)
 
 **Files to modify:**
-- `base/sdk/base-js/src/core/realtime.ts:163` -- PB_CONNECT to HZ_CONNECT
 - Global search-replace across SDK and Go source
 
 ---
@@ -386,7 +380,7 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
          +------------------+------------------+
          |                  |                  |
     Record CRUD        Realtime SSE       Collection API
-         |              (HZ_CONNECT)           |
+         |              (CONNECT)           |
          |                  |                  |
     +----+----+        NATS Publisher     Schema DDL
     |         |         (inter-svc)       migrations
@@ -439,8 +433,8 @@ Backward compatibility via env vars in phases 1-2. Breaking changes in phase 3+.
 25. base/core/record_model_superusers.go:12 -- _superusers collection name
 26. base/apis/base.go:62-64 -- apiPrefix hard-coded "/v1"
 27. base/apis/serve.go:81-95 -- Admin UI disabled by default, root redirect
-28. base/apis/realtime.go:83 -- HZ_CONNECT event name (server)
-29. base/sdk/base-js/src/core/realtime.ts:163 -- PB_CONNECT (stale, needs fix)
+28. base/apis/realtime.go:83 -- CONNECT event name (server)
+29. base/sdk/base-js/src/core/realtime.ts:163 -- CONNECT event name (JS SDK)
 30. base/tools/router/error.go:36-42 -- ApiError struct
 31. base/tools/search/provider.go:47-61 -- Pagination (params + Result struct)
 32. base/apis/superuser_auth_oidc.go:53-56 -- OIDC config from env

@@ -9,7 +9,7 @@
 #
 # The CI job (.github/workflows/gitleaks.yml) scans the NEW commits of
 # each push / PR, so this config only ever fails on newly introduced
-# secrets — the pre-existing upstream PocketBase test vectors below never
+# secrets — the pre-existing test vectors below never
 # gate a change unless a diff actually touches them.
 
 title = "hanzo-base secret scan"
@@ -35,7 +35,7 @@ tags = ["hanzo", "hz_data"]
 
 [allowlist]
 description = """
-Known upstream PocketBase locations that legitimately contain the PEM
+Known locations that legitimately contain the PEM
 header STRING (documentation / generated types / a test vector) but no
 real key body. Scoped by exact path so a real key committed anywhere
 else — including any other test file — is still caught.
