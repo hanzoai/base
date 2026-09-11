@@ -339,10 +339,17 @@ images:
     context: .
     dockerfile: Dockerfile
     repo: ghcr.io/hanzoai/base
-    # amd64 only, exactly what deploy.yml built. The cluster has no arm64 nodes,
-    # and adding an arch here means QEMU-emulating a full Go build for consumers
-    # that do not exist yet. Add linux/arm64 when something pulls it.
-    platforms: [linux/amd64]
+    # BOTH ARCHITECTURES, ONE MANIFEST INDEX. `docker pull ghcr.io/hanzoai/base`
+    # has to work on whatever machine a contributor owns, and an arch-neutral tag
+    # carrying one architecture is the failure that says nothing until a
+    # container starts: the pull resolves, the image runs nowhere.
+    #
+    # What stood here — no arm64 node, so a second arch means QEMU-emulating a Go
+    # build — was true of the runner lane and never of the door. A runner is one
+    # machine and refuses the foreign platform outright; the door schedules one
+    # BuildKit Job per platform, each on a node of that architecture, and joins
+    # them. Nothing is emulated, which is what `mode: delegate` in the caller buys.
+    platforms: [linux/amd64, linux/arm64]
     # NOTE on the version this publishes: a `v*` tag IS the version and is
     # published verbatim (v1.5.16 + the 1.5.16 alias). A branch build derives the
     # next patch above what ghcr already carries, via hanzoai/ci's bin/imgver —
