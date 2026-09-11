@@ -354,18 +354,19 @@ func (c *Client) Stop() {
 }
 
 // connectZAP lazily establishes the ZAP connection to the Tasks server.
+//
+// The node dials and never listens, so it is not started: with discovery off,
+// Start only binds a listener, and with Port 0 that was an ephemeral port on
+// every interface. Nothing reaches this node through one. A Call is answered
+// on the connection it went out on, the node registers no handler, and no peer
+// is told where it is.
 func (c *Client) connectZAP() error {
 	c.zapOnce.Do(func() {
 		c.zapNode = zap.NewNode(zap.NodeConfig{
 			NodeID:      "tasks-sdk",
 			ServiceType: "_tasks-sdk._tcp",
-			Address:     "127.0.0.1:0", // dials out only; nothing needs to reach it
 			NoDiscovery: true,
 		})
-		if err := c.zapNode.Start(); err != nil {
-			c.zapErr = fmt.Errorf("taskqueue: zap start: %w", err)
-			return
-		}
 		if err := c.zapNode.ConnectDirect(c.zapAddr); err != nil {
 			c.zapErr = fmt.Errorf("taskqueue: zap connect %s: %w", c.zapAddr, err)
 			return
