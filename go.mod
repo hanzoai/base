@@ -26,12 +26,12 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/luxfi/age v1.6.0
-	github.com/luxfi/cache v1.3.1
-	github.com/luxfi/consensus v1.36.81
-	github.com/luxfi/fhe v1.8.2
-	github.com/luxfi/keys v1.4.1
+	github.com/luxfi/cache v1.3.5
+	github.com/luxfi/consensus v1.36.92
+	github.com/luxfi/fhe v1.11.2
+	github.com/luxfi/keys v1.4.3
 	github.com/luxfi/kms v1.12.26
-	github.com/luxfi/log v1.5.0
+	github.com/luxfi/log v1.6.2
 	github.com/luxfi/zap v1.2.9
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
@@ -59,6 +59,8 @@ require (
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/gofiber/schema v1.7.1 // indirect
 	github.com/gofiber/utils/v2 v2.0.4 // indirect
@@ -84,7 +86,6 @@ require (
 	github.com/luxfi/container v0.2.2 // indirect
 	github.com/luxfi/corona v0.10.4 // indirect
 	github.com/luxfi/dkg v0.3.5 // indirect
-	github.com/luxfi/formatting v1.1.1 // indirect
 	github.com/luxfi/geth v1.20.2 // indirect
 	github.com/luxfi/go-bip32 v1.1.0 // indirect
 	github.com/luxfi/go-bip39 v1.2.0 // indirect
@@ -93,12 +94,10 @@ require (
 	github.com/luxfi/magnetar v1.2.3 // indirect
 	github.com/luxfi/mlwe v0.3.0 // indirect
 	github.com/luxfi/pq v1.1.0 // indirect
-	github.com/luxfi/protocol v0.0.2 // indirect
 	github.com/luxfi/pulsar v1.9.2 // indirect
 	github.com/luxfi/sampler v1.1.0 // indirect
 	github.com/luxfi/threshold v1.12.3 // indirect
 	github.com/luxfi/tls v1.1.1 // indirect
-	github.com/luxfi/vm v1.3.12 // indirect
 	github.com/magefile/mage v1.15.1-0.20241126214340-bdc92f694516 // indirect
 	github.com/markusmobius/go-dateparser v1.2.4 // indirect
 	github.com/mimoo/StrobeGo v0.0.0-20220103164710-9a04d6ca976b // indirect
@@ -121,7 +120,14 @@ require (
 	github.com/zap-proto/go v1.3.0 // indirect
 	github.com/zap-proto/mcp v1.0.5 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
+	go.opentelemetry.io/otel/log v0.20.0 // indirect
+	go.opentelemetry.io/otel/metric v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk/log v0.20.0 // indirect
+	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
 	google.golang.org/api v0.275.0 // indirect
@@ -158,7 +164,7 @@ require (
 	github.com/luxfi/math v1.5.1 // indirect
 	github.com/luxfi/math/big v0.1.0 // indirect
 	github.com/luxfi/mdns v0.2.1 // indirect
-	github.com/luxfi/metric v1.10.0
+	github.com/luxfi/metric v1.11.2
 	github.com/luxfi/mock v0.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
