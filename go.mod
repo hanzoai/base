@@ -11,7 +11,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gabriel-vasile/mimetype v1.4.15
-	github.com/ganigeorgiev/fexpr v0.5.0
+	github.com/ganigeorgiev/fexpr v0.6.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/hanzoai/authz v1.10.31
