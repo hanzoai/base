@@ -14,13 +14,13 @@ require (
 	github.com/ganigeorgiev/fexpr v0.6.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/authz v1.10.31
-	github.com/hanzoai/cek v0.2.3
-	github.com/hanzoai/dbx v1.17.2
+	github.com/hanzoai/authz v1.10.37
+	github.com/hanzoai/cek v0.2.10
+	github.com/hanzoai/dbx v1.17.4
 	github.com/hanzoai/ha v0.2.0
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/namespace v1.2.0
-	github.com/hanzoai/pubsub-go v1.0.0
+	github.com/hanzoai/pubsub-go v1.53.0
 	github.com/hanzoai/tasks v1.53.2
 	github.com/hanzos3/go v1.0.2
 	github.com/hashicorp/golang-lru/v2 v2.0.7
@@ -48,8 +48,6 @@ require (
 )
 
 require (
-	cloud.google.com/go/iam v1.7.0 // indirect
-	cloud.google.com/go/storage v1.59.2 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/ALTree/bigfloat v0.2.0 // indirect
 	github.com/btcsuite/btcd/btcutil v1.1.6 // indirect
@@ -121,7 +119,6 @@ require (
 	github.com/zap-proto/mcp v1.0.5 // indirect
 	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
 	go.opentelemetry.io/otel v1.44.0 // indirect
 	go.opentelemetry.io/otel/log v0.20.0 // indirect
 	go.opentelemetry.io/otel/metric v1.44.0 // indirect
@@ -130,8 +127,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gonum.org/v1/gonum v0.17.0 // indirect
-	google.golang.org/api v0.275.0 // indirect
-	google.golang.org/genproto v0.0.0-20260406210006-6f92a3bedf2d // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	modernc.org/libc v1.72.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
@@ -152,9 +147,9 @@ require (
 	github.com/google/uuid v1.6.1-0.20241114170450-2d3c2a9cc518 // indirect
 	github.com/gorilla/rpc v1.2.1 // indirect
 	github.com/grandcat/zeroconf v1.0.0 // indirect
-	github.com/hanzoai/orm v0.6.25
-	github.com/hanzoai/replicate v0.9.5
-	github.com/hanzoai/sqlite v0.5.2
+	github.com/hanzoai/orm v0.6.31
+	github.com/hanzoai/replicate v0.9.12
+	github.com/hanzoai/sqlite v0.5.10
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -184,9 +179,6 @@ require (
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.49.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260615183401-62b3387ff324 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260622175928-b703f567277d // indirect
-	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )
