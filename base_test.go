@@ -130,8 +130,9 @@ func TestNewWithConfigAndFlags(t *testing.T) {
 	}
 }
 
-// The ZAP transport's address and mDNS switch come from --zap and --no-mdns
-// laid over ZAP_ADDR, and this is where the flag wins or loses.
+// The ZAP transport's address and mDNS switches come from --zap, --mdns and
+// --no-mdns laid over ZAP_ADDR and ZAP_MDNS, and this is where a flag wins or
+// loses.
 func TestZapFlags(t *testing.T) {
 	// copy os.Args
 	originalArgs := make([]string, len(os.Args))
@@ -143,27 +144,36 @@ func TestZapFlags(t *testing.T) {
 
 	scenarios := []struct {
 		name       string
-		env        string
+		addrEnv    string // ZAP_ADDR
+		mdnsEnv    string // ZAP_MDNS
 		args       []string
 		wantAddr   string
+		wantMDNS   bool
 		wantNoMDNS bool
 	}{
-		{"nothing set", "", []string{"serve"}, "", false},
-		{"flags after --http", "", []string{"serve", "--http", "127.0.0.1:18090", "--zap", "127.0.0.1:19652", "--no-mdns"}, "127.0.0.1:19652", true},
-		{"flag with =", "", []string{"serve", "--zap=[::1]:19652"}, "[::1]:19652", false},
-		{"ZAP_ADDR alone", "127.0.0.1:29652", []string{"serve"}, "127.0.0.1:29652", false},
-		{"--zap beats ZAP_ADDR", "0.0.0.0:29652", []string{"serve", "--zap", "127.0.0.1:19652"}, "127.0.0.1:19652", false},
+		{"nothing set", "", "", []string{"serve"}, "", false, false},
+		{"flags after --http", "", "", []string{"serve", "--http", "127.0.0.1:18090", "--zap", "127.0.0.1:19652", "--no-mdns"}, "127.0.0.1:19652", false, true},
+		{"flag with =", "", "", []string{"serve", "--zap=[::1]:19652"}, "[::1]:19652", false, false},
+		{"ZAP_ADDR alone", "127.0.0.1:29652", "", []string{"serve"}, "127.0.0.1:29652", false, false},
+		{"--zap beats ZAP_ADDR", "0.0.0.0:29652", "", []string{"serve", "--zap", "127.0.0.1:19652"}, "127.0.0.1:19652", false, false},
+		{"--mdns", "", "", []string{"serve", "--mdns"}, "", true, false},
+		{"ZAP_MDNS alone", "", "true", []string{"serve"}, "", true, false},
+		{"--no-mdns alongside --mdns", "", "true", []string{"serve", "--mdns", "--no-mdns"}, "", true, true},
 	}
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			t.Setenv("ZAP_ADDR", s.env)
+			t.Setenv("ZAP_ADDR", s.addrEnv)
+			t.Setenv("ZAP_MDNS", s.mdnsEnv)
 			os.Args = append(originalArgs[:1:1], s.args...)
 
 			config := New().zapConfig()
 
 			if config.Address != s.wantAddr {
 				t.Fatalf("Address = %q, want %q", config.Address, s.wantAddr)
+			}
+			if config.MDNS != s.wantMDNS {
+				t.Fatalf("MDNS = %v, want %v", config.MDNS, s.wantMDNS)
 			}
 			if config.NoMDNS != s.wantNoMDNS {
 				t.Fatalf("NoMDNS = %v, want %v", config.NoMDNS, s.wantNoMDNS)
