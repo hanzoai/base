@@ -9,10 +9,10 @@ import (
 )
 
 // externalIAMAuthMethods returns the auth-methods response a client
-// sees when Base is configured with an external IAM. It exposes a
-// single OAuth2 provider named "iam" — generic, no brand string in
-// Base code. The IAM endpoint is recovered from the JWKS URL the
-// platform plugin stored at boot.
+// sees when Base is configured with an external IAM. It exposes the
+// single OAuth2 provider [core.OAuth2ProviderIAM] — generic, no brand
+// string in Base code. The IAM endpoint is recovered from the JWKS URL
+// the platform plugin stored at boot.
 //
 // IAM_DISPLAY_NAME (optional env) feeds the UI button label; if
 // unset, DisplayName is empty and the UI renders a neutral fallback.
@@ -33,7 +33,7 @@ func externalIAMAuthMethods(e *core.RequestEvent) authMethodsResponse {
 	}
 
 	info := providerInfo{
-		Name:                "iam",
+		Name:                core.OAuth2ProviderIAM,
 		DisplayName:         os.Getenv("IAM_DISPLAY_NAME"),
 		State:               state,
 		AuthURL:             authURL,

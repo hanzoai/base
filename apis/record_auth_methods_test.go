@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 )
@@ -29,31 +30,37 @@ func TestRecordAuthMethodsList(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:           "auth collection with no OAuth2 providers",
+			// the collection stores a disabled oauth2 config, and it makes no
+			// difference: auth is IAM, so every auth collection advertises IAM.
+			Name:           "auth collection, IAM unconfigured",
 			Method:         http.MethodGet,
 			URL:            "/v1/collections/nologin/auth-methods",
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"oauth2":{"providers":[],"enabled":false}`,
+				`"oauth2":{`,
+				`"providers":[{`,
+				`"name":"iam"`,
+				`"enabled":true`,
+				`"authURL":""`, // nowhere to send anyone until IAM is named
 			},
 			ExpectedEvents: map[string]int{"*": 0},
 		},
 		{
-			Name:           "auth collection with OAuth2 providers",
-			Method:         http.MethodGet,
-			URL:            "/v1/collections/users/auth-methods",
+			Name:   "auth collection, IAM configured",
+			Method: http.MethodGet,
+			URL:    "/v1/collections/users/auth-methods",
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyJWKSURL, "https://iam.example.com/v1/iam/.well-known/jwks")
+			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"oauth2":{`,
-				`"providers":[{`,
-				`"name":"google"`,
-				`"name":"gitlab"`,
+				`"name":"iam"`,
 				`"state":`,
 				`"displayName":`,
 				`"codeVerifier":`,
 				`"codeChallenge":`,
-				`"codeChallengeMethod":`,
-				`"authURL":`,
+				`"codeChallengeMethod":"S256"`,
+				`"authURL":"https://iam.example.com/v1/iam/oauth/authorize?response_type=code`,
 				`redirect_uri="`, // ensures that the redirect_uri is the last url param
 			},
 			ExpectedEvents: map[string]int{"*": 0},
