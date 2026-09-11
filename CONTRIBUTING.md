@@ -21,10 +21,7 @@ GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2 go test -count=1 ./...
 golangci-lint run -c ./golangci.yml ./...
 ```
 
-On macOS two tests fail for want of RAM-backed storage: `TestTasksEmbed` in
-`core` and `TestOrgBaseIsEncryptedAtRest` in `plugins/org`. The encrypted SQLite
-codec will only decrypt into RAM, which is `/dev/shm` on Linux, or on macOS a
-`tmpfs` mount named by `HANZO_SQLITE_RAMFS_DIR`.
+The whole suite passes on macOS with those settings.
 
 ## Admin UI
 

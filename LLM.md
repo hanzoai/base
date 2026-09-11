@@ -54,13 +54,12 @@ CI (`hanzo.yml`) runs the Go gates with those three variables, runs
 `network/attack_vectors_test.go` apart from the passes. Do not use `make build`
 or `make ui`: they run pnpm in `ui/`, which does not exist.
 
-**Known failures on macOS.** With the test command above, 63 packages pass and
-two tests fail: `TestTasksEmbed` in `core` and `TestOrgBaseIsEncryptedAtRest` in
-`plugins/org`. Both open an encrypted SQLite file through the pure-Go codec,
-which decrypts only into RAM: `/dev/shm` on Linux, or a `tmpfs` named by
-`HANZO_SQLITE_RAMFS_DIR` (`sudo mount_tmpfs <dir>`). An `hdiutil` RAM disk does
-not count. `TestOAuth2ConfigValidate` and `TestOAuth2ProviderConfigValidate`
-pass.
+**macOS.** The whole suite passes with the test command above, including
+`TestTasksEmbed`, `TestOrgBaseIsEncryptedAtRest`, `TestOAuth2ConfigValidate` and
+`TestOAuth2ProviderConfigValidate`. The first two failed on a Mac before
+`hanzoai/sqlite` v0.5.10, whose pure-Go codec would decrypt only into RAM. It now
+prefers RAM (`HANZO_SQLITE_RAMFS_DIR` when it names a `tmpfs`, then `/dev/shm`)
+and falls back to the OS temp directory.
 
 ## What must stay true
 
@@ -148,7 +147,7 @@ is `BASE_FRAME_ANCESTORS` (default `'self'`). It signs in with IAM PKCE
 - `--publicDir` and `--indexFallback` do nothing: `apis.Serve` registers `GET /{path...}` before the binary's static route checks for one.
 - A fresh Base's `users.createRule` is `""`, so anonymous callers can create rows.
 - `examples/base` sets no `IAMOrg`, so `plugins/org` never reads the master key and org Bases open unencrypted.
-- With a relative data dir, `TASKS_EMBED` uses `base_/data/tasks.sock`, which `zap.Network` reads as a TCP address. The engine fails and `NewBaseApp` drops the error.
+- `TASKS_EMBED` fails and `NewBaseApp` drops the error when the default socket path is relative (`zap.Network` reads `base_/data/tasks.sock` as a TCP address) and on a data directory's first start (the engine binds before the directory exists).
 - The start banner prints `/v1/` and a Dashboard address whatever `BASE_API_PREFIX` and `BASE_ENABLE_ADMIN_UI` say.
 - No GitHub release after `v0.36.7-hanzo.1` carries binaries, so `base update` fails, and `ghcr.io/hanzoai/base` has no image for `v1.5.92` to `v1.5.96`.
 - `go install github.com/hanzoai/base/examples/base@<version>` fails on the `replace` in `go.mod`.

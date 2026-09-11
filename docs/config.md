@@ -183,7 +183,7 @@ variables.
 
 | Variable | Meaning |
 |---|---|
-| `HANZO_SQLITE_RAMFS_DIR` | Directory the pure-Go encrypted SQLite codec decrypts into. It must be RAM-backed: `/dev/shm` is used when this is unset, and on macOS only a `tmpfs` mount qualifies. With neither, an encrypted database does not open. |
+| `HANZO_SQLITE_RAMFS_DIR` | Where the pure-Go encrypted SQLite codec keeps its temporary plaintext copy, when this directory is RAM-backed (on macOS, a `tmpfs` mount). Otherwise the codec uses `/dev/shm`, and failing that the OS temp directory. The copy is deleted on close. |
 | `HOSTNAME` | Default replication node id. |
 
 ### The cli command
