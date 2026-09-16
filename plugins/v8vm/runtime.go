@@ -13,7 +13,7 @@ import (
 
 	v8 "rogchap.com/v8go"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // Defaults — tuned for short-lived per-request JS hooks.

@@ -26,7 +26,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 	"go.starlark.net/syntax"
 )
 

@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/hanzoai/base/core"
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"
 )

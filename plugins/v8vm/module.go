@@ -11,7 +11,7 @@ import (
 
 	v8 "rogchap.com/v8go"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // module is one loaded JS extension. It holds a precompiled UnboundScript

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // writeExt builds a minimal extension dir on disk and returns its path.

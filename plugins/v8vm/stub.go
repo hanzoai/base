@@ -14,7 +14,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // NewRuntime returns a v8go-shaped runtime that errors at Load time when

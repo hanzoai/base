@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/hanzoai/base/plugins/extruntime"
-	"github.com/hanzoai/base/plugins/gojavm"
+	"github.com/hanzoai/plugin/extruntime"
+	"github.com/hanzoai/plugin/gojavm"
 	"github.com/hanzoai/base/plugins/v8vm"
-	"github.com/hanzoai/base/plugins/wasmvm"
+	"github.com/hanzoai/plugin/wasmvm"
 )
 
 func main() {

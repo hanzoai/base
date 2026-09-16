@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // The binary this file builds must be able to run the functions it serves.

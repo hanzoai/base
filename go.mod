@@ -7,7 +7,6 @@ require (
 	github.com/domodwyer/mailyak/v3 v3.6.2
 	github.com/dop251/goja v0.0.0-20260906210903-70ad66ec7ce4
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
-	github.com/evanw/esbuild v0.28.2
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gabriel-vasile/mimetype v1.4.15
@@ -20,6 +19,7 @@ require (
 	github.com/hanzoai/ha v0.2.0
 	github.com/hanzoai/ltx v0.5.1
 	github.com/hanzoai/namespace v1.2.0
+	github.com/hanzoai/plugin v0.1.1
 	github.com/hanzoai/pubsub-go v1.53.0
 	github.com/hanzoai/tasks v1.53.2
 	github.com/hanzos3/go v1.0.2
@@ -35,7 +35,6 @@ require (
 	github.com/luxfi/zap v1.2.9
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
-	github.com/tetratelabs/wazero v1.12.0
 	github.com/valyala/fasthttp v1.74.0
 	go.starlark.net v0.0.0-20260908191801-89a6a09411d5
 	golang.org/x/crypto v0.57.0
@@ -55,6 +54,7 @@ require (
 	github.com/cronokirby/saferith v0.33.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.1 // indirect
 	github.com/dlclark/regexp2/v2 v2.5.2 // indirect
+	github.com/evanw/esbuild v0.28.2 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -110,6 +110,7 @@ require (
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/supranational/blst v0.3.16 // indirect
+	github.com/tetratelabs/wazero v1.12.0 // indirect
 	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/wasilibs/go-re2 v1.3.0 // indirect
@@ -171,7 +172,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/zap-proto/http v0.3.9
-	github.com/zap-proto/zip v1.36.47
+	github.com/zap-proto/zip v1.36.48
 	go.uber.org/mock v0.6.0 // indirect
 	golang.org/x/exp v0.0.0-20260529124908-c761662dc8c9 // indirect
 	golang.org/x/mod v0.41.0 // indirect

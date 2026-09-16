@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 // writeExt writes a tiny manifest+source pair into a temp dir and

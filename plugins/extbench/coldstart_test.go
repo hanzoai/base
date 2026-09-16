@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hanzoai/base/plugins/extruntime"
-	"github.com/hanzoai/base/plugins/gojavm"
-	"github.com/hanzoai/base/plugins/pyvm"
+	"github.com/hanzoai/plugin/extruntime"
+	"github.com/hanzoai/plugin/gojavm"
+	"github.com/hanzoai/plugin/pyvm"
 	"github.com/hanzoai/base/plugins/starkvm"
 	"github.com/hanzoai/base/plugins/v8vm"
-	"github.com/hanzoai/base/plugins/wasmvm"
+	"github.com/hanzoai/plugin/wasmvm"
 )
 
 // Coldstart benchmarks measure the cost of one Load() — fresh runtime,

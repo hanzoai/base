@@ -18,7 +18,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/hanzoai/base/plugins/extruntime"
+	"github.com/hanzoai/plugin/extruntime"
 )
 
 type okOut struct {
