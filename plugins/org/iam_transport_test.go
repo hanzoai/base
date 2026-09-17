@@ -1,6 +1,7 @@
 package org
 
 import (
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,7 @@ func serveIAM(t *testing.T) (addr string, seen *string) {
 
 	var got string
 	app := zip.New(zip.Config{AppName: "iam-fake", DisableStartupMessage: true})
-	app.Get("/v1/iam/oauth/userinfo", func(c *zip.Ctx) error {
+	app.Raw(http.MethodGet, "/v1/iam/oauth/userinfo", func(c *zip.Ctx) error {
 		got = c.Header("Authorization")
 		return c.JSON(200, map[string]any{
 			"id":     "u-1",
@@ -28,7 +29,7 @@ func serveIAM(t *testing.T) (addr string, seen *string) {
 			"orgIds": []string{"hanzo"},
 		})
 	})
-	app.Get("/v1/iam/keys/principal", func(c *zip.Ctx) error {
+	app.Raw(http.MethodGet, "/v1/iam/keys/principal", func(c *zip.Ctx) error {
 		if c.Query("accessKey") != "sk-probe" {
 			return c.JSON(400, map[string]string{"status": "error", "msg": "the entity does not exist"})
 		}

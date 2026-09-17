@@ -179,7 +179,7 @@ func TestAppAnswersWhatTheAdaptedMuxAnswers(t *testing.T) {
 		t.Fatalf("BuildMux: %v", err)
 	}
 	adapted := zip.New(zip.Config{DisableStartupMessage: true})
-	adapted.All("/*", zip.AdaptNetHTTP(mux))
+	adapted.Raw(zip.MethodAll, "/*", zip.AdaptNetHTTP(mux))
 
 	app, err := r.BuildApp()
 	if err != nil {

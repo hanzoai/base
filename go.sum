@@ -453,6 +453,8 @@ github.com/zap-proto/zip v1.36.48 h1:H3iHBP4wBU8A17OgpWSnDLQmLBYQQrOSY2O7/Hr3BZ0
 github.com/zap-proto/zip v1.36.48/go.mod h1:sjlwTZhK8yLnjLWreVhK9VZrf2M/doKtEaqgZzCx+I0=
 github.com/zap-proto/zip v1.37.1 h1:kZyzyCGV2osT3QPBfFLPwAU+mBodPOCngFDYEwQXpgk=
 github.com/zap-proto/zip v1.37.1/go.mod h1:mYE5BMXclZ14Wz4tw/3ir+QBI7A7DPpi3ROXgwnXpfU=
+github.com/zap-proto/zip v1.37.3 h1:QdSB0xqr4c7frwR8c+bVTQSWIpiavPYk3AnMXOpj/LA=
+github.com/zap-proto/zip v1.37.3/go.mod h1:mYE5BMXclZ14Wz4tw/3ir+QBI7A7DPpi3ROXgwnXpfU=
 github.com/zeebo/assert v1.3.0 h1:g7C04CbJuIDKNPFHmsk4hwZDO5O+kntRxzaUoNXj+IQ=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/blake3 v0.2.4 h1:KYQPkhpRtcqh0ssGYcKLG1JYvddkEA8QwCM/yBqhaZI=

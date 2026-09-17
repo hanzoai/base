@@ -55,7 +55,7 @@ func TestConnMemory(t *testing.T) {
 	// lives under BASE_API_PREFIX (default /v1); we don't need to
 	// mount the full plugin set to measure the fasthttp accept-loop
 	// per-conn budget.
-	app.Get("/healthz", func(c *zip.Ctx) error {
+	app.Raw(http.MethodGet, "/healthz", func(c *zip.Ctx) error {
 		return c.JSON(http.StatusOK, map[string]any{
 			"status":  "ok",
 			"service": "base",
@@ -65,7 +65,7 @@ func TestConnMemory(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var holding atomic.Int64
-	app.Get("/hold", func(c *zip.Ctx) error {
+	app.Raw(http.MethodGet, "/hold", func(c *zip.Ctx) error {
 		holding.Add(1)
 		defer holding.Add(-1)
 		<-ctx.Done()

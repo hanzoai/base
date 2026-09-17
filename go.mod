@@ -42,7 +42,7 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/valyala/fasthttp v1.74.0
 	github.com/zap-proto/http v0.3.9
-	github.com/zap-proto/zip v1.37.1
+	github.com/zap-proto/zip v1.37.3
 	go.starlark.net v0.0.0-20260908191801-89a6a09411d5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
