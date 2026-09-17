@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"

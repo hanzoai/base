@@ -3,8 +3,9 @@ package search_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"testing"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/tools/search"
 )

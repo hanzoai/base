@@ -21,7 +21,7 @@ import (
 // `@request.auth.id` resolves to the identifier NULL when there is no auth
 // (core/record_field_resolver_runner.go), the filter compiler counts the literal
 // "null" as an empty identifier (tools/search/filter.go), and equality against
-// an empty identifier is rewritten to `(owner = '' OR owner IS NULL)` so that a
+// an empty identifier is rewritten to `(owner = ” OR owner IS NULL)` so that a
 // missing value can be compared. Each of those three is reasonable alone. Read
 // together they hand every unowned row to anybody who asks.
 //

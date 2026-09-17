@@ -324,4 +324,3 @@ func checkProviderName(value any) error {
 	return validation.NewError("validation_unknown_provider", "The only auth provider is {{.iam}}.").
 		SetParams(map[string]any{"iam": OAuth2ProviderIAM})
 }
-

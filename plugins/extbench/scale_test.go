@@ -34,11 +34,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hanzoai/base/plugins/starkvm"
+	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/plugin/extruntime"
 	"github.com/hanzoai/plugin/gojavm"
 	"github.com/hanzoai/plugin/pyvm"
-	"github.com/hanzoai/base/plugins/starkvm"
-	"github.com/hanzoai/base/plugins/v8vm"
 	"github.com/hanzoai/plugin/wasmvm"
 
 	nativego "github.com/hanzoai/base/plugins/extbench/fixtures/native-go"

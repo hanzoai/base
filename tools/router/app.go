@@ -65,15 +65,14 @@ func (r *Router[T]) BuildApp() (*zip.App, error) {
 		sort.SliceStable(at, func(i, j int) bool { return at[i].method != "" && at[j].method == "" })
 
 		if at[len(at)-1].method == "" {
-			app.All(address, offer(at))
+			app.Raw(zip.MethodAll, address, offer(at))
 			continue
 		}
 		for _, l := range at {
-			verb, ok := verbs[l.method]
-			if !ok {
-				return nil, fmt.Errorf("cannot register %s %s: zip has no %s route", l.method, address, l.method)
+			if !methods[l.method] {
+				return nil, fmt.Errorf("cannot register %s %s: %s is not a method this router serves", l.method, address, l.method)
 			}
-			verb(app, address, offer([]leaf{l}))
+			app.Raw(l.method, address, offer([]leaf{l}))
 		}
 	}
 
@@ -135,17 +134,17 @@ func offer(at []leaf) zip.Handler {
 	}
 }
 
-// verbs is the method each zip route registrar answers for. A method zip has no
-// registrar for is refused rather than widened into All, which would claim
-// every other method at that address as well.
-var verbs = map[string]func(zip.Router, string, zip.Handler){
-	http.MethodGet:     func(r zip.Router, p string, h zip.Handler) { r.Get(p, h) },
-	http.MethodHead:    func(r zip.Router, p string, h zip.Handler) { r.Head(p, h) },
-	http.MethodPost:    func(r zip.Router, p string, h zip.Handler) { r.Post(p, h) },
-	http.MethodPut:     func(r zip.Router, p string, h zip.Handler) { r.Put(p, h) },
-	http.MethodPatch:   func(r zip.Router, p string, h zip.Handler) { r.Patch(p, h) },
-	http.MethodDelete:  func(r zip.Router, p string, h zip.Handler) { r.Delete(p, h) },
-	http.MethodOptions: func(r zip.Router, p string, h zip.Handler) { r.Options(p, h) },
+// methods are the ones a route may name. A method outside this set is refused
+// rather than widened into All, which would claim every other method at that
+// address as well.
+var methods = map[string]bool{
+	http.MethodGet:     true,
+	http.MethodHead:    true,
+	http.MethodPost:    true,
+	http.MethodPut:     true,
+	http.MethodPatch:   true,
+	http.MethodDelete:  true,
+	http.MethodOptions: true,
 }
 
 // spell writes a ServeMux path the way zip's router writes it: "{name}" is one

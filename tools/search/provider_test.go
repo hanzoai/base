@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/orm/query"

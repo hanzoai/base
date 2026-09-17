@@ -11,8 +11,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/hanzoai/ha"
 	"time"
+
+	"github.com/hanzoai/ha"
 
 	luxlog "github.com/luxfi/log"
 )

@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"strings"
 	"testing"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/tools/dbutils"
 )

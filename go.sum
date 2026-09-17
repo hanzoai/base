@@ -220,6 +220,8 @@ github.com/hanzoai/sqlite v0.5.10 h1:TY1YjsS+2ybZ6CKZKpHY01kT0aGdYQBUad2vJV88Jl8
 github.com/hanzoai/sqlite v0.5.10/go.mod h1:6MOvr13PLL+ajbg6SGf1nSvqDsCNzKIvwrLo429LFUY=
 github.com/hanzoai/tasks v1.53.2 h1:tZ8pSe2iUwXiwdKMH+bBCUdNav5AAMMqGmmUe1U1n/U=
 github.com/hanzoai/tasks v1.53.2/go.mod h1:eJXXCcMzNmjbLPlShU/kjbJrk1hYsz34WgOH4ituZ0E=
+github.com/hanzoai/tasks v1.53.3 h1:wumDnH7Fi27LIJOTVQT8SBiCdjADCfgLyHjMukxAU4M=
+github.com/hanzoai/tasks v1.53.3/go.mod h1:97NbYpopfesPaAbpvWUrIIhFO8HXj9HB7l4cPQHBbzo=
 github.com/hanzos3/crc64nvme v1.1.2 h1:LVZSxgYqmE0qrW4rRZCivD4qcP75SQaXCAuBm0D8OQE=
 github.com/hanzos3/crc64nvme v1.1.2/go.mod h1:nUrSo9VBx/TA/OlF3zv2F1xK+nHBp7mVhtMPz8cg+zU=
 github.com/hanzos3/go v1.0.2 h1:DK0sqmNSqs2Uteayi7VHVskp8Cj+joarBfLnkOzeGzI=
@@ -449,6 +451,8 @@ github.com/zap-proto/mcp v1.0.5 h1:1Hi0KNi4YlWW2zkQUMDK9n3jP3wZaRJ1rseMW9p9F0c=
 github.com/zap-proto/mcp v1.0.5/go.mod h1:cYOsq+33NyW4X8nUVtIs/qtezVovYazw1s0V7mrQBYA=
 github.com/zap-proto/zip v1.36.48 h1:H3iHBP4wBU8A17OgpWSnDLQmLBYQQrOSY2O7/Hr3BZ0=
 github.com/zap-proto/zip v1.36.48/go.mod h1:sjlwTZhK8yLnjLWreVhK9VZrf2M/doKtEaqgZzCx+I0=
+github.com/zap-proto/zip v1.37.1 h1:kZyzyCGV2osT3QPBfFLPwAU+mBodPOCngFDYEwQXpgk=
+github.com/zap-proto/zip v1.37.1/go.mod h1:mYE5BMXclZ14Wz4tw/3ir+QBI7A7DPpi3ROXgwnXpfU=
 github.com/zeebo/assert v1.3.0 h1:g7C04CbJuIDKNPFHmsk4hwZDO5O+kntRxzaUoNXj+IQ=
 github.com/zeebo/assert v1.3.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN/wJ0=
 github.com/zeebo/blake3 v0.2.4 h1:KYQPkhpRtcqh0ssGYcKLG1JYvddkEA8QwCM/yBqhaZI=

@@ -492,10 +492,10 @@ type RecordAuthWithOAuth2RequestEvent struct {
 	*RequestEvent
 	baseCollectionEventData
 
-	ProviderName   string
-	Record         *Record
-	CreateData     map[string]any
-	IsNewRecord    bool
+	ProviderName string
+	Record       *Record
+	CreateData   map[string]any
+	IsNewRecord  bool
 }
 
 type RecordAuthRefreshRequestEvent struct {

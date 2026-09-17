@@ -14,13 +14,13 @@ import (
 	"github.com/hanzoai/base/plugins/calendar"
 	"github.com/hanzoai/base/plugins/cloudsql"
 	"github.com/hanzoai/base/plugins/ghupdate"
-	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 	"github.com/hanzoai/base/plugins/jsvm"
 	"github.com/hanzoai/base/plugins/migratecmd"
 	"github.com/hanzoai/base/plugins/org"
 	"github.com/hanzoai/base/plugins/waitlist"
 	"github.com/hanzoai/base/tools/hook"
 	"github.com/hanzoai/base/tools/osutils"
+	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 )
 
 func main() {

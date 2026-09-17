@@ -2,8 +2,9 @@ package search_test
 
 import (
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"testing"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/tools/search"
 	"github.com/hanzoai/orm/query"

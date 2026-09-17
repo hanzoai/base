@@ -3,9 +3,10 @@ package search
 import (
 	"errors"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"strings"
 	"testing"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/ganigeorgiev/fexpr"
 	"github.com/hanzoai/base/tools/security"

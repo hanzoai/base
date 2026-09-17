@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/hanzoai/orm/dialect"
 	"regexp"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hanzoai/orm/dialect"
 
 	"github.com/hanzoai/base/tools/search"
 	"github.com/hanzoai/orm/query"

@@ -11,9 +11,9 @@ import (
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
-	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/types"
+	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 )
 
 // A function starts work somewhere else, and these are the statements about

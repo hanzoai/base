@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/hanzoai/base/core"
-	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/types"
+	_ "github.com/hanzoai/plugin/gojavm" // the "js" runtime a function runs on
 )
 
 // notes is a collection whose rows belong to whoever wrote them, which is the
