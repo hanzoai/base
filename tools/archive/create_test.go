@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/hanzoai/base/tools/archive"
@@ -49,11 +50,6 @@ func TestCreateSuccess(t *testing.T) {
 		t.Fatalf("Expected zip with name %q, got %q", zipName, name)
 	}
 
-	expectedSize := int64(561)
-	if size := info.Size(); size != expectedSize {
-		t.Fatalf("Expected zip with size %d, got %d", expectedSize, size)
-	}
-
 	// An absence is the one thing a listing cannot show, so the archive names
 	// what it left out.
 	zr, err := zip.OpenReader(zipPath)
@@ -61,6 +57,16 @@ func TestCreateSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer zr.Close()
+
+	// The entries, not the byte count: a zip's size is compress/flate's output
+	// and moves with the Go release, while what went in is what Create decides.
+	var got []string
+	for _, f := range zr.File {
+		got = append(got, f.Name)
+	}
+	if want := []string{"a/b/sub1", "a/test", "test2", "test_symlink"}; !slices.Equal(got, want) {
+		t.Fatalf("Expected entries %v, got %v", want, got)
+	}
 
 	if expected := "omits a/b/c, test"; zr.Comment != expected {
 		t.Fatalf("Expected the archive to say %q, got %q", expected, zr.Comment)

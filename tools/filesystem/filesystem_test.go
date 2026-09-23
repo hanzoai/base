@@ -3,6 +3,7 @@ package filesystem_test
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -12,6 +13,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -382,7 +384,7 @@ func TestFileSystemServe(t *testing.T) {
 			map[string]string{
 				"Content-Disposition":     "inline; filename=test_name.png",
 				"Content-Type":            "image/png",
-				"Content-Length":          "73",
+				"Content-Length":          strconv.FormatInt(sizeOf(t, dir, "image.png"), 10),
 				"Content-Security-Policy": csp,
 				"Cache-Control":           cacheControl,
 			},
@@ -397,7 +399,7 @@ func TestFileSystemServe(t *testing.T) {
 			map[string]string{
 				"Content-Disposition":     "attachment; filename=test_name_download.png",
 				"Content-Type":            "image/png",
-				"Content-Length":          "73",
+				"Content-Length":          strconv.FormatInt(sizeOf(t, dir, "image.png"), 10),
 				"Content-Security-Policy": csp,
 				"Cache-Control":           cacheControl,
 			},
@@ -685,8 +687,8 @@ func TestFileSystemCopy(t *testing.T) {
 	}
 	defer f.Close()
 
-	if f.Size() != 73 {
-		t.Fatalf("Expected file size %d, got %d", 73, f.Size())
+	if want := sizeOf(t, dir, "image.png"); f.Size() != want {
+		t.Fatalf("Expected file size %d, got %d", want, f.Size())
 	}
 }
 
@@ -785,7 +787,7 @@ func TestFileSystemServeSingleRange(t *testing.T) {
 		t.Fatalf("Expected StatusCode %d, got %d", http.StatusPartialContent, result.StatusCode)
 	}
 
-	expectedRange := "bytes 0-20/73"
+	expectedRange := fmt.Sprintf("bytes 0-20/%d", sizeOf(t, dir, "image.png"))
 	if cr := result.Header.Get("Content-Range"); cr != expectedRange {
 		t.Fatalf("Expected Content-Range %q, got %q", expectedRange, cr)
 	}
@@ -909,6 +911,18 @@ func TestFileSystemCreateThumb(t *testing.T) {
 }
 
 // ---
+
+// sizeOf is a fixture's size on disk. The PNG fixtures are png.Encode output,
+// which moves with the Go release, so a literal byte count tests the toolchain
+// rather than whether the filesystem reports and serves the file it holds.
+func sizeOf(t *testing.T, dir, name string) int64 {
+	t.Helper()
+	info, err := os.Stat(filepath.Join(dir, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return info.Size()
+}
 
 func createTestDir(t *testing.T) string {
 	dir, err := os.MkdirTemp(os.TempDir(), "hz_test")
