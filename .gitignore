@@ -42,3 +42,6 @@ QWEN.md
 # legacy data dirs (pre base_/ namespace) — never resurrect
 /hz_data/
 .claude/
+
+# Local symlinks to LLM.md
+CLAUDE.md
