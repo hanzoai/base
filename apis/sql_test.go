@@ -71,11 +71,12 @@ func TestSQLRun(t *testing.T) {
 		return signed
 	}
 
-	// Superuser: an IAM token carrying membership of the reserved admin org.
+	// Superuser: an IAM token for a person whose own org — the first entry of
+	// `orgs` — is the reserved admin org.
 	// Regular: an admin of an ordinary org, which is a different authority.
 	superuserToken := mint(jwt.MapClaims{
 		"sub": "iam-admin", "email": "admin@example.com", "owner": "hanzo",
-		"orgs": []any{map[string]any{"org": "hanzo", "role": "admin"}, map[string]any{"org": "admin", "role": "admin"}},
+		"orgs": []any{map[string]any{"org": "admin", "role": "owner"}, map[string]any{"org": "hanzo", "role": "admin"}},
 	})
 	regularToken := mint(jwt.MapClaims{
 		"sub": "iam-regular", "email": "user@example.com", "owner": "hanzo",
@@ -113,7 +114,7 @@ func TestSQLRun(t *testing.T) {
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{
-			Name:           "member of the reserved admin org",
+			Name:           "a person of the reserved admin org",
 			Method:         http.MethodPost,
 			URL:            "/v1/sql",
 			Body:           strings.NewReader(`{"query":"select 1"}`),

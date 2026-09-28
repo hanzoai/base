@@ -116,15 +116,15 @@ func TestActingInAnOrgReachesIt(t *testing.T) {
 }
 
 // TestOperatorReachesTheOrgItNames pins the one cross-tenant scope in the
-// estate. An operator is a member of the reserved admin org, says which org it
-// means, and reaches it — through exactly the same rule as everyone else, since
-// selecting an org is what EffectiveOrg grants a platform operator over any org
-// and everyone else over their own.
+// estate. An operator is a person whose own org is the reserved admin org, says
+// which org it means, and reaches it — through exactly the same rule as everyone
+// else, since selecting an org is what EffectiveOrg grants a platform operator
+// over any org and everyone else over their own.
 func TestOperatorReachesTheOrgItNames(t *testing.T) {
 	_, iam, mux, _ := twoOrgs(t)
 
-	// Home is a brand org; membership in `admin` is what confers the scope.
-	op := iam.token(t, "hanzo/operator", "hanzo", "admin")
+	// Home is the admin org; that is what confers the scope.
+	op := iam.token(t, "admin/operator", "admin", "hanzo")
 	beta := map[string]string{"X-Org-Id": "beta"}
 
 	for _, r := range orgRoutes {
@@ -139,6 +139,16 @@ func TestOperatorReachesTheOrgItNames(t *testing.T) {
 	code, body := call(t, mux, http.MethodGet, "/v1/bases/alpha/config", op, beta)
 	if code != http.StatusForbidden {
 		t.Errorf("an operator acting as beta read alpha: %d %s", code, body)
+	}
+
+	// A brand org's person holding an admin-org membership is not an operator:
+	// the membership reaches no tenant.
+	member := iam.token(t, "hanzo/operator", "hanzo", "admin")
+	for _, r := range orgRoutes {
+		path := strings.Replace(r.path, "%s", "beta", 1)
+		if code, body := call(t, mux, r.method, path, member, beta); code != http.StatusForbidden {
+			t.Errorf("%s %s admitted an admin-org membership acting as beta: %d %s", r.method, path, code, body)
+		}
 	}
 }
 

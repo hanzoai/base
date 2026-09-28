@@ -29,9 +29,10 @@ collection contributes its own rule, and `?expand=` applies the related
 collection's view rule. A collection with no rule is superuser-only: the default
 is closed.
 
-**Platform authority is one predicate.** Membership of IAM's reserved `admin`
-org, asked once through `PlatformSudo()`. An `admin` role on an ordinary org is
-a different authority and grants none of it.
+**Platform authority is one predicate.** A person whose own org is IAM's
+reserved `admin` org, asked once through `authz.Claims.Sudo()`. A membership of
+`admin` held from another org, and an `admin` role on an ordinary org, are
+different authorities and grant none of it.
 
 ## At rest
 

@@ -590,8 +590,9 @@ func orgOf(c *authz.Claims, stated string) (string, error) {
 // Notably NOT the `owner` claim. IAM stamps `owner` with the organization of the
 // APPLICATION a token was minted through, not the subject's own, so reading it
 // makes platform authority a property of the app: everyone who signed in through
-// an admin-org application would arrive holding it. The authority is membership
-// of the reserved admin org, which only an existing platform admin can grant.
+// an admin-org application would arrive holding it. The authority is a person
+// whose own org — the first entry of `orgs` — is the reserved admin org; a
+// membership of it held from another org is not.
 //
 // An `admin` role on an ordinary org is a different, org-scoped authority and
 // answers nothing here. _superusers is unscoped inside the process — schema,

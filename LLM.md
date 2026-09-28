@@ -66,7 +66,8 @@ and falls back to the OS temp directory.
 **One auth, IAM's.** Base has no passwords, sign-in routes, OTP or OAuth2 of its
 own. `resolveJWKSToken` (`apis/middlewares.go`) verifies a token against IAM's
 JWKS and mirrors it into an unsaved record: `_superusers` when
-`authz.Claims.Sudo()` holds (membership of IAM's `admin` org), otherwise
+`authz.Claims.Sudo()` holds (a person whose own org — the first entry of
+`orgs` — is IAM's `admin` org; a membership of `admin` is not it), otherwise
 `users`. Never read authority from the `owner` claim, which IAM sets to the org
 of the application a token was minted through. With `plugins/org` registered,
 only IAM tokens count. Without it, a `users` token Base signed earlier still

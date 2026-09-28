@@ -14,7 +14,7 @@ require (
 	github.com/ganigeorgiev/fexpr v0.6.0
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/hanzoai/authz v1.10.37
+	github.com/hanzoai/authz v1.10.42
 	github.com/hanzoai/cek v0.2.10
 	github.com/hanzoai/dbx v1.17.4
 	github.com/hanzoai/ha v0.2.0

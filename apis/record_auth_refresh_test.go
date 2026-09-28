@@ -14,10 +14,10 @@ func TestRecordAuthRefresh(t *testing.T) {
 	t.Parallel()
 
 	iamToken, jwksURL := mintIAMToken(t, jwt.MapClaims{
-		"sub": "hanzo/z", "owner": "hanzo", "email": "z@hanzo.ai",
+		"sub": "admin/z", "owner": "hanzo", "email": "z@hanzo.ai",
 		"orgs": []any{
+			map[string]any{"org": "admin", "role": "owner"},
 			map[string]any{"org": "hanzo", "role": "admin"},
-			map[string]any{"org": "admin", "role": "admin"},
 		},
 	})
 

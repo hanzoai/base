@@ -99,10 +99,11 @@ func TestOrgOf(t *testing.T) {
 
 // TestOperatorMayReachATenant states the one cross-tenant scope out loud.
 //
-// A member of the reserved admin org is the estate's SuperAdmin, and
-// authz.EffectiveOrg admits its selection of any org. That is deliberate and it
-// is the only way a request reaches a Base its subject is not a member of, so
-// it is written down here rather than left to be discovered.
+// A person whose own org — the first entry of `orgs` — is the reserved admin org
+// is the estate's SuperAdmin, and authz.EffectiveOrg admits its selection of any
+// org. That is deliberate and it is the only way a request reaches a Base its
+// subject is not a member of, so it is written down here rather than left to be
+// discovered. A membership of the admin org held from another org is not it.
 func TestOperatorMayReachATenant(t *testing.T) {
 	operator := &authz.Claims{Orgs: []authz.Membership{
 		{Org: authz.AdminOrg, Role: authz.Admin},
@@ -122,5 +123,21 @@ func TestOperatorMayReachATenant(t *testing.T) {
 	}}
 	if got, err := orgOf(tenant, "beta"); err == nil {
 		t.Fatalf("an org admin reached beta and got %q", got)
+	}
+
+	// Nor does a tenant admin who has been added to the admin org: the
+	// membership reaches neither another tenant nor the admin org itself, and
+	// the Base superuser collection is not theirs.
+	member := &authz.Claims{IsAdmin: true, Orgs: []authz.Membership{
+		{Org: "alpha", Role: authz.Owner},
+		{Org: authz.AdminOrg, Role: authz.Admin},
+	}}
+	if member.Sudo() {
+		t.Fatal("an admin-org membership held from alpha is SuperAdmin")
+	}
+	for _, org := range []string{"beta", authz.AdminOrg} {
+		if got, err := orgOf(member, org); err == nil {
+			t.Fatalf("an admin-org membership reached %s and got %q", org, got)
+		}
 	}
 }

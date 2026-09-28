@@ -896,7 +896,21 @@ func TestIAMSuperuserMirror(t *testing.T) {
 		content []string
 	}{
 		{
-			name: "membership of the reserved admin org",
+			name: "a person whose own org is the reserved admin org",
+			claims: jwt.MapClaims{
+				"sub": "admin/z", "owner": "hanzo", "email": "z@hanzo.ai",
+				"orgs": []any{
+					map[string]any{"org": "admin", "role": "owner"},
+					map[string]any{"org": "hanzo", "role": "admin"},
+				},
+			},
+			status:  200,
+			content: []string{`"totalItems"`, `"_superusers"`},
+		},
+		{
+			// SuperAdmin is the person's own org. A brand org's admin added to the
+			// admin org is not one, wherever the membership sits in the set.
+			name: "a membership of the reserved admin org held from a brand org",
 			claims: jwt.MapClaims{
 				"sub": "hanzo/z", "owner": "hanzo", "email": "z@hanzo.ai",
 				"orgs": []any{
@@ -905,8 +919,8 @@ func TestIAMSuperuserMirror(t *testing.T) {
 					map[string]any{"org": "zoo", "role": "admin"},
 				},
 			},
-			status:  200,
-			content: []string{`"totalItems"`, `"_superusers"`},
+			status:  403,
+			content: []string{`"status":403`},
 		},
 		{
 			// `owner` is the org of the APPLICATION a token was minted through,
