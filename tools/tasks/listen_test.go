@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -27,7 +28,8 @@ func TestZAPClientListensNowhere(t *testing.T) {
 	names := make(chan string, 2)
 	serve := func(field int) zap.Handler {
 		return func(_ context.Context, _ string, msg *zap.Message) (*zap.Message, error) {
-			names <- msg.Root().Text(field)
+			// Text aliases the receive buffer, which the next message reuses.
+			names <- strings.Clone(msg.Root().Text(field))
 			return statusReply(200)
 		}
 	}
