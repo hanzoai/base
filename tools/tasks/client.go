@@ -42,6 +42,10 @@ import (
 // is dispatched on.
 const taskQueue = "base"
 
+// namespacePath is where the Hanzo Tasks HTTP API answers for the namespace
+// this client schedules into: /v1/tasks/namespaces/{ns}.
+const namespacePath = "/v1/tasks/namespaces/default"
+
 // ZAP opcodes for task submission.
 const (
 	OpcodeTaskSubmit   uint16 = 0x0050 // one-shot task
@@ -461,45 +465,11 @@ func (c *Client) scheduleZAP(name string, interval time.Duration) error {
 
 // createCronSchedule creates a durable cron-based schedule on Hanzo Tasks.
 func (c *Client) createCronSchedule(name, cronExpr string) error {
-	schedule := map[string]any{
-		"schedule_id": name,
-		"schedule": map[string]any{
-			"spec": map[string]any{
-				"cron_string": []string{cronExpr},
-			},
-			"action": map[string]any{
-				"start_workflow": map[string]any{
-					"workflow_type": name,
-					"task_queue":    taskQueue,
-				},
-			},
-		},
+	if err := c.postSchedule(name, map[string]any{"cronString": []string{cronExpr}}); err != nil {
+		return err
 	}
-
-	body, err := json.Marshal(schedule)
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-
-	url := c.tasksURL + "/api/v1/namespaces/default/schedules/" + name
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("http: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		c.logger.Info("tasks: durable cron schedule created", "name", name, "cron", cronExpr)
-		return nil
-	}
-
-	return fmt.Errorf("status %d", resp.StatusCode)
+	c.logger.Info("tasks: durable cron schedule created", "name", name, "cron", cronExpr)
+	return nil
 }
 
 // approximateCron converts a cron expression to a rough duration for local dev fallback.
@@ -608,8 +578,7 @@ func (c *Client) startEntryTicker(name string, entry *scheduleEntry) {
 // deleteRemoteSchedule issues a best-effort DELETE to the tasks server.
 // Errors are logged but not returned — local state is already cleared.
 func (c *Client) deleteRemoteSchedule(name string) {
-	url := c.tasksURL + "/api/v1/namespaces/default/schedules/" + name
-	req, err := http.NewRequest("DELETE", url, nil)
+	req, err := http.NewRequest(http.MethodDelete, c.tasksURL+namespacePath+"/schedules/"+name, nil)
 	if err != nil {
 		c.logger.Warn("tasks: remote delete request build failed", "name", name, "error", err)
 		return
@@ -624,47 +593,47 @@ func (c *Client) deleteRemoteSchedule(name string) {
 
 // createSchedule creates a durable schedule on Hanzo Tasks.
 func (c *Client) createSchedule(name string, interval time.Duration) error {
-	schedule := map[string]any{
-		"schedule_id": name,
-		"schedule": map[string]any{
-			"spec": map[string]any{
-				"interval": []map[string]any{
-					{"every": interval.String()},
-				},
-			},
-			"action": map[string]any{
-				"start_workflow": map[string]any{
-					"workflow_type": name,
-					"task_queue":    taskQueue,
-				},
-			},
-		},
+	if err := c.postSchedule(name, map[string]any{"interval": []map[string]any{{"interval": interval.String()}}}); err != nil {
+		return err
 	}
+	c.logger.Info("taskqueue: durable schedule created", "name", name, "interval", interval)
+	return nil
+}
 
-	body, err := json.Marshal(schedule)
+// postSchedule creates or replaces the schedule `name` with the given spec. A
+// create is POST to the collection and replaces a schedule of the same id, so
+// registering a job twice leaves one schedule.
+func (c *Client) postSchedule(name string, spec map[string]any) error {
+	return c.post(namespacePath+"/schedules", map[string]any{
+		"scheduleId": name,
+		"spec":       spec,
+		"action": map[string]any{
+			"workflowType": map[string]any{"name": name},
+			"taskQueue":    taskQueue,
+		},
+	})
+}
+
+// post sends v as JSON to path on the tasks server and fails on any non-2xx.
+func (c *Client) post(path string, v any) error {
+	body, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-
-	url := c.tasksURL + "/api/v1/namespaces/default/schedules/" + name
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, c.tasksURL+path, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("http: %w", err)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		c.logger.Info("taskqueue: durable schedule created", "name", name, "interval", interval)
-		return nil
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("status %d", resp.StatusCode)
 	}
-
-	return fmt.Errorf("status %d", resp.StatusCode)
+	return nil
 }
 
 // execDirect runs the handler in a goroutine (dev mode).
@@ -682,39 +651,17 @@ func (c *Client) execDirect(taskType string, payload map[string]any) error {
 	return nil
 }
 
-// submitHTTP posts a one-shot task to the Hanzo Tasks HTTP API.
+// submitHTTP starts a one-shot workflow on the Hanzo Tasks HTTP API, and runs
+// the task here when the server cannot take it.
 func (c *Client) submitHTTP(taskType string, payload map[string]any) error {
-	envelope := map[string]any{
-		"workflow_type": taskType,
-		"task_queue":    taskQueue,
-		"input":         payload,
-	}
-
-	body, err := json.Marshal(envelope)
+	err := c.post(namespacePath+"/workflows", map[string]any{
+		"workflowType": map[string]any{"name": taskType},
+		"taskQueue":    map[string]any{"name": taskQueue},
+		"input":        payload,
+	})
 	if err != nil {
-		return fmt.Errorf("taskqueue: marshal: %w", err)
-	}
-
-	url := c.tasksURL + "/api/v1/namespaces/default/workflows"
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("taskqueue: request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		c.logger.Warn("taskqueue: server unreachable, executing directly",
-			"type", taskType, "error", err)
+		c.logger.Warn("taskqueue: server refused, executing directly", "type", taskType, "error", err)
 		return c.execDirect(taskType, payload)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return nil
-	}
-
-	c.logger.Warn("taskqueue: server error, executing directly",
-		"type", taskType, "status", resp.StatusCode)
-	return c.execDirect(taskType, payload)
+	return nil
 }
