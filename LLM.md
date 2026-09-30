@@ -131,7 +131,9 @@ exactly, and the Tasks and direct KMS clients dial without listening.
 **Paths are `/v1`.** No `/api/` segment anywhere. `BASE_API_PREFIX` moves the
 data plane and nothing else: `/v1/iam` and `/healthz` stay put. The admin SPA
 writes `/v1` into `ui-react/src/lib/api.ts`, so it does not work under another
-prefix.
+prefix. Outbound calls follow the same rule: the Tasks client posts to
+`/v1/tasks/namespaces/default`. `route_prefix_test.go` fails on a `/api/` string
+literal anywhere in the module or a quoted `/api` path in `ui-react` or `sdk`.
 
 ## Admin UI
 
