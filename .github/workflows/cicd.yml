@@ -42,6 +42,10 @@ concurrency:
 jobs:
   cicd:
     uses: hanzoai/ci/.github/workflows/build.yml@v2
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     # The two platforms hanzo.yml declares, and the only mode that can deliver
     # them. A run is one runner and a runner is one machine, so buildx builds the
     # architecture it is and refuses the other rather than emulating it. The door
