@@ -31,7 +31,7 @@ export interface PrivateListItem {
 // ---------- Local (Base /private) ----------
 
 export interface LocalBackendOptions {
-  /** Base URL for the Base API group. Defaults to '/api'. */
+  /** Base URL for the Base API group. Defaults to '/v1', where Base serves /private. */
   baseUrl?: string
   /** Called for each request to attach auth (e.g. Bearer JWT). */
   authHeader?: () => string | undefined
@@ -45,7 +45,7 @@ export class LocalBackend implements PrivateBackend {
   private fetchImpl: typeof fetch
 
   constructor(opts: LocalBackendOptions = {}) {
-    this.base = (opts.baseUrl ?? '/api').replace(/\/$/, '')
+    this.base = (opts.baseUrl ?? '/v1').replace(/\/$/, '')
     this.authHeader = opts.authHeader
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch.bind(globalThis)
   }
