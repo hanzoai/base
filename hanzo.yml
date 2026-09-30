@@ -213,43 +213,41 @@ test:
     # what widens this gate; the mechanism it would need is already here, in
     # tests.NewTestAppWithConfig.
     #
-    # postgres:18 and not ghcr.io/hanzoai/sql:18, because Base uses none of what
-    # that image adds — vector, postgis, pg_cron, pgcrypto — and its init script
-    # hard-fails the container over the database name pg_cron pins. What Base
-    # does need from a server is ICU, for the nondeterministic `nocase` collation
-    # the dialect's Prelude creates so that COLLATE NOCASE means the same thing
-    # on both engines, and gen_random_uuid(), which has been core since 13. The
-    # official image carries both; measured, not assumed.
-    #
-    # The server joins the JOB's network namespace instead of publishing a port.
-    # The runner's docker daemon is the host's and is shared with every other job
-    # on that node, so a published 5432 would collide with whatever else is
-    # building and would not be at localhost from in here anyway. One mechanism,
-    # spelled for the two ways a job can be hosted.
+    # PostgreSQL 18, from the self-contained build the zonky embedded-postgres
+    # project publishes to Maven Central (pinned by sha256), run as the runner's
+    # own user. No container: the runner carries the docker CLI and no daemon,
+    # and `sudo apt-get` cannot work under its sandbox, so `docker run
+    # postgres:18` died on /var/run/docker.sock and held every release. The build
+    # bundles ICU, which the nondeterministic `nocase` collation the dialect's
+    # Prelude creates needs, and gen_random_uuid() has been core since 13. Not
+    # ghcr.io/hanzoai/sql:18: Base uses none of what that image adds.
     #
     # A server this cannot reach is a FAILURE and never a skip: tests/postgres.go
     # panics rather than falling back to a file, because a gate that quietly
-    # tests SQLite twice is worse than no gate at all.
-    #
-    # Readiness is proved by making the tests' OWN connection — that address,
-    # those credentials, that database — rather than by asking the container
-    # whether it is up. The two answer differently when something else is already
-    # on the port, and then the gate would run against a server it did not make.
+    # tests SQLite twice is worse than no gate at all. `pg_ctl -w` returns only
+    # once the server accepts connections.
     run: |
       set -euo pipefail
       export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
       export BASE_TEST_POSTGRES='postgres://base:base@127.0.0.1:5432/base?sslmode=disable'
-      pg=base-postgres-$$
-      trap 'docker rm -f "$pg" >/dev/null 2>&1 || true' EXIT
-      if [ -f /.dockerenv ]; then net="container:$(cat /etc/hostname)"; else net=host; fi
-      docker run -d --name "$pg" --network "$net" \
-        -e POSTGRES_USER=base -e POSTGRES_PASSWORD=base -e POSTGRES_DB=base \
-        postgres:18 >/dev/null
-      for i in $(seq 60); do
-        docker exec "$pg" psql "$BASE_TEST_POSTGRES" -tAc 'select 1' >/dev/null 2>&1 && break
-        [ "$i" = 60 ] && { echo "::error::nothing answers as this gate's server at $BASE_TEST_POSTGRES"; docker logs "$pg"; exit 1; }
-        sleep 1
-      done
+      v=18.6.0
+      case "$(uname -m)" in
+        x86_64)  a=amd64;   sum=008ee189eaa7ca2b58bd01dd950291e638b998392cf982297acd4779ec898ac1 ;;
+        aarch64) a=arm64v8; sum=5f54e016723afa6213925a8acb939bac52944b1d348f65c7a20f0cd2928c31be ;;
+        *) echo "::error::no PostgreSQL build for $(uname -m)"; exit 1 ;;
+      esac
+      pg=$(mktemp -d)
+      jar=embedded-postgres-binaries-linux-$a-$v.jar
+      curl -fsSL -o "$pg/$jar" "https://repo1.maven.org/maven2/io/zonky/test/postgres/embedded-postgres-binaries-linux-$a/$v/$jar"
+      echo "$sum  $pg/$jar" | sha256sum -c --quiet
+      unzip -p "$pg/$jar" '*.txz' | tar -xJ -C "$pg"
+      "$pg/bin/initdb" -D "$pg/data" -U base --auth=trust -E UTF8 >/dev/null
+      echo 'CREATE DATABASE base OWNER base' | "$pg/bin/postgres" --single -D "$pg/data" postgres >/dev/null 2>&1 \
+        || { echo "::error::could not create database base"; exit 1; }
+      trap '"$pg/bin/pg_ctl" -D "$pg/data" -m immediate stop >/dev/null 2>&1 || true; rm -rf "$pg"' EXIT
+      "$pg/bin/pg_ctl" -D "$pg/data" -l "$pg/log" -w -t 60 \
+        -o "-c listen_addresses=127.0.0.1 -p 5432 -k $pg" start >/dev/null \
+        || { echo "::error::nothing answers as this gate's server at $BASE_TEST_POSTGRES"; cat "$pg/log"; exit 1; }
       go test -count=1 ./tests/engine/
   - name: releases
     # A release that builds nothing looks exactly like a release that built.
