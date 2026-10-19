@@ -42,8 +42,8 @@ require (
 	github.com/spf13/cast v1.10.0
 	github.com/spf13/cobra v1.10.2
 	github.com/valyala/fasthttp v1.74.0
-	github.com/zap-proto/http v0.3.9
-	github.com/zap-proto/zip v1.37.3
+	github.com/zap-proto/http v0.3.12
+	github.com/zap-proto/zip v1.37.43
 	go.starlark.net v0.0.0-20260908191801-89a6a09411d5
 	golang.org/x/crypto v0.57.0
 	golang.org/x/image v0.46.0
@@ -72,6 +72,7 @@ require (
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/evanw/esbuild v0.28.2 // indirect
+	github.com/fasthttp/websocket v1.5.12 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-ini/ini v1.67.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
@@ -148,6 +149,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
+	github.com/savsgio/gotils v0.0.0-20240704082632-aef3928b8a38 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect

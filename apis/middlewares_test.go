@@ -1,16 +1,9 @@
 package apis_test
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"encoding/base64"
-	"encoding/json"
-	"math/big"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/hanzoai/base/apis"
@@ -783,40 +776,8 @@ func TestExternalAuthOnlyHasNoFallback(t *testing.T) {
 func mintIAMToken(t testing.TB, claims jwt.MapClaims) (token, jwksURL string) {
 	t.Helper()
 
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	const kid = "iam-test"
-
-	jwks := map[string]any{"keys": []map[string]any{{
-		"kty": "RSA",
-		"kid": kid,
-		"alg": "RS256",
-		"use": "sig",
-		"n":   base64.RawURLEncoding.EncodeToString(key.PublicKey.N.Bytes()),
-		"e":   base64.RawURLEncoding.EncodeToString(big.NewInt(int64(key.PublicKey.E)).Bytes()),
-	}}}
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(jwks)
-	}))
-	t.Cleanup(ts.Close)
-
-	claims["iat"] = time.Now().Unix()
-	claims["exp"] = time.Now().Add(time.Hour).Unix()
-
-	jt := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	jt.Header["kid"] = kid
-
-	signed, err := jt.SignedString(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return signed, ts.URL
+	iam := tests.NewIAM(t)
+	return iam.Token(t, claims), iam.URL
 }
 
 // TestTheUsernameIsNotADisplayName pins which claim the account's USERNAME is

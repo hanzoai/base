@@ -27,6 +27,7 @@ its own Base at `<data dir>/orgs/<org>/data.db`.
 | `plugins/zap` | the ZAP listener, which serves the HTTP handler |
 | `plugins/extruntime`, `plugins/gojavm` | the runtime interface and the goja runtime behind `/v1/functions` |
 | `plugins/{migratecmd,ghupdate,waitlist,bootnode,calendar,cloudsql,commerce}` | what their names say |
+| `graph/` | a Base's records as typed GraphQL: the schema rendered from its collections, every field answered by a request on its own router as the caller (see "The graph") |
 | `modules/` | named collection sets an org installs into its Base (`POST /v1/modules/{name}`, `core.GrowCollections`); `modules/crm` is the CRM (`crm.json`), blank-imported by the binary |
 | `plugins/{ha,replicate,tasks,scheduler,vault,pyvm,v8vm,wasmvm,starkvm,extbench}` | plugins the binary does not link |
 | `network/` | quasar replication (`BASE_NETWORK=quasar`) and its `s3://` archive |
@@ -200,6 +201,44 @@ writes `/v1` into `ui-react/src/lib/api.ts`, so it does not work under another
 prefix. Outbound calls follow the same rule: the Tasks client posts to
 `/v1/tasks/namespaces/default`. `route_prefix_test.go` fails on a `/api/` string
 literal anywhere in the module or a quoted `/api` path in `ui-react` or `sdk`.
+
+## The graph
+
+`graph.New(app, router)` is the Base's records as GraphQL, executed by zip's
+engine: a host mounts `g.Schema` and `g.Resolve` with `zip.MountGraphFor` (cloud
+serves it at `/v1/base/graphql` and composes it into `/v1/graphql` as `base`).
+The package has no transport of its own and no second authorization.
+
+- **The schema is the Base's own**, rendered from its collections and rebuilt
+  when one changes (keyed by each collection's id and `updated`). Base and view
+  collections are types; a collection Base keeps for itself (`_*`, system) and an
+  auth collection are not, and a relation to one reads as the id it holds.
+  Naming: `people` → `BasePerson`, roots `person(id)`, `people(...)`,
+  `peopleGroupBy(field, filter)`, `createPerson`, `updatePerson`,
+  `upsertPerson(data, on)`, `deletePerson`; a name that would collide is left out
+  (`model.skipped`). Field names are Base's, verbatim. Every type starts with
+  `Base`, so a host composes it without renaming.
+- **Every field is a request on the Base's router**, made with the caller's
+  headers (`zip.Headers`): the records list (`?where=`, `sort`, `expand`), view,
+  create, update, delete, `/aggregate` and `/history`. Rules, tenancy, rate limits
+  and expand's view checks are therefore the REST path's; `graph_test` holds the
+  graph's refusals to REST's own messages.
+- **A filter is a where clause.** `BasePersonFilter` is `and`/`or`/`not`,
+  `inSegment`/`notInSegment`, each field's own filter and each back-relation
+  (`list_members_via_person`), and every operator becomes one leaf of
+  `core.CompileWhere`; `@me`, relative dates, `tz` and `weekStart` mean what they
+  mean there. `orderBy` is a list of one-field objects (a composite part, or one
+  relation deep), with the id appended so the order is total.
+- **A cursor is a position.** Base pages by page and perPage, so a window of n
+  from an offset is read in pages of n+1, one page or the two it spans; inserts
+  before a cursor shift what follows it. `totalCount` is counted only when
+  selected, and `aggregate` (on any connection) and `GroupBy` are the aggregate
+  route, over the filter and never the page.
+- **Bounds.** A page holds at most 100; a selection reaches at most four
+  relations, back-relations or histories deep, refused before any request; one
+  root field makes at most 50 requests; zip refuses a request past 10,000
+  resolutions whole.
+- **No subscriptions.** Realtime is the SSE stream, under the same rules.
 
 ## Admin UI
 
