@@ -184,10 +184,11 @@ func growCollection(txApp App, doc *Collection, created bool, growth *Growth) er
 	} else if !cur.IsView() {
 		for _, idx := range doc.Indexes {
 			name := dbutils.ParseIndex(idx).IndexName
-			if name != "" && cur.GetIndex(name) == "" {
-				cur.Indexes = append(cur.Indexes, idx)
-				note("index:" + name)
+			if name == "" || cur.GetIndex(name) != "" || hasIndexDefinition(txApp, cur.Indexes, idx) {
+				continue // already there, by name or under another one
 			}
+			cur.Indexes = append(cur.Indexes, idx)
+			note("index:" + name)
 		}
 	}
 
@@ -208,6 +209,27 @@ func growCollection(txApp App, doc *Collection, created bool, growth *Growth) er
 	}
 
 	return nil
+}
+
+// hasIndexDefinition reports whether indexes already holds idx's definition under
+// some name: the same columns, uniqueness and condition on the same table.
+func hasIndexDefinition(app App, indexes []string, idx string) bool {
+	want := indexDefinition(app, idx)
+	for _, have := range indexes {
+		if indexDefinition(app, have) == want {
+			return true
+		}
+	}
+	return false
+}
+
+// indexDefinition is an index with its names set aside, as the collection
+// validator compares two of them.
+func indexDefinition(app App, idx string) string {
+	parsed := dbutils.ParseIndex(idx)
+	parsed.SchemaName = ""
+	parsed.IndexName = "definition"
+	return parsed.Build(app.Dialect())
 }
 
 // growSelect adds to have the values of want it lacks, with want's options for

@@ -10,6 +10,7 @@ import (
 	"github.com/hanzoai/base/tools/router"
 	"github.com/hanzoai/base/tools/search"
 	"github.com/hanzoai/base/tools/security"
+	"github.com/hanzoai/dbx"
 )
 
 // bindCollectionApi registers the collection api endpoints and the corresponding handlers.
@@ -17,16 +18,27 @@ func bindCollectionApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 	// A superuser, or an org admin in its own org's Base: the org's schema is
 	// the org's to change. Which collections an org admin may touch is each
 	// route's to ask (refuseUnmanageable); a token secret is not among them.
-	subGroup := rg.Group("/collections").Bind(RequireSchemaAuth())
-	subGroup.GET("", collectionsList)
-	subGroup.POST("", collectionCreate)
-	subGroup.GET("/{collection}", collectionView)
-	subGroup.PATCH("/{collection}", collectionUpdate)
+	//
+	// Reading it is every member's: a client draws a record by its schema (a
+	// field's label, a select value's colour), so a member who could not read
+	// it could not be shown the org's own data.
+	subGroup := rg.Group("/collections")
+	subGroup.GET("", collectionsList).Bind(RequireSchemaReadAuth())
+	subGroup.POST("", collectionCreate).Bind(RequireSchemaAuth())
+	subGroup.GET("/{collection}", collectionView).Bind(RequireSchemaReadAuth())
+	subGroup.PATCH("/{collection}", collectionUpdate).Bind(RequireSchemaAuth())
 	subGroup.POST("/{collection}/rotate", collectionRotate).Bind(RequireSuperuserAuth())
-	subGroup.DELETE("/{collection}", collectionDelete)
-	subGroup.DELETE("/{collection}/truncate", collectionTruncate)
-	subGroup.PUT("/import", collectionsImport)
-	subGroup.GET("/meta/scaffolds", collectionScaffolds)
+	subGroup.DELETE("/{collection}", collectionDelete).Bind(RequireSchemaAuth())
+	subGroup.DELETE("/{collection}/truncate", collectionTruncate).Bind(RequireSchemaAuth())
+	subGroup.PUT("/import", collectionsImport).Bind(RequireSchemaAuth())
+	subGroup.GET("/meta/scaffolds", collectionScaffolds).Bind(RequireSchemaAuth())
+}
+
+// readsBasesOwn reports whether a request may read the collections Base keeps for
+// itself (system collections and the underscore-named tables): a superuser's and
+// an org admin's, never a member's.
+func readsBasesOwn(e *core.RequestEvent) bool {
+	return e.HasSuperuserAuth() || IsOrgAdmin(e)
 }
 
 func collectionsList(e *core.RequestEvent) error {
@@ -37,8 +49,13 @@ func collectionsList(e *core.RequestEvent) error {
 
 	collections := []*core.Collection{}
 
+	query := e.App.CollectionQuery()
+	if !readsBasesOwn(e) {
+		query.AndWhere(dbx.NewExp("[[system]] = {:no} AND substr([[name]], 1, 1) != '_'", dbx.Params{"no": false}))
+	}
+
 	result, err := search.NewProvider(fieldResolver).
-		Query(e.App.CollectionQuery()).
+		Query(query).
 		ParseAndExec(e.Request.URL.Query().Encode(), &collections)
 
 	if err != nil {
@@ -61,6 +78,9 @@ func collectionView(e *core.RequestEvent) error {
 	collection, err := e.App.FindCachedCollectionByNameOrId(e.Request.PathValue("collection"))
 	if err != nil || collection == nil {
 		return e.NotFoundError("", err)
+	}
+	if !readsBasesOwn(e) && (collection.System || strings.HasPrefix(collection.Name, "_")) {
+		return e.NotFoundError("", nil)
 	}
 
 	event := new(core.CollectionRequestEvent)

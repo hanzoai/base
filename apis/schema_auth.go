@@ -11,6 +11,10 @@ import (
 // schema change.
 const DefaultRequireSchemaAuthMiddlewareId = "baseRequireSchemaAuth"
 
+// DefaultRequireSchemaReadAuthMiddlewareId names the middleware that admits a
+// schema read.
+const DefaultRequireSchemaReadAuthMiddlewareId = "baseRequireSchemaReadAuth"
+
 // IsOrgAdmin reports whether a request administers the org it acts in: an org
 // admin's token or the org's own secret key, in that org's Base.
 //
@@ -40,6 +44,36 @@ func RequireSchemaAuth() *hook.Handler[*core.RequestEvent] {
 			return e.ForbiddenError("Only an admin of this org can change its schema.", nil)
 		},
 	}
+}
+
+// RequireSchemaReadAuth admits whoever may READ a Base's schema: a superuser, an
+// org admin, or any member acting in the org whose Base it is. A member reads
+// the org's own collections only (the routes hide Base's own tables from one).
+func RequireSchemaReadAuth() *hook.Handler[*core.RequestEvent] {
+	return &hook.Handler[*core.RequestEvent]{
+		Id: DefaultRequireSchemaReadAuthMiddlewareId,
+		Func: func(e *core.RequestEvent) error {
+			if e.HasSuperuserAuth() || IsOrgAdmin(e) || IsOrgMember(e) {
+				return e.Next()
+			}
+			if sub, _ := e.Get(RequestEventKeySub).(string); e.Auth == nil && sub == "" {
+				return e.UnauthorizedError("The request requires an org member's or a superuser's authorization.", nil)
+			}
+			return e.ForbiddenError("Only a member of this org can read its schema.", nil)
+		},
+	}
+}
+
+// IsOrgMember reports whether a request acts in an org as one of its members:
+// a person IAM vouched for, or the org's own key. A Base that serves no org
+// has no members, so a locally signed-in user is never one.
+func IsOrgMember(e *core.RequestEvent) bool {
+	org, _ := e.Get(RequestEventKeyOrg).(string)
+	if org == "" {
+		return false
+	}
+	sub, _ := e.Get(RequestEventKeySub).(string)
+	return e.Auth != nil || sub != ""
 }
 
 // SchemaManageable reports whether an org admin may change collection: an

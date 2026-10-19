@@ -206,3 +206,30 @@ func TestGrowKeepsACollectionOfAnotherType(t *testing.T) {
 		t.Fatal("a collection of another type must be left alone")
 	}
 }
+
+// An index the collection already holds under another name is already there: an
+// org that indexed a column itself, then installs a module that indexes the same
+// column, keeps its own index and the install still succeeds.
+func TestGrowKeepsAnIndexHeldUnderAnotherName(t *testing.T) {
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	mustGrow(t, app, `[{"name": "events", "type": "base",
+		"fields": [{"name": "source_id", "type": "text"}],
+		"indexes": ["CREATE UNIQUE INDEX `+"`idx_mine`"+` ON `+"`events`"+` (`+"`source_id`"+`) WHERE source_id != ''"]}]`)
+
+	g := mustGrow(t, app, `[{"name": "events", "type": "base",
+		"fields": [{"name": "source_id", "type": "text"}],
+		"indexes": ["CREATE UNIQUE INDEX `+"`idx_events_source_id`"+` ON `+"`events`"+` (`+"`source_id`"+`) WHERE source_id != ''"]}]`)
+	if asJSON(g) != `{"created":[],"grown":{},"kept":{}}` {
+		t.Fatalf("growth: %s", asJSON(g))
+	}
+
+	c, err := app.FindCollectionByNameOrId("events")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(c.Indexes) != 1 || c.GetIndex("idx_mine") == "" {
+		t.Fatalf("indexes: %v", c.Indexes)
+	}
+}

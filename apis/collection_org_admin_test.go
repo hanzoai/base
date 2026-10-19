@@ -46,7 +46,14 @@ func TestOrgAdminSchemaAuthority(t *testing.T) {
 	}
 
 	member := []call{
-		{"member lists", http.MethodGet, "/v1/collections", "", 403, `"status":403`},
+		// a member reads the org's own schema, which is how a client draws its records
+		{"member lists the org's collections", http.MethodGet, "/v1/collections?filter=name%3D%27leads%27", "", 200, `"name":"leads"`},
+		{"member views a collection", http.MethodGet, "/v1/collections/leads", "", 200, `"name":"leads"`},
+		{"member's list leaves out Base's own", http.MethodGet, "/v1/collections?filter=name%3D%27_superusers%27", "", 200, `"totalItems":0`},
+		{"member's list leaves out a system collection", http.MethodGet, "/v1/collections?filter=name%3D%27sysbox%27", "", 200, `"totalItems":0`},
+		{"member cannot view Base's own", http.MethodGet, "/v1/collections/_superusers", "", 404, `"status":404`},
+		{"member cannot view a system collection", http.MethodGet, "/v1/collections/sysbox", "", 404, `"status":404`},
+		{"member cannot read the scaffolds", http.MethodGet, "/v1/collections/meta/scaffolds", "", 403, `"status":403`},
 		{"member creates", http.MethodPost, "/v1/collections", `{"name":"mine","type":"base"}`, 403, `"status":403`},
 		{"member updates", http.MethodPatch, "/v1/collections/leads", `{"fields":[{"name":"title","type":"text"},{"name":"stage","type":"text"}]}`, 403, `"status":403`},
 		{"member deletes", http.MethodDelete, "/v1/collections/leads", "", 403, `"status":403`},
@@ -122,6 +129,15 @@ func TestOrgAdminSchemaAuthority(t *testing.T) {
 		{"another org's admin creates", http.MethodPost, "/v1/collections", `{"name":"mine","type":"base"}`, 403, `"status":403`},
 		{"another org's admin lists", http.MethodGet, "/v1/collections", "", 403, `"status":403`},
 	})
+
+	anonymousRead := tests.ApiScenario{
+		Name:            "anonymous read",
+		Method:          http.MethodGet,
+		URL:             "/v1/collections",
+		ExpectedStatus:  401,
+		ExpectedContent: []string{`"status":401`},
+	}
+	anonymousRead.Test(t)
 
 	anonymous := tests.ApiScenario{
 		Name:            "anonymous",
