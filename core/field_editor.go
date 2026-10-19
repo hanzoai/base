@@ -5,6 +5,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/hanzoai/base/core/validators"
+	"github.com/microcosm-cc/bluemonday"
 	"github.com/spf13/cast"
 )
 
@@ -21,9 +22,23 @@ const DefaultEditorFieldMaxSize int64 = 5 << 20
 var (
 	_ Field                 = (*EditorField)(nil)
 	_ MaxBodySizeCalculator = (*EditorField)(nil)
+	_ RecordInterceptor     = (*EditorField)(nil)
 )
 
+// editorPolicy is what HTML an editor field keeps: the formatting, links,
+// images, lists, tables and code of written text. Scripts, styles, frames, forms
+// and event handler attributes are removed, and links are marked nofollow.
+var editorPolicy = bluemonday.UGCPolicy()
+
+// SanitizeHTML returns s with only what an editor field keeps.
+func SanitizeHTML(s string) string {
+	return editorPolicy.Sanitize(s)
+}
+
 // EditorField defines "editor" type field to store HTML formatted text.
+//
+// What is written is sanitized on the way in (see [SanitizeHTML]), so a value
+// read back is safe to render in a browser whoever wrote it.
 //
 // The respective zero record field value is empty string.
 type EditorField struct {
@@ -44,6 +59,10 @@ type EditorField struct {
 	// Presentable hints the Dashboard UI to use the underlying
 	// field record value in the relation preview label.
 	Presentable bool `form:"presentable" json:"presentable"`
+
+	// FieldMeta is how a person sees the field: label, description, icon
+	// and position. It changes nothing about the value.
+	FieldMeta
 
 	// ---
 
@@ -150,6 +169,25 @@ func (f *EditorField) ValidateSettings(ctx context.Context, app App, collection 
 		validation.Field(&f.Name, validation.By(DefaultFieldNameValidationRule)),
 		validation.Field(&f.MaxSize, validation.Min(0), validation.Max(maxSafeJSONInt)),
 	)
+}
+
+// Intercept implements the [RecordInterceptor] interface: the value is
+// sanitized immediately before it is written.
+func (f *EditorField) Intercept(
+	ctx context.Context,
+	app App,
+	record *Record,
+	actionName string,
+	actionFunc func() error,
+) error {
+	switch actionName {
+	case InterceptorActionCreateExecute, InterceptorActionUpdateExecute:
+		if v := record.GetString(f.Name); v != "" {
+			record.SetRaw(f.Name, SanitizeHTML(v))
+		}
+	}
+
+	return actionFunc()
 }
 
 // CalculateMaxBodySize implements the [MaxBodySizeCalculator] interface.

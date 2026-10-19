@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"slices"
+	"strconv"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/hanzoai/base/tools/list"
@@ -70,6 +71,10 @@ type SelectField struct {
 	// field record value in the relation preview label.
 	Presentable bool `form:"presentable" json:"presentable"`
 
+	// FieldMeta is how a person sees the field: label, description, icon
+	// and position. It changes nothing about the value.
+	FieldMeta
+
 	// ---
 
 	// Values specifies the list of accepted values.
@@ -82,6 +87,28 @@ type SelectField struct {
 
 	// Required will require the field value to be non-empty.
 	Required bool `form:"required" json:"required"`
+
+	// Options says how each value is shown: the label a person reads, its
+	// colour and its place in a list (a board's columns, a picker's order). A
+	// value without an option reads as itself, in gray, in the order of Values.
+	// An option names a value of Values and nothing else, so what may be stored
+	// stays Values' to say.
+	Options []SelectOption `form:"options" json:"options,omitempty"`
+}
+
+// SelectOption is how one value of a select field is shown.
+type SelectOption struct {
+	// Value is the value of Values this option is for.
+	Value string `form:"value" json:"value"`
+
+	// Label is what a person reads. Empty means the value itself.
+	Label string `form:"label" json:"label,omitempty"`
+
+	// Color is one of [TagColors]. Empty means gray.
+	Color string `form:"color" json:"color,omitempty"`
+
+	// Position orders the value among the others.
+	Position int `form:"position" json:"position,omitempty"`
 }
 
 // Type implements [Field.Type] interface method.
@@ -218,7 +245,36 @@ func (f *SelectField) ValidateSettings(ctx context.Context, app App, collection 
 		validation.Field(&f.Name, validation.By(DefaultFieldNameValidationRule)),
 		validation.Field(&f.Values, validation.Required),
 		validation.Field(&f.MaxSelect, validation.Min(0), validation.Max(max)),
+		validation.Field(&f.Options, validation.By(f.checkOptions)),
 	)
+}
+
+// checkOptions accepts one option per value, each for a value of Values, with a
+// colour from the palette.
+func (f *SelectField) checkOptions(value any) error {
+	seen := make(map[string]struct{}, len(f.Options))
+
+	for i, o := range f.Options {
+		var err error
+		switch _, dup := seen[o.Value]; {
+		case !slices.Contains(f.Values, o.Value):
+			err = validation.NewError("validation_unknown_option", "The option is for a value that is not one of the field's values.")
+		case dup:
+			err = validation.NewError("validation_duplicated_option", "The value has more than one option.")
+		case o.Color != "" && !slices.Contains(TagColors, o.Color):
+			err = validation.NewError("validation_invalid_color", "The color is not one of the palette's.")
+		case len(o.Label) > 255:
+			err = validation.NewError("validation_label_too_long", "The label is longer than 255 characters.")
+		case o.Position < 0:
+			err = validation.NewError("validation_invalid_position", "The position must not be negative.")
+		}
+		if err != nil {
+			return validation.Errors{strconv.Itoa(i): err}
+		}
+		seen[o.Value] = struct{}{}
+	}
+
+	return nil
 }
 
 // FindSetter implements the [SetterFinder] interface.

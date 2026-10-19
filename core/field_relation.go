@@ -70,6 +70,10 @@ type RelationField struct {
 	// field record value in the relation preview label.
 	Presentable bool `form:"presentable" json:"presentable"`
 
+	// FieldMeta is how a person sees the field: label, description, icon
+	// and position. It changes nothing about the value.
+	FieldMeta
+
 	// ---
 
 	// CollectionId is the id of the related collection.

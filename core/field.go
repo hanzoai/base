@@ -26,6 +26,12 @@ const (
 	FieldNameVerified        = "verified"
 	FieldNameTokenKey        = "tokenKey"
 	FieldNameSource          = "source"
+
+	// FieldNameAuthAdmin and FieldNameAuthRole are the caller's authority in
+	// the org a request acts in, on the auth record IAM's token is mirrored
+	// into: whether it administers the org, and its role there.
+	FieldNameAuthAdmin = "admin"
+	FieldNameAuthRole  = "role"
 )
 
 // SystemFields returns special internal field names that are usually readonly.

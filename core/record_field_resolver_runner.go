@@ -224,6 +224,15 @@ func (r *runner) processRequestAuthField() (*search.ResolverResult, error) {
 		return r.resolver.resolveStaticRequestField(r.activeProps[1:]...)
 	}
 
+	// An auth record IAM vouched for is minted for the request and never saved
+	// (apis resolveJWKSToken), so there is no row to join: its own fields — the
+	// org it acts in, whether it administers that org, its role there — are
+	// read off the record itself. Joining would compare against NULL and every
+	// rule that asks one of them would quietly match nothing.
+	if r.resolver.requestInfo.Auth.IsNew() && len(r.activeProps) == 3 {
+		return r.resolver.resolveStaticRequestField(r.activeProps[1:]...)
+	}
+
 	// resolve the auth collection field
 	// ---
 	collection := r.resolver.requestInfo.Auth.Collection()
@@ -475,8 +484,14 @@ func (r *runner) processActiveProps() (*search.ResolverResult, error) {
 		}
 
 		// @todo consider moving to the finalizer and converting to "JSONExtractable" interface with optional extra validation for the remaining props?
-		// json or geoPoint field -> treat the rest of the props as json path
-		if field != nil && (field.Type() == FieldTypeJSON || field.Type() == FieldTypeGeoPoint) {
+		// a composite value names its parts, so a path reaching for a part it
+		// does not have is a mistake to report rather than a NULL to compare
+		if field != nil && IsComposite(field) && !HasPart(field, r.activeProps[i+1]) {
+			return nil, fmt.Errorf("field %q has no part %q", prop, r.activeProps[i+1])
+		}
+
+		// json, geoPoint or composite field -> treat the rest of the props as json path
+		if field != nil && (field.Type() == FieldTypeJSON || field.Type() == FieldTypeGeoPoint || IsComposite(field)) {
 			var jsonPath strings.Builder
 			for j, p := range r.activeProps[i+1:] {
 				if _, err := strconv.Atoi(p); err == nil {

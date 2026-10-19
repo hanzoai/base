@@ -302,7 +302,11 @@ func (validator *collectionValidator) checkFieldValidators(value any) error {
 	errs := validation.Errors{}
 
 	for i, field := range fields {
-		if err := field.ValidateSettings(validator.ctx, validator.app, validator.new); err != nil {
+		err := field.ValidateSettings(validator.ctx, validator.app, validator.new)
+		if m, ok := field.(FieldMetaHolder); ok {
+			err = validators.JoinValidationErrors(err, m.Meta().Validate())
+		}
+		if err != nil {
 			errs[strconv.Itoa(i)] = err
 		}
 	}
@@ -656,6 +660,8 @@ func (validator *collectionValidator) validateOptions() error {
 		return validator.new.collectionAuthOptions.validate(validator)
 	case CollectionTypeView:
 		return validator.new.collectionViewOptions.validate(validator)
+	case CollectionTypeBase:
+		return validator.new.collectionBaseOptions.validate(validator)
 	}
 
 	return nil

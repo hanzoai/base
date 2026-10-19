@@ -234,6 +234,12 @@ const (
 	// function starts actually runs. A deployment that sets none runs no work
 	// and says so; see [Sandboxes].
 	StoreKeySandboxes = "sandboxes"
+
+	// StoreKeyTenant names the one org a Base was opened for, by a host that
+	// opens one Base per org. A token acting in any other org is refused there,
+	// so the Base that serves a request and the org its rules and its schema
+	// authority are decided for cannot be two different orgs.
+	StoreKeyTenant = "tenant"
 )
 
 // Bases answers which Base serves an org.
@@ -464,6 +470,11 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		return nil, refusal{err}
 	}
 
+	// A Base its host opened for one org answers that org and no other.
+	if tenant, _ := e.App.Store().Get(StoreKeyTenant).(string); tenant != "" && bases == nil && tenant != org {
+		return nil, refusal{router.NewForbiddenError("The token does not act in this Base's organization.", nil)}
+	}
+
 	// Acting anywhere but home is either an explicit selection the membership
 	// set admits or a platform operator reaching a tenant, which is the one
 	// cross-tenant scope in the estate and the one worth a line in the log.
@@ -523,9 +534,33 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	if collection.Fields.GetByName("org_id") != nil {
 		record.Set("org_id", org)
 	}
+	if collection.Fields.GetByName(core.FieldNameAuthAdmin) != nil {
+		record.Set(core.FieldNameAuthAdmin, verified.OrgAdmin(org))
+	}
+	if collection.Fields.GetByName(core.FieldNameAuthRole) != nil {
+		record.Set(core.FieldNameAuthRole, roleIn(verified, org))
+	}
 	record.SetVerified(true)
 
 	return record, nil
+}
+
+// roleIn is the role the claims hold in org, as IAM's coarse vocabulary names
+// it (owner, admin or member), for a rule to read as `@request.auth.role`. A
+// membership that names no role is a member's.
+func roleIn(c *authz.Claims, org string) string {
+	for _, m := range c.Orgs {
+		if m.Org == org {
+			if r := strings.ToLower(strings.TrimSpace(string(m.Role))); r != "" {
+				return r
+			}
+			break
+		}
+	}
+	if c.IsAdmin && org == c.Home() {
+		return string(authz.Admin)
+	}
+	return string(authz.Member)
 }
 
 // headerUserEmail travels beside the canonical three but is not one of them —
