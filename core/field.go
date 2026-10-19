@@ -34,6 +34,18 @@ const (
 	FieldNameAuthRole  = "role"
 )
 
+// Collections Base reads by name.
+const (
+	// CollectionNameHistory holds a row for every write to a collection that
+	// keeps its history.
+	CollectionNameHistory = "_history"
+
+	// CollectionNameSegments is where a saved filter lives: a record with the
+	// collection it filters (`object`) and the filter (`where`), which a where
+	// clause names with the inSegment and notInSegment operators.
+	CollectionNameSegments = "segments"
+)
+
 // SystemFields returns special internal field names that are usually readonly.
 var SystemDynamicFieldNames = []string{
 	FieldNameCollectionId,
