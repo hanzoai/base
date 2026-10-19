@@ -111,6 +111,26 @@ func (t *grants) spend(id string) *grant {
 	return g
 }
 
+// StreamGrantOrg answers which org an unspent grant opens a stream in, without
+// spending it.
+//
+// It is for a host that serves many orgs' Bases from one process and has to
+// route the stream to the right one before any Base reads it: the request that
+// opens a stream carries no credential (EventSource sends no headers), so the
+// grant is the only thing that knows. The host routes, and the Base it routed
+// to spends the grant as it would any other.
+func StreamGrantOrg(id string) (string, bool) {
+	streamGrants.mu.Lock()
+	defer streamGrants.mu.Unlock()
+
+	g, ok := streamGrants.m[id]
+	if !ok || g.org == "" || time.Now().After(g.deadline) {
+		return "", false
+	}
+
+	return g.org, true
+}
+
 // realtimeGrant mints the grant a stream is opened with.
 //
 // It answers on an ordinary authenticated request, so the caller presents its

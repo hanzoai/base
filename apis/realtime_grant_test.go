@@ -63,3 +63,30 @@ func TestTheLogRendersNoGrant(t *testing.T) {
 		t.Errorf("the log lost the shape of the call: %s", got)
 	}
 }
+
+// A host routing a stream to its org's Base reads the org off the grant and
+// leaves the grant for that Base to spend.
+func TestAGrantNamesItsOrgWithoutBeingSpent(t *testing.T) {
+	fresh := streamGrants.mint(&grant{org: "acme", deadline: time.Now().Add(grantTTL)})
+	stale := streamGrants.mint(&grant{org: "acme", deadline: time.Now().Add(-time.Second)})
+	anon := streamGrants.mint(&grant{deadline: time.Now().Add(grantTTL)})
+
+	if org, ok := StreamGrantOrg(fresh); !ok || org != "acme" {
+		t.Fatalf("a fresh grant answered %q, %v", org, ok)
+	}
+	if streamGrants.spend(fresh) == nil {
+		t.Fatal("asking the org spent the grant")
+	}
+	if _, ok := StreamGrantOrg(fresh); ok {
+		t.Error("a spent grant still names an org")
+	}
+	if _, ok := StreamGrantOrg(stale); ok {
+		t.Error("an expired grant still names an org")
+	}
+	if _, ok := StreamGrantOrg(anon); ok {
+		t.Error("a grant minted in no org named one")
+	}
+	if _, ok := StreamGrantOrg("never-minted"); ok {
+		t.Error("an unknown grant named an org")
+	}
+}
