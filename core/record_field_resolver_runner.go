@@ -229,7 +229,8 @@ func (r *runner) processRequestAuthField() (*search.ResolverResult, error) {
 	// grant it to itself. A saved auth record therefore administers no org and
 	// holds no role in one.
 	if len(r.activeProps) == 3 && !r.resolver.requestInfo.Auth.IsNew() {
-		switch r.activeProps[2] {
+		name, _, _ := strings.Cut(r.activeProps[2], ":") // any modifier reads the same column
+		switch name {
 		case FieldNameAuthAdmin:
 			return &search.ResolverResult{Identifier: "FALSE"}, nil
 		case FieldNameAuthRole:

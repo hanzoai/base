@@ -162,7 +162,7 @@ func TestASavedUserHoldsNoOrgAuthority(t *testing.T) {
 	// users, test@example.com, a token Base signed itself
 	const localToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo"
 
-	for _, rule := range []string{`@request.auth.admin = true`, `@request.auth.role = "owner"`} {
+	for _, rule := range []string{`@request.auth.admin = true`, `@request.auth.role = "owner"`, `@request.auth.role:lower = "owner"`} {
 		scenario := tests.ApiScenario{
 			Name:            rule,
 			Method:          http.MethodGet,
