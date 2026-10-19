@@ -21,6 +21,27 @@ func collectionsImport(e *core.RequestEvent) error {
 		return firstApiError(err, e.BadRequestError("An error occurred while validating the submitted data.", err))
 	}
 
+	// An org admin grows and changes its own base collections. It deletes none
+	// by omission: deleteMissing drops every collection the document leaves
+	// out, the ones that are not the org's to touch among them.
+	var names []string
+	if !e.HasSuperuserAuth() {
+		if form.DeleteMissing {
+			return e.ForbiddenError("An org admin cannot import with deleteMissing.", nil)
+		}
+
+		current, after, err := importedCollections(e.App, form.Collections)
+		if err != nil {
+			return e.BadRequestError("An error occurred while loading the submitted data.", err)
+		}
+		if err := refuseUnmanageable(e, "import", append(current, after...)...); err != nil {
+			return err
+		}
+		for _, c := range after {
+			names = append(names, c.Name)
+		}
+	}
+
 	event := new(core.CollectionsImportRequestEvent)
 	event.RequestEvent = e
 	event.CollectionsData = form.Collections
@@ -29,6 +50,8 @@ func collectionsImport(e *core.RequestEvent) error {
 	return event.App.OnCollectionsImportRequest().Trigger(event, func(e *core.CollectionsImportRequestEvent) error {
 		importErr := e.App.ImportCollections(e.CollectionsData, form.DeleteMissing)
 		if importErr == nil {
+			logOrgAdminSchemaChange(e.RequestEvent, "import", names...)
+
 			return execAfterSuccessTx(true, e.App, func() error {
 				return e.NoContent(http.StatusNoContent)
 			})

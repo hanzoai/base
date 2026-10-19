@@ -905,7 +905,7 @@ func TestIAMSuperuserMirror(t *testing.T) {
 				},
 			},
 			status:  200,
-			content: []string{`"totalItems"`, `"_superusers"`},
+			content: []string{`"meta"`, `"rateLimits"`},
 		},
 		{
 			// SuperAdmin is the person's own org. A brand org's admin added to the
@@ -992,13 +992,15 @@ func TestIAMSuperuserMirror(t *testing.T) {
 		},
 	}
 
+	// The probe is a route only a superuser reaches. /v1/collections was one,
+	// until an org admin could change its own Base's schema there.
 	for _, s := range scenarios {
 		token, jwksURL := mintIAMToken(t, s.claims)
 
 		scenario := tests.ApiScenario{
 			Name:            s.name,
 			Method:          http.MethodGet,
-			URL:             "/v1/collections",
+			URL:             "/v1/settings",
 			Headers:         map[string]string{"Authorization": "Bearer " + token},
 			ExpectedStatus:  s.status,
 			ExpectedContent: s.content,

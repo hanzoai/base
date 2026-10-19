@@ -14,12 +14,15 @@ import (
 
 // bindCollectionApi registers the collection api endpoints and the corresponding handlers.
 func bindCollectionApi(app core.App, rg *router.RouterGroup[*core.RequestEvent]) {
-	subGroup := rg.Group("/collections").Bind(RequireSuperuserAuth())
+	// A superuser, or an org admin in its own org's Base: the org's schema is
+	// the org's to change. Which collections an org admin may touch is each
+	// route's to ask (refuseUnmanageable); a token secret is not among them.
+	subGroup := rg.Group("/collections").Bind(RequireSchemaAuth())
 	subGroup.GET("", collectionsList)
 	subGroup.POST("", collectionCreate)
 	subGroup.GET("/{collection}", collectionView)
 	subGroup.PATCH("/{collection}", collectionUpdate)
-	subGroup.POST("/{collection}/rotate", collectionRotate)
+	subGroup.POST("/{collection}/rotate", collectionRotate).Bind(RequireSuperuserAuth())
 	subGroup.DELETE("/{collection}", collectionDelete)
 	subGroup.DELETE("/{collection}/truncate", collectionTruncate)
 	subGroup.PUT("/import", collectionsImport)
@@ -89,11 +92,19 @@ func collectionCreate(e *core.RequestEvent) error {
 		return e.BadRequestError("Failed to load the submitted data due to invalid formatting.", err)
 	}
 
+	if err := refuseUnmanageable(e, "create", collection); err != nil {
+		return err
+	}
+
 	event := new(core.CollectionRequestEvent)
 	event.RequestEvent = e
 	event.Collection = collection
 
 	return e.App.OnCollectionCreateRequest().Trigger(event, func(e *core.CollectionRequestEvent) error {
+		if err := refuseUnmanageable(e.RequestEvent, "create", e.Collection); err != nil {
+			return err
+		}
+
 		if err := e.App.Save(e.Collection); err != nil {
 			// validation failure
 			var validationErrors validation.Errors
@@ -104,6 +115,8 @@ func collectionCreate(e *core.RequestEvent) error {
 			// other generic db error
 			return e.BadRequestError("Failed to create collection. Raw error: \n"+err.Error(), nil)
 		}
+
+		logOrgAdminSchemaChange(e.RequestEvent, "create", e.Collection.Name)
 
 		return execAfterSuccessTx(true, e.App, func() error {
 			return e.JSON(http.StatusOK, e.Collection)
@@ -117,8 +130,17 @@ func collectionUpdate(e *core.RequestEvent) error {
 		return e.NotFoundError("", err)
 	}
 
+	if err := refuseUnmanageable(e, "change", collection); err != nil {
+		return err
+	}
+
 	if err := e.BindBody(collection); err != nil {
 		return e.BadRequestError("Failed to load the submitted data due to invalid formatting.", err)
+	}
+
+	// and as the change would leave it
+	if err := refuseUnmanageable(e, "change", collection); err != nil {
+		return err
 	}
 
 	event := new(core.CollectionRequestEvent)
@@ -126,6 +148,10 @@ func collectionUpdate(e *core.RequestEvent) error {
 	event.Collection = collection
 
 	return event.App.OnCollectionUpdateRequest().Trigger(event, func(e *core.CollectionRequestEvent) error {
+		if err := refuseUnmanageable(e.RequestEvent, "change", e.Collection); err != nil {
+			return err
+		}
+
 		if err := e.App.Save(e.Collection); err != nil {
 			// validation failure
 			var validationErrors validation.Errors
@@ -136,6 +162,8 @@ func collectionUpdate(e *core.RequestEvent) error {
 			// other generic db error
 			return e.BadRequestError("Failed to update collection. Raw error: \n"+err.Error(), nil)
 		}
+
+		logOrgAdminSchemaChange(e.RequestEvent, "update", e.Collection.Name)
 
 		return execAfterSuccessTx(true, e.App, func() error {
 			return e.JSON(http.StatusOK, e.Collection)
@@ -179,6 +207,10 @@ func collectionDelete(e *core.RequestEvent) error {
 		return e.NotFoundError("", err)
 	}
 
+	if err := refuseUnmanageable(e, "delete", collection); err != nil {
+		return err
+	}
+
 	event := new(core.CollectionRequestEvent)
 	event.RequestEvent = e
 	event.Collection = collection
@@ -200,6 +232,8 @@ func collectionDelete(e *core.RequestEvent) error {
 			return e.BadRequestError(msg, err)
 		}
 
+		logOrgAdminSchemaChange(e.RequestEvent, "delete", e.Collection.Name)
+
 		return execAfterSuccessTx(true, e.App, func() error {
 			return e.NoContent(http.StatusNoContent)
 		})
@@ -216,10 +250,16 @@ func collectionTruncate(e *core.RequestEvent) error {
 		return e.BadRequestError("View collections cannot be truncated since they don't store their own records.", nil)
 	}
 
+	if err := refuseUnmanageable(e, "truncate", collection); err != nil {
+		return err
+	}
+
 	err = e.App.TruncateCollection(collection)
 	if err != nil {
 		return e.BadRequestError("Failed to truncate collection (most likely due to required cascade delete record references).", err)
 	}
+
+	logOrgAdminSchemaChange(e, "truncate", collection.Name)
 
 	return e.NoContent(http.StatusNoContent)
 }
