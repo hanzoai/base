@@ -41,6 +41,8 @@ const FIELD_TYPES = [
     'text', 'number', 'bool', 'email', 'url', 'editor',
     'date', 'select', 'json', 'file', 'relation',
     'autodate', 'geoPoint',
+    'currency', 'emails', 'phones', 'links', 'address', 'fullName',
+    'rating', 'actor',
 ] as const;
 
 function toFormValues(c: CollectionModel): CollectionFormValues {

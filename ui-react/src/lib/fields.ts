@@ -34,13 +34,22 @@ export function editorKind(field: CollectionField): EditorKind {
       return 'date';
     case 'json':
     case 'geoPoint':
+    case 'currency':
+    case 'emails':
+    case 'phones':
+    case 'links':
+    case 'address':
+    case 'fullName':
       return 'json';
+    case 'rating':
+      return 'number';
     case 'relation':
       return 'relation';
     case 'file':
       return 'file';
     default:
-      // autodate, password and anything unknown are not inline-editable.
+      // autodate, actor (stamped by the server) and anything unknown are not
+      // inline-editable.
       return 'readonly';
   }
 }
