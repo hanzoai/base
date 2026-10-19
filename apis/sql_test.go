@@ -208,10 +208,12 @@ func TestSQLRun(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"execTime":`,
-				// hanzoai/sqlite's pure-Go (no-CGO) backend reports
-				// RowsAffected()=1 for DDL; the handler passes the driver
-				// value through faithfully rather than special-casing DDL.
-				`"affectedRows":1`,
+				// A CREATE TABLE changes no rows. SQLite answers a statement
+				// that is not an INSERT, UPDATE or DELETE with the connection's
+				// last count, so this read 1 for as long as every test app ran
+				// the fixture's missing migrations first: it was the one
+				// _migrations row the last of them wrote.
+				`"affectedRows":0`,
 				`"columns":[]`,
 				`"rows":[]`,
 			},

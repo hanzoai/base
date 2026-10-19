@@ -65,10 +65,11 @@ test:
     run: |
       set -e
       export GOWORK=off CGO_ENABLED=0 GOEXPERIMENT=jsonv2
-      # core and apis each take longer than go test's default 10 minutes on the
-      # runner, and a package that times out is reported as FAIL with nothing
-      # failed in it: every release since v1.5.102 died there with green tests.
-      go test -count=1 -timeout 30m ./...
+      # go test's own 10 minutes per package, on purpose. core and apis once took
+      # longer, and the cause was not the packages: tests/data lacked twelve
+      # migrations, so every test app ran them first (about four seconds each).
+      # The fixture holds them now and tests.TestTheFixtureIsMigrated keeps it so.
+      go test -count=1 ./...
   - name: network-attack-suite
     # A second reading of a package `go-test` already ran, asking the one
     # question a green suite cannot answer about itself: were its SKIPS honest?

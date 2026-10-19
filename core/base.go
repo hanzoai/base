@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/hanzoai/base/tools/osutils"
@@ -106,6 +107,12 @@ type BaseApp struct {
 	auxNonconcurrentDB  dbx.Builder
 	dialect             dialect.Dialect
 	network             baseNetwork
+
+	// fileDeletes counts the storage deletions running in the background, so a
+	// Base that stops waits for them rather than leaving a deleted record's
+	// files behind. A pointer, because a transaction's app is a copy of this one
+	// and has to count into the same total.
+	fileDeletes *sync.WaitGroup
 
 	// app event hooks
 	onBootstrap     *hook.Hook[*BootstrapEvent]
@@ -257,6 +264,7 @@ func NewBaseApp(config BaseAppConfig) *BaseApp {
 		cron:                cron.NewFromTasks(tc),
 		subscriptionsBroker: subscriptions.NewBroker(),
 		config:              &config,
+		fileDeletes:         &sync.WaitGroup{},
 	}
 
 	// apply config defaults
@@ -513,6 +521,8 @@ type closer interface {
 func (app *BaseApp) ResetBootstrapState() error {
 	app.Cron().Stop()
 
+	app.WaitFileDeletes()
+
 	var errs []error
 
 	dbs := []*dbx.Builder{
@@ -546,6 +556,14 @@ func (app *BaseApp) ResetBootstrapState() error {
 	}
 
 	return nil
+}
+
+// WaitFileDeletes waits for the storage deletions a delete started in the
+// background: a deleted record's or collection's files are removed after its
+// transaction commits, so the write does not wait on the filesystem, and this is
+// how anything that has to see them gone (shutting down, a test) waits for it.
+func (app *BaseApp) WaitFileDeletes() {
+	app.fileDeletes.Wait()
 }
 
 // DB returns the default app data.db builder instance.
@@ -1426,7 +1444,7 @@ func (app *BaseApp) registerBaseHooks() {
 								"error", err.Error(),
 							)
 						}
-					})
+					}, app.fileDeletes)
 				}
 			}
 

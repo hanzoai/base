@@ -75,14 +75,14 @@ func TestCRM(t *testing.T) {
 		where string
 		want  int
 	}{
-		"select any of":       {`{"field":"lifecycle","op":"is","value":["lead"]}`, 1},
-		"composite contains":  {`{"field":"emails","op":"contains","value":"globex"}`, 1},
-		"phone digits":        {`{"field":"phones","op":"contains","value":"415 555"}`, 1},
-		"a relation's field":  {`{"field":"company.name","op":"is","value":"Acme"}`, 1},
-		"not":                 {`{"not":{"field":"lifecycle","op":"is","value":"lead"}}`, 1},
-		"empty composite":     {`{"field":"address","op":"empty"}`, 2},
-		"or":                  {`{"or":[{"field":"name.firstName","op":"is","value":"Ada"},{"field":"name.firstName","op":"is","value":"Grace"}]}`, 2},
-		"created today":       {`{"field":"created","op":"today"}`, 2},
+		"select any of":      {`{"field":"lifecycle","op":"is","value":["lead"]}`, 1},
+		"composite contains": {`{"field":"emails","op":"contains","value":"globex"}`, 1},
+		"phone digits":       {`{"field":"phones","op":"contains","value":"415 555"}`, 1},
+		"a relation's field": {`{"field":"company.name","op":"is","value":"Acme"}`, 1},
+		"not":                {`{"not":{"field":"lifecycle","op":"is","value":"lead"}}`, 1},
+		"empty composite":    {`{"field":"address","op":"empty"}`, 2},
+		"or":                 {`{"or":[{"field":"name.firstName","op":"is","value":"Ada"},{"field":"name.firstName","op":"is","value":"Grace"}]}`, 2},
+		"created today":      {`{"field":"created","op":"today"}`, 2},
 	} {
 		filter, params, err := core.CompileWhere(app, people, nil, []byte(s.where), time.Now())
 		if err != nil {

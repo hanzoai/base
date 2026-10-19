@@ -50,6 +50,13 @@ golangci-lint run -c ./golangci.yml ./...
 pnpm --dir ui-react install && pnpm --dir ui-react build && pnpm --dir ui-react smoke
 ```
 
+**The fixture is migrated.** Every test app is a copy of `tests/data`, and a copy
+that lacks a migration runs it before its test begins. Twelve missing migrations
+cost each test app about four seconds, which is what pushed `core` and `apis` past
+the runner's ten minutes (26 s and 23 s once the fixture held them). A new
+migration is added to the fixture with `go run ./tests/fixture`;
+`tests.TestTheFixtureIsMigrated` fails, naming it, until it is.
+
 CI (`hanzo.yml`) runs the Go gates with those three variables, runs
 `tests/engine` against PostgreSQL 18, and keeps the skips in
 `network/attack_vectors_test.go` apart from the passes. Do not use `make build`
