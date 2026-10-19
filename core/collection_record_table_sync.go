@@ -157,13 +157,19 @@ func normalizeSingleVsMultipleFieldChanges(app App, newCollection *Collection, o
 
 	return app.RunInTransaction(func(txApp App) error {
 		for _, newField := range newCollection.Fields {
-			// allow to continue even if there is no old field for the cases
-			// when a new field is added and there are already inserted data
+			// A field the collection did not have was just added as a column of
+			// its own type, holding its default in every row, so there is no
+			// old shape to convert. Converting it anyway read the fresh JSON
+			// column as text, which PostgreSQL refuses (`COALESCE(jsonb, '')`),
+			// so adding any multi-valued field to a collection failed there.
+			oldField := oldCollection.Fields.GetById(newField.GetId())
+			if oldField == nil {
+				continue
+			}
+
 			var isOldMultiple bool
-			if oldField := oldCollection.Fields.GetById(newField.GetId()); oldField != nil {
-				if mv, ok := oldField.(MultiValuer); ok {
-					isOldMultiple = mv.IsMultiple()
-				}
+			if mv, ok := oldField.(MultiValuer); ok {
+				isOldMultiple = mv.IsMultiple()
 			}
 
 			var isNewMultiple bool

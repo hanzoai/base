@@ -269,6 +269,41 @@ func TestFieldAdded(t *testing.T) {
 	}
 }
 
+// A multi-valued field added to a collection that already holds rows: every
+// existing row reads it as empty and a new row stores a list. Adding one used to
+// fail on PostgreSQL, which refused to read the fresh JSON column as text.
+func TestMultiValuedFieldAdded(t *testing.T) {
+	app := newApp(t)
+	c := items(t, app)
+
+	c.Fields.Add(
+		&core.SelectField{Name: "tags", Values: []string{"a", "b", "c"}, MaxSelect: 3},
+		&core.RelationField{Name: "links", CollectionId: c.Id, MaxSelect: 5},
+	)
+	if err := app.Save(c); err != nil {
+		t.Fatalf("add multi-valued fields: %v", err)
+	}
+
+	rec := core.NewRecord(c)
+	rec.Set("title", "Delta")
+	rec.Set("tags", []string{"a", "c"})
+	if err := app.Save(rec); err != nil {
+		t.Fatalf("save with the new fields: %v", err)
+	}
+
+	empty, err := app.FindRecordsByFilter("items", `tags:length = 0`, "", 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty) != 3 {
+		t.Fatalf("%d rows read the new field as empty, want the 3 that were there", len(empty))
+	}
+	tagged, err := app.FindRecordsByFilter("items", `tags:each ?= "c"`, "", 0, 0)
+	if err != nil || len(tagged) != 1 {
+		t.Fatalf("filter on the new field: %d, %v", len(tagged), err)
+	}
+}
+
 // Writers arriving together all land. One write connection serialises them and a
 // pool does not, so on an engine whose pool is free this is the path where two
 // transactions can take rows in opposite orders — a failure the writer is

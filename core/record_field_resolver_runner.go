@@ -865,7 +865,11 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 	// wrap in json_extract to ensure that top-level primitives
 	// stored as json work correctly when compared to their SQL equivalent
 	// (https://github.com/hanzoai/base/issues/4068)
-	if field.Type() == FieldTypeJSON {
+	//
+	// A composite value is a JSON document too, read the same way: as text, so a
+	// whole-value comparison with null is IS NULL and a LIKE compares text on
+	// every engine (PostgreSQL refuses `jsonb = ''` and `jsonb LIKE`).
+	if field.Type() == FieldTypeJSON || IsComposite(field) {
 		result.NullFallback = search.NullFallbackDisabled
 		result.Extracted = true
 		result.Identifier = dbutils.JSONExtract(r.resolver.app.Dialect(), r.activeTableAlias+"."+cleanFieldName, "")
