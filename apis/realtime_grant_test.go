@@ -1,10 +1,14 @@
 package apis
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/hanzoai/base/core"
 )
 
 // A grant that was not spent in time is not spent at all.
@@ -88,5 +92,33 @@ func TestAGrantNamesItsOrgWithoutBeingSpent(t *testing.T) {
 	}
 	if _, ok := StreamGrantOrg("never-minted"); ok {
 		t.Error("an unknown grant named an org")
+	}
+}
+
+// A stream the host already routed to its org's Base is served by that Base,
+// the live one, and not by the instance the grant was minted on: a pool may
+// close an org's Base between the mint and the stream and open it again.
+func TestAGrantKeepsTheBaseTheHostRouted(t *testing.T) {
+	minted := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+	reopened := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+	process := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+
+	minted.Store().Set(StoreKeyTenant, "acme")
+	reopened.Store().Set(StoreKeyTenant, "acme")
+
+	g := &grant{app: minted, org: "acme", deadline: time.Now().Add(grantTTL)}
+
+	routed := &core.RequestEvent{App: reopened}
+	routed.Request = httptest.NewRequest(http.MethodGet, "/v1/realtime", nil)
+	g.apply(routed)
+	if routed.App != reopened {
+		t.Fatal("the grant replaced the org's live Base with the one it was minted on")
+	}
+
+	unrouted := &core.RequestEvent{App: process}
+	unrouted.Request = httptest.NewRequest(http.MethodGet, "/v1/realtime", nil)
+	g.apply(unrouted)
+	if unrouted.App != minted {
+		t.Fatal("a stream nobody routed was not served by the Base that minted its grant")
 	}
 }

@@ -3,6 +3,7 @@ package apis_test
 import (
 	"net/http"
 	"net/url"
+	"strconv"
 	"testing"
 
 	"github.com/hanzoai/base/core"
@@ -308,4 +309,45 @@ func TestRecordsListWhere(t *testing.T) {
 		}
 		s.Test(t)
 	}
+}
+
+// Every group a grouped figure reports is counted by the query that chose the
+// groups. With more values than the 200 a request reports, a separate count of
+// empties would rank its own 200 groups: here every bucket has one empty row, so
+// it would keep the "a" buckets (first by name) and report the busier "z" buckets
+// shown in the answer as having none.
+func TestRecordsAggregateEmptinessFollowsTheGroupsShown(t *testing.T) {
+	t.Parallel()
+
+	scenario := tests.ApiScenario{
+		Method:          http.MethodGet,
+		URL:             "/v1/collections/tallies/aggregate?ops=" + url.QueryEscape("count,countEmpty(note)") + "&group=bucket",
+		ExpectedStatus:  200,
+		ExpectedContent: []string{`{"count":2,"countEmpty(note)":1,"value":"z0001"}`},
+		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			c := core.NewBaseCollection("tallies")
+			c.ListRule = types.Pointer("")
+			c.Fields.Add(&core.TextField{Name: "bucket"}, &core.TextField{Name: "note"})
+			if err := app.Save(c); err != nil {
+				t.Fatal(err)
+			}
+			add := func(bucket, note string) {
+				r := core.NewRecord(c)
+				r.Set("bucket", bucket)
+				r.Set("note", note)
+				if err := app.Save(r); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for i := 1; i <= 150; i++ {
+				z := "z" + strconv.Itoa(10000 + i)[1:]
+				add(z, "")
+				add(z, "kept")
+			}
+			for i := 1; i <= 250; i++ {
+				add("a"+strconv.Itoa(10000 + i)[1:], "")
+			}
+		},
+	}
+	scenario.Test(t)
 }

@@ -153,3 +153,86 @@ func TestARequestStatesItsWriter(t *testing.T) {
 
 	scenario.Test(t)
 }
+
+// A saved user's own record says nothing about its org authority: a user who may
+// write its record could otherwise set admin on it and pass every admin rule.
+func TestASavedUserHoldsNoOrgAuthority(t *testing.T) {
+	t.Parallel()
+
+	// users, test@example.com, a token Base signed itself
+	const localToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo"
+
+	for _, rule := range []string{`@request.auth.admin = true`, `@request.auth.role = "owner"`} {
+		scenario := tests.ApiScenario{
+			Name:            rule,
+			Method:          http.MethodGet,
+			URL:             "/v1/collections/secrets/records",
+			Headers:         map[string]string{"Authorization": localToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"totalItems":0`},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				user, err := app.FindRecordById("users", "4q1xlclmfloku33")
+				if err != nil {
+					t.Fatal(err)
+				}
+				user.Set(core.FieldNameAuthAdmin, true)
+				user.Set(core.FieldNameAuthRole, "owner")
+				if err := app.SaveNoValidate(user); err != nil {
+					t.Fatal(err)
+				}
+
+				c := core.NewBaseCollection("secrets")
+				c.ListRule = types.Pointer(rule)
+				c.Fields.Add(&core.TextField{Name: "title"})
+				if err := app.Save(c); err != nil {
+					t.Fatal(err)
+				}
+				r := core.NewRecord(c)
+				r.Set("title", "the plan")
+				if err := app.Save(r); err != nil {
+					t.Fatal(err)
+				}
+			},
+		}
+		scenario.Test(t)
+	}
+}
+
+// An admin of an org IAM knows administers nothing in a Base that was not opened
+// for that org: one deployed for a single tenant names none.
+func TestAnOrgAdminAdministersOnlyItsOrgsBase(t *testing.T) {
+	t.Parallel()
+
+	token, jwksURL := mintIAMToken(t, jwt.MapClaims{"sub": "acme/ann", "email": "ann@acme.test", "orgs": []any{map[string]any{"org": "acme", "role": "owner"}}})
+
+	for _, s := range []struct {
+		name, tenant string
+		status       int
+	}{
+		{"a Base for no org", "", 403},
+		{"another org's Base", "zoo", 403},
+		{"the org's own Base", "acme", 200},
+	} {
+		scenario := tests.ApiScenario{
+			Name:           s.name,
+			Method:         http.MethodPost,
+			URL:            "/v1/collections",
+			Body:           strings.NewReader(`{"name":"mine","type":"base"}`),
+			Headers:        map[string]string{"Authorization": "Bearer " + token},
+			ExpectedStatus: s.status,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+				app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+				if s.tenant != "" {
+					app.Store().Set(apis.StoreKeyTenant, s.tenant)
+				}
+			},
+		}
+		if s.status != 200 {
+			scenario.ExpectedContent = []string{`"status":403`}
+		} else {
+			scenario.ExpectedContent = []string{`"name":"mine"`}
+		}
+		scenario.Test(t)
+	}
+}

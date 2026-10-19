@@ -2,6 +2,7 @@ package apis
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -403,56 +404,22 @@ func aggregateRows(
 		main.AndSelect(expr + " AS [[" + col + "]]")
 	}
 
-	rows := []dbx.NullStringMap{}
-	if err := main.All(&rows); err != nil {
-		return nil, err
+	// the emptiness figures, one column per field, in the same query: the
+	// field's empty predicate is the where clause's own `empty`, so "empty"
+	// means one thing in a filter and a figure, and every group a figure
+	// reports is counted by the one query that chose the groups
+	db, ok := e.App.ConcurrentDB().(*dbx.DB)
+	if !ok {
+		return nil, errors.New("aggregate: the figures are read outside a transaction")
 	}
-
-	// a group's key: its value, NULL apart from the empty string
-	keyOf := func(r dbx.NullStringMap) string {
-		switch {
-		case group == nil:
-			return ""
-		case !r["__group"].Valid:
-			return "\x00null"
-		default:
-			return r["__group"].String
-		}
-	}
-
-	out := make([]*aggregateRow, 0, len(rows))
-	byGroup := map[string]*aggregateRow{}
-	counts := map[string]float64{}
-	for _, r := range rows {
-		key := keyOf(r)
-		row := &aggregateRow{values: map[string]any{}}
-		if group != nil {
-			row.value = groupValue(group, r["__group"])
-		}
-		count := parseFloat(r["__count"])
-		counts[key] = count
-		for _, op := range ops {
-			col, ok := cols[op.key]
-			switch {
-			case op.name == "count":
-				row.values[op.key] = int64(count)
-			case ok:
-				row.values[op.key] = figureValue(op, fields[op.field], r[col])
-			}
-		}
-		out = append(out, row)
-		byGroup[key] = row
-	}
-
-	// the emptiness figures, one count per field
-	empties := map[string]map[string]float64{}
+	emptyCols := map[string]string{}
 	for _, op := range ops {
 		switch op.name {
 		case "countEmpty", "countNotEmpty", "percentEmpty", "percentNotEmpty":
 		default:
 			continue
 		}
-		if _, done := empties[op.field]; done {
+		if _, done := emptyCols[op.field]; done {
 			continue
 		}
 
@@ -466,42 +433,43 @@ func aggregateRows(
 			return nil, err
 		}
 
-		q := base().AndWhere(expr)
-		if err := resolver.UpdateQuery(q); err != nil {
-			return nil, err
-		}
-
-		emptyRows := []dbx.NullStringMap{}
-		if err := q.All(&emptyRows); err != nil {
-			return nil, err
-		}
-
-		m := map[string]float64{}
-		for _, r := range emptyRows {
-			m[keyOf(r)] = parseFloat(r["__count"])
-		}
-		empties[op.field] = m
+		bound := dbx.Params{}
+		col := "__e" + strconv.Itoa(len(emptyCols))
+		main.AndSelect("SUM(CASE WHEN " + expr.Build(db, bound) + " THEN 1 ELSE 0 END) AS [[" + col + "]]").AndBind(bound)
+		emptyCols[op.field] = col
 	}
 
-	for key, row := range byGroup {
-		total := counts[key]
+	rows := []dbx.NullStringMap{}
+	if err := main.All(&rows); err != nil {
+		return nil, err
+	}
+
+	out := make([]*aggregateRow, 0, len(rows))
+	for _, r := range rows {
+		row := &aggregateRow{values: map[string]any{}}
+		if group != nil {
+			row.value = groupValue(group, r["__group"])
+		}
+		total := parseFloat(r["__count"])
 		for _, op := range ops {
-			m, ok := empties[op.field]
-			if !ok {
-				continue
-			}
-			empty := m[key]
-			switch op.name {
-			case "countEmpty":
+			col, ok := cols[op.key]
+			empty := parseFloat(r[emptyCols[op.field]])
+			switch {
+			case op.name == "count":
+				row.values[op.key] = int64(total)
+			case op.name == "countEmpty":
 				row.values[op.key] = int64(empty)
-			case "countNotEmpty":
+			case op.name == "countNotEmpty":
 				row.values[op.key] = int64(total - empty)
-			case "percentEmpty":
+			case op.name == "percentEmpty":
 				row.values[op.key] = percent(empty, total)
-			case "percentNotEmpty":
+			case op.name == "percentNotEmpty":
 				row.values[op.key] = percent(total-empty, total)
+			case ok:
+				row.values[op.key] = figureValue(op, fields[op.field], r[col])
 			}
 		}
+		out = append(out, row)
 	}
 
 	return out, nil

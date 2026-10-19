@@ -50,7 +50,13 @@ type grant struct {
 // header-authenticated request arrives in: the Base it reads and writes, the
 // record its rules resolve @request.auth against, and the org it acts in.
 func (g *grant) apply(e *core.RequestEvent) {
-	e.App = g.app
+	// A host that routed the stream to the org's Base already chose the Base
+	// that serves it, and its choice is the live one: a pool may have closed
+	// the instance the grant was minted on and opened the org's Base again,
+	// and a stream registered on the closed one would never hear a write.
+	if tenant, _ := e.App.Store().Get(StoreKeyTenant).(string); tenant == "" || tenant != g.org {
+		e.App = g.app
+	}
 	e.Auth = g.auth
 	e.Set(RequestEventKeySub, g.sub)
 	e.Set(RequestEventKeyOrg, g.org)

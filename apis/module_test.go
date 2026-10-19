@@ -29,6 +29,7 @@ func TestModuleInstall(t *testing.T) {
 			func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
 				app.Store().Set(apis.StoreKeyJWKSURL, jwksURL)
+				app.Store().Set(apis.StoreKeyTenant, "acme")
 			}
 	}
 

@@ -224,6 +224,19 @@ func (r *runner) processRequestAuthField() (*search.ResolverResult, error) {
 		return r.resolver.resolveStaticRequestField(r.activeProps[1:]...)
 	}
 
+	// The caller's authority in its org is the verified token's to say and no
+	// stored row's: a user allowed to write its own record could otherwise
+	// grant it to itself. A saved auth record therefore administers no org and
+	// holds no role in one.
+	if len(r.activeProps) == 3 && !r.resolver.requestInfo.Auth.IsNew() {
+		switch r.activeProps[2] {
+		case FieldNameAuthAdmin:
+			return &search.ResolverResult{Identifier: "FALSE"}, nil
+		case FieldNameAuthRole:
+			return &search.ResolverResult{Identifier: "''"}, nil
+		}
+	}
+
 	// An auth record IAM vouched for is minted for the request and never saved
 	// (apis resolveJWKSToken), so there is no row to join: its own fields — the
 	// org it acts in, whether it administers that org, its role there — are

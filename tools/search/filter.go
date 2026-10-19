@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -56,28 +57,22 @@ func (f FilterData) BuildExprWithLimit(
 ) (query.Expression, error) {
 	raw := string(f)
 
-	// replace the placeholder params in the raw string filter
-	for _, p := range placeholderReplacements {
-		for key, value := range p {
-			var replacement string
-			switch v := value.(type) {
-			case nil:
-				replacement = "null"
-			case bool, float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8:
-				replacement = cast.ToString(v)
-			default:
-				replacement = cast.ToString(v)
-
-				// try to json serialize as fallback
-				if replacement == "" {
-					raw, _ := json.Marshal(v)
-					replacement = string(raw)
+	// Replace the placeholder params in the raw string filter, in ONE pass over
+	// the filter as it was written. Replacing one param at a time scanned the
+	// values already pasted in, so a value that itself spelled another param's
+	// placeholder ("{:b}") was rewritten inside its own quotes, and a quote in
+	// that second value closed the first one's string: a bound value could add
+	// conditions of its own to the filter.
+	if len(placeholderReplacements) > 0 {
+		raw = placeholderRegex.ReplaceAllStringFunc(raw, func(m string) string {
+			key := m[2 : len(m)-1]
+			for _, p := range placeholderReplacements {
+				if value, ok := p[key]; ok {
+					return placeholderLiteral(value)
 				}
-
-				replacement = strconv.Quote(replacement)
 			}
-			raw = strings.ReplaceAll(raw, "{:"+key+"}", replacement)
-		}
+			return m
+		})
 	}
 
 	cacheKey := raw + "/" + strconv.Itoa(maxExpressions)
@@ -103,6 +98,30 @@ func (f FilterData) BuildExprWithLimit(
 	parsedFilterData.SetIfLessThanLimit(cacheKey, data, 500)
 
 	return buildParsedFilterExpr(data, fieldResolver, &maxExpressions)
+}
+
+// placeholderRegex matches a bound param's placeholder in a filter.
+var placeholderRegex = regexp.MustCompile(`\{:(\w+)\}`)
+
+// placeholderLiteral is how a bound value is written into a filter: a number or
+// a bool as itself, nil as null, anything else as a quoted string.
+func placeholderLiteral(value any) string {
+	switch v := value.(type) {
+	case nil:
+		return "null"
+	case bool, float64, float32, int, int64, int32, int16, int8, uint, uint64, uint32, uint16, uint8:
+		return cast.ToString(v)
+	default:
+		replacement := cast.ToString(v)
+
+		// try to json serialize as fallback
+		if replacement == "" {
+			raw, _ := json.Marshal(v)
+			replacement = string(raw)
+		}
+
+		return strconv.Quote(replacement)
+	}
 }
 
 func buildParsedFilterExpr(data []fexpr.ExprGroup, fieldResolver FieldResolver, maxExpressions *int) (query.Expression, error) {

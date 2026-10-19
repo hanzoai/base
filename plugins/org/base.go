@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/hanzoai/authz"
+	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/dbx"
 	"github.com/hanzoai/sqlite"
@@ -209,6 +210,8 @@ func (b *bases) fill(org string, e *entry) {
 		e.err = fmt.Errorf("open the Base for %q: %w", org, err)
 		return
 	}
+	// the org's Base, and no other org's
+	app.Store().Set(apis.StoreKeyTenant, org)
 	b.p.declare(app)
 
 	e.app, e.err = app, nil

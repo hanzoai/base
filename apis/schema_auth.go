@@ -16,15 +16,24 @@ const DefaultRequireSchemaAuthMiddlewareId = "baseRequireSchemaAuth"
 const DefaultRequireSchemaReadAuthMiddlewareId = "baseRequireSchemaReadAuth"
 
 // IsOrgAdmin reports whether a request administers the org it acts in: an org
-// admin's token or the org's own secret key, in that org's Base.
+// admin's token or the org's own secret key, in a Base opened for that org.
 //
 // It is the org's own authority over its own Base and nothing wider. A
 // superuser is a different fact ([core.RequestEvent.HasSuperuserAuth]) and is
 // never reached through this one.
 func IsOrgAdmin(e *core.RequestEvent) bool {
 	admin, _ := e.Get(RequestEventKeyOrgAdmin).(bool)
+	return admin && servesOrg(e)
+}
+
+// servesOrg reports whether the Base serving a request was opened for the org
+// the request acts in (StoreKeyTenant), which is what makes that org's
+// authority mean anything here. A Base that names no org belongs to whoever
+// deployed it, so an admin of some org IAM knows administers nothing in it.
+func servesOrg(e *core.RequestEvent) bool {
 	org, _ := e.Get(RequestEventKeyOrg).(string)
-	return admin && org != ""
+	tenant, _ := e.App.Store().Get(StoreKeyTenant).(string)
+	return org != "" && tenant == org
 }
 
 // RequireSchemaAuth admits a superuser, or an org admin in its own org's Base.
@@ -64,12 +73,11 @@ func RequireSchemaReadAuth() *hook.Handler[*core.RequestEvent] {
 	}
 }
 
-// IsOrgMember reports whether a request acts in an org as one of its members:
-// a person IAM vouched for, or the org's own key. A Base that serves no org
-// has no members, so a locally signed-in user is never one.
+// IsOrgMember reports whether a request acts in an org as one of its members,
+// in that org's own Base: a person IAM vouched for, or the org's own key. A Base
+// that serves no org has no members, so a locally signed-in user is never one.
 func IsOrgMember(e *core.RequestEvent) bool {
-	org, _ := e.Get(RequestEventKeyOrg).(string)
-	if org == "" {
+	if !servesOrg(e) {
 		return false
 	}
 	sub, _ := e.Get(RequestEventKeySub).(string)

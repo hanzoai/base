@@ -422,3 +422,51 @@ func TestLikeParamsWrapping(t *testing.T) {
 		t.Fatalf("Expected query \n%s, \ngot \n%s", expectedQuery, calledQueries[0])
 	}
 }
+
+// A bound value is a value and nothing else, whatever it spells: a quote, a
+// backslash or another param's placeholder inside it never reaches the filter
+// as filter text.
+func TestFilterDataBoundValuesStayValues(t *testing.T) {
+	resolver := search.NewSimpleFieldResolver(dialect.For("sqlite"), "test1", "test2")
+
+	hostile := []query.Params{
+		// a value spelling the next param's placeholder: pasted in after it, the
+		// second value's own quotes close the first one's string around it
+		{"a": "{:b}", "b": ` || test2 != `},
+		{"b": "{:a}", "a": ` || test2 != `},
+		{"a": `\" || test2 != "`, "b": `\\`},
+		{"a": "{:a}", "b": "{:b}"},
+	}
+
+	for i, params := range hostile {
+		expr, err := search.FilterData("test1 = {:a} && test1 = {:b}").BuildExpr(resolver, params)
+		if err != nil {
+			t.Fatalf("%d: %v", i, err)
+		}
+
+		bound := query.Params{}
+		sql := expr.Build(nil, bound)
+		if strings.Contains(sql, "test2") {
+			t.Fatalf("%d: a bound value became filter text: %s", i, sql)
+		}
+		if n := strings.Count(sql, "test1"); n != 2 {
+			t.Fatalf("%d: want 2 comparisons, got %d: %s", i, n, sql)
+		}
+
+		var got []string
+		for _, v := range bound {
+			got = append(got, fmt.Sprint(v))
+		}
+		for _, want := range []string{fmt.Sprint(params["a"]), fmt.Sprint(params["b"])} {
+			found := false
+			for _, g := range got {
+				if g == want {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("%d: value %q was not bound as itself (bound %q)", i, want, got)
+			}
+		}
+	}
+}
