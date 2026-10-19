@@ -10,6 +10,7 @@ import (
 	"github.com/hanzoai/base"
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
+	_ "github.com/hanzoai/base/modules/crm" // the CRM, installable into any org's Base
 	"github.com/hanzoai/base/plugins/bootnode"
 	"github.com/hanzoai/base/plugins/calendar"
 	"github.com/hanzoai/base/plugins/cloudsql"

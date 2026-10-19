@@ -49,6 +49,7 @@ func NewRouter(app core.App) (*router.Router[*core.RequestEvent], error) {
 	bindSQLApi(app, apiGroup)
 	bindSettingsApi(app, apiGroup)
 	bindCollectionApi(app, apiGroup)
+	bindModuleApi(app, apiGroup)
 	bindRecordCrudApi(app, apiGroup)
 	bindRecordAuthApi(app, apiGroup)
 	bindLogsApi(app, apiGroup)

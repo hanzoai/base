@@ -1,0 +1,2242 @@
+[
+  {
+    "name": "companies",
+    "type": "base",
+    "label": "Company",
+    "plural": "Companies",
+    "icon": "IconBuildingSkyscraper",
+    "description": "The organizations the org sells to, partners with or hires from.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconBuilding",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "domain",
+        "type": "links",
+        "label": "Domain",
+        "icon": "IconWorld",
+        "unique": true,
+        "maxValues": 1,
+        "position": 2
+      },
+      {
+        "name": "address",
+        "type": "address",
+        "label": "Address",
+        "icon": "IconMap2",
+        "position": 3
+      },
+      {
+        "name": "linkedin",
+        "type": "links",
+        "label": "LinkedIn",
+        "icon": "IconBrandLinkedin",
+        "maxValues": 1,
+        "position": 4
+      },
+      {
+        "name": "x",
+        "type": "links",
+        "label": "X",
+        "icon": "IconBrandX",
+        "maxValues": 1,
+        "position": 5
+      },
+      {
+        "name": "employees",
+        "type": "number",
+        "label": "Employees",
+        "icon": "IconUsers",
+        "onlyInt": true,
+        "min": 0,
+        "position": 6
+      },
+      {
+        "name": "annual_revenue",
+        "type": "currency",
+        "label": "Annual revenue",
+        "icon": "IconMoneybag",
+        "position": 7
+      },
+      {
+        "name": "icp",
+        "type": "bool",
+        "label": "Ideal customer",
+        "icon": "IconTarget",
+        "position": 8
+      },
+      {
+        "name": "owner",
+        "type": "text",
+        "label": "Account owner",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 9
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 10
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 11
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 12
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 13
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "people",
+    "type": "base",
+    "label": "Person",
+    "plural": "People",
+    "icon": "IconUser",
+    "description": "The people the org knows: leads, contacts and customers.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "name",
+        "type": "fullName",
+        "label": "Name",
+        "icon": "IconUser",
+        "position": 1
+      },
+      {
+        "name": "emails",
+        "type": "emails",
+        "label": "Emails",
+        "icon": "IconMail",
+        "unique": true,
+        "maxValues": 10,
+        "position": 2
+      },
+      {
+        "name": "phones",
+        "type": "phones",
+        "label": "Phones",
+        "icon": "IconPhone",
+        "maxValues": 10,
+        "position": 3
+      },
+      {
+        "name": "job_title",
+        "type": "text",
+        "label": "Job title",
+        "icon": "IconBriefcase",
+        "max": 255,
+        "position": 4
+      },
+      {
+        "name": "company",
+        "type": "relation",
+        "label": "Company",
+        "collectionId": "companies",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 5
+      },
+      {
+        "name": "address",
+        "type": "address",
+        "label": "Address",
+        "icon": "IconMap2",
+        "position": 6
+      },
+      {
+        "name": "linkedin",
+        "type": "links",
+        "label": "LinkedIn",
+        "icon": "IconBrandLinkedin",
+        "maxValues": 1,
+        "position": 7
+      },
+      {
+        "name": "x",
+        "type": "links",
+        "label": "X",
+        "icon": "IconBrandX",
+        "maxValues": 1,
+        "position": 8
+      },
+      {
+        "name": "lifecycle",
+        "type": "select",
+        "label": "Lifecycle",
+        "maxSelect": 1,
+        "values": [
+          "lead",
+          "qualified",
+          "customer",
+          "disqualified"
+        ],
+        "options": [
+          {
+            "value": "lead",
+            "label": "Lead",
+            "color": "sky",
+            "position": 0
+          },
+          {
+            "value": "qualified",
+            "label": "Qualified",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "customer",
+            "label": "Customer",
+            "color": "green",
+            "position": 2
+          },
+          {
+            "value": "disqualified",
+            "label": "Disqualified",
+            "color": "gray",
+            "position": 3
+          }
+        ],
+        "icon": "IconProgress",
+        "position": 9
+      },
+      {
+        "name": "source",
+        "type": "text",
+        "label": "Source",
+        "icon": "IconSourceCode",
+        "max": 255,
+        "position": 10
+      },
+      {
+        "name": "owner",
+        "type": "text",
+        "label": "Owner",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 11
+      },
+      {
+        "name": "consent",
+        "type": "json",
+        "label": "Consent",
+        "icon": "IconShieldCheck",
+        "maxSize": 65536,
+        "position": 12
+      },
+      {
+        "name": "avatar",
+        "type": "file",
+        "label": "Avatar",
+        "icon": "IconPhoto",
+        "maxSelect": 1,
+        "maxSize": 5242880,
+        "mimeTypes": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "image/gif"
+        ],
+        "position": 13
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 14
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 15
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 16
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 17
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_people_company` ON `people` (`company`)"
+    ]
+  },
+  {
+    "name": "opportunities",
+    "type": "base",
+    "label": "Opportunity",
+    "plural": "Opportunities",
+    "icon": "IconTargetArrow",
+    "description": "Deals in the pipeline.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconTargetArrow",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "amount",
+        "type": "currency",
+        "label": "Amount",
+        "icon": "IconCurrencyDollar",
+        "position": 2
+      },
+      {
+        "name": "stage",
+        "type": "select",
+        "label": "Stage",
+        "maxSelect": 1,
+        "values": [
+          "new",
+          "screening",
+          "meeting",
+          "proposal",
+          "customer"
+        ],
+        "options": [
+          {
+            "value": "new",
+            "label": "New",
+            "color": "red",
+            "position": 0
+          },
+          {
+            "value": "screening",
+            "label": "Screening",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "meeting",
+            "label": "Meeting",
+            "color": "sky",
+            "position": 2
+          },
+          {
+            "value": "proposal",
+            "label": "Proposal",
+            "color": "turquoise",
+            "position": 3
+          },
+          {
+            "value": "customer",
+            "label": "Customer",
+            "color": "yellow",
+            "position": 4
+          }
+        ],
+        "icon": "IconProgressCheck",
+        "position": 3
+      },
+      {
+        "name": "close_date",
+        "type": "date",
+        "label": "Close date",
+        "icon": "IconCalendarEvent",
+        "position": 4
+      },
+      {
+        "name": "company",
+        "type": "relation",
+        "label": "Company",
+        "collectionId": "companies",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 5
+      },
+      {
+        "name": "contact",
+        "type": "relation",
+        "label": "Point of contact",
+        "collectionId": "people",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconUser",
+        "position": 6
+      },
+      {
+        "name": "owner",
+        "type": "text",
+        "label": "Owner",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 7
+      },
+      {
+        "name": "position",
+        "type": "number",
+        "label": "Position",
+        "icon": "IconHierarchy",
+        "position": 8
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 9
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 10
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 11
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 12
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_opportunities_stage` ON `opportunities` (`stage`)",
+      "CREATE INDEX `idx_opportunities_company` ON `opportunities` (`company`)"
+    ]
+  },
+  {
+    "name": "candidates",
+    "type": "base",
+    "label": "Candidate",
+    "plural": "Candidates",
+    "icon": "IconId",
+    "description": "People applying to the org's openings. Never an audience.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "name",
+        "type": "fullName",
+        "label": "Name",
+        "icon": "IconUser",
+        "position": 1
+      },
+      {
+        "name": "emails",
+        "type": "emails",
+        "label": "Emails",
+        "icon": "IconMail",
+        "maxValues": 10,
+        "position": 2
+      },
+      {
+        "name": "phones",
+        "type": "phones",
+        "label": "Phones",
+        "icon": "IconPhone",
+        "maxValues": 10,
+        "position": 3
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "label": "Role",
+        "icon": "IconBriefcase",
+        "max": 255,
+        "position": 4
+      },
+      {
+        "name": "job",
+        "type": "text",
+        "label": "Opening",
+        "icon": "IconClipboardList",
+        "max": 255,
+        "position": 5
+      },
+      {
+        "name": "department",
+        "type": "text",
+        "label": "Department",
+        "icon": "IconSitemap",
+        "max": 255,
+        "position": 6
+      },
+      {
+        "name": "location",
+        "type": "text",
+        "label": "Location",
+        "icon": "IconMapPin",
+        "max": 255,
+        "position": 7
+      },
+      {
+        "name": "resume",
+        "type": "file",
+        "label": "Resume",
+        "icon": "IconFileCv",
+        "maxSelect": 1,
+        "maxSize": 10485760,
+        "mimeTypes": [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ],
+        "position": 8
+      },
+      {
+        "name": "links",
+        "type": "links",
+        "label": "Links",
+        "icon": "IconLink",
+        "maxValues": 5,
+        "position": 9
+      },
+      {
+        "name": "background",
+        "type": "editor",
+        "label": "Background",
+        "icon": "IconFileText",
+        "position": 10
+      },
+      {
+        "name": "answers",
+        "type": "json",
+        "label": "Application",
+        "icon": "IconForms",
+        "maxSize": 262144,
+        "position": 11
+      },
+      {
+        "name": "source",
+        "type": "text",
+        "label": "Source",
+        "icon": "IconSourceCode",
+        "max": 255,
+        "position": 12
+      },
+      {
+        "name": "stage",
+        "type": "select",
+        "label": "Stage",
+        "maxSelect": 1,
+        "values": [
+          "new",
+          "screening",
+          "interview",
+          "offer",
+          "hired",
+          "rejected"
+        ],
+        "options": [
+          {
+            "value": "new",
+            "label": "New",
+            "color": "sky",
+            "position": 0
+          },
+          {
+            "value": "screening",
+            "label": "Screening",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "interview",
+            "label": "Interview",
+            "color": "blue",
+            "position": 2
+          },
+          {
+            "value": "offer",
+            "label": "Offer",
+            "color": "amber",
+            "position": 3
+          },
+          {
+            "value": "hired",
+            "label": "Hired",
+            "color": "green",
+            "position": 4
+          },
+          {
+            "value": "rejected",
+            "label": "Rejected",
+            "color": "red",
+            "position": 5
+          }
+        ],
+        "icon": "IconProgress",
+        "position": 13
+      },
+      {
+        "name": "consent",
+        "type": "select",
+        "label": "Marketing consent",
+        "maxSelect": 1,
+        "values": [
+          "unasked",
+          "given",
+          "declined"
+        ],
+        "options": [
+          {
+            "value": "unasked",
+            "label": "Not asked",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "given",
+            "label": "Given",
+            "color": "green",
+            "position": 1
+          },
+          {
+            "value": "declined",
+            "label": "Declined",
+            "color": "red",
+            "position": 2
+          }
+        ],
+        "icon": "IconShieldCheck",
+        "position": 14
+      },
+      {
+        "name": "applied",
+        "type": "date",
+        "label": "Received",
+        "icon": "IconCalendarEvent",
+        "position": 15
+      },
+      {
+        "name": "public_ref",
+        "type": "text",
+        "label": "Public reference",
+        "icon": "IconHash",
+        "max": 64,
+        "position": 16
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 17
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 18
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 19
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 20
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_candidates_public_ref` ON `candidates` (`public_ref`) WHERE public_ref != ''"
+    ]
+  },
+  {
+    "name": "applications",
+    "type": "base",
+    "label": "Application",
+    "plural": "Applications",
+    "icon": "IconFileDescription",
+    "description": "A programme intake, promoted into a company and a person once accepted.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "company",
+        "type": "text",
+        "label": "Company",
+        "icon": "IconBuilding",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "website",
+        "type": "links",
+        "label": "Website",
+        "icon": "IconWorld",
+        "maxValues": 1,
+        "position": 2
+      },
+      {
+        "name": "contact_name",
+        "type": "text",
+        "label": "Contact name",
+        "icon": "IconUser",
+        "max": 255,
+        "position": 3
+      },
+      {
+        "name": "emails",
+        "type": "emails",
+        "label": "Emails",
+        "icon": "IconMail",
+        "maxValues": 10,
+        "position": 4
+      },
+      {
+        "name": "role",
+        "type": "text",
+        "label": "Role",
+        "icon": "IconBriefcase",
+        "max": 255,
+        "position": 5
+      },
+      {
+        "name": "stage",
+        "type": "select",
+        "label": "Stage",
+        "maxSelect": 1,
+        "values": [
+          "applied",
+          "screening",
+          "accepted",
+          "rejected"
+        ],
+        "options": [
+          {
+            "value": "applied",
+            "label": "Applied",
+            "color": "sky",
+            "position": 0
+          },
+          {
+            "value": "screening",
+            "label": "Screening",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "accepted",
+            "label": "Accepted",
+            "color": "green",
+            "position": 2
+          },
+          {
+            "value": "rejected",
+            "label": "Rejected",
+            "color": "red",
+            "position": 3
+          }
+        ],
+        "icon": "IconProgress",
+        "position": 6
+      },
+      {
+        "name": "tier1",
+        "type": "bool",
+        "label": "Tier 1",
+        "icon": "IconStar",
+        "position": 7
+      },
+      {
+        "name": "reason",
+        "type": "editor",
+        "label": "Reason",
+        "icon": "IconFileText",
+        "position": 8
+      },
+      {
+        "name": "metadata",
+        "type": "json",
+        "label": "Metadata",
+        "icon": "IconBraces",
+        "maxSize": 262144,
+        "position": 9
+      },
+      {
+        "name": "screen",
+        "type": "json",
+        "label": "Screen",
+        "icon": "IconListCheck",
+        "maxSize": 262144,
+        "position": 10
+      },
+      {
+        "name": "events",
+        "type": "json",
+        "label": "Events",
+        "icon": "IconTimeline",
+        "maxSize": 262144,
+        "position": 11
+      },
+      {
+        "name": "promoted_company",
+        "type": "relation",
+        "label": "Company record",
+        "collectionId": "companies",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 12
+      },
+      {
+        "name": "promoted_contact",
+        "type": "relation",
+        "label": "Contact record",
+        "collectionId": "people",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconUser",
+        "position": 13
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 14
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 15
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 16
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 17
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "segments",
+    "type": "base",
+    "label": "Segment",
+    "plural": "Segments",
+    "icon": "IconFilter",
+    "description": "A saved filter over one collection, evaluated whenever it is read.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconFilter",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "label": "Description",
+        "icon": "IconFileText",
+        "max": 1000,
+        "position": 2
+      },
+      {
+        "name": "object",
+        "type": "text",
+        "label": "Object",
+        "icon": "IconDatabase",
+        "required": true,
+        "max": 255,
+        "position": 3
+      },
+      {
+        "name": "where",
+        "type": "json",
+        "label": "Filter",
+        "icon": "IconFilterCog",
+        "required": true,
+        "maxSize": 65536,
+        "position": 4
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 5
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 6
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 7
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 8
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "lists",
+    "type": "base",
+    "label": "List",
+    "plural": "Lists",
+    "icon": "IconList",
+    "description": "A hand-picked set of people or companies, kept for a purpose.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconList",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "label": "Description",
+        "icon": "IconFileText",
+        "max": 1000,
+        "position": 2
+      },
+      {
+        "name": "purpose",
+        "type": "text",
+        "label": "Purpose",
+        "icon": "IconBulb",
+        "max": 255,
+        "position": 3
+      },
+      {
+        "name": "object",
+        "type": "select",
+        "label": "Object",
+        "maxSelect": 1,
+        "values": [
+          "people",
+          "companies"
+        ],
+        "options": [
+          {
+            "value": "people",
+            "label": "People",
+            "color": "blue",
+            "position": 0
+          },
+          {
+            "value": "companies",
+            "label": "Companies",
+            "color": "green",
+            "position": 1
+          }
+        ],
+        "icon": "IconDatabase",
+        "position": 4
+      },
+      {
+        "name": "owner",
+        "type": "text",
+        "label": "Owner",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 5
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 6
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 7
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 8
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 9
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "list_members",
+    "type": "base",
+    "label": "List member",
+    "plural": "List members",
+    "icon": "IconUsersGroup",
+    "description": "One person on one list, once.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": null,
+    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "fields": [
+      {
+        "name": "list",
+        "type": "relation",
+        "label": "List",
+        "collectionId": "lists",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconList",
+        "required": true,
+        "position": 1
+      },
+      {
+        "name": "person",
+        "type": "relation",
+        "label": "Person",
+        "collectionId": "people",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconUser",
+        "required": true,
+        "position": 2
+      },
+      {
+        "name": "source",
+        "type": "select",
+        "label": "Source",
+        "maxSelect": 1,
+        "values": [
+          "manual",
+          "import",
+          "segment",
+          "api",
+          "workflow"
+        ],
+        "options": [
+          {
+            "value": "manual",
+            "label": "Manual",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "import",
+            "label": "Import",
+            "color": "blue",
+            "position": 1
+          },
+          {
+            "value": "segment",
+            "label": "Segment",
+            "color": "purple",
+            "position": 2
+          },
+          {
+            "value": "api",
+            "label": "API",
+            "color": "sky",
+            "position": 3
+          },
+          {
+            "value": "workflow",
+            "label": "Workflow",
+            "color": "amber",
+            "position": 4
+          }
+        ],
+        "icon": "IconSourceCode",
+        "position": 3
+      },
+      {
+        "name": "segment",
+        "type": "relation",
+        "label": "Segment",
+        "collectionId": "segments",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconFilter",
+        "position": 4
+      },
+      {
+        "name": "consent_at",
+        "type": "date",
+        "label": "Consent given",
+        "icon": "IconShieldCheck",
+        "position": 5
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 6
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 7
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 8
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 9
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_list_members_list_person` ON `list_members` (`list`, `person`)",
+      "CREATE INDEX `idx_list_members_person` ON `list_members` (`person`)"
+    ]
+  },
+  {
+    "name": "activities",
+    "type": "base",
+    "label": "Activity",
+    "plural": "Activities",
+    "icon": "IconTimelineEvent",
+    "description": "The timeline: one row per message, meeting, form or order, written once per source.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.admin = true",
+    "fields": [
+      {
+        "name": "kind",
+        "type": "select",
+        "label": "Kind",
+        "maxSelect": 1,
+        "values": [
+          "email",
+          "sms",
+          "whatsapp",
+          "chat",
+          "call",
+          "meeting",
+          "note",
+          "form",
+          "order",
+          "task",
+          "booking",
+          "system"
+        ],
+        "options": [
+          {
+            "value": "email",
+            "label": "Email",
+            "color": "blue",
+            "position": 0
+          },
+          {
+            "value": "sms",
+            "label": "SMS",
+            "color": "green",
+            "position": 1
+          },
+          {
+            "value": "whatsapp",
+            "label": "WhatsApp",
+            "color": "grass",
+            "position": 2
+          },
+          {
+            "value": "chat",
+            "label": "Chat",
+            "color": "sky",
+            "position": 3
+          },
+          {
+            "value": "call",
+            "label": "Call",
+            "color": "orange",
+            "position": 4
+          },
+          {
+            "value": "meeting",
+            "label": "Meeting",
+            "color": "purple",
+            "position": 5
+          },
+          {
+            "value": "note",
+            "label": "Note",
+            "color": "yellow",
+            "position": 6
+          },
+          {
+            "value": "form",
+            "label": "Form",
+            "color": "pink",
+            "position": 7
+          },
+          {
+            "value": "order",
+            "label": "Order",
+            "color": "gold",
+            "position": 8
+          },
+          {
+            "value": "task",
+            "label": "Task",
+            "color": "iris",
+            "position": 9
+          },
+          {
+            "value": "booking",
+            "label": "Booking",
+            "color": "violet",
+            "position": 10
+          },
+          {
+            "value": "system",
+            "label": "System",
+            "color": "gray",
+            "position": 11
+          }
+        ],
+        "icon": "IconCategory",
+        "required": true,
+        "position": 1
+      },
+      {
+        "name": "direction",
+        "type": "select",
+        "label": "Direction",
+        "maxSelect": 1,
+        "values": [
+          "in",
+          "out"
+        ],
+        "options": [
+          {
+            "value": "in",
+            "label": "Inbound",
+            "color": "green",
+            "position": 0
+          },
+          {
+            "value": "out",
+            "label": "Outbound",
+            "color": "blue",
+            "position": 1
+          }
+        ],
+        "icon": "IconArrowsExchange",
+        "position": 2
+      },
+      {
+        "name": "channel",
+        "type": "text",
+        "label": "Channel",
+        "icon": "IconMessages",
+        "max": 255,
+        "position": 3
+      },
+      {
+        "name": "room",
+        "type": "text",
+        "label": "Room",
+        "icon": "IconDoor",
+        "max": 255,
+        "position": 4
+      },
+      {
+        "name": "source_id",
+        "type": "text",
+        "label": "Source id",
+        "icon": "IconFingerprint",
+        "max": 255,
+        "position": 5
+      },
+      {
+        "name": "subject",
+        "type": "text",
+        "label": "Subject",
+        "icon": "IconHeading",
+        "max": 1000,
+        "position": 6
+      },
+      {
+        "name": "snippet",
+        "type": "text",
+        "label": "Snippet",
+        "icon": "IconAlignLeft",
+        "max": 2000,
+        "position": 7
+      },
+      {
+        "name": "body",
+        "type": "editor",
+        "label": "Body",
+        "icon": "IconFileText",
+        "position": 8
+      },
+      {
+        "name": "at",
+        "type": "date",
+        "label": "When",
+        "icon": "IconClock",
+        "position": 9
+      },
+      {
+        "name": "person",
+        "type": "relation",
+        "label": "Person",
+        "collectionId": "people",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconUser",
+        "position": 10
+      },
+      {
+        "name": "company",
+        "type": "relation",
+        "label": "Company",
+        "collectionId": "companies",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 11
+      },
+      {
+        "name": "opportunity",
+        "type": "relation",
+        "label": "Opportunity",
+        "collectionId": "opportunities",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconTargetArrow",
+        "position": 12
+      },
+      {
+        "name": "candidate",
+        "type": "relation",
+        "label": "Candidate",
+        "collectionId": "candidates",
+        "maxSelect": 1,
+        "cascadeDelete": false,
+        "icon": "IconId",
+        "position": 13
+      },
+      {
+        "name": "data",
+        "type": "json",
+        "label": "Data",
+        "icon": "IconBraces",
+        "maxSize": 262144,
+        "position": 14
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 15
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 16
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 17
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 18
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_activities_source_id` ON `activities` (`source_id`) WHERE source_id != ''",
+      "CREATE INDEX `idx_activities_person_at` ON `activities` (`person`, `at`)"
+    ]
+  },
+  {
+    "name": "notes",
+    "type": "base",
+    "label": "Note",
+    "plural": "Notes",
+    "icon": "IconNotes",
+    "description": "Notes on records.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "title",
+        "type": "text",
+        "label": "Title",
+        "icon": "IconHeading",
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "body",
+        "type": "editor",
+        "label": "Body",
+        "icon": "IconFileText",
+        "position": 2
+      },
+      {
+        "name": "people",
+        "type": "relation",
+        "label": "People",
+        "collectionId": "people",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconUser",
+        "position": 3
+      },
+      {
+        "name": "companies",
+        "type": "relation",
+        "label": "Companies",
+        "collectionId": "companies",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 4
+      },
+      {
+        "name": "opportunities",
+        "type": "relation",
+        "label": "Opportunities",
+        "collectionId": "opportunities",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconTargetArrow",
+        "position": 5
+      },
+      {
+        "name": "candidates",
+        "type": "relation",
+        "label": "Candidates",
+        "collectionId": "candidates",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconId",
+        "position": 6
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 7
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 8
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 9
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 10
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "tasks",
+    "type": "base",
+    "label": "Task",
+    "plural": "Tasks",
+    "icon": "IconCheckbox",
+    "description": "Work to do, on records, assigned to someone.",
+    "history": true,
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "title",
+        "type": "text",
+        "label": "Title",
+        "icon": "IconHeading",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "body",
+        "type": "editor",
+        "label": "Body",
+        "icon": "IconFileText",
+        "position": 2
+      },
+      {
+        "name": "status",
+        "type": "select",
+        "label": "Status",
+        "maxSelect": 1,
+        "values": [
+          "todo",
+          "in_progress",
+          "done"
+        ],
+        "options": [
+          {
+            "value": "todo",
+            "label": "To do",
+            "color": "sky",
+            "position": 0
+          },
+          {
+            "value": "in_progress",
+            "label": "In progress",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "done",
+            "label": "Done",
+            "color": "green",
+            "position": 2
+          }
+        ],
+        "icon": "IconProgressCheck",
+        "position": 3
+      },
+      {
+        "name": "due",
+        "type": "date",
+        "label": "Due",
+        "icon": "IconCalendarDue",
+        "position": 4
+      },
+      {
+        "name": "assignee",
+        "type": "text",
+        "label": "Assignee",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 5
+      },
+      {
+        "name": "people",
+        "type": "relation",
+        "label": "People",
+        "collectionId": "people",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconUser",
+        "position": 6
+      },
+      {
+        "name": "companies",
+        "type": "relation",
+        "label": "Companies",
+        "collectionId": "companies",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconBuildingSkyscraper",
+        "position": 7
+      },
+      {
+        "name": "opportunities",
+        "type": "relation",
+        "label": "Opportunities",
+        "collectionId": "opportunities",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconTargetArrow",
+        "position": 8
+      },
+      {
+        "name": "candidates",
+        "type": "relation",
+        "label": "Candidates",
+        "collectionId": "candidates",
+        "maxSelect": 100,
+        "cascadeDelete": false,
+        "icon": "IconId",
+        "position": 9
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 10
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 11
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 12
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 13
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_tasks_assignee` ON `tasks` (`assignee`)"
+    ]
+  },
+  {
+    "name": "attachments",
+    "type": "base",
+    "label": "Attachment",
+    "plural": "Attachments",
+    "icon": "IconPaperclip",
+    "description": "Files on records.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "@request.auth.id != \"\"",
+    "deleteRule": "@request.auth.id != \"\"",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconFile",
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "file",
+        "type": "file",
+        "label": "File",
+        "icon": "IconPaperclip",
+        "maxSelect": 1,
+        "maxSize": 20971520,
+        "position": 2
+      },
+      {
+        "name": "category",
+        "type": "select",
+        "label": "Category",
+        "maxSelect": 1,
+        "values": [
+          "archive",
+          "audio",
+          "image",
+          "presentation",
+          "spreadsheet",
+          "document",
+          "video",
+          "other"
+        ],
+        "options": [
+          {
+            "value": "archive",
+            "label": "Archive",
+            "color": "brown",
+            "position": 0
+          },
+          {
+            "value": "audio",
+            "label": "Audio",
+            "color": "pink",
+            "position": 1
+          },
+          {
+            "value": "image",
+            "label": "Image",
+            "color": "green",
+            "position": 2
+          },
+          {
+            "value": "presentation",
+            "label": "Presentation",
+            "color": "orange",
+            "position": 3
+          },
+          {
+            "value": "spreadsheet",
+            "label": "Spreadsheet",
+            "color": "grass",
+            "position": 4
+          },
+          {
+            "value": "document",
+            "label": "Document",
+            "color": "blue",
+            "position": 5
+          },
+          {
+            "value": "video",
+            "label": "Video",
+            "color": "purple",
+            "position": 6
+          },
+          {
+            "value": "other",
+            "label": "Other",
+            "color": "gray",
+            "position": 7
+          }
+        ],
+        "icon": "IconCategory",
+        "position": 3
+      },
+      {
+        "name": "person",
+        "type": "relation",
+        "label": "Person",
+        "collectionId": "people",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconUser",
+        "position": 4
+      },
+      {
+        "name": "company",
+        "type": "relation",
+        "label": "Company",
+        "collectionId": "companies",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconBuildingSkyscraper",
+        "position": 5
+      },
+      {
+        "name": "opportunity",
+        "type": "relation",
+        "label": "Opportunity",
+        "collectionId": "opportunities",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconTargetArrow",
+        "position": 6
+      },
+      {
+        "name": "candidate",
+        "type": "relation",
+        "label": "Candidate",
+        "collectionId": "candidates",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconId",
+        "position": 7
+      },
+      {
+        "name": "note",
+        "type": "relation",
+        "label": "Note",
+        "collectionId": "notes",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconNotes",
+        "position": 8
+      },
+      {
+        "name": "task",
+        "type": "relation",
+        "label": "Task",
+        "collectionId": "tasks",
+        "maxSelect": 1,
+        "cascadeDelete": true,
+        "icon": "IconCheckbox",
+        "position": 9
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 10
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 11
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 12
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 13
+      }
+    ],
+    "indexes": []
+  },
+  {
+    "name": "views",
+    "type": "base",
+    "label": "View",
+    "plural": "Views",
+    "icon": "IconLayoutKanban",
+    "description": "The org's shared views of a collection. A person's own views are kept in their IAM preferences.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconLayoutKanban",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "object",
+        "type": "text",
+        "label": "Object",
+        "icon": "IconDatabase",
+        "required": true,
+        "max": 255,
+        "position": 2
+      },
+      {
+        "name": "type",
+        "type": "select",
+        "label": "Type",
+        "maxSelect": 1,
+        "values": [
+          "table",
+          "kanban",
+          "calendar",
+          "list"
+        ],
+        "options": [
+          {
+            "value": "table",
+            "label": "Table",
+            "color": "blue",
+            "position": 0
+          },
+          {
+            "value": "kanban",
+            "label": "Kanban",
+            "color": "purple",
+            "position": 1
+          },
+          {
+            "value": "calendar",
+            "label": "Calendar",
+            "color": "green",
+            "position": 2
+          },
+          {
+            "value": "list",
+            "label": "List",
+            "color": "gray",
+            "position": 3
+          }
+        ],
+        "icon": "IconLayout",
+        "position": 3
+      },
+      {
+        "name": "icon",
+        "type": "text",
+        "label": "Icon",
+        "icon": "IconIcons",
+        "max": 64,
+        "position": 4
+      },
+      {
+        "name": "position",
+        "type": "number",
+        "label": "Position",
+        "icon": "IconHierarchy",
+        "position": 5
+      },
+      {
+        "name": "group_by",
+        "type": "text",
+        "label": "Group by",
+        "icon": "IconColumns",
+        "max": 255,
+        "position": 6
+      },
+      {
+        "name": "calendar_field",
+        "type": "text",
+        "label": "Calendar field",
+        "icon": "IconCalendar",
+        "max": 255,
+        "position": 7
+      },
+      {
+        "name": "calendar_layout",
+        "type": "select",
+        "label": "Calendar layout",
+        "maxSelect": 1,
+        "values": [
+          "day",
+          "week",
+          "month"
+        ],
+        "options": [
+          {
+            "value": "day",
+            "label": "Day",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "week",
+            "label": "Week",
+            "color": "gray",
+            "position": 1
+          },
+          {
+            "value": "month",
+            "label": "Month",
+            "color": "gray",
+            "position": 2
+          }
+        ],
+        "icon": "IconCalendarMonth",
+        "position": 8
+      },
+      {
+        "name": "open_in",
+        "type": "select",
+        "label": "Open records in",
+        "maxSelect": 1,
+        "values": [
+          "side",
+          "page"
+        ],
+        "options": [
+          {
+            "value": "side",
+            "label": "Side panel",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "page",
+            "label": "Full page",
+            "color": "gray",
+            "position": 1
+          }
+        ],
+        "icon": "IconLayoutSidebarRight",
+        "position": 9
+      },
+      {
+        "name": "fields",
+        "type": "json",
+        "label": "Columns",
+        "icon": "IconColumns",
+        "maxSize": 65536,
+        "position": 10
+      },
+      {
+        "name": "where",
+        "type": "json",
+        "label": "Filter",
+        "icon": "IconFilter",
+        "maxSize": 65536,
+        "position": 11
+      },
+      {
+        "name": "sorts",
+        "type": "json",
+        "label": "Sorts",
+        "icon": "IconArrowsSort",
+        "maxSize": 16384,
+        "position": 12
+      },
+      {
+        "name": "groups",
+        "type": "json",
+        "label": "Groups",
+        "icon": "IconLayoutColumns",
+        "maxSize": 65536,
+        "position": 13
+      },
+      {
+        "name": "search",
+        "type": "text",
+        "label": "Search",
+        "icon": "IconSearch",
+        "max": 255,
+        "position": 14
+      },
+      {
+        "name": "is_default",
+        "type": "bool",
+        "label": "Default view",
+        "icon": "IconPin",
+        "position": 15
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 16
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 17
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 18
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 19
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_views_object` ON `views` (`object`)"
+    ]
+  }
+]
