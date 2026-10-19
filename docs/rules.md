@@ -73,14 +73,23 @@ saved:
 | `email` | `email` |
 | `name` | `name`, else `displayName` |
 | `org_id` | the org the request acts in, when the auth collection has an `org_id` field |
+| `admin` | whether the caller administers that org (its IAM role there is owner or admin) |
+| `role` | the caller's role in that org: `owner`, `admin` or `member` |
 
-Rules read these as `@request.auth.id`, `@request.auth.email` and so on.
+Rules read these as `@request.auth.id`, `@request.auth.email` and so on, so
+"only the org's admins delete" is `@request.auth.admin = true`.
 
 **Superusers are the members of IAM's `admin` org**, and nobody else. Their
 record is mirrored into `_superusers`; everyone else's into `users`. A superuser
 passes every rule, manages collections and settings, and can act in any org. An
 `admin` role inside an ordinary org is a different thing and grants none of
 this.
+
+**An org's admins change its schema.** In an org's Base, an org admin creates,
+changes and deletes the org's ordinary base collections through
+`/v1/collections` (never auth, view or system collections, nor Base's own `_`
+tables) and installs modules (`POST /v1/modules/crm`). Every member reads the
+schema.
 
 **Each org has its own database.** Base takes the org from the token's
 memberships and opens `<data dir>/orgs/<org>/data.db` for the request. Two orgs
