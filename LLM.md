@@ -27,6 +27,7 @@ its own Base at `<data dir>/orgs/<org>/data.db`.
 | `plugins/zap` | the ZAP listener, which serves the HTTP handler |
 | `plugins/extruntime`, `plugins/gojavm` | the runtime interface and the goja runtime behind `/v1/functions` |
 | `plugins/{migratecmd,ghupdate,waitlist,bootnode,calendar,cloudsql,commerce}` | what their names say |
+| `modules/` | named collection sets an org installs into its Base (`POST /v1/modules/{name}`, `core.GrowCollections`); `modules/crm` is the CRM (`crm.json`), blank-imported by the binary |
 | `plugins/{ha,replicate,tasks,scheduler,vault,pyvm,v8vm,wasmvm,starkvm,extbench}` | plugins the binary does not link |
 | `network/` | quasar replication (`BASE_NETWORK=quasar`) and its `s3://` archive |
 | `store/` | at-rest encryption for per-base SQLite: keyrings and encrypted replicas |
@@ -128,6 +129,60 @@ address, mDNS is opt-in and never on loopback, `BASE_LISTEN_P2P` binds its host
 exactly, and the Tasks and direct KMS clients dial without listening.
 `docs/listeners.md` is the list; change it with the code.
 
+**An org admin changes its own Base's schema, and nothing wider.**
+`RequireSchemaAuth` admits a superuser or an org admin (`IsOrgAdmin`: the
+credential administers the org the request acts in); `rotate` stays a
+superuser's. An org admin reaches ordinary base collections only
+(`SchemaManageable`: not auth, not view, not system, no `_` name), judged as each
+is and as the request would leave it, never `deleteMissing`, and every change is
+logged. Any member reads the org's own schema (`RequireSchemaReadAuth`; Base's
+own tables are hidden from one), because a client draws records by it. The CRM
+module installs through the same door (`POST /v1/modules/crm`).
+
+**Rules read the caller's org authority.** `@request.auth.admin` and
+`@request.auth.role` (owner, admin or member) come off the verified token onto
+the unsaved record IAM is mirrored into, and an unsaved auth record's own fields
+are read off the record rather than joined against a row that does not exist
+(`processRequestAuthField`); before that `@request.auth.org_id` matched nothing.
+
+**A Base opened for one org answers that org.** A host that pools Bases sets
+`StoreKeyTenant`; a token acting in any other org is refused there.
+
+**Composite values are one JSON column.** currency (`amountMicros`,
+`currencyCode`), emails, phones, links, address, fullName and actor are
+`CompositeField`s: NULL when empty, parts reached by name in filters, sorts and
+aggregates (`emails.primaryEmail`), a path naming no part refused. Emails,
+phones and links normalize what is typed, and their primary part can be unique
+(a validation query: SQLite admits one writer, PostgreSQL could race two). Every
+field embeds `FieldMeta` (label, description, icon, position); a select carries
+`options` (label, colour from `TagColors`, position) for values of `values` only;
+a base collection carries `label`, `plural`, `icon`, `description`, `history`.
+Editor HTML is sanitized before it is written (bluemonday UGC).
+
+**The writer is stated, never sent.** An actor field is stamped from
+`core.ActorFrom(ctx)`: record CRUD states the person (`apis.WithRequestActor`), a
+host states a program (`core.WithActor`), and nothing in a body sets one.
+
+**History is written in the record's transaction.** A base collection with
+`history` writes a `_history` row per create, update and delete (who, when,
+changed fields from and to), merging one writer's edits within ten minutes;
+`GET /v1/collections/{c}/records/{id}/history` answers under the record's view
+rule.
+
+**A where filter is the filter language, written as data.** `core.CompileWhere`
+turns `{"and"|"or"|"not"|field, op, value}` into Base's filter with bound
+parameters: per-type operators, relative dates in a time zone, `@me`,
+back-relations (`list_members_via_person.list` is "in list") and
+`inSegment`/`notInSegment` over the `segments` collection. `?where=` on the
+records list and `GET /v1/collections/{c}/aggregate?ops=&group=` (count, sums,
+averages, empties, uniques, grouped lanes) both run under the list rule.
+
+**Grow never drops.** `core.GrowCollections` creates what is missing and adds
+fields, select values and indexes by name, keeping every field, rule, option and
+index an org changed; it is how modules and a host's imports reach a Base. The
+`_views*` system collections are retired (`1790000200`); team views are the
+CRM's ordinary `views` collection, a person's own views live in IAM preferences.
+
 **Paths are `/v1`.** No `/api/` segment anywhere. `BASE_API_PREFIX` moves the
 data plane and nothing else: `/v1/iam` and `/healthz` stay put. The admin SPA
 writes `/v1` into `ui-react/src/lib/api.ts`, so it does not work under another
@@ -152,6 +207,9 @@ is `BASE_FRAME_ANCESTORS` (default `'self'`). It signs in with IAM PKCE
   empty rather than sending it.
 
 ## Known problems
+
+- `migrations/1780500000_connect_messaging_calendar.go` gives `connectedAccount` encrypted token fields, so an OAuth token can sit in a record. Secrets belong in KMS; the collection is retired by another change, and nothing reads it.
+- `plugins/jsvm/internal/types/generated/types.d.ts` has not been regenerated for the composite field types: the generator names its aliases at random, so a run rewrites some 36,000 lines.
 
 - `apis/installer.go` tells a Base without IAM to run `superuser upsert`, a command that no longer exists.
 - `--publicDir` and `--indexFallback` do nothing: `apis.Serve` registers `GET /{path...}` before the binary's static route checks for one.
