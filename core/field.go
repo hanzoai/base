@@ -78,6 +78,15 @@ var (
 	ErrMustBeSystem          = validation.NewError("validation_must_be_system", `The field must be marked as "System".`)
 )
 
+// EmailGated reports whether field is an auth collection's email, which a
+// caller who is not a superuser reads only on the records that made it public
+// (emailVisibility). The filter resolver and the aggregate route both ask it, so
+// an address a record keeps private is out of reach of a comparison and of a
+// figure alike.
+func EmailGated(collection *Collection, field Field) bool {
+	return collection != nil && collection.IsAuth() && field != nil && field.GetName() == FieldNameEmail
+}
+
 // FieldFactoryFunc defines a simple function to construct a specific Field instance.
 type FieldFactoryFunc func() Field
 

@@ -174,7 +174,8 @@ host states a program (`core.WithActor`), and nothing in a body sets one.
 `history` writes a `_history` row per create, update and delete (who, when,
 changed fields from and to), merging one writer's edits within ten minutes;
 `GET /v1/collections/{c}/records/{id}/history` answers under the record's view
-rule.
+rule, without the changes of a field hidden or removed since (a superuser reads
+the row whole).
 
 **A where filter is the filter language, written as data.** `core.CompileWhere`
 turns `{"and"|"or"|"not"|field, op, value}` into Base's filter with bound
@@ -182,7 +183,10 @@ parameters: per-type operators, relative dates in a time zone, `@me`,
 back-relations (`list_members_via_person.list` is "in list") and
 `inSegment`/`notInSegment` over the `segments` collection. `?where=` on the
 records list and `GET /v1/collections/{c}/aggregate?ops=&group=` (count, sums,
-averages, empties, uniques, grouped lanes) both run under the list rule.
+averages, empties, uniques, grouped lanes) both run under the list rule. An
+aggregate reads columns directly, so for a caller who is not a superuser it
+refuses a hidden field and an auth collection's email (`core.EmailGated`, the
+rule the filter resolver applies by ANDing `emailVisibility`).
 
 **Grow never drops.** `core.GrowCollections` creates what is missing and adds
 fields, select values and indexes by name, keeping every field, rule, option and
@@ -215,6 +219,7 @@ is `BASE_FRAME_ANCESTORS` (default `'self'`). It signs in with IAM PKCE
 
 ## Known problems
 
+- A composite's unique primary part (an email, a phone, a URL) is held by a SELECT before the write (`checkUniquePart`), not by an index: the part is inside a JSON column and an expression index is spelled per engine. SQLite admits one writer, so it holds there; on a Base placed on PostgreSQL two writers of one address at once can both pass. Decided to keep until a placed Base takes concurrent writes of one key; the fix is a unique expression index from the dialect.
 - `migrations/1780500000_connect_messaging_calendar.go` gives `connectedAccount` encrypted token fields, so an OAuth token can sit in a record. Secrets belong in KMS; the collection is retired by another change, and nothing reads it.
 - `plugins/jsvm/internal/types/generated/types.d.ts` has not been regenerated for the composite field types: the generator names its aliases at random, so a run rewrites some 36,000 lines.
 

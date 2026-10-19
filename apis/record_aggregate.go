@@ -214,7 +214,9 @@ func resolveAggregateField(app core.App, collection *core.Collection, path strin
 	if field == nil {
 		return nil, fmt.Errorf("%q has no field %q", collection.Name, segs[0])
 	}
-	if field.GetHidden() && !superuser {
+	// a figure reads the column itself, so a value some records keep private
+	// (an auth record's email) is out of its reach entirely
+	if (field.GetHidden() || core.EmailGated(collection, field)) && !superuser {
 		return nil, fmt.Errorf("%q is not filterable", segs[0])
 	}
 

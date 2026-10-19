@@ -36,7 +36,7 @@ func TestRecordHistoryRoute(t *testing.T) {
 		c := core.NewBaseCollection("deals")
 		c.History = true
 		c.ViewRule = viewRule
-		c.Fields.Add(&core.TextField{Name: "title"}, &core.TextField{Name: "note"})
+		c.Fields.Add(&core.TextField{Name: "title"}, &core.TextField{Name: "note"}, &core.TextField{Name: "stage"})
 		if err := app.Save(c); err != nil {
 			t.Fatal(err)
 		}
@@ -54,12 +54,15 @@ func TestRecordHistoryRoute(t *testing.T) {
 		r, _ = app.FindRecordById(c, id)
 		r.Set("title", "Acme Inc")
 		r.Set("note", "called")
+		r.Set("stage", "negotiating")
 		if err := app.SaveWithContext(bob, r); err != nil {
 			t.Fatal(err)
 		}
 
-		// the note is hidden after it changed: its change is no reader's now
+		// the note is hidden after it changed, and the stage removed: neither
+		// change is any reader's now
 		c.Fields.GetByName("note").SetHidden(true)
+		c.Fields.RemoveByName("stage")
 		if err := app.Save(c); err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +93,7 @@ func TestRecordHistoryRoute(t *testing.T) {
 				`"totalItems":2`, `"action":"update"`, `"action":"create"`, `"name":"Bob"`, `"source":"import"`,
 				`"title":{"from":"Acme","to":"Acme Inc"}`, `"title":{"to":"Acme"}`,
 			},
-			excluded: []string{"call back", "called"},
+			excluded: []string{"call back", "called", "negotiating", `"stage"`},
 			order:    []string{`"action":"update"`, `"action":"create"`},
 		},
 		{name: "a caller the view rule refuses", role: "member", rule: adminOnly, status: 404, content: []string{`"status":404`}},

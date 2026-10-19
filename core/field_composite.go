@@ -80,6 +80,10 @@ var errValueNotUnique = validation.NewError("validation_not_unique", "Value must
 //
 // It compares case-insensitively, since every such part is matched that way by
 // the people who type it.
+//
+// It is a read before the write, so it holds where the engine admits one writer
+// (SQLite). On PostgreSQL two writers of one value at once can both pass it; a
+// unique expression index from the dialect is what would close that.
 func checkUniquePart(ctx context.Context, app App, record *Record, field, part, value string) error {
 	if value == "" {
 		return nil

@@ -110,8 +110,10 @@ func recordHistory(e *core.RequestEvent) error {
 	})
 }
 
-// visibleChanges drops the changes of fields the collection hides now, for a
-// caller who is not a superuser. A field hidden when it changed was never
+// visibleChanges drops the changes of fields the collection hides now, and of
+// fields it no longer has, for a caller who is not a superuser: an org admin who
+// removes a field means its values to be gone from view, and _history keeps the
+// row for a superuser's audit. A field hidden when it changed was never
 // recorded.
 func visibleChanges(collection *core.Collection, requestInfo *core.RequestInfo, raw string) json.RawMessage {
 	if requestInfo.HasSuperuserAuth() || raw == "" {
@@ -123,7 +125,7 @@ func visibleChanges(collection *core.Collection, requestInfo *core.RequestInfo, 
 		return json.RawMessage(`{}`)
 	}
 	for name := range changes {
-		if f := collection.Fields.GetByName(name); f != nil && f.GetHidden() {
+		if f := collection.Fields.GetByName(name); f == nil || f.GetHidden() {
 			delete(changes, name)
 		}
 	}

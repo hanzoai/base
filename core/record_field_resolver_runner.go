@@ -866,7 +866,7 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 	}
 
 	// allow querying only auth records with emails marked as public
-	if field.GetName() == FieldNameEmail && !r.resolver.allowHiddenFields && collection.IsAuth() {
+	if EmailGated(collection, field) && !r.resolver.allowHiddenFields {
 		result.AfterBuild = func(expr dbx.Expression) dbx.Expression {
 			return dbx.Enclose(dbx.And(expr, dbx.NewExp(fmt.Sprintf(
 				"[[%s.%s]] = TRUE",
