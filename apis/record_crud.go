@@ -57,6 +57,9 @@ func bindRecordCrudApi(app core.App, rg *router.RouterGroup[*core.RequestEvent])
 		subGroup.GET("/{id}", recordView),
 	)
 
+	// The figures a list shows beside its rows, under the same list rule.
+	Public(rg.Group("/collections/{collection}").Unbind(DefaultRateLimitMiddlewareId).GET("/aggregate", recordsAggregate))
+
 	subGroup.POST("", recordCreate(true, nil)).Bind(dynamicCollectionBodyLimit(""))
 	subGroup.PATCH("/{id}", recordUpdate(true, nil)).Bind(dynamicCollectionBodyLimit(""))
 	subGroup.DELETE("/{id}", recordDelete(true, nil))
@@ -118,6 +121,14 @@ func recordsList(e *core.RequestEvent) error {
 		if expr != nil {
 			query.AndWhere(expr)
 		}
+	}
+
+	// A filter sent as data (?where=) is compiled into the same filter
+	// language and bound against the same resolver, after the list rule.
+	if expr, err := whereExpr(e, collection, requestInfo, fieldsResolver); err != nil {
+		return e.BadRequestError(err.Error(), err)
+	} else if expr != nil {
+		query.AndWhere(expr)
 	}
 
 	searchProvider := search.NewProvider(fieldsResolver).Query(query)
