@@ -1998,12 +1998,18 @@
     "label": "View",
     "plural": "Views",
     "icon": "IconLayoutKanban",
-    "description": "The org's shared views of a collection. A person's own views are kept in their IAM preferences.",
-    "listRule": "@request.auth.id != \"\"",
-    "viewRule": "@request.auth.id != \"\"",
+    "description": "Saved views of a collection: the org's, which every member sees, and a person's own, which only they see. Which view a person opens first is their IAM preference.",
+    "listRule": "@request.auth.id != \"\" && (visibility != \"private\" || created_by.id = @request.auth.id)",
+    "viewRule": "@request.auth.id != \"\" && (visibility != \"private\" || created_by.id = @request.auth.id)",
     "createRule": "@request.auth.id != \"\"",
-    "updateRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
-    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "updateRule": "created_by.id = @request.auth.id || (visibility != \"private\" && @request.auth.admin = true)",
+    "deleteRule": "created_by.id = @request.auth.id || (visibility != \"private\" && @request.auth.admin = true)",
+    "replaces": {
+      "listRule": ["@request.auth.id != \"\""],
+      "viewRule": ["@request.auth.id != \"\""],
+      "updateRule": ["created_by.id = @request.auth.id || @request.auth.admin = true"],
+      "deleteRule": ["created_by.id = @request.auth.id || @request.auth.admin = true"]
+    },
     "fields": [
       {
         "name": "name",
@@ -2201,12 +2207,39 @@
         "position": 15
       },
       {
+        "name": "visibility",
+        "type": "select",
+        "label": "Visibility",
+        "description": "org: every member of the org sees the view. private: only the person who made it does. Empty is org.",
+        "maxSelect": 1,
+        "values": [
+          "org",
+          "private"
+        ],
+        "options": [
+          {
+            "value": "org",
+            "label": "Everyone in the org",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "private",
+            "label": "Only me",
+            "color": "gray",
+            "position": 1
+          }
+        ],
+        "icon": "IconLock",
+        "position": 16
+      },
+      {
         "name": "created_by",
         "type": "actor",
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 16
+        "position": 17
       },
       {
         "name": "updated_by",
@@ -2215,7 +2248,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 17
+        "position": 18
       },
       {
         "name": "created",
@@ -2223,7 +2256,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 18
+        "position": 19
       },
       {
         "name": "updated",
@@ -2232,7 +2265,7 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 19
+        "position": 20
       }
     ],
     "indexes": [

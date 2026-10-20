@@ -43,6 +43,13 @@ type Growth struct {
 // org that added fields of its own, renamed a label or tightened a rule keeps
 // what it did.
 //
+// The one exception is a rule the document says it replaces. A document may
+// carry `replaces`, naming for each rule ("listRule", …) the rules an earlier
+// version of the same document gave it: an existing collection still holding
+// one of those exactly takes the document's rule, and one holding anything
+// else keeps it. That is how a module tightens a rule it shipped without
+// overwriting a rule an org wrote.
+//
 // A relation field's collectionId may name its collection by name. It resolves
 // against the documents and app alike, so a set of collections that relate to
 // each other — or to themselves — is described without ids.
@@ -52,7 +59,14 @@ func GrowCollections(app App, docs []map[string]any) (*Growth, error) {
 	}
 
 	wanted := make([]*Collection, len(docs))
+	replaced := make([]map[string][]string, len(docs))
 	for i, doc := range docs {
+		r, err := rulesReplaced(doc["replaces"])
+		if err != nil {
+			return nil, fmt.Errorf("collection %d: %w", i, err)
+		}
+		replaced[i] = r
+
 		raw, err := json.Marshal(doc)
 		if err != nil {
 			return nil, err
@@ -101,8 +115,8 @@ func GrowCollections(app App, docs []map[string]any) (*Growth, error) {
 		}
 
 		// Then every collection is grown to what its document describes.
-		for _, doc := range wanted {
-			if err := growCollection(txApp, doc, created[doc.Name], growth); err != nil {
+		for i, doc := range wanted {
+			if err := growCollection(txApp, doc, replaced[i], created[doc.Name], growth); err != nil {
 				return err
 			}
 		}
@@ -116,7 +130,7 @@ func GrowCollections(app App, docs []map[string]any) (*Growth, error) {
 	return growth, nil
 }
 
-func growCollection(txApp App, doc *Collection, created bool, growth *Growth) error {
+func growCollection(txApp App, doc *Collection, replaced map[string][]string, created bool, growth *Growth) error {
 	cur, err := findCollectionByName(txApp, doc.Name)
 	if errors.Is(err, sql.ErrNoRows) {
 		// an auth or a view collection nobody has yet, created as described
@@ -182,6 +196,13 @@ func growCollection(txApp App, doc *Collection, created bool, growth *Growth) er
 		cur.CreateRule, cur.UpdateRule, cur.DeleteRule = doc.CreateRule, doc.UpdateRule, doc.DeleteRule
 		cur.Indexes = slices.Clone(doc.Indexes)
 	} else if !cur.IsView() {
+		for _, name := range ruleNames {
+			have, want := ruleOf(cur, name), ruleOf(doc, name)
+			if *have != nil && slices.Contains(replaced[name], **have) && !sameRule(*have, *want) {
+				*have = cloneRule(*want)
+				note("rule:" + name)
+			}
+		}
 		for _, idx := range doc.Indexes {
 			name := dbutils.ParseIndex(idx).IndexName
 			if name == "" || cur.GetIndex(name) != "" || hasIndexDefinition(txApp, cur.Indexes, idx) {
@@ -209,6 +230,57 @@ func growCollection(txApp App, doc *Collection, created bool, growth *Growth) er
 	}
 
 	return nil
+}
+
+// ruleNames are a collection's rules, as a document spells them.
+var ruleNames = []string{"listRule", "viewRule", "createRule", "updateRule", "deleteRule"}
+
+func ruleOf(c *Collection, name string) **string {
+	switch name {
+	case "listRule":
+		return &c.ListRule
+	case "viewRule":
+		return &c.ViewRule
+	case "createRule":
+		return &c.CreateRule
+	case "updateRule":
+		return &c.UpdateRule
+	}
+	return &c.DeleteRule
+}
+
+func sameRule(a, b *string) bool {
+	return (a == nil) == (b == nil) && (a == nil || *a == *b)
+}
+
+func cloneRule(r *string) *string {
+	if r == nil {
+		return nil
+	}
+	v := *r
+	return &v
+}
+
+// rulesReplaced reads a document's `replaces`: per rule, the earlier rules the
+// document's own rule replaces.
+func rulesReplaced(v any) (map[string][]string, error) {
+	if v == nil {
+		return nil, nil
+	}
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string][]string
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, fmt.Errorf("replaces names, per rule, the rules it replaces: %w", err)
+	}
+	for name := range out {
+		if !slices.Contains(ruleNames, name) {
+			return nil, fmt.Errorf("replaces names %q, which is not a rule", name)
+		}
+	}
+	return out, nil
 }
 
 // hasIndexDefinition reports whether indexes already holds idx's definition under

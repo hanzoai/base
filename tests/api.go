@@ -315,3 +315,27 @@ func (scenario *ApiScenario) test(t testing.TB) {
 		t.Fatalf("Failed to trigger app serve hook: %v", serveErr)
 	}
 }
+
+// Router compiles app's routes into the handler a host serves it with: the
+// router, then OnServe so plugins bind their routes, then the mux. A test that
+// makes several requests of one app, or hands the handler to something that
+// asks it in process (graph.New), serves app through it.
+func Router(t testing.TB, app core.App) http.Handler {
+	t.Helper()
+
+	router, err := apis.NewRouter(app)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mux http.Handler
+	e := &core.ServeEvent{App: app, Router: router, Server: &http.Server{}}
+	err = app.OnServe().Trigger(e, func(e *core.ServeEvent) error {
+		m, err := e.Router.BuildMux()
+		mux = m
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mux
+}

@@ -67,34 +67,12 @@ func setup(t *testing.T) *fx {
 		bob: member("acme/bob", "Bob", "acme", "admin"),
 		zed: member("zoo/zed", "Zed", "zoo", "owner"),
 	}
-	f.mux = serve(t, app)
+	f.mux = tests.Router(t, app)
 
 	g := graph.New(app, f.mux)
 	f.zip = zip.New(zip.Config{DisableStartupMessage: true})
 	f.zip.MountGraphFor("/v1/graphql", g.Schema, g.Resolve)
 	return f
-}
-
-// serve compiles app's router the way a host does: the router, then OnServe so
-// plugins bind their routes, then the mux.
-func serve(t *testing.T, app core.App) http.Handler {
-	t.Helper()
-
-	router, err := apis.NewRouter(app)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var mux http.Handler
-	e := &core.ServeEvent{App: app, Router: router, Server: &http.Server{}}
-	err = app.OnServe().Trigger(e, func(e *core.ServeEvent) error {
-		m, err := e.Router.BuildMux()
-		mux = m
-		return err
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return mux
 }
 
 type answer struct {
@@ -265,7 +243,7 @@ func TestTheSchemaIsEachBasesOwn(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer plain.Cleanup()
-	other := graph.New(plain, serve(t, plain))
+	other := graph.New(plain, tests.Router(t, plain))
 
 	crmSDL, err := graph.New(f.app, f.mux).Schema(context.Background())
 	if err != nil {

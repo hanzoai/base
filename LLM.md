@@ -191,9 +191,14 @@ rule the filter resolver applies by ANDing `emailVisibility`).
 
 **Grow never drops.** `core.GrowCollections` creates what is missing and adds
 fields, select values and indexes by name, keeping every field, rule, option and
-index an org changed; it is how modules and a host's imports reach a Base. The
-`_views*` system collections are retired (`1790000200`); team views are the
-CRM's ordinary `views` collection, a person's own views live in IAM preferences.
+index an org changed; it is how modules and a host's imports reach a Base. A
+document may say which earlier rules its own replace (`replaces`): a collection
+still holding one of those exactly takes the new rule, and a rule an org wrote is
+kept. The `_views*` system collections are retired (`1790000200`); saved views
+are the CRM's ordinary `views` collection, the org's (`visibility` org or empty)
+and a person's own (`private`, which only its maker lists, reads, changes or
+deletes, an org admin included). IAM preferences hold only which view a person
+opens first.
 
 **Paths are `/v1`.** No `/api/` segment anywhere. `BASE_API_PREFIX` moves the
 data plane and nothing else: `/v1/iam` and `/healthz` stay put. The admin SPA

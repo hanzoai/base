@@ -233,3 +233,40 @@ func TestGrowKeepsAnIndexHeldUnderAnotherName(t *testing.T) {
 		t.Fatalf("indexes: %v", c.Indexes)
 	}
 }
+
+// A document that says which rules it replaces tightens a collection still
+// holding one of them, keeps a rule an org wrote, and is refused naming a rule
+// that is not one.
+func TestGrowReplacesOnlyTheRulesItShipped(t *testing.T) {
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	mustGrow(t, app, `[{"name": "notes", "type": "base", "listRule": "@request.auth.id != \"\"", "viewRule": "@request.auth.id != \"\"",
+		"fields": [{"name": "title", "type": "text"}]}]`)
+
+	notes, _ := app.FindCollectionByNameOrId("notes")
+	notes.ViewRule = types.Pointer(`@request.auth.admin = true`) // the org's own
+	if err := app.Save(notes); err != nil {
+		t.Fatal(err)
+	}
+
+	tighter := `[{"name": "notes", "type": "base",
+		"listRule": "@request.auth.id != \"\" && title != \"\"", "viewRule": "@request.auth.id != \"\" && title != \"\"",
+		"replaces": {"listRule": ["@request.auth.id != \"\""], "viewRule": ["@request.auth.id != \"\""]},
+		"fields": [{"name": "title", "type": "text"}]}]`
+	g := mustGrow(t, app, tighter)
+	if asJSON(g.Grown) != `{"notes":["rule:listRule"]}` {
+		t.Fatalf("growth: %s", asJSON(g))
+	}
+	notes, _ = app.FindCollectionByNameOrId("notes")
+	if *notes.ListRule != `@request.auth.id != "" && title != ""` || *notes.ViewRule != `@request.auth.admin = true` {
+		t.Fatalf("rules %q %q", *notes.ListRule, *notes.ViewRule)
+	}
+	if g := mustGrow(t, app, tighter); len(g.Grown) != 0 {
+		t.Fatalf("a second grow changed %s", asJSON(g))
+	}
+
+	if _, err := core.GrowCollections(app, docs(t, `[{"name": "notes", "type": "base", "replaces": {"readRule": ["x"]}}]`)); err == nil {
+		t.Fatal("a replaces naming no rule was accepted")
+	}
+}
