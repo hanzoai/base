@@ -48,7 +48,10 @@ func NewIAM(t testing.TB) *IAM {
 	}))
 	t.Cleanup(ts.Close)
 
-	return &IAM{URL: ts.URL, key: key}
+	// A process caches a JWKS document by its address, and a closed test
+	// server's port is soon another's: two IAMs at one address would read each
+	// other's keys. A path of its own keeps every IAM's address its own.
+	return &IAM{URL: ts.URL + "/" + rand.Text() + "/jwks", key: key}
 }
 
 // Token signs claims, valid for the next hour.
