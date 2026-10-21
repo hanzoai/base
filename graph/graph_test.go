@@ -2,7 +2,6 @@ package graph_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -112,6 +111,29 @@ func (f *fx) gql(t *testing.T, token, query string, vars map[string]any) answer 
 	}
 	a.status = res.StatusCode
 	return a
+}
+
+// sdlOf is the schema g publishes to the bearer of token ("" for nobody), read
+// the way a client reads it: GET on the address it is mounted at.
+func sdlOf(t *testing.T, g *graph.Graph, token string) string {
+	t.Helper()
+
+	z := zip.New(zip.Config{DisableStartupMessage: true})
+	z.MountGraphFor("/v1/graphql", g.Schema, g.Resolve)
+	req := httptest.NewRequest(http.MethodGet, "/v1/graphql", nil)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	res, err := z.Test(req, zip.TestConfig{Timeout: time.Minute})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("GET the schema: %d %s", res.StatusCode, raw)
+	}
+	return string(raw)
 }
 
 // ok runs a request that must answer without an error.
@@ -245,14 +267,8 @@ func TestTheSchemaIsEachBasesOwn(t *testing.T) {
 	defer plain.Cleanup()
 	other := graph.New(plain, tests.Router(t, plain))
 
-	crmSDL, err := graph.New(f.app, f.mux).Schema(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	plainSDL, err := other.Schema(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	crmSDL := sdlOf(t, graph.New(f.app, f.mux), f.ann)
+	plainSDL := sdlOf(t, other, plainUser)
 
 	for _, sdl := range []string{crmSDL, plainSDL} {
 		if err := zip.CheckSchema(sdl); err != nil {
@@ -667,7 +683,6 @@ func TestTheGraphRefusesWhatRESTRefuses(t *testing.T) {
 	}{
 		{"a member's create a rule refuses", f.ann, `mutation { createSecret(data: {title: "x"}) { id } }`, http.MethodPost, "/v1/collections/secrets/records", `{"title":"x"}`},
 		{"a collection only a superuser lists", f.bob, `{ vault { edges { node { id } } } }`, http.MethodGet, "/v1/collections/vault/records", ""},
-		{"a token of another org", f.zed, `{ people { edges { node { id } } } }`, http.MethodGet, "/v1/collections/people/records", ""},
 	} {
 		t.Run(s.name, func(t *testing.T) {
 			code, rest := f.rest(t, s.token, s.method, s.path, s.body)
@@ -687,12 +702,19 @@ func TestTheGraphRefusesWhatRESTRefuses(t *testing.T) {
 		})
 	}
 
-	t.Run("nobody signed in", func(t *testing.T) {
-		a := f.ok(t, "", `{ people { totalCount } }`, nil)
-		if a["people"].(map[string]any)["totalCount"] != float64(0) {
-			t.Fatalf("an anonymous caller reads %v", a)
-		}
-	})
+	// A collection beyond the caller's reach is not in its schema at all, so the
+	// graph does not even say it is there.
+	for _, s := range []struct{ name, token string }{{"nobody signed in", ""}, {"a token of another org", f.zed}} {
+		t.Run(s.name, func(t *testing.T) {
+			if code, _ := f.rest(t, s.token, http.MethodGet, "/v1/collections/people/records", ""); s.token != "" && code != http.StatusForbidden {
+				t.Fatalf("REST answered %d", code)
+			}
+			a := f.gql(t, s.token, `{ people { totalCount } }`, nil)
+			if !strings.Contains(a.messages(), `no query field "people"`) || a.Data["people"] != nil {
+				t.Fatalf("the graph answered %v %s", a.Data, a.messages())
+			}
+		})
+	}
 
 	t.Run("a record the caller may not view is not expanded", func(t *testing.T) {
 		secret := f.save(t, "secrets", map[string]any{"title": "linked"})
@@ -784,3 +806,73 @@ func TestTypeNames(t *testing.T) {
 		}
 	}
 }
+
+// plainUser is a users token the test fixture's own Base signed (test@example.com).
+const plainUser = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJfdXNlcnNfYXV0aF8iLCJleHAiOjI1MjQ2MDQ0NjEsImlkIjoiNHExeGxjbG1mbG9rdTMzIiwicmVmcmVzaGFibGUiOnRydWUsInR5cGUiOiJhdXRoIn0.AuFTIzCsdLEy-5adFzpjZzbqAdTP6Iu9B1wPBAxLBgo"
+
+// The schema is the caller's. A member sees the Base whole; a visitor only the
+// collections that admit visitors; anybody else only those whose list rule
+// admits anyone; and each reach is its own schema, rebuilt as a collection
+// changes.
+func TestTheSchemaIsTheCallers(t *testing.T) {
+	t.Parallel()
+
+	f := setup(t)
+	g := graph.New(f.app, f.mux)
+
+	comments := core.NewBaseCollection("comments")
+	comments.Visitors = true
+	comments.ListRule = types.Pointer(`author = @request.auth.id`)
+	comments.Fields.Add(&core.TextField{Name: "author"}, &core.TextField{Name: "body"})
+	posts := core.NewBaseCollection("posts")
+	posts.ListRule = types.Pointer("")
+	posts.Fields.Add(&core.TextField{Name: "title"})
+	for _, c := range []*core.Collection{comments, posts} {
+		if err := f.app.Save(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	crm := []string{"BasePerson", "BaseCompany", "BaseOpportunity", "BaseNote"}
+	for _, s := range []struct {
+		who, token string
+		see, not   []string
+	}{
+		{"a member", f.ann, append([]string{"type BaseComment {", "type BasePost {"}, crm...), nil},
+		{"a visitor", f.zed, []string{"type BaseComment {"}, append([]string{"BasePost"}, crm...)},
+		{"nobody", "", []string{"type BasePost {"}, append([]string{"BaseComment"}, crm...)},
+	} {
+		sdl := sdlOf(t, g, s.token)
+		if err := zip.CheckSchema(sdl); err != nil {
+			t.Fatalf("%s: not a schema a client can build against: %v\n%s", s.who, err, sdl)
+		}
+		for _, want := range s.see {
+			if !strings.Contains(sdl, want) {
+				t.Errorf("%s does not see %q", s.who, want)
+			}
+		}
+		for _, never := range s.not {
+			if strings.Contains(sdl, never) {
+				t.Errorf("%s sees %q", s.who, never)
+			}
+		}
+	}
+
+	// A visitor's request names nothing beyond its reach either.
+	if a := f.gql(t, f.zed, `{ people { totalCount } }`, nil); !strings.Contains(a.messages(), `no query field "people"`) {
+		t.Fatalf("a visitor asking for people: %v %s", a.Data, a.messages())
+	}
+	if a := f.ok(t, f.zed, `{ comments { totalCount } }`, nil); a["comments"].(map[string]any)["totalCount"] != float64(0) {
+		t.Fatalf("a visitor's comments: %v", a)
+	}
+
+	// Closing the collection takes it out of the visitor's next schema.
+	comments.Visitors = false
+	if err := f.app.Save(comments); err != nil {
+		t.Fatal(err)
+	}
+	if sdl := sdlOf(t, g, f.zed); strings.Contains(sdl, "BaseComment") {
+		t.Fatal("a visitor still sees a collection that no longer admits visitors")
+	}
+}
+

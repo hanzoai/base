@@ -479,7 +479,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		return nil, refusal{router.NewForbiddenError("The token does not act in this Base's organization.", nil)}
 	}
 	if visitor && e.Request.Method != http.MethodGet && e.Request.Method != http.MethodHead {
-		if err := holdTo(e, "__visitor__", visitorWrites, sub); err != nil {
+		if err := holdVisitor(e, sub); err != nil {
 			return nil, refusal{err}
 		}
 	}
@@ -573,10 +573,90 @@ var visitorRoutes = []string{
 	http.MethodGet + " /files/{collection}/{recordId}/{filename}",
 }
 
-// visitorWrites holds each visitor to ten writes a minute in a Base, whatever
-// the deployment's own limits say, counted by who the visitor is rather than
-// where the request came from.
-var visitorWrites = core.RateLimitRule{Label: "visitor", MaxRequests: 10, Duration: 60}
+// visitorWrites hold the writes visitors make in a Base, whatever the
+// deployment's own limits say: ten a minute from one account, fifteen from one
+// address however many accounts sign in from it, and 120 from every visitor
+// together, so an account made for the purpose buys no more than its address,
+// and addresses no more than the Base allows.
+var (
+	visitorAccount = core.RateLimitRule{Label: "visitor", MaxRequests: 10, Duration: 60}
+	visitorAddress = core.RateLimitRule{Label: "visitor address", MaxRequests: 15, Duration: 60}
+	visitorBase    = core.RateLimitRule{Label: "visitors", MaxRequests: 120, Duration: 60}
+)
+
+// holdVisitor counts one write by the visitor sub names against each of
+// visitorWrites, and refuses it once any is over. A write that names no client
+// address cannot be held to the address's limit and is refused.
+func holdVisitor(e *core.RequestEvent, sub string) error {
+	ip := e.RealIP()
+	if ip == "" {
+		return e.TooManyRequestsError("", errors.New("a visitor's write carries no client address"))
+	}
+	for _, h := range []struct {
+		id   string
+		rule core.RateLimitRule
+		key  string
+	}{
+		{"__visitor__", visitorAccount, sub},
+		{"__visitor_address__", visitorAddress, ip},
+		{"__visitors__", visitorBase, ""},
+	} {
+		if err := holdTo(e, h.id, h.rule, h.key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Reach is how far a caller reaches into a Base, for an answer that is not a
+// route of its own: the schema a graph of the Base renders, say.
+type Reach int
+
+const (
+	// ReachGuest is a caller with no credential the Base honors. It reaches
+	// what an anonymous caller may list.
+	ReachGuest Reach = iota
+	// ReachVisitor is a visitor. It reaches the collections that admit
+	// visitors.
+	ReachVisitor
+	// ReachMember is a member of the Base's org, its admin, or a superuser. It
+	// reaches the Base whole.
+	ReachMember
+)
+
+// ReachOf answers how far r's caller reaches into app. It puts r's credential
+// through loadAuthToken, the door every request passes, as a list of a
+// collection that admits visitors would come, that being the one route every
+// kind of caller may take, and reads who the door made of it. A credential the
+// door refuses reaches as far as none.
+func ReachOf(app core.App, r *http.Request) Reach {
+	probe := r.Clone(r.Context())
+	probe.Method = http.MethodGet
+	probe.Pattern = http.MethodGet + " " + Prefix() + recordsPath
+
+	collections, _ := app.Store().Get(core.StoreKeyCachedCollections).([]*core.Collection)
+	for _, c := range collections {
+		if c.AdmitsVisitors() {
+			probe.SetPathValue("collection", c.Id)
+			break
+		}
+	}
+
+	e := &core.RequestEvent{App: app}
+	e.Request = probe
+	e.Set(core.RequestEventKeyDeployment, app)
+	if err := loadAuthToken().Func(e); err != nil {
+		return ReachGuest
+	}
+	switch {
+	case core.IsVisitor(e.Auth):
+		return ReachVisitor
+	case e.Auth != nil:
+		return ReachMember
+	default:
+		return ReachGuest
+	}
+}
 
 // visits reports whether a request is one a visitor may make: one of
 // visitorRoutes, to a collection of this Base that admits visitors.

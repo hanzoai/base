@@ -116,9 +116,12 @@ A visitor reaches nothing else: no other collection, not the schema, settings,
 batch, realtime, aggregates, history or a file token, and naming the Base's org
 in `X-Org-Id` is still `403`. Where a visitors' collection relates to another,
 that collection's rules read the visitor as a guest, so an expand or a filter
-through the relation shows only what a guest would see. A visitor's writes are
-held to ten a minute in a Base, counted by who it is. A superuser is never a
-visitor; it names the org.
+through the relation shows only what a guest would see. Visitors' writes are
+held, in each Base, to ten a minute from one account, fifteen from one client
+address, and 120 from all visitors together. A Base's GraphQL schema is the
+caller's too: a member sees every collection, a visitor only those that admit
+visitors, and anyone else only those whose list rule is `""`. A superuser is
+never a visitor; it names the org.
 
 **Keys** stand in for tokens when no person is signing in. IAM issues them.
 `sk-` keys are for servers. `pk-` keys are for web pages and reach only routes

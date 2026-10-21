@@ -29,7 +29,7 @@ const (
 
 // Resolve answers one root field of the graph, as zip's engine asks it.
 func (g *Graph) Resolve(ctx context.Context, kind string, s zip.Selection) (any, error) {
-	m, _, err := g.current()
+	m, _, err := g.current(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package apis_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -27,6 +28,7 @@ const (
 type visitorBase struct {
 	app                    *tests.TestApp
 	mux                    http.Handler
+	iam                    *tests.IAM
 	visitor, member, admin string
 	person, comment        string
 }
@@ -102,6 +104,7 @@ func newVisitorBase(t *testing.T) *visitorBase {
 	return &visitorBase{
 		app: app,
 		mux: mux,
+		iam: iam,
 		visitor: iam.Token(t, jwt.MapClaims{"sub": "vic", "name": "Vic", "email": "vic@zoo.test",
 			"orgs": []any{map[string]any{"org": "zoo", "role": "owner"}}}),
 		member: iam.Token(t, jwt.MapClaims{"sub": "mem", "name": "Mem", "email": "mem@acme.test",
@@ -115,8 +118,15 @@ func newVisitorBase(t *testing.T) *visitorBase {
 
 func (b *visitorBase) do(t *testing.T, token, method, target, body string, headers ...string) (int, string) {
 	t.Helper()
+	return b.from(t, "192.0.2.1", token, method, target, body, headers...)
+}
+
+// from makes a request as do does, from the client address ip.
+func (b *visitorBase) from(t *testing.T, ip, token, method, target, body string, headers ...string) (int, string) {
+	t.Helper()
 
 	req := httptest.NewRequest(method, target, strings.NewReader(body))
+	req.RemoteAddr = ip + ":1234"
 	if body != "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -322,8 +332,9 @@ func TestAVisitorCannotNameTheBasesOrg(t *testing.T) {
 	}
 }
 
-// A visitor's writes are held to ten a minute, whether or not the deployment
-// limits anything.
+// A visitor's writes are held, whether or not the deployment limits anything,
+// to ten a minute from one account, fifteen from one address whatever accounts
+// sign in from it, and 120 from every visitor in the Base together.
 func TestAVisitorsWritesAreLimited(t *testing.T) {
 	t.Parallel()
 
@@ -331,21 +342,64 @@ func TestAVisitorsWritesAreLimited(t *testing.T) {
 	if b.app.Settings().RateLimits.Enabled {
 		t.Fatal("the fixture limits rates; this test is about a Base that does not")
 	}
+	visitor := func(n int) (token, id string) {
+		sub := fmt.Sprintf("v%d", n)
+		return b.iam.Token(t, jwt.MapClaims{"sub": sub, "name": sub,
+			"orgs": []any{map[string]any{"org": "zoo" + sub, "role": "owner"}}}), sub + strings.Repeat("_", 15-len(sub))
+	}
+	write := func(ip, token, id string) int {
+		status, _ := b.from(t, ip, token, "POST", "/v1/collections/comments/records", `{"author":"`+id+`","body":"again"}`)
+		return status
+	}
 
+	// One account: ten, then refused.
 	for i := range 10 {
-		if status, body := b.do(t, b.visitor, "POST", "/v1/collections/comments/records", `{"author":"`+visitorID+`","body":"again"}`); status != 200 {
-			t.Fatalf("write %d: %d %s", i+1, status, body)
+		if status := write("198.51.100.1", b.visitor, visitorID); status != 200 {
+			t.Fatalf("account write %d: %d", i+1, status)
 		}
 	}
-	if status, body := b.do(t, b.visitor, "POST", "/v1/collections/comments/records", `{"author":"`+visitorID+`","body":"again"}`); status != 429 {
-		t.Fatalf("write 11: %d %s", status, body)
+	if status := write("198.51.100.1", b.visitor, visitorID); status != 429 {
+		t.Fatalf("account write 11: %d", status)
 	}
+
+	// A second account on that address: five more fill the address's fifteen.
+	second, secondID := visitor(2)
+	for i := range 5 {
+		if status := write("198.51.100.1", second, secondID); status != 200 {
+			t.Fatalf("second account write %d: %d", i+1, status)
+		}
+	}
+	if status := write("198.51.100.1", second, secondID); status != 429 {
+		t.Fatalf("second account write 6, the address's 16th: %d", status)
+	}
+	// The same account from another address is held to its own count alone.
+	if status := write("198.51.100.2", second, secondID); status != 200 {
+		t.Fatalf("second account from another address: %d", status)
+	}
+
 	// Reads are not writes, and a member is not a visitor.
 	if status, _ := b.do(t, b.visitor, "GET", "/v1/collections/comments/records", ""); status != 200 {
 		t.Fatalf("read after the limit: %d", status)
 	}
-	if status, _ := b.do(t, b.member, "POST", "/v1/collections/comments/records", `{"author":"`+memberID+`","body":"member"}`); status != 200 {
+	if status, _ := b.from(t, "198.51.100.1", b.member, "POST", "/v1/collections/comments/records", `{"author":"`+memberID+`","body":"member"}`); status != 200 {
 		t.Fatalf("member after the limit: %d", status)
+	}
+
+	// Every visitor together: 16 so far, then accounts of their own on
+	// addresses of their own until the Base's 120.
+	written := 16
+	for n := 3; written < 120; n++ {
+		token, id := visitor(n)
+		for i := 0; i < 10 && written < 120; i++ {
+			if status := write(fmt.Sprintf("203.0.113.%d", n), token, id); status != 200 {
+				t.Fatalf("visitor write %d: %d", written+1, status)
+			}
+			written++
+		}
+	}
+	fresh, freshID := visitor(99)
+	if status := write("203.0.113.250", fresh, freshID); status != 429 {
+		t.Fatalf("the Base's 121st visitor write: %d", status)
 	}
 }
 

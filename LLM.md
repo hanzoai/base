@@ -103,7 +103,10 @@ routes in `visitorRoutes` (records and files) of a base collection with
 has role `visitor` (`core.IsVisitor`) and admin false, and every other
 collection's rules read it as a guest (`processRequestAuthField`), so a
 relation, expand or filter cannot carry it further. Its writes go through
-`holdTo` keyed by sub. A superuser is never a visitor.
+`holdVisitor`: per sub, per client address (`RealIP`, so a host behind a proxy
+names the header in `TrustedProxy`), and per Base. A graph's schema is scoped
+the same way (`apis.ReachOf`, `graph.sees`), one cached schema per reach. A
+superuser is never a visitor.
 
 **Rules are enforced in Go, on every engine.** `nil` is superuser only and `""`
 is public. A list rule is ANDed into the query before paging and counting. An
