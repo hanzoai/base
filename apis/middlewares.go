@@ -470,9 +470,18 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		return nil, refusal{err}
 	}
 
-	// A Base its host opened for one org answers that org and no other.
-	if tenant, _ := e.App.Store().Get(StoreKeyTenant).(string); tenant != "" && bases == nil && tenant != org {
+	// A Base its host opened for one org answers that org, and anyone else only
+	// as a visitor: on a route visitors may take, to a collection that admits
+	// them. A superuser is never one; it acts in a tenant by naming it.
+	tenant, _ := e.App.Store().Get(StoreKeyTenant).(string)
+	visitor := tenant != "" && bases == nil && tenant != org
+	if visitor && (verified.Sudo() || !visits(e)) {
 		return nil, refusal{router.NewForbiddenError("The token does not act in this Base's organization.", nil)}
+	}
+	if visitor && e.Request.Method != http.MethodGet && e.Request.Method != http.MethodHead {
+		if err := holdTo(e, "__visitor__", visitorWrites, sub); err != nil {
+			return nil, refusal{err}
+		}
 	}
 
 	// Acting anywhere but home is either an explicit selection the membership
@@ -499,7 +508,7 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 	e.Set(RequestEventKeyName, username)
 	e.Set(RequestEventKeyOrgs, orgsOf(verified))
 	e.Set(RequestEventKeyOrg, org)
-	e.Set(RequestEventKeyOrgAdmin, verified.OrgAdmin(org))
+	e.Set(RequestEventKeyOrgAdmin, !visitor && verified.OrgAdmin(org))
 	e.Request.Header.Set(claims.HeaderUserID, sub)
 	e.Request.Header.Set(claims.HeaderOrgID, org)
 	e.Request.Header.Set(headerUserEmail, email)
@@ -535,14 +544,49 @@ func resolveJWKSToken(e *core.RequestEvent, token, jwksURL string) (*core.Record
 		record.Set("org_id", org)
 	}
 	if collection.Fields.GetByName(core.FieldNameAuthAdmin) != nil {
-		record.Set(core.FieldNameAuthAdmin, verified.OrgAdmin(org))
+		record.Set(core.FieldNameAuthAdmin, !visitor && verified.OrgAdmin(org))
 	}
-	if collection.Fields.GetByName(core.FieldNameAuthRole) != nil {
+	switch {
+	case visitor && collection.Fields.GetByName(core.FieldNameAuthRole) == nil:
+		// The role is what marks a visitor to the rules, so a Base that cannot
+		// record one admits no visitor.
+		return nil, refusal{router.NewForbiddenError("The token does not act in this Base's organization.", nil)}
+	case visitor:
+		record.Set(core.FieldNameAuthRole, core.AuthRoleVisitor)
+	case collection.Fields.GetByName(core.FieldNameAuthRole) != nil:
 		record.Set(core.FieldNameAuthRole, roleIn(verified, org))
 	}
 	record.SetVerified(true)
 
 	return record, nil
+}
+
+// visitorRoutes are the routes a visitor may take, beneath the API prefix: a
+// collection's records and the files they hold. Nothing else admits one — not
+// the schema, settings, batch, realtime, aggregates, history or a file token.
+var visitorRoutes = []string{
+	http.MethodGet + " " + recordsPath,
+	http.MethodGet + " " + recordsPath + "/{id}",
+	http.MethodPost + " " + recordsPath,
+	http.MethodPatch + " " + recordsPath + "/{id}",
+	http.MethodDelete + " " + recordsPath + "/{id}",
+	http.MethodGet + " /files/{collection}/{recordId}/{filename}",
+}
+
+// visitorWrites holds each visitor to ten writes a minute in a Base, whatever
+// the deployment's own limits say, counted by who the visitor is rather than
+// where the request came from.
+var visitorWrites = core.RateLimitRule{Label: "visitor", MaxRequests: 10, Duration: 60}
+
+// visits reports whether a request is one a visitor may make: one of
+// visitorRoutes, to a collection of this Base that admits visitors.
+func visits(e *core.RequestEvent) bool {
+	method, path, _ := strings.Cut(e.Request.Pattern, " ")
+	if !slices.Contains(visitorRoutes, method+" "+strings.TrimPrefix(path, Prefix())) {
+		return false
+	}
+	c, err := e.App.FindCachedCollectionByNameOrId(e.Request.PathValue("collection"))
+	return err == nil && c.AdmitsVisitors()
 }
 
 // roleIn is the role the claims hold in org, as IAM's coarse vocabulary names

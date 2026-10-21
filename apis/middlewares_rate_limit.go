@@ -131,6 +131,26 @@ func checkRateLimit(e *core.RequestEvent, rtId string, rule core.RateLimitRule) 
 		}
 	}
 
+	// A limit is per client, so a request that names no client cannot be held
+	// to one and is refused. The alternative is a rule that admits whatever it
+	// cannot count, which reads as enforcement and is not.
+	//
+	// A socket peer is where the address usually comes from, and a transport
+	// that terminates elsewhere and hands the request on has none. Where the
+	// deployment names a header to read it from instead — Settings.TrustedProxy
+	// — there is a client again and the rule applies to it.
+	key := e.RealIP()
+	if key == "" {
+		e.Deployment().Logger().Warn("Rate limited request carries no client address", "rule", rule.String())
+		return e.TooManyRequestsError("", errors.New("no client address for rate limit rule: "+rule.String()))
+	}
+
+	return holdTo(e, rtId, rule, key)
+}
+
+// holdTo counts one request from the client key names against rule, in the
+// limiter rtId names, and refuses it once the client is over.
+func holdTo(e *core.RequestEvent, rtId string, rule core.RateLimitRule, key string) error {
 	// One set of counters, on the Base the process serves from. Per-tenant
 	// counters would multiply every rule by the number of orgs a caller can
 	// name, so a limit of 2 would admit 2 per org and the number the operator
@@ -151,20 +171,6 @@ func checkRateLimit(e *core.RequestEvent, rtId string, rule core.RateLimitRule) 
 	if rt == nil {
 		app.Logger().Warn("Failed to retrieve app rate limiter", "id", rtId)
 		return nil
-	}
-
-	// A limit is per client, so a request that names no client cannot be held
-	// to one and is refused. The alternative is a rule that admits whatever it
-	// cannot count, which reads as enforcement and is not.
-	//
-	// A socket peer is where the address usually comes from, and a transport
-	// that terminates elsewhere and hands the request on has none. Where the
-	// deployment names a header to read it from instead — Settings.TrustedProxy
-	// — there is a client again and the rule applies to it.
-	key := e.RealIP()
-	if key == "" {
-		app.Logger().Warn("Rate limited request carries no client address", "rule", rule.String())
-		return e.TooManyRequestsError("", errors.New("no client address for rate limit rule: "+rule.String()))
 	}
 
 	if !rt.isAllowed(key) {

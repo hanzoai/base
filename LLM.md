@@ -96,6 +96,15 @@ refuses a plaintext file.
 `RequestEvent.App` at the org's Base before any handler runs, so handlers know
 nothing about tenancy.
 
+**A visitor reaches only what admits one.** A Base whose host opened it for
+one org (`StoreKeyTenant`) refuses a token acting in another org, except on the
+routes in `visitorRoutes` (records and files) of a base collection with
+`visitors: true` (`Collection.AdmitsVisitors`). The visitor's mirrored record
+has role `visitor` (`core.IsVisitor`) and admin false, and every other
+collection's rules read it as a guest (`processRequestAuthField`), so a
+relation, expand or filter cannot carry it further. Its writes go through
+`holdTo` keyed by sub. A superuser is never a visitor.
+
 **Rules are enforced in Go, on every engine.** `nil` is superuser only and `""`
 is public. A list rule is ANDed into the query before paging and counting. An
 update is checked against the record as it would be after the write

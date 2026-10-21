@@ -199,10 +199,17 @@ func (r *runner) processCollectionField() (*search.ResolverResult, error) {
 }
 
 func (r *runner) processRequestAuthField() (*search.ResolverResult, error) {
-	if r.resolver.requestInfo == nil || r.resolver.requestInfo.Auth == nil || r.resolver.requestInfo.Auth.Collection() == nil {
+	if r.resolver.requestInfo == nil || r.resolver.requestInfo.Auth == nil || r.resolver.requestInfo.Auth.Collection() == nil ||
+		(IsVisitor(r.resolver.requestInfo.Auth) && !r.resolver.baseCollection.AdmitsVisitors()) {
 		// Nobody is signed in, so a comparison against this identity matches no
 		// row — which is the whole point of `owner = @request.auth.id` and what
 		// Postgres answers, where `owner = NULL` is NULL and NULL is not true.
+		//
+		// A visitor is nobody too, wherever the rule is of a collection that does
+		// not admit visitors: one it joins through a relation, expands, or names
+		// with @collection. The routes refuse a visitor such a collection
+		// outright, and this keeps a rule another collection states from seeing
+		// one as anything more than a guest.
 		//
 		// The identifier alone cannot say that: `NULL` reads as an EMPTY
 		// identifier to the filter compiler, and equality against an empty

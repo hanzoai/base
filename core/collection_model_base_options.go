@@ -14,6 +14,13 @@ type collectionBaseOptions struct {
 	// collection asks for it.
 	History bool `form:"history" json:"history,omitempty"`
 
+	// Visitors admits a visitor to the collection: a person IAM vouched for
+	// whose token acts in another org than the one whose Base this is. Off,
+	// which is every collection until one asks, a visitor is refused here as
+	// anywhere else. On, its rules decide, reading the visitor as
+	// `@request.auth.role = "visitor"`. See [Collection.AdmitsVisitors].
+	Visitors bool `form:"visitors" json:"visitors,omitempty"`
+
 	// Label is what a person calls one record ("Person"), Plural what they
 	// call many ("People"). Empty means the collection's name.
 	Label  string `form:"label" json:"label,omitempty"`
@@ -25,6 +32,12 @@ type collectionBaseOptions struct {
 
 	// Description says what the collection holds.
 	Description string `form:"description" json:"description,omitempty"`
+}
+
+// AdmitsVisitors reports whether a visitor may reach the collection's records
+// and files. Only a base collection can, and only when it says so.
+func (c *Collection) AdmitsVisitors() bool {
+	return c != nil && c.IsBase() && c.Visitors
 }
 
 func (o *collectionBaseOptions) validate(cv *collectionValidator) error {

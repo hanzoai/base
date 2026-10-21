@@ -34,6 +34,16 @@ const (
 	FieldNameAuthRole  = "role"
 )
 
+// AuthRoleVisitor is the role of a visitor: a caller IAM vouched for whose
+// token acts in another org than the one whose Base serves it.
+const AuthRoleVisitor = "visitor"
+
+// IsVisitor reports whether auth is a visitor's. Only a record minted for one
+// request from an IAM token is (apis resolveJWKSToken); a saved one never is.
+func IsVisitor(auth *Record) bool {
+	return auth != nil && auth.IsNew() && auth.GetString(FieldNameAuthRole) == AuthRoleVisitor
+}
+
 // Collections Base reads by name.
 const (
 	// CollectionNameHistory holds a row for every write to a collection that

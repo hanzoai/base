@@ -74,7 +74,7 @@ saved:
 | `name` | `name`, else `displayName` |
 | `org_id` | the org the request acts in, when the auth collection has an `org_id` field |
 | `admin` | whether the caller administers that org (its IAM role there is owner or admin) |
-| `role` | the caller's role in that org: `owner`, `admin` or `member` |
+| `role` | the caller's role in that org: `owner`, `admin` or `member`, or `visitor` (below) |
 
 Rules read these as `@request.auth.id`, `@request.auth.email` and so on, so
 "only the org's admins delete" is `@request.auth.admin = true`.
@@ -96,6 +96,29 @@ memberships and opens `<data dir>/orgs/<org>/data.db` for the request. Two orgs
 never share a file, so a query in one cannot return another's rows. A token
 that belongs to several orgs picks one with `X-Org-Id: <org>`. Naming an org
 the token does not carry gets `403`, and so does a token with no org.
+
+**Visitors.** A Base its host opened for one org (a site's) refuses a token
+that acts in another org, with `403`, everywhere except where a collection
+admits visitors. A base collection does with `"visitors": true`, which a
+superuser or the org's admin sets through `/v1/collections`. On such a
+collection a visitor may list, view, create, update and delete records and read
+their files, as its rules allow. Its auth record has `role` `visitor`, `admin`
+false, `org_id` its own org, and `id` and `name` as above, so a comment that
+is its writer's alone reads:
+
+```
+createRule: @request.auth.id != "" && author = @request.auth.id
+updateRule: author = @request.auth.id
+deleteRule: author = @request.auth.id
+```
+
+A visitor reaches nothing else: no other collection, not the schema, settings,
+batch, realtime, aggregates, history or a file token, and naming the Base's org
+in `X-Org-Id` is still `403`. Where a visitors' collection relates to another,
+that collection's rules read the visitor as a guest, so an expand or a filter
+through the relation shows only what a guest would see. A visitor's writes are
+held to ten a minute in a Base, counted by who it is. A superuser is never a
+visitor; it names the org.
 
 **Keys** stand in for tokens when no person is signing in. IAM issues them.
 `sk-` keys are for servers. `pk-` keys are for web pages and reach only routes
