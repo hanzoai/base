@@ -32,11 +32,58 @@
         "position": 2
       },
       {
+        "name": "type",
+        "type": "select",
+        "label": "Type",
+        "maxSelect": 1,
+        "values": [
+          "prospect",
+          "customer",
+          "investor",
+          "partner",
+          "vendor"
+        ],
+        "options": [
+          {
+            "value": "prospect",
+            "label": "Prospect",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "customer",
+            "label": "Customer",
+            "color": "green",
+            "position": 1
+          },
+          {
+            "value": "investor",
+            "label": "Investor",
+            "color": "purple",
+            "position": 2
+          },
+          {
+            "value": "partner",
+            "label": "Partner",
+            "color": "sky",
+            "position": 3
+          },
+          {
+            "value": "vendor",
+            "label": "Vendor",
+            "color": "orange",
+            "position": 4
+          }
+        ],
+        "icon": "IconTag",
+        "position": 3
+      },
+      {
         "name": "address",
         "type": "address",
         "label": "Address",
         "icon": "IconMap2",
-        "position": 3
+        "position": 4
       },
       {
         "name": "linkedin",
@@ -44,7 +91,7 @@
         "label": "LinkedIn",
         "icon": "IconBrandLinkedin",
         "maxValues": 1,
-        "position": 4
+        "position": 5
       },
       {
         "name": "x",
@@ -52,7 +99,7 @@
         "label": "X",
         "icon": "IconBrandX",
         "maxValues": 1,
-        "position": 5
+        "position": 6
       },
       {
         "name": "employees",
@@ -61,21 +108,21 @@
         "icon": "IconUsers",
         "onlyInt": true,
         "min": 0,
-        "position": 6
+        "position": 7
       },
       {
         "name": "annual_revenue",
         "type": "currency",
         "label": "Annual revenue",
         "icon": "IconMoneybag",
-        "position": 7
+        "position": 8
       },
       {
         "name": "icp",
         "type": "bool",
         "label": "Ideal customer",
         "icon": "IconTarget",
-        "position": 8
+        "position": 9
       },
       {
         "name": "owner",
@@ -83,7 +130,7 @@
         "label": "Account owner",
         "icon": "IconUserCircle",
         "max": 100,
-        "position": 9
+        "position": 10
       },
       {
         "name": "created_by",
@@ -91,7 +138,7 @@
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 10
+        "position": 11
       },
       {
         "name": "updated_by",
@@ -100,7 +147,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 11
+        "position": 12
       },
       {
         "name": "created",
@@ -108,7 +155,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 12
+        "position": 13
       },
       {
         "name": "updated",
@@ -117,10 +164,14 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 13
+        "position": 14
       }
     ],
-    "indexes": []
+    "indexes": [
+      "CREATE INDEX `idx_companies_name` ON `companies` (`name`)",
+      "CREATE INDEX `idx_companies_type` ON `companies` (`type`)",
+      "CREATE INDEX `idx_companies_created` ON `companies` (`created`)"
+    ]
   },
   {
     "name": "people",
@@ -242,12 +293,120 @@
         "position": 9
       },
       {
+        "name": "type",
+        "type": "select",
+        "label": "Type",
+        "maxSelect": 1,
+        "values": [
+          "prospect",
+          "customer",
+          "investor",
+          "partner",
+          "vendor"
+        ],
+        "options": [
+          {
+            "value": "prospect",
+            "label": "Prospect",
+            "color": "gray",
+            "position": 0
+          },
+          {
+            "value": "customer",
+            "label": "Customer",
+            "color": "green",
+            "position": 1
+          },
+          {
+            "value": "investor",
+            "label": "Investor",
+            "color": "purple",
+            "position": 2
+          },
+          {
+            "value": "partner",
+            "label": "Partner",
+            "color": "sky",
+            "position": 3
+          },
+          {
+            "value": "vendor",
+            "label": "Vendor",
+            "color": "orange",
+            "position": 4
+          }
+        ],
+        "icon": "IconTag",
+        "position": 10
+      },
+      {
+        "name": "outreach",
+        "type": "select",
+        "label": "Outreach",
+        "maxSelect": 1,
+        "values": [
+          "sent",
+          "opened",
+          "clicked",
+          "replied",
+          "bounced",
+          "unsubscribed"
+        ],
+        "options": [
+          {
+            "value": "sent",
+            "label": "Sent",
+            "color": "sky",
+            "position": 0
+          },
+          {
+            "value": "opened",
+            "label": "Opened",
+            "color": "turquoise",
+            "position": 1
+          },
+          {
+            "value": "clicked",
+            "label": "Clicked",
+            "color": "blue",
+            "position": 2
+          },
+          {
+            "value": "replied",
+            "label": "Replied",
+            "color": "green",
+            "position": 3
+          },
+          {
+            "value": "bounced",
+            "label": "Bounced",
+            "color": "red",
+            "position": 4
+          },
+          {
+            "value": "unsubscribed",
+            "label": "Unsubscribed",
+            "color": "gray",
+            "position": 5
+          }
+        ],
+        "icon": "IconMailForward",
+        "position": 11
+      },
+      {
+        "name": "contacted",
+        "type": "date",
+        "label": "Last contact",
+        "icon": "IconCalendarTime",
+        "position": 12
+      },
+      {
         "name": "source",
         "type": "text",
         "label": "Source",
         "icon": "IconSourceCode",
         "max": 255,
-        "position": 10
+        "position": 13
       },
       {
         "name": "owner",
@@ -255,7 +414,7 @@
         "label": "Owner",
         "icon": "IconUserCircle",
         "max": 100,
-        "position": 11
+        "position": 14
       },
       {
         "name": "consent",
@@ -263,7 +422,7 @@
         "label": "Consent",
         "icon": "IconShieldCheck",
         "maxSize": 65536,
-        "position": 12
+        "position": 15
       },
       {
         "name": "avatar",
@@ -278,7 +437,7 @@
           "image/webp",
           "image/gif"
         ],
-        "position": 13
+        "position": 16
       },
       {
         "name": "created_by",
@@ -286,7 +445,7 @@
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 14
+        "position": 17
       },
       {
         "name": "updated_by",
@@ -295,7 +454,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 15
+        "position": 18
       },
       {
         "name": "created",
@@ -303,7 +462,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 16
+        "position": 19
       },
       {
         "name": "updated",
@@ -312,11 +471,17 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 17
+        "position": 20
       }
     ],
     "indexes": [
-      "CREATE INDEX `idx_people_company` ON `people` (`company`)"
+      "CREATE INDEX `idx_people_company` ON `people` (`company`)",
+      "CREATE INDEX `idx_people_created` ON `people` (`created`)",
+      "CREATE INDEX `idx_people_updated` ON `people` (`updated`)",
+      "CREATE INDEX `idx_people_lifecycle` ON `people` (`lifecycle`)",
+      "CREATE INDEX `idx_people_type` ON `people` (`type`)",
+      "CREATE INDEX `idx_people_outreach` ON `people` (`outreach`)",
+      "CREATE INDEX `idx_people_contacted` ON `people` (`contacted`)"
     ]
   },
   {
@@ -325,7 +490,7 @@
     "label": "Opportunity",
     "plural": "Opportunities",
     "icon": "IconTargetArrow",
-    "description": "Deals in the pipeline.",
+    "description": "Deals in a pipeline: sales, or fundraising.",
     "history": true,
     "listRule": "@request.auth.id != \"\"",
     "viewRule": "@request.auth.id != \"\"",
@@ -343,11 +508,37 @@
         "position": 1
       },
       {
+        "name": "pipeline",
+        "type": "select",
+        "label": "Pipeline",
+        "maxSelect": 1,
+        "values": [
+          "sales",
+          "fundraising"
+        ],
+        "options": [
+          {
+            "value": "sales",
+            "label": "Sales",
+            "color": "blue",
+            "position": 0
+          },
+          {
+            "value": "fundraising",
+            "label": "Fundraising",
+            "color": "purple",
+            "position": 1
+          }
+        ],
+        "icon": "IconRoute",
+        "position": 2
+      },
+      {
         "name": "amount",
         "type": "currency",
         "label": "Amount",
         "icon": "IconCurrencyDollar",
-        "position": 2
+        "position": 3
       },
       {
         "name": "stage",
@@ -359,7 +550,12 @@
           "screening",
           "meeting",
           "proposal",
-          "customer"
+          "customer",
+          "intro",
+          "diligence",
+          "term_sheet",
+          "closed",
+          "lost"
         ],
         "options": [
           {
@@ -391,17 +587,47 @@
             "label": "Customer",
             "color": "yellow",
             "position": 4
+          },
+          {
+            "value": "intro",
+            "label": "Intro",
+            "color": "sky",
+            "position": 5
+          },
+          {
+            "value": "diligence",
+            "label": "Diligence",
+            "color": "purple",
+            "position": 6
+          },
+          {
+            "value": "term_sheet",
+            "label": "Term sheet",
+            "color": "turquoise",
+            "position": 7
+          },
+          {
+            "value": "closed",
+            "label": "Closed",
+            "color": "green",
+            "position": 8
+          },
+          {
+            "value": "lost",
+            "label": "Lost",
+            "color": "gray",
+            "position": 9
           }
         ],
         "icon": "IconProgressCheck",
-        "position": 3
+        "position": 4
       },
       {
         "name": "close_date",
         "type": "date",
         "label": "Close date",
         "icon": "IconCalendarEvent",
-        "position": 4
+        "position": 5
       },
       {
         "name": "company",
@@ -411,7 +637,7 @@
         "maxSelect": 1,
         "cascadeDelete": false,
         "icon": "IconBuildingSkyscraper",
-        "position": 5
+        "position": 6
       },
       {
         "name": "contact",
@@ -421,7 +647,7 @@
         "maxSelect": 1,
         "cascadeDelete": false,
         "icon": "IconUser",
-        "position": 6
+        "position": 7
       },
       {
         "name": "owner",
@@ -429,14 +655,29 @@
         "label": "Owner",
         "icon": "IconUserCircle",
         "max": 100,
-        "position": 7
+        "position": 8
+      },
+      {
+        "name": "next_step",
+        "type": "text",
+        "label": "Next step",
+        "icon": "IconArrowRight",
+        "max": 500,
+        "position": 9
+      },
+      {
+        "name": "contacted",
+        "type": "date",
+        "label": "Last contact",
+        "icon": "IconCalendarTime",
+        "position": 10
       },
       {
         "name": "position",
         "type": "number",
         "label": "Position",
         "icon": "IconHierarchy",
-        "position": 8
+        "position": 11
       },
       {
         "name": "created_by",
@@ -444,7 +685,7 @@
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 9
+        "position": 12
       },
       {
         "name": "updated_by",
@@ -453,7 +694,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 10
+        "position": 13
       },
       {
         "name": "created",
@@ -461,7 +702,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 11
+        "position": 14
       },
       {
         "name": "updated",
@@ -470,12 +711,14 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 12
+        "position": 15
       }
     ],
     "indexes": [
       "CREATE INDEX `idx_opportunities_stage` ON `opportunities` (`stage`)",
-      "CREATE INDEX `idx_opportunities_company` ON `opportunities` (`company`)"
+      "CREATE INDEX `idx_opportunities_company` ON `opportunities` (`company`)",
+      "CREATE INDEX `idx_opportunities_pipeline_stage` ON `opportunities` (`pipeline`, `stage`)",
+      "CREATE INDEX `idx_opportunities_close_date` ON `opportunities` (`close_date`)"
     ]
   },
   {
@@ -1531,7 +1774,8 @@
     ],
     "indexes": [
       "CREATE UNIQUE INDEX `idx_activities_source_id` ON `activities` (`source_id`) WHERE source_id != ''",
-      "CREATE INDEX `idx_activities_person_at` ON `activities` (`person`, `at`)"
+      "CREATE INDEX `idx_activities_person_at` ON `activities` (`person`, `at`)",
+      "CREATE INDEX `idx_activities_kind_at` ON `activities` (`kind`, `at`)"
     ]
   },
   {
@@ -1794,7 +2038,8 @@
       }
     ],
     "indexes": [
-      "CREATE INDEX `idx_tasks_assignee` ON `tasks` (`assignee`)"
+      "CREATE INDEX `idx_tasks_assignee` ON `tasks` (`assignee`)",
+      "CREATE INDEX `idx_tasks_status_due` ON `tasks` (`status`, `due`)"
     ]
   },
   {

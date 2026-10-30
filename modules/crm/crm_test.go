@@ -80,8 +80,90 @@ func TestEveryFieldIsLabelled(t *testing.T) {
 	}
 
 	stage := mustCollection(t, app, "opportunities").Fields.GetByName("stage").(*core.SelectField)
-	if len(stage.Options) != 5 || stage.Options[0].Color != "red" || stage.Options[4].Color != "yellow" {
+	if len(stage.Options) != 10 || stage.Options[0].Color != "red" || stage.Options[4].Color != "yellow" {
 		t.Errorf("the pipeline stages are not coloured: %+v", stage.Options)
+	}
+}
+
+func TestFundraisingIsAPipeline(t *testing.T) {
+	app := install(t)
+
+	fund := save(t, app, "companies", map[string]any{"name": "First Fund", "type": "investor"})
+	gp := save(t, app, "people", map[string]any{
+		"name":      map[string]any{"firstName": "Grace", "lastName": "Partner"},
+		"emails":    map[string]any{"primaryEmail": "grace@first.test"},
+		"company":   fund.Id,
+		"type":      "investor",
+		"outreach":  "replied",
+		"contacted": "2026-10-20 00:00:00.000Z",
+	})
+	round := save(t, app, "opportunities", map[string]any{
+		"name":      "First Fund, seed",
+		"pipeline":  "fundraising",
+		"stage":     "term_sheet",
+		"amount":    map[string]any{"amountMicros": 1_500_000_000_000, "currencyCode": "USD"},
+		"company":   fund.Id,
+		"contact":   gp.Id,
+		"next_step": "Send the data room",
+		"contacted": "2026-10-28 00:00:00.000Z",
+	})
+	save(t, app, "opportunities", map[string]any{"name": "Acme pilot", "pipeline": "sales", "stage": "meeting"})
+
+	got, err := app.FindRecordsByFilter("opportunities",
+		`pipeline = "fundraising" && stage = "term_sheet" && amount.amountMicros >= 1000000000000 && contacted >= "2026-10-01"`, "", 0, 0)
+	if err != nil || len(got) != 1 || got[0].Id != round.Id {
+		t.Fatalf("the round is not found in its pipeline: %v %v", got, err)
+	}
+	if got[0].GetString("next_step") != "Send the data room" {
+		t.Fatalf("next step: %q", got[0].GetString("next_step"))
+	}
+
+	investors, err := app.FindRecordsByFilter("people", `type = "investor" && outreach = "replied" && company.type = "investor"`, "", 0, 0)
+	if err != nil || len(investors) != 1 || investors[0].Id != gp.Id {
+		t.Fatalf("investors: %v %v", investors, err)
+	}
+
+	bad := core.NewRecord(mustCollection(t, app, "opportunities"))
+	bad.Load(map[string]any{"name": "x", "pipeline": "lottery"})
+	if err := app.Save(bad); err == nil {
+		t.Fatal("a pipeline the module does not name must be refused")
+	}
+}
+
+func TestACrmInstalledBeforeThePipelinesGrowsThem(t *testing.T) {
+	app := install(t)
+
+	// The CRM as it was installed before pipelines, types and outreach: drop what
+	// this version adds, then install again.
+	opp := mustCollection(t, app, "opportunities")
+	opp.Fields.RemoveByName("pipeline")
+	opp.Fields.RemoveByName("next_step")
+	stage := opp.Fields.GetByName("stage").(*core.SelectField)
+	stage.Values = stage.Values[:5]
+	stage.Options = stage.Options[:5]
+	opp.RemoveIndex("idx_opportunities_pipeline_stage")
+	if err := app.Save(opp); err != nil {
+		t.Fatal(err)
+	}
+	people := mustCollection(t, app, "people")
+	people.Fields.RemoveByName("outreach")
+	people.RemoveIndex("idx_people_outreach")
+	if err := app.Save(people); err != nil {
+		t.Fatal(err)
+	}
+
+	g, err := modules.Install(app, crm.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grown := strings.Join(g.Grown["opportunities"], ",")
+	for _, want := range []string{"pipeline", "next_step", "stage:intro", "stage:term_sheet", "stage:lost", "index:idx_opportunities_pipeline_stage"} {
+		if !strings.Contains(","+grown+",", ","+want+",") {
+			t.Errorf("opportunities did not grow %s: %s", want, grown)
+		}
+	}
+	if !strings.Contains(strings.Join(g.Grown["people"], ","), "outreach") {
+		t.Errorf("people did not grow outreach: %v", g.Grown["people"])
 	}
 }
 

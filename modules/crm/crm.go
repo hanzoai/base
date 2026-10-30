@@ -1,13 +1,21 @@
 // Package crm is the CRM as a Base module: the collections an org's sales,
 // hiring and outreach run on, installed into the org's own Base.
 //
-//	companies, people, opportunities   the pipeline
+//	companies, people, opportunities   the pipelines: sales and fundraising
 //	candidates, applications           hiring and programme intake
 //	lists, list_members                hand-picked sets of people
 //	segments                           saved filters, read whenever they are used
 //	activities                         the timeline: one row per event, once per source id
 //	notes, tasks, attachments          what is kept on a record
 //	views                              saved views of a collection, the org's and a person's own
+//
+// An opportunity is in one pipeline, sales or fundraising, and its stage is one of
+// that pipeline's: new, screening, meeting, proposal, customer, lost for a sale;
+// intro, meeting, diligence, term_sheet, closed, lost for a round. A person and a
+// company have a type (prospect, customer, investor, partner, vendor); a person
+// carries where outreach to them stands and when they were last contacted, and an
+// opportunity its next step and its last contact, so a table filters and sorts by
+// them without reading the timeline.
 //
 // A view is the org's (visibility org, or empty) or its maker's (private): a
 // private view is read, changed and deleted by the person who made it and by
@@ -45,7 +53,7 @@ func init() {
 	modules.Register(modules.Module{
 		Name:        Name,
 		Title:       "CRM",
-		Description: "People, companies, opportunities, candidates and applications, with lists, segments, the activity timeline, notes, tasks, attachments and saved views.",
+		Description: "People, companies, sales and fundraising opportunities, candidates and applications, with lists, segments, the activity timeline, notes, tasks, attachments and saved views.",
 		Collections: collections,
 	})
 }
