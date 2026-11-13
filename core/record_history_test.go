@@ -52,11 +52,18 @@ type historyRow struct {
 func historyOf(t *testing.T, app core.App, c *core.Collection, id string) []historyRow {
 	t.Helper()
 
+	// insertion order within one moment: the row id on SQLite, the physical position
+	// on PostgreSQL
+	order := "ctid ASC"
+	if core.LocalDatabase(app.Dialect()) {
+		order = "_rowid_ ASC"
+	}
+
 	rows := []historyRow{}
 	err := app.DB().Select("id", "action", "actor", "changes", "created").
 		From(core.CollectionNameHistory).
 		Where(dbx.HashExp{"collection": c.Id, "record": id}).
-		OrderBy("created ASC", "_rowid_ ASC").
+		OrderBy("created ASC", order).
 		All(&rows)
 	if err != nil {
 		t.Fatal(err)

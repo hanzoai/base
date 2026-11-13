@@ -899,6 +899,13 @@ func (r *runner) finalizeActivePropsProcessing(collection *Collection, prop stri
 		}
 	}
 
+	// A number or a boolean is a typed column on a server engine, which refuses to
+	// compare it with the empty string the null fallback compares text with
+	// (`numeric = ''` is an error there, not false). Its emptiness is NULL.
+	if !LocalDatabase(r.resolver.app.Dialect()) && (field.Type() == FieldTypeNumber || field.Type() == FieldTypeBool) {
+		result.NullFallback = search.NullFallbackDisabled
+	}
+
 	// account for the ":lower" modifier
 	if modifier == lowerModifier {
 		result.Identifier = "LOWER(" + result.Identifier + ")"

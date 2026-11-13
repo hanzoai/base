@@ -106,6 +106,7 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 		config.DataDir = filepath.Join(path.Dir(currentFile), "data")
 	}
 
+	fixture := config.DataDir
 	tempDir, err := TempDirClone(config.DataDir)
 	if err != nil {
 		return nil, err
@@ -115,12 +116,17 @@ func NewTestAppWithConfig(config core.BaseAppConfig) (*TestApp, error) {
 	config.DataDir = tempDir
 
 	// When the suite is pointed at a PostgreSQL server, every app built here
-	// gets a fresh schema on it instead of the embedded file. Nothing else
-	// changes: the same config, the same Bootstrap, the same migrations.
+	// is a database on it that holds a copy of the fixture, instead of the
+	// embedded files. Nothing else changes: the same config, the same
+	// Bootstrap, the same migrations (see postgres_template.go).
 	dropSchema := func() {}
 	if config.DataDSN == "" {
-		if dsn, drop := postgresSchema(); dsn != "" {
-			config.DataDSN, config.AuxDSN, dropSchema = dsn, dsn, drop
+		data, aux, drop, err := postgresClone(fixture, config.EncryptionEnv)
+		if err != nil {
+			return nil, err
+		}
+		if data != "" {
+			config.DataDSN, config.AuxDSN, dropSchema = data, aux, drop
 		}
 	}
 

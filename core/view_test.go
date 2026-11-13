@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/core"
@@ -15,7 +16,7 @@ func ensureNoTempViews(app core.App, t *testing.T) {
 	var total int
 
 	err := app.DB().Select("count(*)").
-		From("sqlite_schema").
+		From(app.Dialect().Catalog()).
 		AndWhere(dbx.HashExp{"type": "view"}).
 		AndWhere(dbx.NewExp(`[[name]] LIKE '%\_temp\_%' ESCAPE '\'`)).
 		Limit(1).
@@ -130,7 +131,7 @@ func TestSaveView(t *testing.T) {
 		{
 			"simple select query (+ trimmed semicolon)",
 			"123Test",
-			";select *, count(id) as c  from " + core.CollectionNameSuperusers + ";",
+			";select *, count(id) as c  from " + core.CollectionNameSuperusers + " group by id;",
 			false,
 			[]string{
 				"id", "created", "updated",
@@ -317,7 +318,7 @@ func TestCreateViewFields(t *testing.T) {
 		},
 		{
 			"query with indirect relations fields",
-			"select a.id, b.id as bid, b.created from demo1 as a left join demo2 b",
+			"select a.id, b.id as bid, b.created from demo1 as a left join demo2 b on true",
 			false,
 			map[string]string{
 				"id":      core.FieldTypeText,
@@ -337,11 +338,10 @@ func TestCreateViewFields(t *testing.T) {
 					` + core.CollectionNameSuperusers + `.id as eid,
 					` + core.CollectionNameSuperusers + `.email
 				from demo1 a, demo2 as b
-				left join demo3 lj on lj.id = 123
-				inner join demo4 as ij on ij.id = 123
-				join ` + core.CollectionNameSuperusers + `
+				left join demo3 lj on lj.id = '123'
+				inner join demo4 as ij on ij.id = '123'
+				join ` + core.CollectionNameSuperusers + ` on true
 				where 1=1
-				group by a.id
 				limit 10
 			`,
 			false,
@@ -368,17 +368,16 @@ func TestCreateViewFields(t *testing.T) {
 				cast(a.id as text) cast_text,
 				cast(a.id as bool) cast_bool,
 				cast(a.id as boolean) cast_boolean,
-				avg(a.id) avg,
-				sum(a.id) sum,
-				total(a.id) total,
+				avg(cast(a.id as numeric)) avg,
+				sum(cast(a.id as numeric)) sum,
 				min(a.id) min,
 				max(a.id) max
-			from demo1 a`,
+			from demo1 a
+			group by a.id`,
 			false,
 			map[string]string{
 				"id":           core.FieldTypeText,
 				"count":        core.FieldTypeNumber,
-				"total":        core.FieldTypeNumber,
 				"cast_int":     core.FieldTypeNumber,
 				"cast_integer": core.FieldTypeNumber,
 				"cast_real":    core.FieldTypeNumber,
@@ -407,7 +406,8 @@ func TestCreateViewFields(t *testing.T) {
 						end
 					) as int
 				) as cast_int
-			from demo1 a`,
+			from demo1 a
+			group by id`,
 			false,
 			map[string]string{
 				"id":       core.FieldTypeText,
@@ -433,11 +433,11 @@ func TestCreateViewFields(t *testing.T) {
 					a.id,
 					a.username,
 					a.email,
-					a.emailVisibility,
+					a."emailVisibility",
 					a.verified,
 					demo1.id relid
 				from users a
-				left join demo1
+				left join demo1 on true
 			`,
 			false,
 			map[string]string{
@@ -498,7 +498,7 @@ func TestCreateViewFields(t *testing.T) {
 				b.text as alias3,
 				b.text as alias4
 			from demo1 a
-			left join demo1 as b`,
+			left join demo1 as b on true`,
 			false,
 			map[string]string{
 				"id":     core.FieldTypeText,
@@ -512,7 +512,13 @@ func TestCreateViewFields(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			result, err := app.CreateViewFields(s.query)
+			query := s.query
+			if !core.LocalDatabase(app.Dialect()) {
+				// SQLite reads [x] and `x` and 'x' as identifiers; a server engine
+				// reads them as what they are written as
+				query = strings.NewReplacer("[text]", `"text"`, "`", `"`, "as 'single_quoted_column'", `as "single_quoted_column"`).Replace(query)
+			}
+			result, err := app.CreateViewFields(query)
 
 			hasErr := err != nil
 			if hasErr != s.expectError {
@@ -560,7 +566,11 @@ func TestCreateViewFieldsWithNumberOnlyInt(t *testing.T) {
 		cast(a.id as real) cast_real,
 		cast(a.id as decimal) cast_decimal,
 		cast(a.id as numeric) cast_numeric
-	from demo1 a`
+	from demo1 a
+	group by a.id`
+	if !core.LocalDatabase(app.Dialect()) {
+		sql = strings.Replace(sql, "total(a.id) total,", "", 1) // SQLite's own aggregate
+	}
 
 	result, err := app.CreateViewFields(sql)
 	if err != nil {
@@ -575,6 +585,10 @@ func TestCreateViewFieldsWithNumberOnlyInt(t *testing.T) {
 		"cast_real":    false,
 		"cast_decimal": false,
 		"cast_numeric": false,
+	}
+
+	if !core.LocalDatabase(app.Dialect()) {
+		delete(onlyInts, "total")
 	}
 
 	totalExpected := len(onlyInts) + 1

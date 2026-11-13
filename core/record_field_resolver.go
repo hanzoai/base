@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -214,6 +215,20 @@ func (r *RecordFieldResolver) updateQueryWithCollectionListRule(c *Collection, t
 }
 
 func (r *RecordFieldResolver) updateQueryWithDeduplicateConstraint(query *dbx.SelectQuery) {
+	// A server engine refuses DISTINCT over a select list that does not carry
+	// the expressions the rows are ordered by, and a sort through a relation is
+	// one. The base record's id identifies a row, so the rows are grouped by it
+	// and by what they are ordered by, which is the same deduplication.
+	if info := query.Info(); !LocalDatabase(r.app.Dialect()) && len(info.OrderBy) > 0 {
+		groupBy := []string{r.baseIdentifier() + ".[[id]]"}
+		for _, order := range info.OrderBy {
+			groupBy = append(groupBy, orderDirection.ReplaceAllString(order, ""))
+		}
+		query.GroupBy(groupBy...)
+
+		return
+	}
+
 	query.Distinct(true)
 
 	// @todo Research better options for generic rows deduplication.
@@ -245,6 +260,19 @@ func (r *RecordFieldResolver) updateQueryWithDeduplicateConstraint(query *dbx.Se
 	// } else {
 	// 	query.Distinct(true)
 	// }
+}
+
+// orderDirection is what an ORDER BY term carries after the expression sorted.
+var orderDirection = regexp.MustCompile(`(?i)\s+(ASC|DESC)(\s+NULLS\s+(FIRST|LAST))?\s*$`)
+
+// baseIdentifier is the quoted name rows of the collection searched are read
+// through: its alias in a rule's join subquery, its table otherwise.
+func (r *RecordFieldResolver) baseIdentifier() string {
+	if r.baseCollectionAlias != "" {
+		return "[[" + r.baseCollectionAlias + "]]"
+	}
+
+	return "[[" + r.baseCollection.Name + "]]"
 }
 
 func preferGroupBy(info *dbx.QueryInfo, fullUnquotedGroupByCol string) bool {

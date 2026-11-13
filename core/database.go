@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/hanzoai/dbx"
 	"os"
 	"path/filepath"
 )
@@ -114,7 +115,7 @@ func ReclaimDatabase(app App) (before, after int64, err error) {
 		}
 	}
 
-	if _, err = app.NonconcurrentDB().NewQuery(app.Dialect().Optimize()).Execute(); err != nil {
+	if err = optimize(app, app.NonconcurrentDB()); err != nil {
 		return before, databaseOnDisk(app), err
 	}
 
@@ -145,4 +146,30 @@ func databaseFile(app App, name string) DatabaseFile {
 	}
 
 	return file
+}
+
+// optimize refreshes the planner's statistics of the database db is a handle to.
+//
+// On SQLite that is one pragma. PostgreSQL's ANALYZE with no table names every
+// table of every schema of the database the role can reach, which for a Base
+// that is one tenant of many on a server is every other tenant's tables: slow,
+// and a lock wait against whatever they are doing. So it is told the tables of
+// this Base's own schema.
+func optimize(app App, db dbx.Builder) error {
+	if LocalDatabase(app.Dialect()) {
+		_, err := db.NewQuery(app.Dialect().Optimize()).Execute()
+		return err
+	}
+
+	var tables []string
+	if err := db.NewQuery(`SELECT tablename FROM pg_tables WHERE schemaname = current_schema()`).Column(&tables); err != nil {
+		return err
+	}
+	for _, t := range tables {
+		if _, err := db.NewQuery("ANALYZE " + app.Dialect().Quote(t)).Execute(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

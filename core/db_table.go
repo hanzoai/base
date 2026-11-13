@@ -102,9 +102,15 @@ func (app *BaseApp) TableIndexes(tableName string) (map[string]string, error) {
 // NB! Be aware that this method is vulnerable to SQL injection and the
 // "dangerousTableName" argument must come only from trusted input!
 func (app *BaseApp) DeleteTable(dangerousTableName string) error {
+	// see DeleteView: a server engine takes the views built on the table with it
+	cascade := ""
+	if !LocalDatabase(app.Dialect()) {
+		cascade = " CASCADE"
+	}
+
 	_, err := app.NonconcurrentDB().NewQuery(fmt.Sprintf(
-		"DROP TABLE IF EXISTS {{%s}}",
-		dangerousTableName,
+		"DROP TABLE IF EXISTS {{%s}}%s",
+		dangerousTableName, cascade,
 	)).Execute()
 
 	return err

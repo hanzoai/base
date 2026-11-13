@@ -450,8 +450,14 @@ func TestOrderAndPages(t *testing.T) {
 	if got := order(`[{lifecycle: Asc}, {name: {lastName: Desc}}]`); strings.Join(got, ",") != "Grace,Ada,Alan" {
 		t.Fatalf("two keys: %v", got)
 	}
-	if got := order(`[{company: {name: Desc}}]`); strings.Join(got[:2], ",") != "Grace,Ada" {
-		t.Fatalf("through a relation: %v", got)
+	byCompany := order(`[{company: {name: Desc}}]`)
+	if tests.Postgres() {
+		// a server engine puts the one with no company first when descending,
+		// where SQLite puts it last; the others are in the same order
+		byCompany = byCompany[1:]
+	}
+	if strings.Join(byCompany[:2], ",") != "Grace,Ada" {
+		t.Fatalf("through a relation: %v", byCompany)
 	}
 	for by, says := range map[string]string{
 		`[{name: {firstName: Asc}, lifecycle: Asc}]`: "names one field",
@@ -875,4 +881,3 @@ func TestTheSchemaIsTheCallers(t *testing.T) {
 		t.Fatal("a visitor still sees a collection that no longer admits visitors")
 	}
 }
-

@@ -102,6 +102,14 @@ func TestRecordHistoryRoute(t *testing.T) {
 	}
 
 	for _, s := range scenarios {
+		if tests.Postgres() {
+			// jsonb keeps an object's keys by length, then by name, not as written
+			for i, c := range s.content {
+				if c == `"title":{"from":"Acme","to":"Acme Inc"}` {
+					s.content[i] = `"title":{"to":"Acme Inc","from":"Acme"}`
+				}
+			}
+		}
 		token, jwksURL := iamCaller(t, "acme", s.role)
 
 		scenario := tests.ApiScenario{

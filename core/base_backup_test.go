@@ -19,6 +19,14 @@ func TestCreateBackup(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
+	if !core.LocalDatabase(app.Dialect()) {
+		// A server engine keeps the database in the server, which is where it is
+		// backed up: an archive of the data directory would be a backup of nothing.
+		// Nothing is written to the data directory either.
+		assertBackupsRefused(t, app)
+		return
+	}
+
 	// set some long app name with spaces and special characters
 	app.Settings().Meta.AppName = "test @! " + strings.Repeat("a", 100)
 
@@ -85,6 +93,14 @@ func TestCreateBackup(t *testing.T) {
 func TestRestoreBackup(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
+
+	if !core.LocalDatabase(app.Dialect()) {
+		// A server engine keeps the database in the server, which is where it is
+		// backed up: an archive of the data directory would be a backup of nothing.
+		// Nothing is written to the data directory either.
+		assertBackupsRefused(t, app)
+		return
+	}
 
 	// create a initial test backup to ensure that there are at least 1
 	// backup file and that the generated zip doesn't contain the backups dir
@@ -189,4 +205,22 @@ func getEntryNames(entries []fs.DirEntry) []string {
 	}
 
 	return names
+}
+
+func assertBackupsRefused(t *testing.T, app core.App) {
+	t.Helper()
+
+	err := app.CreateBackup(context.Background(), "refused")
+	if err == nil || !strings.Contains(err.Error(), "at the server") {
+		t.Fatalf("Expected the backup to be refused in favor of the server's own, got %v", err)
+	}
+
+	err = app.RestoreBackup(context.Background(), "refused")
+	if err == nil || !strings.Contains(err.Error(), "at the server") {
+		t.Fatalf("Expected the restore to be refused in favor of the server's own, got %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(app.DataDir(), core.LocalBackupsDirName)); err == nil {
+		t.Fatal("Expected no backups directory to be made on the volume")
+	}
 }

@@ -23,7 +23,7 @@ func TestGeoPointFieldColumnType(t *testing.T) {
 
 	expected := `JSON DEFAULT '{"lon":0,"lat":0}' NOT NULL`
 
-	if v := f.ColumnType(app); v != expected {
+	if v := f.ColumnType(app); v != engineType(app, expected) {
 		t.Fatalf("Expected\n%q\ngot\n%q", expected, v)
 	}
 }

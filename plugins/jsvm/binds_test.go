@@ -786,8 +786,14 @@ func TestDbxBinds(t *testing.T) {
 
 		v, _ := result.Export().(string)
 
-		if v != s.expected {
-			t.Fatalf("[%s] Expected \n%s, \ngot \n%s", s.js, s.expected, v)
+		expected := s.expected
+		if tests.Postgres() {
+			// a server engine quotes a name with double quotes
+			expected = strings.ReplaceAll(expected, "`", `"`)
+		}
+
+		if v != expected {
+			t.Fatalf("[%s] Expected \n%s, \ngot \n%s", s.js, expected, v)
 		}
 	}
 }

@@ -116,6 +116,12 @@ func TestTableInfo(t *testing.T) {
 		},
 	}
 
+	if !core.LocalDatabase(app.Dialect()) {
+		// the server's own spelling of the same table: its types, its defaults
+		// and the order the columns were made in
+		scenarios[2].expected = `[{"PK":1,"Index":0,"Name":"id","Type":"TEXT","NotNull":true,"DefaultValue":{"String":"('r'::text || substr(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 14))","Valid":true}},{"PK":0,"Index":1,"Name":"value","Type":"JSONB","NotNull":false,"DefaultValue":{"String":"","Valid":false}},{"PK":0,"Index":2,"Name":"created","Type":"TEXT","NotNull":true,"DefaultValue":{"String":"to_char((now() AT TIME ZONE 'UTC'::text), 'YYYY-MM-DD HH24:MI:SS.MS\"Z\"'::text)","Valid":true}},{"PK":0,"Index":3,"Name":"updated","Type":"TEXT","NotNull":true,"DefaultValue":{"String":"to_char((now() AT TIME ZONE 'UTC'::text), 'YYYY-MM-DD HH24:MI:SS.MS\"Z\"'::text)","Valid":true}}]`
+	}
+
 	for i, s := range scenarios {
 		t.Run(fmt.Sprintf("%d_%s", i, s.tableName), func(t *testing.T) {
 			rows, _ := app.TableInfo(s.tableName)

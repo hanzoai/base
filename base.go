@@ -81,6 +81,9 @@ type Config struct {
 	DataDB func() (*sql.DB, error)
 	AuxDB  func() (*sql.DB, error)
 	Files  func() (*filesystem.System, error)
+
+	// BackupFiles hands Base the filesystem its backups are kept in.
+	BackupFiles func() (*filesystem.System, error)
 }
 
 // New creates a new Base instance with the default configuration.
@@ -170,6 +173,7 @@ func NewWithConfig(config Config) *Base {
 		DataDB:           config.DataDB,
 		AuxDB:            config.AuxDB,
 		Files:            config.Files,
+		BackupFiles:      config.BackupFiles,
 	})
 
 	// hide the default help command (allow only `--help` flag)

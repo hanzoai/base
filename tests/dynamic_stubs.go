@@ -4,33 +4,33 @@ package tests
 // _mfas / _otps system collections in the IAM-native rip.
 
 func StubLogsData(app *TestApp) error {
-	_, err := app.AuxDB().NewQuery(`
-		delete from {{_logs}};
+	// one statement a call: a server engine runs a prepared statement, which is one
+	if _, err := app.AuxDB().NewQuery(`delete from {{_logs}}`).Execute(); err != nil {
+		return err
+	}
 
+	_, err := app.AuxDB().NewQuery(`
 		insert into {{_logs}} (
 			[[id]],
 			[[level]],
 			[[message]],
 			[[data]],
-			[[created]],
-			[[updated]]
+			[[created]]
 		)
 		values
 		(
-			"873f2133-9f38-44fb-bf82-c8f53b310d91",
+			'873f2133-9f38-44fb-bf82-c8f53b310d91',
 			0,
-			"test_message1",
+			'test_message1',
 			'{"status":200}',
-			"2022-05-01 10:00:00.123Z",
-			"2022-05-01 10:00:00.123Z"
+			'2022-05-01 10:00:00.123Z'
 		),
 		(
-			"f2133873-44fb-9f38-bf82-c918f53b310d",
+			'f2133873-44fb-9f38-bf82-c918f53b310d',
 			8,
-			"test_message2",
+			'test_message2',
 			'{"status":400}',
-			"2022-05-02 10:00:00.123Z",
-			"2022-05-02 10:00:00.123Z"
+			'2022-05-02 10:00:00.123Z'
 		);
 	`).Execute()
 

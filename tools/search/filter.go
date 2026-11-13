@@ -201,6 +201,10 @@ func buildResolversExpr(
 		left, right = readAsNumbers(d, left, right)
 	}
 
+	if !isLikeOp(op) {
+		left, right = typedLiterals(d, left, right)
+	}
+
 	switch op {
 	case fexpr.SignEq, fexpr.SignAnyEq:
 		expr = resolveEqualExpr(true, left, right)
@@ -471,6 +475,18 @@ func readAsNumbers(d dialect.Dialect, left, right *ResolverResult) (*ResolverRes
 	}
 
 	return left, right
+}
+
+// bindsBool reports whether the operand is a single bound boolean.
+func bindsBool(result *ResolverResult) bool {
+	for key, value := range result.Params {
+		if result.Identifier == "{:"+key+"}" {
+			_, ok := value.(bool)
+			return ok
+		}
+	}
+
+	return false
 }
 
 // bindsNumber reports whether the operand is a single bound number.
@@ -843,4 +859,31 @@ func (e *manyVsOneExpr) Build(db *query.DB, params query.Params) string {
 		e.alias,
 		e.where.Build(db, params),
 	)
+}
+
+// typedLiterals gives a number its type where nothing around it does. A server
+// engine types a parameter from the expression it is in, and `1 = 1` has two
+// parameters and nothing else, so it cannot be told what they are; a column or
+// a value read from a document on either side is what tells it, and then the
+// parameter is left to be typed by that.
+func typedLiterals(d dialect.Dialect, left, right *ResolverResult) (*ResolverResult, *ResolverResult) {
+	if _, local := d.(dialect.SQLite); local {
+		return left, right
+	}
+
+	// A bound boolean beside text (the literal true) is typed as text by the
+	// server and cannot be written into it, so it is given its own type.
+	if bindsBool(left) {
+		left = withIdentifier(left, "CAST("+left.Identifier+" AS BOOLEAN)")
+	}
+	if bindsBool(right) {
+		right = withIdentifier(right, "CAST("+right.Identifier+" AS BOOLEAN)")
+	}
+
+	if !bindsNumber(left) || !bindsNumber(right) {
+		return left, right
+	}
+
+	return withIdentifier(left, "CAST("+left.Identifier+" AS NUMERIC)"),
+		withIdentifier(right, "CAST("+right.Identifier+" AS NUMERIC)")
 }

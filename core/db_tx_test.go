@@ -31,6 +31,27 @@ func TestRunInTransaction(t *testing.T) {
 		}
 	})
 
+	t.Run("a handled nested failure leaves the outer transaction usable", func(t *testing.T) {
+		err := app.RunInTransaction(func(txApp core.App) error {
+			nested := txApp.RunInTransaction(func(tx2 core.App) error {
+				// a statement the server refuses: on PostgreSQL this aborts a
+				// transaction that is not a savepoint
+				if _, err := tx2.DB().NewQuery("SELECT * FROM no_such_table_here").Execute(); err == nil {
+					t.Fatal("expected the statement to fail")
+				}
+				return errors.New("handled")
+			})
+			if nested == nil {
+				t.Fatal("expected the nested failure")
+			}
+			_, err := txApp.FindAuthRecordByEmail(core.CollectionNameSuperusers, "test@example.com")
+			return err
+		})
+		if err != nil {
+			t.Fatalf("the outer transaction was lost to a handled nested failure: %v", err)
+		}
+	})
+
 	t.Run("successful nested transaction", func(t *testing.T) {
 		app.RunInTransaction(func(txApp core.App) error {
 			superuser, _ := txApp.FindAuthRecordByEmail(core.CollectionNameSuperusers, "test@example.com")

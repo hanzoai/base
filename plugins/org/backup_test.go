@@ -41,6 +41,14 @@ func TestPlatformBackupCarriesItsOwnBase(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if !core.LocalDatabase(app.Dialect()) {
+		// a server engine archives no data directory; the refusal is the answer
+		if err := app.CreateBackup(context.Background(), "test.zip"); err == nil {
+			t.Fatal("expected a backup on a server engine to be refused")
+		}
+		return
+	}
+
 	if err := app.CreateBackup(context.Background(), "test.zip"); err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +180,8 @@ func TestRestoreSparesWhatTheBackupDidNotCarry(t *testing.T) {
 			return e.Next()
 		})
 
-		if err := on.CreateBackup(context.Background(), "test.zip"); err != nil {
+		// the exclusions are settled before a server engine refuses the archive
+		if err := on.CreateBackup(context.Background(), "test.zip"); err != nil && core.LocalDatabase(on.Dialect()) {
 			t.Fatal(err)
 		}
 		// The restore itself stops on the missing archive, after the exclusions

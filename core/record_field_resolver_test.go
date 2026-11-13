@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hanzoai/dbx"
+
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
 	"github.com/hanzoai/base/tools/list"
@@ -675,6 +677,12 @@ func TestRecordFieldResolverUpdateQuery(t *testing.T) {
 			}
 
 			expectError := s.expectQuery == ""
+			local := core.LocalDatabase(app.Dialect())
+			if !local && strings.Contains(s.rule, "strftime(") {
+				// SQLite's own date function: a server engine has no equivalent
+				// and says so when the rule is built
+				expectError = true
+			}
 
 			query := app.RecordQuery(collection)
 
@@ -693,6 +701,16 @@ func TestRecordFieldResolverUpdateQuery(t *testing.T) {
 			}
 
 			if expectError {
+				return
+			}
+
+			if !local {
+				// the golden below is SQLite's spelling; here the query is run, which is
+				// what proves the engine takes what the resolver built
+				var rows []dbx.NullStringMap
+				if err := query.AndWhere(expr).All(&rows); err != nil && !typedRefusal(err) {
+					t.Fatalf("the engine refused the built query: %v", err)
+				}
 				return
 			}
 
@@ -809,8 +827,13 @@ func TestRecordFieldResolverResolveCollectionFields(t *testing.T) {
 				return
 			}
 
-			if r.Identifier != s.expectName {
-				t.Fatalf("Expected r.Identifier\n%q\ngot\n%q", s.expectName, r.Identifier)
+			expectName := s.expectName
+			if !core.LocalDatabase(app.Dialect()) {
+				expectName = engineJSONRead(expectName)
+			}
+
+			if r.Identifier != expectName {
+				t.Fatalf("Expected r.Identifier\n%q\ngot\n%q", expectName, r.Identifier)
 			}
 
 			// params should be empty for non @request fields
@@ -954,4 +977,18 @@ func TestRecordFieldResolverResolveStaticRequestInfoFields(t *testing.T) {
 	if v, ok := authRecord.PublicExport()[core.FieldNameEmail]; ok {
 		t.Fatalf("Expected the original authRecord email to not be exported, got %q", v)
 	}
+}
+
+var sqliteJSONRead = regexp.MustCompile(`^\(CASE WHEN json_valid\(\[\[(.+?)\]\]\) THEN JSON_EXTRACT\(\[\[.+?\]\], '(.+?)'\) ELSE JSON_EXTRACT\(json_object\('base', \[\[.+?\]\]\), '(.+?)'\) END\)$`)
+
+// engineJSONRead is how a server engine reads a path out of a JSON column the
+// resolver was asked for: the same two readings (a document, and a bare value
+// that was stored as one), spelled in its own functions.
+func engineJSONRead(sqlite string) string {
+	m := sqliteJSONRead.FindStringSubmatch(sqlite)
+	if m == nil {
+		return sqlite
+	}
+
+	return "(CASE WHEN ([[" + m[1] + "]])::text IS JSON THEN jsonb_path_query_first(([[" + m[1] + "]])::jsonb, '" + m[2] + "'::jsonpath) #>> '{}' ELSE jsonb_path_query_first(jsonb_build_object('base', ([[" + m[1] + "]])::text), '" + m[3] + "'::jsonpath) #>> '{}' END)"
 }

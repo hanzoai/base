@@ -280,7 +280,7 @@ func shadowRow(app core.App, collection *core.Collection, record *core.Record) (
 		k = inflector.Columnify(k) // extra measure in case of custom fields
 		param := randomPart + "_" + k
 		params[param] = v
-		selects = append(selects, "{:"+param+"} AS [["+k+"]]")
+		selects = append(selects, dummySelect(app, param, k, v))
 	}
 
 	shadow := *collection
@@ -364,7 +364,7 @@ func recordCreate(responseWriteAfterTx bool, optFinalizer func(data any) error) 
 				k = inflector.Columnify(k) // columnify is just as extra measure in case of custom fields
 				param = "__hzf_create__" + k
 				dummyParams[param] = v
-				selects = append(selects, "{:"+param+"} AS [["+k+"]]")
+				selects = append(selects, dummySelect(e.App, param, k, v))
 			}
 
 			// shallow clone the current collection
@@ -873,4 +873,25 @@ func hasAuthManageAccess(app core.App, requestInfo *core.RequestInfo, collection
 	err = query.Limit(1).Row(&exists)
 
 	return err == nil && exists > 0
+}
+
+// dummySelect is one column of the stand-in row a rule is checked against. A
+// server engine types a parameter from where it sits, and in a bare select list
+// that is nowhere, so it reads as text and refuses the number or boolean the
+// column holds; the value is given its own type.
+func dummySelect(app core.App, param, column string, value any) string {
+	expr := "{:" + param + "}"
+
+	if !core.LocalDatabase(app.Dialect()) {
+		switch value.(type) {
+		case bool:
+			expr = "CAST(" + expr + " AS BOOLEAN)"
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+			expr = "CAST(" + expr + " AS BIGINT)"
+		case float32, float64:
+			expr = "CAST(" + expr + " AS DOUBLE PRECISION)"
+		}
+	}
+
+	return expr + " AS [[" + column + "]]"
 }

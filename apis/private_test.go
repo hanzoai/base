@@ -24,10 +24,10 @@ func seedPrivateRow(app *tests.TestApp, tag string, ct []byte) error {
 		CREATE TABLE IF NOT EXISTS _private (
 			user_id TEXT NOT NULL,
 			tag TEXT NOT NULL,
-			ct BLOB NOT NULL,
-			updated_at INTEGER NOT NULL,
+			ct ` + app.Dialect().Bytes() + ` NOT NULL,
+			updated_at BIGINT NOT NULL,
 			PRIMARY KEY (user_id, tag)
-		) WITHOUT ROWID
+		)
 	`).Execute()
 	if err != nil {
 		return err

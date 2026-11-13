@@ -23,6 +23,12 @@ const databaseSuperuser = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9u
 func TestDatabaseRead(t *testing.T) {
 	t.Parallel()
 
+	engine := []string{`"engine":"sqlite"`, `"local":true`, `"path":"`, `data.db"`, `auxiliary.db"`}
+	if tests.Postgres() {
+		// a server engine keeps nothing in the data directory to name or size
+		engine = []string{`"engine":"postgres"`, `"local":false`, `"data":{"path":"","size":0}`}
+	}
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:            "unauthorized",
@@ -47,18 +53,12 @@ func TestDatabaseRead(t *testing.T) {
 			URL:            "/v1/database",
 			Headers:        map[string]string{"Authorization": databaseSuperuser},
 			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"engine":"sqlite"`,
-				`"local":true`,
-				`"path":"`,
-				`data.db"`,
-				`auxiliary.db"`,
+			ExpectedContent: append(engine,
 				// a base collection, an auth one and a view all carry a count,
 				// so the report covers every kind of collection there is
 				`{"records":3,"id":"wsmn24bux7wo113","name":"demo1","type":"base","system":false}`,
 				`{"records":4,"id":"hbc_3142635823","name":"_superusers","type":"auth","system":true}`,
-				`{"records":3,"id":"v9gwnfh02gjq1q0","name":"view1","type":"view","system":false}`,
-			},
+				`{"records":3,"id":"v9gwnfh02gjq1q0","name":"view1","type":"view","system":false}`),
 			ExpectedEvents: map[string]int{"*": 0},
 		},
 	}
@@ -81,7 +81,7 @@ func TestDatabaseUncountable(t *testing.T) {
 		URL:     "/v1/database",
 		Headers: map[string]string{"Authorization": databaseSuperuser},
 		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			if _, err := app.NonconcurrentDB().NewQuery("DROP TABLE demo1").Execute(); err != nil {
+			if _, err := app.NonconcurrentDB().NewQuery("DROP TABLE demo1" + cascade(app)).Execute(); err != nil {
 				t.Fatal(err)
 			}
 		},
@@ -137,6 +137,9 @@ func TestDatabaseReclaim(t *testing.T) {
 			ExpectedContent: []string{`"before":`, `"after":`},
 			ExpectedEvents:  map[string]int{"*": 0},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				if !core.LocalDatabase(app.Dialect()) {
+					return // a server engine's space is the server's, and none is the data directory's
+				}
 				for name, after := range databaseSizes(t, app) {
 					if after >= before[name] {
 						t.Fatalf("expected the reclaim to free the pages the dropped rows left behind in %s, still holding %d of %d bytes", name, after, before[name])
@@ -165,7 +168,7 @@ func databaseBloat(t testing.TB, app *tests.TestApp) {
 	for _, db := range []dbx.Builder{app.NonconcurrentDB(), app.AuxNonconcurrentDB()} {
 		for _, query := range []string{
 			"CREATE TABLE _bloat (v TEXT)",
-			"INSERT INTO _bloat (v) WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 20000) " +
+			"WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c WHERE x < 20000) INSERT INTO _bloat (v) " +
 				"SELECT 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' FROM c",
 			"DROP TABLE _bloat",
 			app.Dialect().Checkpoint(),
@@ -189,6 +192,10 @@ func databaseSizes(t testing.TB, app *tests.TestApp) map[string]int64 {
 
 	sizes := map[string]int64{}
 
+	if !core.LocalDatabase(app.Dialect()) {
+		return sizes // no file of the app's to measure
+	}
+
 	for _, name := range []string{"data.db", "auxiliary.db"} {
 		for _, path := range []string{name, name + "-wal"} {
 			info, err := os.Stat(filepath.Join(app.DataDir(), path))
@@ -200,4 +207,14 @@ func databaseSizes(t testing.TB, app *tests.TestApp) map[string]int64 {
 	}
 
 	return sizes
+}
+
+// cascade is what drops a table with the views reading from it on an engine
+// that refuses to leave them dangling.
+func cascade(app core.App) string {
+	if core.LocalDatabase(app.Dialect()) {
+		return ""
+	}
+
+	return " CASCADE"
 }

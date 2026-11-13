@@ -1613,6 +1613,21 @@ func TestCollectionSaveViewWrapping(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			if !core.LocalDatabase(app.Dialect()) {
+				// the stored SQL below is SQLite's text of the view; a server engine
+				// keeps its own rewriting of it, so what holds on both is the result:
+				// the view's id is text, wrapped or not
+				var typ string
+				if err := app.ConcurrentDB().NewQuery("SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name={:name} AND column_name='id'").
+					Bind(dbx.Params{"name": viewName}).Row(&typ); err != nil {
+					t.Fatalf("Failed to read the id column of the view: %v", err)
+				}
+				if typ != "text" {
+					t.Fatalf("Expected the view's id to be text, got %q", typ)
+				}
+				return
+			}
+
 			var sql string
 
 			rowErr := app.ConcurrentDB().NewQuery("SELECT sql FROM sqlite_master WHERE type='view' AND name={:name}").

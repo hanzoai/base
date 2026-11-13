@@ -49,7 +49,7 @@ func TestFileFieldColumnType(t *testing.T) {
 
 	for _, s := range scenarios {
 		t.Run(s.name, func(t *testing.T) {
-			if v := s.field.ColumnType(app); v != s.expected {
+			if v := s.field.ColumnType(app); v != engineType(app, s.expected) {
 				t.Fatalf("Expected\n%q\ngot\n%q", s.expected, v)
 			}
 		})

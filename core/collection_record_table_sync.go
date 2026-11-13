@@ -142,7 +142,7 @@ func (app *BaseApp) SyncRecordTableSchema(newCollection *Collection, oldCollecti
 	}
 
 	// refresh the planner's statistics now that the table's shape changed
-	_, optimizeErr := app.NonconcurrentDB().NewQuery(app.Dialect().Optimize()).Execute()
+	optimizeErr := optimize(app, app.NonconcurrentDB())
 	if optimizeErr != nil {
 		app.Logger().Warn("Failed to refresh statistics after record table sync", "error", optimizeErr.Error())
 	}
@@ -267,12 +267,29 @@ func normalizeSingleVsMultipleFieldChanges(app App, newCollection *Collection, o
 				return err
 			}
 
-			// restore views
-			for _, view := range views {
-				_, err = txApp.DB().NewQuery(view.SQL).Execute()
-				if err != nil {
-					return err
+			// restore views. A view is made over the ones it reads from, which a server
+			// engine insists exist, so each pass makes what can be made and the ones
+			// left wait for the next; a pass that makes none is the real error.
+			for pending := views; len(pending) > 0; {
+				var waiting []struct {
+					Name string `db:"name"`
+					SQL  string `db:"sql"`
 				}
+				var lastErr error
+				for _, view := range pending {
+					viewSQL := view.SQL
+					if err := txApp.RunInTransaction(func(tx2 App) error {
+						_, err := tx2.DB().NewQuery(viewSQL).Execute()
+						return err
+					}); err != nil {
+						lastErr = err
+						waiting = append(waiting, view)
+					}
+				}
+				if len(waiting) == len(pending) {
+					return lastErr
+				}
+				pending = waiting
 			}
 		}
 

@@ -7,13 +7,18 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/apis"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/tests"
+	"github.com/hanzoai/base/tools/archive"
+	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/filesystem/blob"
+	"github.com/hanzoai/base/tools/security"
 	"github.com/hanzoai/base/tools/types"
 )
 
@@ -90,6 +95,11 @@ func TestBackupsList(t *testing.T) {
 
 func TestBackupsCreate(t *testing.T) {
 	t.Parallel()
+
+	if tests.Postgres() {
+		backupsAreTheServers(t)
+		return
+	}
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -707,6 +717,11 @@ func TestBackupsDelete(t *testing.T) {
 func TestBackupsRestore(t *testing.T) {
 	t.Parallel()
 
+	if tests.Postgres() {
+		backupsAreTheServers(t)
+		return
+	}
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "unauthorized",
@@ -856,8 +871,54 @@ func TestBackupsRestoreOutcome(t *testing.T) {
 
 // -------------------------------------------------------------------
 
+// backupsAreTheServers pins what a server engine does with the two backup routes
+// that archive or replace the data directory: it refuses both, naming the server as
+// the place the database is backed up, and writes nothing to the volume. Listing,
+// downloading and deleting backups are the backups filesystem's and are tested on
+// both engines by the tests beside it.
+func backupsAreTheServers(t *testing.T) {
+	superuser := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2xsZWN0aW9uSWQiOiJoYmNfMzE0MjYzNTgyMyIsImV4cCI6MjUyNDYwNDQ2MSwiaWQiOiJzeXdiaGVjbmg0NnJobTAiLCJyZWZyZXNoYWJsZSI6dHJ1ZSwidHlwZSI6ImF1dGgifQ.CXBf8BazmUeg2RnJW8OEs1UFYF41rbCMOa6YZa4wZio"
+
+	for _, s := range []tests.ApiScenario{
+		{
+			Name:    "create is refused",
+			Method:  http.MethodPost,
+			URL:     "/v1/backups",
+			Headers: map[string]string{"Authorization": superuser},
+			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+				ensureNoBackups(t, app)
+			},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"OnBackupCreate": 1},
+		},
+		{
+			Name:    "restore is refused",
+			Method:  http.MethodPost,
+			URL:     "/v1/backups/test1.zip/restore",
+			Headers: map[string]string{"Authorization": superuser},
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				if err := createTestBackups(app); err != nil {
+					t.Fatal(err)
+				}
+			},
+			ExpectedStatus:        204,
+			ExpectedEvents:        map[string]int{"*": 0},
+			DisableTestAppCleanup: false,
+		},
+	} {
+		s.Test(t)
+	}
+}
+
 func createTestBackups(app core.App) error {
 	ctx := context.Background()
+
+	if !core.LocalDatabase(app.Dialect()) {
+		// A server engine makes no archive of its own, so the backups the routes
+		// list, serve and delete are put in the backups filesystem directly.
+		return putTestBackups(app, "test1.zip", "test2.zip", "test3.zip", "@test4.zip")
+	}
 
 	if err := app.CreateBackup(ctx, "test1.zip"); err != nil {
 		return err
@@ -897,4 +958,51 @@ func ensureNoBackups(t testing.TB, app *tests.TestApp) {
 	if total := len(files); total != 0 {
 		t.Fatalf("Expected 0 backup files, got %d", total)
 	}
+}
+
+// putTestBackups writes a small valid archive under each name into the app's
+// backups filesystem.
+func putTestBackups(app core.App, names ...string) error {
+	dir, err := os.MkdirTemp("", "hz-backup-src-")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(dir)
+	if err := os.MkdirAll(filepath.Join(dir, "storage"), 0o700); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "storage", "marker.txt"), []byte("backup"), 0o600); err != nil {
+		return err
+	}
+
+	for _, name := range []string{"data.db", "auxiliary.db"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte("backup"), 0o600); err != nil {
+			return err
+		}
+	}
+
+	zipPath := filepath.Join(os.TempDir(), "hz-backup-"+security.PseudorandomString(8)+".zip")
+	defer os.Remove(zipPath)
+	if err := archive.Create(dir, zipPath); err != nil {
+		return err
+	}
+
+	fsys, err := app.NewBackupsFilesystem()
+	if err != nil {
+		return err
+	}
+	defer fsys.Close()
+
+	for _, name := range names {
+		file, err := filesystem.NewFileFromPath(zipPath)
+		if err != nil {
+			return err
+		}
+		file.OriginalName, file.Name = name, name
+		if err := fsys.UploadFile(file, name); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

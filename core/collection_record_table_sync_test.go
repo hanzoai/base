@@ -3,6 +3,7 @@ package core_test
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/hanzoai/base/core"
@@ -119,7 +120,7 @@ func getTotalViews(app core.App) (int, error) {
 	var total int
 
 	err := app.DB().Select("count(*)").
-		From("sqlite_master").
+		From(app.Dialect().Catalog()).
 		AndWhere(dbx.NewExp("sql is not null")).
 		AndWhere(dbx.HashExp{"type": "view"}).
 		Row(&total)
@@ -201,7 +202,14 @@ func TestSingleVsMultipleValuesNormalization(t *testing.T) {
 				t.Fatalf("Missing info for column %q", col)
 			}
 
-			if v := row.DefaultValue.String; v != dflt {
+			v := row.DefaultValue.String
+			if !core.LocalDatabase(app.Dialect()) {
+				// a server engine writes the type a default was cast to beside it
+				if i := strings.Index(v, "::"); i >= 0 {
+					v = v[:i]
+				}
+			}
+			if v != dflt {
 				t.Fatalf("Expected default value %q, got %q", dflt, v)
 			}
 		})

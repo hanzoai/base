@@ -21,12 +21,66 @@ import (
 // NB! Be aware that this method is vulnerable to SQL injection and the
 // "dangerousViewName" argument must come only from trusted input!
 func (app *BaseApp) DeleteView(dangerousViewName string) error {
+	// A server engine will not drop a view another view is built on, where SQLite
+	// drops it and leaves the other pointing at nothing. The dependents go with
+	// it; SaveView puts back the ones it can.
+	cascade := ""
+	if !LocalDatabase(app.Dialect()) {
+		cascade = " CASCADE"
+	}
+
 	_, err := app.DB().NewQuery(fmt.Sprintf(
-		"DROP VIEW IF EXISTS {{%s}}",
-		dangerousViewName,
+		"DROP VIEW IF EXISTS {{%s}}%s",
+		dangerousViewName, cascade,
 	)).Execute()
 
 	return err
+}
+
+// dependentViews lists the views built on the named view, transitively, with the
+// SQL each was made from, nearest first. Empty on an engine that keeps a view
+// whose source is dropped.
+func dependentViews(app App, name string) ([][2]string, error) {
+	if LocalDatabase(app.Dialect()) {
+		return nil, nil
+	}
+
+	var rows []struct {
+		Name       string `db:"relname"`
+		Definition string `db:"def"`
+	}
+	err := app.DB().NewQuery(`
+		WITH RECURSIVE dep(oid, relname, depth) AS (
+			SELECT r.ev_class, c.relname, 1
+			FROM pg_depend d
+			JOIN pg_rewrite r ON r.oid = d.objid
+			JOIN pg_class c ON c.oid = r.ev_class AND c.relkind = 'v'
+			JOIN pg_class s ON s.oid = d.refobjid
+			JOIN pg_namespace n ON n.oid = s.relnamespace
+			WHERE s.relname = {:name} AND n.nspname = current_schema() AND r.ev_class <> s.oid
+			UNION
+			SELECT r.ev_class, c.relname, dep.depth + 1
+			FROM dep
+			JOIN pg_depend d ON d.refobjid = dep.oid
+			JOIN pg_rewrite r ON r.oid = d.objid
+			JOIN pg_class c ON c.oid = r.ev_class AND c.relkind = 'v'
+			WHERE r.ev_class <> dep.oid
+		)
+		SELECT relname, pg_get_viewdef(oid) AS def
+		FROM (SELECT oid, relname, max(depth) AS depth FROM dep GROUP BY oid, relname) x
+		ORDER BY depth, relname`).
+		Bind(dbx.Params{"name": name}).
+		All(&rows)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([][2]string, len(rows))
+	for i, r := range rows {
+		out[i] = [2]string{r.Name, r.Definition}
+	}
+
+	return out, nil
 }
 
 // SaveView creates (or updates already existing) persistent SQL view.
@@ -35,6 +89,11 @@ func (app *BaseApp) DeleteView(dangerousViewName string) error {
 // its arguments must come only from trusted input!
 func (app *BaseApp) SaveView(dangerousViewName string, dangerousSelectQuery string) error {
 	return app.RunInTransaction(func(txApp App) error {
+		dependents, err := dependentViews(txApp, dangerousViewName)
+		if err != nil {
+			return err
+		}
+
 		// delete old view (if exists)
 		if err := txApp.DeleteView(dangerousViewName); err != nil {
 			return err
@@ -66,6 +125,16 @@ func (app *BaseApp) SaveView(dangerousViewName string, dangerousSelectQuery stri
 			txApp.DeleteView(dangerousViewName)
 
 			return err
+		}
+
+		// put back the views that were built on it. One that no longer fits the new
+		// columns stays gone, as it stays broken on SQLite, until its collection is
+		// saved again (see resaveViewsWithChangedFields).
+		for _, d := range dependents {
+			_ = txApp.RunInTransaction(func(tx2 App) error {
+				_, err := tx2.DB().NewQuery("CREATE VIEW " + tx2.Dialect().Quote(d[0]) + " AS " + d[1]).Execute()
+				return err
+			})
 		}
 
 		return nil

@@ -89,7 +89,7 @@ func (idx Index) Build(d dialect.Dialect) string {
 
 		if strings.Contains(col.Name, "(") || strings.Contains(col.Name, " ") {
 			// most likely an expression
-			str.WriteString(trimmedColName)
+			str.WriteString(requote(d, trimmedColName))
 		} else {
 			// regular identifier
 			str.WriteString(d.Quote(trimmedColName))
@@ -116,7 +116,7 @@ func (idx Index) Build(d dialect.Dialect) string {
 
 	if idx.Where != "" {
 		str.WriteString(" WHERE ")
-		str.WriteString(idx.Where)
+		str.WriteString(requote(d, idx.Where))
 	}
 
 	return str.String()
@@ -221,4 +221,36 @@ func FindSingleColumnUniqueIndex(indexes []string, column string) (Index, bool) 
 func HasSingleColumnUniqueIndex(column string, indexes []string) bool {
 	_, ok := FindSingleColumnUniqueIndex(indexes, column)
 	return ok
+}
+
+// requote rewrites the backtick-quoted identifiers of an index expression into
+// the dialect's own quoting. An index is stored as the SQL it was written in,
+// and the quoting Base writes (and its admin UI shows) is the backtick, which
+// only SQLite reads; PostgreSQL takes double quotes. Text inside a string
+// literal is left as it is.
+func requote(d dialect.Dialect, expr string) string {
+	if !strings.Contains(expr, "`") || d.Quote("x") == "`x`" {
+		return expr
+	}
+	var b strings.Builder
+	inString := false
+	for i := 0; i < len(expr); i++ {
+		c := expr[i]
+		switch {
+		case c == '\'':
+			inString = !inString
+			b.WriteByte(c)
+		case c == '`' && !inString:
+			end := strings.IndexByte(expr[i+1:], '`')
+			if end < 0 {
+				b.WriteByte(c)
+				continue
+			}
+			b.WriteString(d.Quote(expr[i+1 : i+1+end]))
+			i += end + 1
+		default:
+			b.WriteByte(c)
+		}
+	}
+	return b.String()
 }

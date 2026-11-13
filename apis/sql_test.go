@@ -290,6 +290,21 @@ func TestSQLRun(t *testing.T) {
 		},
 	}
 
+	if tests.Postgres() {
+		// a server engine names an unnamed column and types every one
+		for i := range scenarios {
+			for j, c := range scenarios[i].ExpectedContent {
+				switch c {
+				case `"columns":[{"name":"1","type":"","nullable":true}]`,
+					`"columns":[{"name":"2","type":"","nullable":true}]`:
+					scenarios[i].ExpectedContent[j] = `"columns":[{"name":"?column?","type":"INT4","nullable":false}]`
+				case `"columns":[{"name":"id","type":"","nullable":true}]`:
+					scenarios[i].ExpectedContent[j] = `"columns":[{"name":"id","type":"TEXT","nullable":false}]`
+				}
+			}
+		}
+	}
+
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}

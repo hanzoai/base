@@ -4,9 +4,14 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/hanzoai/dbx"
+	"github.com/hanzoai/orm/dialect"
 )
+
+// savepoints names the nested transactions of an engine that has them.
+var savepoints atomic.Int64
 
 // RunInTransaction wraps fn into a transaction for the regular app database.
 //
@@ -26,7 +31,26 @@ func (app *BaseApp) runInTransaction(db dbx.Builder, fn func(txApp App) error, i
 	switch txOrDB := db.(type) {
 	case *dbx.Tx:
 		// run as part of the already existing transaction
-		return fn(app)
+		if _, local := app.Dialect().(dialect.SQLite); local {
+			return fn(app)
+		}
+		// PostgreSQL aborts the whole transaction at the first failed statement,
+		// so a nested call whose error the caller handles would leave the outer
+		// one unusable. A savepoint is the nested transaction: its failure rolls
+		// back its own statements and nothing else.
+		name := fmt.Sprintf("hz_sp_%d", savepoints.Add(1))
+		if _, err := txOrDB.NewQuery("SAVEPOINT " + name).Execute(); err != nil {
+			return err
+		}
+		if err := fn(app); err != nil {
+			if _, rerr := txOrDB.NewQuery("ROLLBACK TO SAVEPOINT " + name).Execute(); rerr != nil {
+				return errors.Join(err, rerr)
+			}
+			_, _ = txOrDB.NewQuery("RELEASE SAVEPOINT " + name).Execute()
+			return err
+		}
+		_, err := txOrDB.NewQuery("RELEASE SAVEPOINT " + name).Execute()
+		return err
 	case *dbx.DB:
 		// an engine that rolls a transaction back for conflicting with a
 		// concurrent one is asking for that transaction, and so for fn, to run

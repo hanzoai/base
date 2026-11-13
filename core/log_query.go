@@ -46,7 +46,8 @@ func (app *BaseApp) LogsStats(expr dbx.Expression) ([]*LogsStatsItem, error) {
 
 	query := app.LogQuery().
 		Select("count(id) as total", LogHour+" as date").
-		GroupBy("date")
+		GroupBy("date").
+		OrderBy("date ASC") // a grouped read has no order of its own on a server engine
 
 	if expr != nil {
 		query.AndWhere(expr)

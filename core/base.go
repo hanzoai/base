@@ -103,6 +103,12 @@ type BaseAppConfig struct {
 	// which the caller closes.
 	Files func() (*filesystem.System, error)
 
+	// BackupFiles, when set, opens the filesystem backups are kept in, in
+	// place of the instance's backup S3 settings or the local backups
+	// directory: the same contract as Files, for a host that keeps no state on
+	// its own disk.
+	BackupFiles func() (*filesystem.System, error)
+
 	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
 	// When set, per-org bases is automatically enabled and per-org databases
 	// are encrypted with HKDF-derived keys.
@@ -873,6 +879,10 @@ func (app *BaseApp) NewFilesystem() (*filesystem.System, error) {
 // NB! Make sure to call Close() on the returned result
 // after you are done working with it.
 func (app *BaseApp) NewBackupsFilesystem() (*filesystem.System, error) {
+	if app.config.BackupFiles != nil {
+		return app.config.BackupFiles()
+	}
+
 	if app.settings != nil && app.settings.Backups.S3.Enabled {
 		return filesystem.NewS3(
 			app.settings.Backups.S3.Bucket,
@@ -1537,7 +1547,7 @@ func (app *BaseApp) registerBaseHooks() {
 			}
 		}
 
-		_, execErr := app.NonconcurrentDB().NewQuery(app.Dialect().Optimize()).Execute()
+		execErr := optimize(app, app.NonconcurrentDB())
 		if execErr != nil {
 			app.Logger().Warn("Failed to refresh statistics", "error", execErr.Error())
 		}
