@@ -1,6 +1,7 @@
 package base
 
 import (
+	"database/sql"
 	"io"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"github.com/hanzoai/base/cmd"
 	"github.com/hanzoai/base/core"
 	"github.com/hanzoai/base/plugins/zap"
+	"github.com/hanzoai/base/tools/filesystem"
 	"github.com/hanzoai/base/tools/list"
 	"github.com/hanzoai/base/tools/osutils"
 	"github.com/spf13/cobra"
@@ -73,6 +75,12 @@ type Config struct {
 	// running many tenants answers it per tenant.
 	DataDSN string
 	AuxDSN  string
+
+	// DataDB and AuxDB hand Base the PostgreSQL pool itself; see
+	// core.BaseAppConfig.
+	DataDB func() (*sql.DB, error)
+	AuxDB  func() (*sql.DB, error)
+	Files  func() (*filesystem.System, error)
 }
 
 // New creates a new Base instance with the default configuration.
@@ -159,6 +167,9 @@ func NewWithConfig(config Config) *Base {
 		DBConnect:        config.DBConnect,
 		DataDSN:          config.DataDSN,
 		AuxDSN:           config.AuxDSN,
+		DataDB:           config.DataDB,
+		AuxDB:            config.AuxDB,
+		Files:            config.Files,
 	})
 
 	// hide the default help command (allow only `--help` flag)

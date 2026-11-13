@@ -81,6 +81,28 @@ type BaseAppConfig struct {
 	// When set, overrides the file-path-based SQLite aux connection.
 	AuxDSN string
 
+	// DataDB and AuxDB, when set, open the PostgreSQL pool themselves instead
+	// of dialing DataDSN and AuxDSN. They exist for a host that already holds
+	// a pool discipline for its server (a connection budget shared by every
+	// tenant of the process, a schema per tenant): the host's pool is the one
+	// Base uses, so Base spends the host's connections and not a second set
+	// of its own. A pool the func returns is Base's to size and close, and
+	// each call must return a pool of its own (Base asks twice for each
+	// database, one for readers and one for the writer). The pool must run
+	// pgx in its describe-exec mode (PostgresDBConnect sets it): a collection
+	// changes the tables while the process runs, and a statement cached under
+	// the old shape fails against the new one.
+	DataDB func() (*sql.DB, error)
+	AuxDB  func() (*sql.DB, error)
+
+	// Files, when set, opens the filesystem the records' uploaded files live
+	// in, in place of the S3 settings of the instance or the local storage
+	// directory. A host that keeps no state on its own disk hands Base the
+	// store (and the credential for it, which then never sits in the
+	// instance's settings row). Each call returns a filesystem of its own,
+	// which the caller closes.
+	Files func() (*filesystem.System, error)
+
 	// MasterKey is the 32-byte master encryption key for per-org CEK derivation.
 	// When set, per-org bases is automatically enabled and per-org databases
 	// are encrypted with HKDF-derived keys.
@@ -826,6 +848,10 @@ func (app *BaseApp) NewMailClient() mailer.Mailer {
 // NB! Make sure to call Close() on the returned result
 // after you are done working with it.
 func (app *BaseApp) NewFilesystem() (*filesystem.System, error) {
+	if app.config.Files != nil {
+		return app.config.Files()
+	}
+
 	if app.settings != nil && app.settings.S3.Enabled {
 		return filesystem.NewS3(
 			app.settings.S3.Bucket,
@@ -1245,10 +1271,28 @@ func (app *BaseApp) OnBatchRequest() *hook.Hook[*BatchRequestEvent] {
 // Helpers
 // -------------------------------------------------------------------
 
+// placed adapts a host's pool to the connect func Base opens its databases
+// with. The pool is a PostgreSQL one: that is the only engine a host hands over.
+func placed(open func() (*sql.DB, error)) func() (*dbx.DB, error) {
+	return func() (*dbx.DB, error) {
+		db, err := open()
+		if err != nil {
+			return nil, err
+		}
+		if err := db.Ping(); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("failed to connect to PostgreSQL: %w", err)
+		}
+		return dbx.NewFromDB(db, "pgx"), nil
+	}
+}
+
 func (app *BaseApp) initDataDB() error {
 	var connectFunc func() (*dbx.DB, error)
 
-	if app.config.DataDSN != "" {
+	if app.config.DataDB != nil {
+		connectFunc = placed(app.config.DataDB)
+	} else if app.config.DataDSN != "" {
 		connectFunc = func() (*dbx.DB, error) {
 			return PostgresDBConnect(app.config.DataDSN)
 		}
@@ -1316,7 +1360,9 @@ func normalizeSQLLog(sql string) string {
 func (app *BaseApp) initAuxDB() error {
 	var connectFunc func() (*dbx.DB, error)
 
-	if app.config.AuxDSN != "" {
+	if app.config.AuxDB != nil {
+		connectFunc = placed(app.config.AuxDB)
+	} else if app.config.AuxDSN != "" {
 		connectFunc = func() (*dbx.DB, error) {
 			return PostgresDBConnect(app.config.AuxDSN)
 		}
