@@ -2,6 +2,8 @@
 
 # Base
 
+[![Open in Hanzo](https://hanzo.app/badges/open-in-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/base&ref=main&action=open) [![Edit with Hanzo](https://hanzo.app/badges/edit-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/base&ref=main&action=edit) [![Deploy with Hanzo](https://hanzo.app/badges/deploy-with-hanzo.svg)](https://hanzo.app/dev/open?repo=github.com/hanzoai/base&ref=main&action=deploy)
+
 Base is a backend in one Go binary: collections of records behind a REST API at
 `/v1`, with realtime updates, files, per-collection access rules and JavaScript
 hooks, stored in SQLite. Identity comes from Hanzo IAM, and with IAM on, each
