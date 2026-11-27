@@ -2938,7 +2938,7 @@
       }
     ],
     "indexes": [
-      "CREATE UNIQUE INDEX `idx_crm_favorites_user_target` ON `crm_favorites` (`user`, `object`, `record_id`) WHERE user != ''",
+      "CREATE UNIQUE INDEX `idx_crm_favorites_user_target` ON `crm_favorites` (`user`, `object`, `record_id`) WHERE [[user]] != ''",
       "CREATE INDEX `idx_crm_favorites_user_position` ON `crm_favorites` (`user`, `position`)"
     ]
   }
