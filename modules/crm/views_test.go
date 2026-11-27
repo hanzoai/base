@@ -127,3 +127,68 @@ func TestAReinstallTightensTheRulesItShipped(t *testing.T) {
 		t.Fatalf("a third install changed %v %v", again, err)
 	}
 }
+
+// A user's favorites are private to them: they can list, read, update and
+// delete their own pins, and cannot see or spoof another user's pins.
+func TestFavoritesArePerUser(t *testing.T) {
+	app := install(t)
+	iam := tests.NewIAM(t)
+	app.Store().Set(apis.StoreKeyExternalAuthOnly, true)
+	app.Store().Set(apis.StoreKeyJWKSURL, iam.URL)
+	mux := tests.Router(t, app)
+
+	person := func(name, role string) string {
+		return "Bearer " + iam.Token(t, jwt.MapClaims{"sub": "acme/" + name, "email": name + "@acme.test", "name": name,
+			"orgs": []any{map[string]any{"org": "acme", "role": role}}})
+	}
+	ann, bob := person("ann", "member"), person("bob", "member")
+
+	do := func(token, method, path, body string) (int, string) {
+		t.Helper()
+		var req *http.Request
+		if body == "" {
+			req = httptest.NewRequest(method, path, nil)
+		} else {
+			req = httptest.NewRequest(method, path, strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if token != "" {
+			req.Header.Set("Authorization", token)
+		}
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, req)
+		return w.Code, w.Body.String()
+	}
+
+	code, body := do(ann, http.MethodPost, "/v1/collections/crm_favorites/records", `{"object":"people","record_id":"rec1","label":"Ada","position":1}`)
+	if code != 200 {
+		t.Fatalf("ann creates favorite: %d %s", code, body)
+	}
+	var created struct{ Id string }
+	if err := json.Unmarshal([]byte(body), &created); err != nil || created.Id == "" {
+		t.Fatalf("no record id in %s", body)
+	}
+
+	// Ann sees her own pin; Bob sees 0; Bob cannot read/patch/delete Ann's pin or spoof another user.
+	for _, tc := range []struct {
+		name, token, method, path, body string
+		status                          int
+		has                             string
+	}{
+		{"owner lists own favorite", ann, http.MethodGet, "/v1/collections/crm_favorites/records", "", 200, `"totalItems":1`},
+		{"other member sees none", bob, http.MethodGet, "/v1/collections/crm_favorites/records", "", 200, `"totalItems":0`},
+		{"other member cannot read", bob, http.MethodGet, "/v1/collections/crm_favorites/records/" + created.Id, "", 404, ""},
+		{"other member cannot update", bob, http.MethodPatch, "/v1/collections/crm_favorites/records/" + created.Id, `{"label":"Hijacked"}`, 404, ""},
+		{"other member cannot delete", bob, http.MethodDelete, "/v1/collections/crm_favorites/records/" + created.Id, "", 404, ""},
+		{"cannot spoof another user on create", bob, http.MethodPost, "/v1/collections/crm_favorites/records", `{"user":"acme/ann","object":"people","record_id":"rec2"}`, 400, ""},
+		{"owner can update own favorite", ann, http.MethodPatch, "/v1/collections/crm_favorites/records/" + created.Id, `{"label":"Ada L."}`, 200, `"label":"Ada L."`},
+		{"owner can delete own favorite", ann, http.MethodDelete, "/v1/collections/crm_favorites/records/" + created.Id, "", 204, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code, body := do(tc.token, tc.method, tc.path, tc.body)
+			if code != tc.status || (tc.has != "" && !strings.Contains(body, tc.has)) {
+				t.Fatalf("got %d %s, want status %d containing %q", code, body, tc.status, tc.has)
+			}
+		})
+	}
+}

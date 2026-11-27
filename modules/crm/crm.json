@@ -133,12 +133,35 @@
         "position": 10
       },
       {
+        "name": "tags",
+        "type": "json",
+        "label": "Tags",
+        "icon": "IconTags",
+        "maxSize": 65536,
+        "position": 11
+      },
+      {
+        "name": "favorite",
+        "type": "bool",
+        "label": "Favorite",
+        "icon": "IconStar",
+        "position": 12
+      },
+      {
+        "name": "enrichment",
+        "type": "json",
+        "label": "Enrichment",
+        "icon": "IconSparkles",
+        "maxSize": 262144,
+        "position": 13
+      },
+      {
         "name": "created_by",
         "type": "actor",
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 11
+        "position": 14
       },
       {
         "name": "updated_by",
@@ -147,7 +170,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 12
+        "position": 15
       },
       {
         "name": "created",
@@ -155,7 +178,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 13
+        "position": 16
       },
       {
         "name": "updated",
@@ -164,13 +187,14 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 14
+        "position": 17
       }
     ],
     "indexes": [
       "CREATE INDEX `idx_companies_name` ON `companies` (`name`)",
       "CREATE INDEX `idx_companies_type` ON `companies` (`type`)",
-      "CREATE INDEX `idx_companies_created` ON `companies` (`created`)"
+      "CREATE INDEX `idx_companies_created` ON `companies` (`created`)",
+      "CREATE INDEX `idx_companies_favorite` ON `companies` (`favorite`)"
     ]
   },
   {
@@ -440,12 +464,35 @@
         "position": 16
       },
       {
+        "name": "tags",
+        "type": "json",
+        "label": "Tags",
+        "icon": "IconTags",
+        "maxSize": 65536,
+        "position": 17
+      },
+      {
+        "name": "favorite",
+        "type": "bool",
+        "label": "Favorite",
+        "icon": "IconStar",
+        "position": 18
+      },
+      {
+        "name": "enrichment",
+        "type": "json",
+        "label": "Enrichment",
+        "icon": "IconSparkles",
+        "maxSize": 262144,
+        "position": 19
+      },
+      {
         "name": "created_by",
         "type": "actor",
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 17
+        "position": 20
       },
       {
         "name": "updated_by",
@@ -454,7 +501,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 18
+        "position": 21
       },
       {
         "name": "created",
@@ -462,7 +509,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 19
+        "position": 22
       },
       {
         "name": "updated",
@@ -471,7 +518,7 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 20
+        "position": 23
       }
     ],
     "indexes": [
@@ -481,7 +528,8 @@
       "CREATE INDEX `idx_people_lifecycle` ON `people` (`lifecycle`)",
       "CREATE INDEX `idx_people_type` ON `people` (`type`)",
       "CREATE INDEX `idx_people_outreach` ON `people` (`outreach`)",
-      "CREATE INDEX `idx_people_contacted` ON `people` (`contacted`)"
+      "CREATE INDEX `idx_people_contacted` ON `people` (`contacted`)",
+      "CREATE INDEX `idx_people_favorite` ON `people` (`favorite`)"
     ]
   },
   {
@@ -680,12 +728,29 @@
         "position": 11
       },
       {
+        "name": "probability",
+        "type": "number",
+        "label": "Probability",
+        "icon": "IconPercentage",
+        "min": 0,
+        "max": 100,
+        "position": 12
+      },
+      {
+        "name": "tags",
+        "type": "json",
+        "label": "Tags",
+        "icon": "IconTags",
+        "maxSize": 65536,
+        "position": 13
+      },
+      {
         "name": "created_by",
         "type": "actor",
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 12
+        "position": 14
       },
       {
         "name": "updated_by",
@@ -694,7 +759,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 13
+        "position": 15
       },
       {
         "name": "created",
@@ -702,7 +767,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 14
+        "position": 16
       },
       {
         "name": "updated",
@@ -711,7 +776,7 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 15
+        "position": 17
       }
     ],
     "indexes": [
@@ -1738,12 +1803,44 @@
         "position": 14
       },
       {
+        "name": "thread_id",
+        "type": "text",
+        "label": "Thread id",
+        "icon": "IconMessageDots",
+        "max": 255,
+        "position": 15
+      },
+      {
+        "name": "message_id",
+        "type": "text",
+        "label": "Message id",
+        "icon": "IconMailCode",
+        "max": 512,
+        "position": 16
+      },
+      {
+        "name": "in_reply_to",
+        "type": "text",
+        "label": "In reply to",
+        "icon": "IconArrowBackUp",
+        "max": 512,
+        "position": 17
+      },
+      {
+        "name": "participants",
+        "type": "json",
+        "label": "Participants",
+        "icon": "IconUsers",
+        "maxSize": 65536,
+        "position": 18
+      },
+      {
         "name": "created_by",
         "type": "actor",
         "label": "Created by",
         "icon": "IconCreativeCommonsBy",
         "onCreate": true,
-        "position": 15
+        "position": 19
       },
       {
         "name": "updated_by",
@@ -1752,7 +1849,7 @@
         "icon": "IconUserEdit",
         "onCreate": true,
         "onUpdate": true,
-        "position": 16
+        "position": 20
       },
       {
         "name": "created",
@@ -1760,7 +1857,7 @@
         "label": "Created",
         "icon": "IconCalendarPlus",
         "onCreate": true,
-        "position": 17
+        "position": 21
       },
       {
         "name": "updated",
@@ -1769,13 +1866,15 @@
         "icon": "IconCalendarClock",
         "onCreate": true,
         "onUpdate": true,
-        "position": 18
+        "position": 22
       }
     ],
     "indexes": [
       "CREATE UNIQUE INDEX `idx_activities_source_id` ON `activities` (`source_id`) WHERE source_id != ''",
       "CREATE INDEX `idx_activities_person_at` ON `activities` (`person`, `at`)",
-      "CREATE INDEX `idx_activities_kind_at` ON `activities` (`kind`, `at`)"
+      "CREATE INDEX `idx_activities_kind_at` ON `activities` (`kind`, `at`)",
+      "CREATE INDEX `idx_activities_thread_id` ON `activities` (`thread_id`) WHERE thread_id != ''",
+      "CREATE INDEX `idx_activities_message_id` ON `activities` (`message_id`) WHERE message_id != ''"
     ]
   },
   {
@@ -2250,10 +2349,18 @@
     "updateRule": "created_by.id = @request.auth.id || (visibility != \"private\" && @request.auth.admin = true)",
     "deleteRule": "created_by.id = @request.auth.id || (visibility != \"private\" && @request.auth.admin = true)",
     "replaces": {
-      "listRule": ["@request.auth.id != \"\""],
-      "viewRule": ["@request.auth.id != \"\""],
-      "updateRule": ["created_by.id = @request.auth.id || @request.auth.admin = true"],
-      "deleteRule": ["created_by.id = @request.auth.id || @request.auth.admin = true"]
+      "listRule": [
+        "@request.auth.id != \"\""
+      ],
+      "viewRule": [
+        "@request.auth.id != \"\""
+      ],
+      "updateRule": [
+        "created_by.id = @request.auth.id || @request.auth.admin = true"
+      ],
+      "deleteRule": [
+        "created_by.id = @request.auth.id || @request.auth.admin = true"
+      ]
     },
     "fields": [
       {
@@ -2515,6 +2622,324 @@
     ],
     "indexes": [
       "CREATE INDEX `idx_views_object` ON `views` (`object`)"
+    ]
+  },
+  {
+    "name": "crm_workflows",
+    "type": "base",
+    "label": "Workflow",
+    "plural": "Workflows",
+    "icon": "IconSettingsAutomation",
+    "description": "Record-triggered automations that run steps when CRM records change.",
+    "listRule": "@request.auth.id != \"\"",
+    "viewRule": "@request.auth.id != \"\"",
+    "createRule": "@request.auth.id != \"\"",
+    "updateRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "deleteRule": "created_by.id = @request.auth.id || @request.auth.admin = true",
+    "fields": [
+      {
+        "name": "name",
+        "type": "text",
+        "label": "Name",
+        "icon": "IconSettingsAutomation",
+        "required": true,
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "description",
+        "type": "text",
+        "label": "Description",
+        "icon": "IconFileText",
+        "max": 1000,
+        "position": 2
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "label": "Enabled",
+        "icon": "IconToggleRight",
+        "position": 3
+      },
+      {
+        "name": "trigger_object",
+        "type": "select",
+        "label": "Trigger object",
+        "maxSelect": 1,
+        "values": [
+          "people",
+          "companies",
+          "opportunities",
+          "tasks",
+          "notes",
+          "activities",
+          "candidates"
+        ],
+        "options": [
+          {
+            "value": "people",
+            "label": "People",
+            "color": "blue",
+            "position": 0
+          },
+          {
+            "value": "companies",
+            "label": "Companies",
+            "color": "green",
+            "position": 1
+          },
+          {
+            "value": "opportunities",
+            "label": "Opportunities",
+            "color": "purple",
+            "position": 2
+          },
+          {
+            "value": "tasks",
+            "label": "Tasks",
+            "color": "sky",
+            "position": 3
+          },
+          {
+            "value": "notes",
+            "label": "Notes",
+            "color": "yellow",
+            "position": 4
+          },
+          {
+            "value": "activities",
+            "label": "Activities",
+            "color": "orange",
+            "position": 5
+          },
+          {
+            "value": "candidates",
+            "label": "Candidates",
+            "color": "turquoise",
+            "position": 6
+          }
+        ],
+        "icon": "IconDatabase",
+        "position": 4
+      },
+      {
+        "name": "trigger_event",
+        "type": "select",
+        "label": "Trigger event",
+        "maxSelect": 1,
+        "values": [
+          "created",
+          "updated",
+          "stage_changed",
+          "email_replied",
+          "manual"
+        ],
+        "options": [
+          {
+            "value": "created",
+            "label": "Created",
+            "color": "green",
+            "position": 0
+          },
+          {
+            "value": "updated",
+            "label": "Updated",
+            "color": "blue",
+            "position": 1
+          },
+          {
+            "value": "stage_changed",
+            "label": "Stage changed",
+            "color": "purple",
+            "position": 2
+          },
+          {
+            "value": "email_replied",
+            "label": "Email replied",
+            "color": "turquoise",
+            "position": 3
+          },
+          {
+            "value": "manual",
+            "label": "Manual",
+            "color": "gray",
+            "position": 4
+          }
+        ],
+        "icon": "IconBolt",
+        "position": 5
+      },
+      {
+        "name": "trigger_filter",
+        "type": "json",
+        "label": "Trigger filter",
+        "icon": "IconFilterCog",
+        "maxSize": 65536,
+        "position": 6
+      },
+      {
+        "name": "steps",
+        "type": "json",
+        "label": "Steps",
+        "icon": "IconListDetails",
+        "maxSize": 262144,
+        "position": 7
+      },
+      {
+        "name": "last_run_at",
+        "type": "date",
+        "label": "Last run",
+        "icon": "IconCalendarTime",
+        "position": 8
+      },
+      {
+        "name": "run_count",
+        "type": "number",
+        "label": "Run count",
+        "icon": "IconHash",
+        "onlyInt": true,
+        "min": 0,
+        "position": 9
+      },
+      {
+        "name": "owner",
+        "type": "text",
+        "label": "Owner",
+        "icon": "IconUserCircle",
+        "max": 100,
+        "position": 10
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 11
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 12
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 13
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 14
+      }
+    ],
+    "indexes": [
+      "CREATE INDEX `idx_crm_workflows_trigger` ON `crm_workflows` (`enabled`, `trigger_object`, `trigger_event`)"
+    ]
+  },
+  {
+    "name": "crm_favorites",
+    "type": "base",
+    "label": "Favorite",
+    "plural": "Favorites",
+    "icon": "IconStar",
+    "description": "Records and views pinned by a person for quick access.",
+    "listRule": "@request.auth.id != \"\" && (user = @request.auth.id || (user = \"\" && created_by.id = @request.auth.id))",
+    "viewRule": "@request.auth.id != \"\" && (user = @request.auth.id || (user = \"\" && created_by.id = @request.auth.id))",
+    "createRule": "@request.auth.id != \"\" && (user = \"\" || user = @request.auth.id)",
+    "updateRule": "user = @request.auth.id || (user = \"\" && created_by.id = @request.auth.id)",
+    "deleteRule": "user = @request.auth.id || (user = \"\" && created_by.id = @request.auth.id)",
+    "fields": [
+      {
+        "name": "user",
+        "type": "text",
+        "label": "User",
+        "icon": "IconUser",
+        "max": 255,
+        "position": 1
+      },
+      {
+        "name": "object",
+        "type": "text",
+        "label": "Object",
+        "icon": "IconDatabase",
+        "required": true,
+        "max": 255,
+        "position": 2
+      },
+      {
+        "name": "record_id",
+        "type": "text",
+        "label": "Record id",
+        "icon": "IconHash",
+        "required": true,
+        "max": 255,
+        "position": 3
+      },
+      {
+        "name": "label",
+        "type": "text",
+        "label": "Label",
+        "icon": "IconTag",
+        "max": 255,
+        "position": 4
+      },
+      {
+        "name": "position",
+        "type": "number",
+        "label": "Position",
+        "icon": "IconHierarchy",
+        "position": 5
+      },
+      {
+        "name": "created_by",
+        "type": "actor",
+        "label": "Created by",
+        "icon": "IconCreativeCommonsBy",
+        "onCreate": true,
+        "position": 6
+      },
+      {
+        "name": "updated_by",
+        "type": "actor",
+        "label": "Updated by",
+        "icon": "IconUserEdit",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 7
+      },
+      {
+        "name": "created",
+        "type": "autodate",
+        "label": "Created",
+        "icon": "IconCalendarPlus",
+        "onCreate": true,
+        "position": 8
+      },
+      {
+        "name": "updated",
+        "type": "autodate",
+        "label": "Last update",
+        "icon": "IconCalendarClock",
+        "onCreate": true,
+        "onUpdate": true,
+        "position": 9
+      }
+    ],
+    "indexes": [
+      "CREATE UNIQUE INDEX `idx_crm_favorites_user_target` ON `crm_favorites` (`user`, `object`, `record_id`) WHERE [[user]] != ''",
+      "CREATE INDEX `idx_crm_favorites_user_position` ON `crm_favorites` (`user`, `position`)"
     ]
   }
 ]

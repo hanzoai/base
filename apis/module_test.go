@@ -81,7 +81,7 @@ func TestModuleInstall(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"module":"crm"`,
-				`"created":["companies","people","opportunities","candidates","applications","segments","lists","list_members","activities","notes","tasks","attachments","views"]`,
+				`"created":["companies","people","opportunities","candidates","applications","segments","lists","list_members","activities","notes","tasks","attachments","views","crm_workflows","crm_favorites"]`,
 				`"grown":{}`,
 				`"kept":{}`,
 			},

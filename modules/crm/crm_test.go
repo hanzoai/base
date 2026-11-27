@@ -14,6 +14,7 @@ import (
 var collections = []string{
 	"companies", "people", "opportunities", "candidates", "applications", "segments",
 	"lists", "list_members", "activities", "notes", "tasks", "attachments", "views",
+	"crm_workflows", "crm_favorites",
 }
 
 func install(t *testing.T) *tests.TestApp {
@@ -288,6 +289,260 @@ func TestSegmentsAndViewsHoldTheirFilters(t *testing.T) {
 		}
 		if !strings.Contains(got.GetString("where"), `"lifecycle"`) {
 			t.Fatalf("%s lost its filter: %s", r.Collection().Name, got.GetString("where"))
+		}
+	}
+}
+
+func TestEnrichmentTagsFavoritesAndOpportunityProbability(t *testing.T) {
+	app := install(t)
+
+	acme := save(t, app, "companies", map[string]any{
+		"name":     "Acme AI",
+		"tags":     []any{"enterprise", "ai"},
+		"favorite": true,
+		"enrichment": map[string]any{
+			"source":      "clearbit",
+			"enriched_at": "2026-11-27T08:00:00Z",
+			"confidence":  0.94,
+		},
+	})
+	ada := save(t, app, "people", map[string]any{
+		"name":     map[string]any{"firstName": "Ada", "lastName": "Lovelace"},
+		"company":  acme.Id,
+		"tags":     []any{"champion", "vip"},
+		"favorite": true,
+		"enrichment": map[string]any{
+			"source":      "linkedin",
+			"enriched_at": "2026-11-27T08:05:00Z",
+		},
+	})
+	opp := save(t, app, "opportunities", map[string]any{
+		"name":        "Acme Enterprise",
+		"pipeline":    "sales",
+		"stage":       "proposal",
+		"company":     acme.Id,
+		"contact":     ada.Id,
+		"probability": 75,
+		"tags":        []any{"q4", "priority"},
+	})
+
+	if !acme.GetBool("favorite") || !strings.Contains(acme.GetString("enrichment"), `"clearbit"`) || !strings.Contains(acme.GetString("tags"), `"enterprise"`) {
+		t.Fatalf("companies parity fields not persisted: fav=%v tags=%s enrich=%s", acme.GetBool("favorite"), acme.GetString("tags"), acme.GetString("enrichment"))
+	}
+	if !ada.GetBool("favorite") || !strings.Contains(ada.GetString("enrichment"), `"linkedin"`) || !strings.Contains(ada.GetString("tags"), `"vip"`) {
+		t.Fatalf("people parity fields not persisted: fav=%v tags=%s enrich=%s", ada.GetBool("favorite"), ada.GetString("tags"), ada.GetString("enrichment"))
+	}
+	if opp.GetFloat("probability") != 75 || !strings.Contains(opp.GetString("tags"), `"priority"`) {
+		t.Fatalf("opportunities parity fields not persisted: prob=%v tags=%s", opp.GetFloat("probability"), opp.GetString("tags"))
+	}
+
+	// probability must stay within [0, 100]
+	for _, invalid := range []float64{-1, 101} {
+		bad := core.NewRecord(mustCollection(t, app, "opportunities"))
+		bad.Load(map[string]any{"name": "Bad prob", "probability": invalid})
+		if err := app.Save(bad); err == nil {
+			t.Fatalf("opportunity probability %v must be refused", invalid)
+		}
+	}
+}
+
+func TestActivityEmailThreadingFields(t *testing.T) {
+	app := install(t)
+
+	ada := save(t, app, "people", map[string]any{"name": map[string]any{"firstName": "Ada"}})
+	first := save(t, app, "activities", map[string]any{
+		"kind":       "email",
+		"direction":  "out",
+		"source_id":  "gmail:msg-100",
+		"thread_id":  "gmail:thr-42",
+		"message_id": "<msg-100@acme.test>",
+		"participants": []any{
+			map[string]any{"role": "from", "email": "sales@hanzo.ai"},
+			map[string]any{"role": "to", "email": "ada@acme.test"},
+		},
+		"subject": "Intro",
+		"person":  ada.Id,
+	})
+	reply := save(t, app, "activities", map[string]any{
+		"kind":        "email",
+		"direction":   "in",
+		"source_id":   "gmail:msg-101",
+		"thread_id":   "gmail:thr-42",
+		"message_id":  "<msg-101@acme.test>",
+		"in_reply_to": "<msg-100@acme.test>",
+		"participants": []any{
+			map[string]any{"role": "from", "email": "ada@acme.test"},
+			map[string]any{"role": "to", "email": "sales@hanzo.ai"},
+		},
+		"subject": "Re: Intro",
+		"person":  ada.Id,
+	})
+
+	thread, err := app.FindRecordsByFilter("activities", `thread_id = "gmail:thr-42"`, "created", 0, 0)
+	if err != nil || len(thread) != 2 {
+		t.Fatalf("thread lookup failed: %d %v", len(thread), err)
+	}
+	if thread[0].Id != first.Id || thread[1].Id != reply.Id {
+		t.Fatalf("unexpected thread order: %s, %s", thread[0].Id, thread[1].Id)
+	}
+	if thread[1].GetString("in_reply_to") != "<msg-100@acme.test>" || !strings.Contains(thread[1].GetString("participants"), `"ada@acme.test"`) {
+		t.Fatalf("reply threading fields missing: in_reply_to=%q participants=%s", thread[1].GetString("in_reply_to"), thread[1].GetString("participants"))
+	}
+}
+
+func TestWorkflowsAndFavorites(t *testing.T) {
+	app := install(t)
+
+	wf := save(t, app, "crm_workflows", map[string]any{
+		"name":           "Auto-create follow-up task",
+		"description":    "Creates a task whenever a deal moves to proposal.",
+		"enabled":        true,
+		"trigger_object": "opportunities",
+		"trigger_event":  "stage_changed",
+		"trigger_filter": map[string]any{"field": "stage", "op": "is", "value": []any{"proposal"}},
+		"steps":          []any{map[string]any{"action": "create_task", "title": "Send pricing deck"}},
+		"last_run_at":    "2026-11-27 08:00:00.000Z",
+		"run_count":      3,
+		"owner":          "acme/ann",
+	})
+	if !wf.GetBool("enabled") || wf.GetInt("run_count") != 3 || wf.GetString("trigger_event") != "stage_changed" {
+		t.Fatalf("workflow fields mismatch: %+v", wf.PublicExport())
+	}
+
+	// invalid trigger_object or trigger_event must be rejected
+	badObj := core.NewRecord(mustCollection(t, app, "crm_workflows"))
+	badObj.Load(map[string]any{"name": "Bad", "trigger_object": "invoices"})
+	if err := app.Save(badObj); err == nil {
+		t.Fatal("unknown trigger_object must be refused")
+	}
+	badEvent := core.NewRecord(mustCollection(t, app, "crm_workflows"))
+	badEvent.Load(map[string]any{"name": "Bad", "trigger_event": "exploded"})
+	if err := app.Save(badEvent); err == nil {
+		t.Fatal("unknown trigger_event must be refused")
+	}
+	badCount := core.NewRecord(mustCollection(t, app, "crm_workflows"))
+	badCount.Load(map[string]any{"name": "Bad", "run_count": -1})
+	if err := app.Save(badCount); err == nil {
+		t.Fatal("negative run_count must be refused")
+	}
+
+	// crm_favorites: pin a record per user, enforce uniqueness per (user, object, record_id)
+	ada := save(t, app, "people", map[string]any{"name": map[string]any{"firstName": "Ada"}})
+	fav := save(t, app, "crm_favorites", map[string]any{
+		"user":      "acme/ann",
+		"object":    "people",
+		"record_id": ada.Id,
+		"label":     "Ada Lovelace",
+		"position":  1,
+	})
+	if fav.GetString("label") != "Ada Lovelace" || fav.GetInt("position") != 1 {
+		t.Fatalf("favorite fields mismatch: %+v", fav.PublicExport())
+	}
+
+	dupFav := core.NewRecord(mustCollection(t, app, "crm_favorites"))
+	dupFav.Load(map[string]any{"user": "acme/ann", "object": "people", "record_id": ada.Id})
+	if err := app.Save(dupFav); err == nil {
+		t.Fatal("duplicate favorite for the same user/object/record_id must be refused")
+	}
+
+	// another user can pin the same record
+	save(t, app, "crm_favorites", map[string]any{
+		"user":      "acme/bob",
+		"object":    "people",
+		"record_id": ada.Id,
+		"label":     "Ada",
+		"position":  1,
+	})
+}
+
+func TestAdditiveGrowParityFields(t *testing.T) {
+	app := install(t)
+
+	// Simulate an existing installation created before Twenty parity additions.
+	for _, tc := range []struct {
+		coll    string
+		fields  []string
+		indexes []string
+	}{
+		{"companies", []string{"enrichment", "tags", "favorite"}, []string{"idx_companies_favorite"}},
+		{"people", []string{"enrichment", "tags", "favorite"}, []string{"idx_people_favorite"}},
+		{"activities", []string{"thread_id", "message_id", "in_reply_to", "participants"}, []string{"idx_activities_thread_id", "idx_activities_message_id"}},
+		{"opportunities", []string{"probability", "tags"}, nil},
+	} {
+		c := mustCollection(t, app, tc.coll)
+		for _, f := range tc.fields {
+			c.Fields.RemoveByName(f)
+		}
+		for _, idx := range tc.indexes {
+			c.RemoveIndex(idx)
+		}
+		if err := app.Save(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"crm_workflows", "crm_favorites"} {
+		if err := app.Delete(mustCollection(t, app, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	g, err := modules.Install(app, crm.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(g.Created, ",") != "crm_workflows,crm_favorites" {
+		t.Fatalf("expected new collections to be created, got %v", g.Created)
+	}
+	for coll, want := range map[string][]string{
+		"companies":     {"tags", "favorite", "enrichment", "index:idx_companies_favorite"},
+		"people":        {"tags", "favorite", "enrichment", "index:idx_people_favorite"},
+		"activities":    {"thread_id", "message_id", "in_reply_to", "participants", "index:idx_activities_thread_id", "index:idx_activities_message_id"},
+		"opportunities": {"probability", "tags"},
+	} {
+		grown := "," + strings.Join(g.Grown[coll], ",") + ","
+		for _, item := range want {
+			if !strings.Contains(grown, ","+item+",") {
+				t.Errorf("%s did not grow %s: %s", coll, item, grown)
+			}
+		}
+	}
+}
+
+func TestSeedStarterViewsIsIdempotent(t *testing.T) {
+	app := install(t)
+
+	// Installing the module alone creates zero view records (preserving views_test.go expectations).
+	before, err := app.FindRecordsByFilter("views", "", "", 0, 0)
+	if err != nil || len(before) != 0 {
+		t.Fatalf("expected 0 views after fresh install, got %d %v", len(before), err)
+	}
+
+	n, err := crm.SeedStarterViews(app)
+	if err != nil {
+		t.Fatalf("SeedStarterViews: %v", err)
+	}
+	if n != len(crm.StarterViews) {
+		t.Fatalf("seeded %d views, want %d", n, len(crm.StarterViews))
+	}
+
+	// Second seed must be a no-op.
+	n2, err := crm.SeedStarterViews(app)
+	if err != nil || n2 != 0 {
+		t.Fatalf("second SeedStarterViews created %d (err=%v), want 0", n2, err)
+	}
+
+	// Verify table, kanban, calendar, and list view types are all present.
+	views, err := app.FindRecordsByFilter("views", "", "", 0, 0)
+	if err != nil || len(views) != len(crm.StarterViews) {
+		t.Fatalf("views count = %d, err = %v", len(views), err)
+	}
+	seenTypes := map[string]bool{}
+	for _, v := range views {
+		seenTypes[v.GetString("type")] = true
+	}
+	for _, wantType := range []string{"table", "kanban", "calendar", "list"} {
+		if !seenTypes[wantType] {
+			t.Errorf("starter views missing type %q", wantType)
 		}
 	}
 }

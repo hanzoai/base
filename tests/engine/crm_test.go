@@ -22,7 +22,7 @@ func TestCRM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("install: %v", err)
 	}
-	if len(growth.Created) != 13 {
+	if len(growth.Created) != 15 {
 		t.Fatalf("created %v", growth.Created)
 	}
 	if again, err := modules.Install(app, "crm"); err != nil || len(again.Created)+len(again.Grown) != 0 {
